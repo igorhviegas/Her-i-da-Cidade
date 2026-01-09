@@ -1,5 +1,7 @@
 import React from "react";
 
+const spider = "/images/spider.PNG";
+
 export const Footer: React.FC = () => {
   const socialLinks = [
     {
@@ -48,7 +50,7 @@ export const Footer: React.FC = () => {
             <div className="flex items-center gap-2 mb-8">
               <div className="w-10 h-10 bg-[#0072d2] rounded-full flex items-center justify-center shadow-lg shadow-blue-600/10 overflow-hidden">
                 <img
-                  src="/spider.PNG"
+                  src={spider}
                   alt="logo"
                   className="w-6 h-6 object-contain"
                 />
