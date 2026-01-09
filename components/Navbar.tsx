@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const spider = '/images/spider.PNG';
+const spider = "/images/spider.PNG";
 
 export const Navbar: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
