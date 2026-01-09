@@ -1,0 +1,8 @@
+{
+  "name": "O Herói da Cidade",
+  "description": "Uma landing page premium para serviços de heróis e personagens, com design inspirado no Disney Plus.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
