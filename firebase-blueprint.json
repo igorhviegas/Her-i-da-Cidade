@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "Service": {
+      "title": "Service",
+      "description": "Serviço oferecido pelo Herói da Cidade (aparições, chamadas, vídeos).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "slug": { "type": "string", "maxLength": 100 },
+        "shortDescription": { "type": "string", "maxLength": 250 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "price": { "type": "string", "maxLength": 50 },
+        "promotionalPrice": { "type": "string", "maxLength": 50 },
+        "duration": { "type": "string", "maxLength": 50 },
+        "image": { "type": "string", "maxLength": 500 },
+        "category": { "type": "string", "maxLength": 50 },
+        "active": { "type": "boolean" },
+        "order": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "price", "description", "image", "active", "order"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Registro de permissão administrativa para usuários autenticados.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 150 },
+        "role": { "type": "string", "enum": ["superadmin", "admin", "editor"] },
+        "active": { "type": "boolean" },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "role", "active", "createdAt"]
+    },
+    "Video": {
+      "title": "Video",
+      "description": "Vídeo educativo ou de entretenimento publicado no Instagram pelo Herói da Cidade.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string", "maxLength": 150 },
+        "instagramUrl": { "type": "string", "maxLength": 500 },
+        "caption": { "type": "string", "maxLength": 2000 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "thumbnail": { "type": "string", "maxLength": 500 },
+        "categories": { "type": "array" },
+        "tags": { "type": "array" },
+        "topics": { "type": "array" },
+        "ageRange": { "type": "string", "maxLength": 50 },
+        "keywords": { "type": "array" },
+        "publishedAt": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["title", "instagramUrl", "thumbnail", "active"]
+    }
+  },
+  "firestore": {
+    "/services/{serviceId}": {
+      "schema": { "$ref": "#/entities/Service" },
+      "description": "Catálogo de serviços públicos exibidos no site e gerenciáveis por administradores."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Tabela de autorização de administradores do sistema."
+    },
+    "/videos/{videoId}": {
+      "schema": { "$ref": "#/entities/Video" },
+      "description": "Catálogo de vídeos do Instagram com metadados para busca e categorização futura."
+    }
+  }
+}

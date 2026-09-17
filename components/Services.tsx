@@ -1,10 +1,14 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { SERVICES } from "../constants";
 import { ServiceCard } from "./ServiceCard";
+import { useServices } from "../services/servicesService";
 
 export const Services: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const { services: servicesList, loading } = useServices({
+    onlyActive: true,
+    realTime: true,
+  });
 
   const handleScroll = useCallback(() => {
     const container = containerRef.current;
@@ -68,18 +72,33 @@ export const Services: React.FC = () => {
         ref={containerRef}
         className="flex overflow-x-auto pb-8 gap-4 snap-x snap-mandatory md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 md:gap-6 md:overflow-visible md:pb-0 scrollbar-hide"
       >
-        {SERVICES.map((service) => (
-          <div
-            key={service.id}
-            className="min-w-[85vw] xs:min-w-[45vw] md:min-w-0 snap-start snap-always"
-          >
-            <ServiceCard service={service} />
-          </div>
-        ))}
+        {loading && servicesList.length === 0 ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="min-w-[85vw] xs:min-w-[45vw] md:min-w-0 snap-start snap-always"
+            >
+              <div className="relative aspect-[2/3] rounded-lg overflow-hidden border-2 border-white/10 bg-white/5 animate-pulse flex flex-col justify-end p-5">
+                <div className="w-16 h-3 bg-white/10 rounded mb-2" />
+                <div className="w-3/4 h-5 bg-white/20 rounded mb-2" />
+                <div className="w-1/2 h-3 bg-white/10 rounded" />
+              </div>
+            </div>
+          ))
+        ) : (
+          servicesList.map((service) => (
+            <div
+              key={service.id}
+              className="min-w-[85vw] xs:min-w-[45vw] md:min-w-0 snap-start snap-always"
+            >
+              <ServiceCard service={service} />
+            </div>
+          ))
+        )}
       </div>
 
       <div className="flex justify-center gap-1.5 mt-4 md:hidden">
-        {SERVICES.map((_, i) => (
+        {(servicesList.length > 0 ? servicesList : Array.from({ length: 6 })).map((_, i) => (
           <div
             key={i}
             className={`h-1 rounded-full transition-all ${
@@ -120,3 +139,4 @@ export const Services: React.FC = () => {
     </section>
   );
 };
+

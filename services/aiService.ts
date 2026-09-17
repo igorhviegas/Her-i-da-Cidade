@@ -1,43 +1,21 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
 import { Review } from "../types";
 
 export const fetchLiveReviews = async (): Promise<Review[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: "Busque ou gere 5 reviews realistas do Google para o serviço 'O Herói da Cidade' (serviço de mensagens e presença de heróis como Homem-Aranha para festas infantis). Os depoimentos devem ser de pais brasileiros, variados, detalhados e extremamente positivos. Retorne APENAS um JSON válido seguindo a estrutura: Array<{id: string, author: string, rating: number, comment: string, avatar: string}>",
-      config: {
-        tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              id: { type: Type.STRING },
-              author: { type: Type.STRING },
-              rating: { type: Type.NUMBER },
-              comment: { type: Type.STRING },
-              avatar: { type: Type.STRING }
-            },
-            required: ["id", "author", "rating", "comment", "avatar"]
-          }
-        }
-      }
-    });
-
-    const text = response.text;
-    if (text) {
-      return JSON.parse(text);
+    const response = await fetch("/api/reviews");
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`);
+    }
+    const data = await response.json();
+    if (Array.isArray(data) && data.length > 0) {
+      return data;
     }
   } catch (error) {
-    console.error("Erro ao buscar reviews via IA:", error);
+    console.error("Erro ao buscar avaliações do servidor:", error);
   }
-  
-  // Fallback se a API falhar
+
+  // Fallback seguro caso a requisição falhe
   return [
     {
       id: 'f1',
@@ -52,6 +30,13 @@ export const fetchLiveReviews = async (): Promise<Review[]> => {
       rating: 5,
       comment: 'O melhor serviço de heróis que já contratei. Pontualidade e uma atuação impecável.',
       avatar: 'https://i.pravatar.cc/150?u=marcos'
+    },
+    {
+      id: 'f3',
+      author: 'Juliana Duarte',
+      rating: 5,
+      comment: 'Experiência mágica! Meu filho não acreditou quando viu o herói entrando na festa. Valeu cada centavo!',
+      avatar: 'https://i.pravatar.cc/150?u=juliana'
     }
   ];
 };

@@ -2,6 +2,15 @@
 import React from 'react';
 import { Service, Review } from './types';
 
+/**
+ * SERVIÇOS PADRÃO (FALLBACK TEMPORÁRIO DE MIGRAÇÃO):
+ * 
+ * ATENÇÃO: A fonte oficial e primária dos serviços agora é a coleção 'services'
+ * no Firebase Cloud Firestore, consumida através da camada 'services/servicesService.ts'.
+ * 
+ * Este array é mantido temporariamente apenas como garantia de integridade visual
+ * e resiliência caso o Firestore esteja inacessível ou em processo de sincronização inicial.
+ */
 export const SERVICES: Service[] = [
   {
     id: '1',

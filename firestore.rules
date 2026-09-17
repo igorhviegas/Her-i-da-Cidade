@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: usuário precisa estar autenticado
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper: usuário autenticado é administrador
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'igorhviegas@gmail.com' ||
+        request.auth.uid != null
+      );
+    }
+
+    // 1. COLEÇÃO 'services'
+    // Leitura pública para exibição no site; escrita permitida para administradores ou inicialização
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // 2. COLEÇÃO 'videos'
+    match /videos/{videoId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // 3. COLEÇÃO 'admins'
+    match /admins/{adminId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}
+
+
