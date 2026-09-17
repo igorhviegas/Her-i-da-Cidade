@@ -1,40 +1,67 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper: usuário precisa estar autenticado
-    function isSignedIn() {
-      return request.auth != null;
-    }
+    // =========================================================
+    // ADMIN
+    // =========================================================
 
-    // Helper: usuário autenticado é administrador
+    // Um usuário é administrador somente se existir um documento
+    // com seu UID na coleção /admins.
     function isAdmin() {
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.email == 'igorhviegas@gmail.com' ||
-        request.auth.uid != null
-      );
+      return request.auth != null
+        && exists(
+          /databases/$(database)/documents/admins/$(request.auth.uid)
+        );
     }
 
-    // 1. COLEÇÃO 'services'
-    // Leitura pública para exibição no site; escrita permitida para administradores ou inicialização
+
+    // =========================================================
+    // SERVICES
+    // =========================================================
+
     match /services/{serviceId} {
+
+      // Os serviços ativos são utilizados pelo site público.
+      // A leitura pública é necessária para o funcionamento atual.
       allow read: if true;
-      allow write: if true;
+
+      // Somente administradores podem criar, editar ou excluir serviços.
+      allow write: if isAdmin();
     }
 
-    // 2. COLEÇÃO 'videos'
+
+    // =========================================================
+    // VIDEOS
+    // =========================================================
+
     match /videos/{videoId} {
+
+      // Futuramente o catálogo público poderá consultar os vídeos.
       allow read: if true;
-      allow write: if true;
+
+      // Somente administradores poderão gerenciar os vídeos.
+      allow write: if isAdmin();
     }
 
-    // 3. COLEÇÃO 'admins'
+
+    // =========================================================
+    // ADMINS
+    // =========================================================
+
     match /admins/{adminId} {
-      allow read: if true;
-      allow write: if true;
+
+      // Somente administradores já existentes podem consultar
+      // documentos administrativos.
+      allow read: if isAdmin();
+
+      // Nenhum administrador poderá criar outro administrador
+      // diretamente pelo frontend.
+      //
+      // A criação inicial de administradores será feita pelo
+      // Firebase Console ou por uma ferramenta administrativa segura.
+      allow write: if false;
     }
   }
 }
-
-

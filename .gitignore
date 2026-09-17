@@ -16,8 +16,11 @@ dist-ssr
 !.env.example
 *.pem
 *.key
+firebase-service-account.json
 *serviceAccount*.json
 *service-account*.json
+credentials/
+*.serviceaccount.json
 
 # Editor directories and files
 .vscode/*
