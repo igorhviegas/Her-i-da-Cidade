@@ -63,5 +63,20 @@ service cloud.firestore {
       // Firebase Console ou por uma ferramenta administrativa segura.
       allow write: if false;
     }
+
+
+    // =========================================================
+    // SITE CONFIG (Configurações do Site)
+    // =========================================================
+
+    match /siteConfig/{configId} {
+
+      // Leitura pública permitida para o documento 'public'.
+      // Outros documentos requerem privilégios de administrador.
+      allow read: if configId == 'public' || isAdmin();
+
+      // Somente administradores autenticados podem criar ou atualizar.
+      allow write: if isAdmin();
+    }
   }
 }

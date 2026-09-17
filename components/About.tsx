@@ -1,9 +1,12 @@
-
 import React from 'react';
+import { useSiteConfig, buildWhatsAppLink } from '../services/siteConfigService';
 
 export const About: React.FC = () => {
-  const whatsappMessage = encodeURIComponent("Olá, Gostaria de saber mais sobre os serviços do Heroi da Cidade");
-  const whatsappUrl = `https://wa.me/5531999044206?text=${whatsappMessage}`;
+  const { whatsappUrl } = useSiteConfig();
+  const whatsappUrlFormatted = buildWhatsAppLink(
+    whatsappUrl,
+    "Olá, Gostaria de saber mais sobre os serviços do Heroi da Cidade"
+  );
   const youtubeShortsUrl = "https://youtube.com/shorts/0uohQKcVu6M?si=EFfoOHr_Dz6BS7u-";
 
   return (
@@ -36,7 +39,7 @@ export const About: React.FC = () => {
           </h3>
           <div className="space-y-6 text-white/70 leading-relaxed font-light">
             <p>
-              O <strong>Herói da Cidade</strong> nasceu do sonho de um menino  apaixonado pelo "Amigão da Vizinhança", de se tornar um super heroi desde pequeno. Como a principal função de um herói é ajudar as pesssoas, Igor Viegas (nosso Homem-Aranha) descobriu uma maneira divertida de fazer isso. Com os vídeos educativos, conquistou milhares de seguidores e ajudou diversas famílias com as tarefas mais difíceis do desenvolvimento infanti. Somos especializados em entretenimento lúdico e educacional de alta qualidade exclusivamente com o Homem-Aranha.
+              O <strong>Herói da Cidade</strong> nasceu do sonho de um menino apaixonado pelo "Amigão da Vizinhança", de se tornar um super heroi desde pequeno. Como a principal função de um herói é ajudar as pesssoas, Igor Viegas (nosso Homem-Aranha) descobriu uma maneira divertida de fazer isso. Com os vídeos educativos, conquistou milhares de seguidores e ajudou diversas famílias com as tarefas mais difíceis do desenvolvimento infanti. Somos especializados em entretenimento lúdico e educacional de alta qualidade exclusivamente com o Homem-Aranha.
             </p>
             <p>
               Fora das telinhas, o heroi da Cidade atua em festas infantis com o personagem Homem-Aranha em toda região metropolitana de Belo Horizonte em minas Gerais, incluindo Betim, Contagem, Nova Lima, Lagoa Santa, Igarapé, Ribeirão das neves e muito mais. Fazemos com que até os mais velhos se questionem se o Homem-Aranha realmente existe; Incorporamos os valores, a voz e a presença do herói mais querido. Nosso compromisso é com a emoção genuína e a criação de memórias que duram a vida toda.
@@ -58,7 +61,7 @@ export const About: React.FC = () => {
           </div>
           <div className="mt-10">
             <a 
-              href={whatsappUrl} 
+              href={whatsappUrlFormatted} 
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-700 rounded-lg font-bold hover:shadow-[0_0_20px_rgba(37,99,235,0.3)] transition-all active:scale-95 text-white"

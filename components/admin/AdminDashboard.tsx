@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useRouter } from '../../lib/router';
 import { getServices, seedServicesIfEmpty } from '../../services/servicesService';
 import { AdminServices } from './AdminServices';
+import { AdminSettings } from './AdminSettings';
 import { 
   Shield, 
   LayoutDashboard, 
@@ -34,6 +35,8 @@ export const AdminDashboard: React.FC = () => {
   const initialTab: AdminTab = 
     path === '/admin/servicos' || path === '/admin/services'
       ? 'services'
+      : path === '/admin/configuracoes' || path === '/admin/settings'
+      ? 'settings'
       : 'dashboard';
 
   const [currentTab, setCurrentTab] = useState<AdminTab>(initialTab);
@@ -44,6 +47,8 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     if (path === '/admin/servicos' || path === '/admin/services') {
       setCurrentTab('services');
+    } else if (path === '/admin/configuracoes' || path === '/admin/settings') {
+      setCurrentTab('settings');
     } else if (path === '/admin' || path === '/admin/dashboard') {
       setCurrentTab('dashboard');
     }
@@ -53,6 +58,8 @@ export const AdminDashboard: React.FC = () => {
     setCurrentTab(tabId);
     if (tabId === 'services') {
       navigate('/admin/servicos');
+    } else if (tabId === 'settings') {
+      navigate('/admin/configuracoes');
     } else if (tabId === 'dashboard') {
       navigate('/admin');
     }
@@ -119,7 +126,7 @@ export const AdminDashboard: React.FC = () => {
     { id: 'services' as AdminTab, label: 'Serviços', icon: Sparkles, status: 'active' },
     { id: 'videos' as AdminTab, label: 'Vídeos', icon: Video, status: 'soon', hint: 'Etapa 5' },
     { id: 'content' as AdminTab, label: 'Conteúdo', icon: FileText, status: 'soon', hint: 'Etapa 6' },
-    { id: 'settings' as AdminTab, label: 'Configurações', icon: Settings, status: 'soon', hint: 'Etapa 7' },
+    { id: 'settings' as AdminTab, label: 'Configurações', icon: Settings, status: 'active' },
   ];
 
   return (
@@ -175,7 +182,7 @@ export const AdminDashboard: React.FC = () => {
                     {item.hint || 'Em breve'}
                   </span>
                 )}
-                {item.id === 'services' && (
+                {(item.id === 'services' || item.id === 'settings') && (
                   <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                     Ativo
                   </span>
@@ -256,7 +263,7 @@ export const AdminDashboard: React.FC = () => {
                         {item.hint || 'Em breve'}
                       </span>
                     )}
-                    {item.id === 'services' && (
+                    {(item.id === 'services' || item.id === 'settings') && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-medium">
                         Ativo
                       </span>
@@ -544,26 +551,26 @@ export const AdminDashboard: React.FC = () => {
 
                   {/* Card Configurações */}
                   <div 
-                    onClick={() => setCurrentTab('settings')}
+                    onClick={() => handleTabChange('settings')}
                     className="group bg-[#0D1527] hover:bg-[#111B30] border border-white/10 hover:border-slate-400 rounded-2xl p-6 transition-all cursor-pointer shadow-lg"
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="w-12 h-12 rounded-xl bg-slate-500/10 border border-slate-500/20 flex items-center justify-center text-slate-400 group-hover:scale-105 transition-transform">
                         <Settings className="w-6 h-6" />
                       </div>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                        <Clock className="w-3 h-3" />
-                        Em breve • Etapa 6
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Ativo • Gerenciável
                       </span>
                     </div>
                     <h4 className="text-lg font-bold text-white group-hover:text-slate-300 transition-colors mb-2">
                       Configurações Gerais
                     </h4>
                     <p className="text-sm text-white/60 leading-relaxed font-light mb-4">
-                      Gerenciamento de contas administrativas, número de WhatsApp de conversão e parâmetros do sistema.
+                      Gerenciamento de canais de conversão (WhatsApp), parâmetros do sistema e dados públicos do site.
                     </p>
                     <div className="flex items-center gap-1 text-xs font-semibold text-slate-400 group-hover:translate-x-1 transition-transform">
-                      <span>Ver detalhes do módulo</span>
+                      <span>Acessar configurações</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </div>
                   </div>
@@ -579,8 +586,13 @@ export const AdminDashboard: React.FC = () => {
             <AdminServices />
           )}
 
+          {/* TAB: CONFIGURAÇÕES */}
+          {currentTab === 'settings' && (
+            <AdminSettings />
+          )}
+
           {/* TAB: SUBMÓDULOS EM BREVE */}
-          {currentTab !== 'dashboard' && currentTab !== 'services' && (
+          {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && (
             <div className="max-w-2xl mx-auto py-12 text-center animate-in fade-in duration-200">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 mb-4 text-blue-400">
                 <Clock className="w-8 h-8" />

@@ -4,6 +4,8 @@ import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
 import { seedServices, INITIAL_SERVICES } from './seed-services.mjs';
+import { seedSiteConfig } from './seed-site-config.mjs';
+import { migrateServicesWhatsAppUrls } from './migrate-services-whatsapp.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -167,6 +169,17 @@ async function main() {
 
   // 5. POPULAÇÃO IDEMPOTENTE DOS SERVIÇOS
   const servicesResult = await seedServices(db, isDryRun);
+
+  // 6. MIGRAÇÃO IDEMPOTENTE DO WHATSAPP DOS SERVIÇOS
+  await migrateServicesWhatsAppUrls(db, isDryRun);
+
+  // 6. POPULAÇÃO IDEMPOTENTE DE siteConfig/public
+  console.log('\n--- 4. Configurações Globais do Site (siteConfig/public) ---');
+  if (!isDryRun) {
+    await seedSiteConfig(db);
+  } else {
+    console.log(`  [DRY RUN] Documento 'siteConfig/public' seria inicializado.`);
+  }
 
   // 6. VALIDAÇÃO FINAL E RESUMO DE EXECUÇÃO
   console.log('\n====================================================');

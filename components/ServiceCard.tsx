@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Service } from '../types';
 
@@ -7,7 +6,7 @@ interface ServiceCardProps {
 }
 
 export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
-  const whatsappUrl = `https://wa.me/5531999044206?text=${encodeURIComponent('Olá, gostaria de saber mais sobre os serviços do Heroi da Cidade! Tenho interesse no serviço: ' + service.title)}`;
+  const whatsappUrl = service.whatsappUrl || `https://wa.me/5531999044206?text=${encodeURIComponent('Olá, gostaria de saber mais sobre os serviços do Heroi da Cidade! Tenho interesse no serviço: ' + service.title)}`;
 
   return (
     <a 

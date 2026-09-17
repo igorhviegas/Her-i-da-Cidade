@@ -6,6 +6,7 @@ export interface Service {
   description: string;
   imageUrl: string;
   category: string;
+  whatsappUrl: string;
   active?: boolean;
   order?: number;
   createdAt?: any;
@@ -22,6 +23,7 @@ export interface FirestoreService {
   description: string;
   imageUrl: string;
   category: string;
+  whatsappUrl: string;
   active: boolean;
   order: number;
   createdAt?: any;
@@ -67,6 +69,15 @@ export interface Review {
   rating: number;
   comment: string;
   avatar: string;
+}
+
+/**
+ * Modelo de documento Firestore para configurações públicas do site ('siteConfig/public').
+ */
+export interface PublicSiteConfig {
+  whatsappUrl: string;
+  updatedAt?: any;
+  [key: string]: any;
 }
 
 /**

@@ -80,6 +80,7 @@ export interface CreateServiceInput {
   description: string;
   imageUrl: string;
   category: string;
+  whatsappUrl: string;
   active?: boolean;
   order?: number;
 }
@@ -90,8 +91,33 @@ export interface UpdateServiceInput {
   description?: string;
   imageUrl?: string;
   category?: string;
+  whatsappUrl?: string;
   active?: boolean;
   order?: number;
+}
+
+/**
+ * Validação de link de WhatsApp individual do serviço.
+ * Aceita wa.me, api.whatsapp.com e rejeita esquemas inseguros ou vazios.
+ */
+export function isValidServiceWhatsAppUrl(url: string): boolean {
+  if (!url || typeof url !== "string") return false;
+  const trimmed = url.trim();
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return false;
+    }
+    const validHosts = [
+      "wa.me",
+      "api.whatsapp.com",
+      "web.whatsapp.com",
+      "chat.whatsapp.com"
+    ];
+    return validHosts.some((h) => parsed.hostname === h || parsed.hostname.endsWith(`.${h}`));
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -107,6 +133,11 @@ export interface ServicesState {
  * Converte dados brutos do Firestore para o tipo Service da aplicação com fallback seguro.
  */
 export function mapDocToService(docId: string, data: any): Service {
+  // Se não houver whatsappUrl no documento, constrói a URL oficial inicial baseada no título
+  const defaultWhatsapp = `https://wa.me/5531999044206?text=${encodeURIComponent(
+    'Olá, gostaria de saber mais sobre os serviços do Heroi da Cidade! Tenho interesse no serviço: ' + (data.title || '')
+  )}`;
+
   return {
     id: docId,
     title: data.title || "",
@@ -114,6 +145,7 @@ export function mapDocToService(docId: string, data: any): Service {
     description: data.description || "",
     imageUrl: data.imageUrl || "",
     category: data.category || "Geral",
+    whatsappUrl: data.whatsappUrl || defaultWhatsapp,
     active: data.active !== false,
     order: typeof data.order === "number" ? data.order : 0,
     createdAt: data.createdAt,
@@ -395,6 +427,7 @@ export async function seedServicesIfEmpty(): Promise<{
         description: item.description,
         imageUrl: item.imageUrl,
         category: item.category,
+        whatsappUrl: item.whatsappUrl || `https://wa.me/5531999044206?text=${encodeURIComponent('Olá, gostaria de saber mais sobre os serviços do Heroi da Cidade! Tenho interesse no serviço: ' + item.title)}`,
         active: true,
         order: index + 1,
         createdAt: serverTimestamp(),
@@ -434,12 +467,17 @@ export async function createService(input: CreateServiceInput): Promise<Service>
   const description = input.description?.trim();
   const category = input.category?.trim();
   const imageUrl = input.imageUrl?.trim();
+  const whatsappUrl = input.whatsappUrl?.trim();
 
   if (!title) throw new Error("O nome do serviço é obrigatório.");
   if (!price) throw new Error("O preço do serviço é obrigatório.");
   if (!description) throw new Error("A descrição do serviço é obrigatória.");
   if (!category) throw new Error("A categoria do serviço é obrigatória.");
   if (!imageUrl) throw new Error("A URL da imagem é obrigatória.");
+  if (!whatsappUrl) throw new Error("O link do WhatsApp do serviço é obrigatório.");
+  if (!isValidServiceWhatsAppUrl(whatsappUrl)) {
+    throw new Error("O link do WhatsApp informado é inválido. Utilize um formato válido (ex: https://wa.me/5531999044206).");
+  }
 
   let order = typeof input.order === "number" ? input.order : undefined;
   if (order === undefined || isNaN(order)) {
@@ -464,6 +502,7 @@ export async function createService(input: CreateServiceInput): Promise<Service>
     imageUrl,
     image: imageUrl, // compatibilidade com blueprint legado
     category,
+    whatsappUrl,
     active: input.active !== false,
     order,
     createdAt: serverTimestamp(),
@@ -486,6 +525,7 @@ export async function createService(input: CreateServiceInput): Promise<Service>
     description,
     imageUrl,
     category,
+    whatsappUrl,
     active: input.active !== false,
     order,
   };
@@ -535,6 +575,15 @@ export async function updateService(id: string, updates: UpdateServiceInput): Pr
     if (!trimmed) throw new Error("A URL da imagem não pode ser vazia.");
     payload.imageUrl = trimmed;
     payload.image = trimmed;
+  }
+
+  if (updates.whatsappUrl !== undefined) {
+    const trimmed = updates.whatsappUrl.trim();
+    if (!trimmed) throw new Error("O link do WhatsApp não pode ser vazio.");
+    if (!isValidServiceWhatsAppUrl(trimmed)) {
+      throw new Error("O link do WhatsApp informado é inválido. Utilize um formato válido (ex: https://wa.me/5531999044206).");
+    }
+    payload.whatsappUrl = trimmed;
   }
 
   if (updates.active !== undefined) {
@@ -609,3 +658,48 @@ export async function updateServiceOrder(id: string, newOrder: number): Promise<
   }
   await updateService(id, { order: orderNum });
 }
+
+/**
+ * Migração idempotente para preencher whatsappUrl nos serviços existentes no Firestore.
+ * - Se whatsappUrl já existir: preserva o valor atual.
+ * - Se não existir: preenche com o link oficial correspondente àquele serviço.
+ */
+export async function migrateServiceWhatsAppUrls(): Promise<{
+  total: number;
+  migrated: number;
+  preserved: number;
+}> {
+  if (!db) {
+    throw new Error("Firebase Firestore não inicializado.");
+  }
+
+  const querySnapshot = await getDocs(collection(db, SERVICES_COLLECTION));
+  let migrated = 0;
+  let preserved = 0;
+
+  for (const docSnap of querySnapshot.docs) {
+    const data = docSnap.data();
+    if (data.whatsappUrl && typeof data.whatsappUrl === 'string' && data.whatsappUrl.trim().length > 0) {
+      preserved++;
+      continue;
+    }
+
+    const title = data.title || "";
+    const defaultUrl = `https://wa.me/5531999044206?text=${encodeURIComponent(
+      'Olá, gostaria de saber mais sobre os serviços do Heroi da Cidade! Tenho interesse no serviço: ' + title
+    )}`;
+
+    await updateDoc(docSnap.ref, {
+      whatsappUrl: defaultUrl,
+      updatedAt: serverTimestamp(),
+    });
+    migrated++;
+  }
+
+  return {
+    total: querySnapshot.size,
+    migrated,
+    preserved,
+  };
+}
+

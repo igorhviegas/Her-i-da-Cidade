@@ -7,8 +7,15 @@ import { Booking } from './Booking';
 import { Feedbacks } from './Feedbacks';
 import { Footer } from './Footer';
 import { BackToTop } from './BackToTop';
+import { useSiteConfig, buildWhatsAppLink } from '../services/siteConfigService';
 
 export const PublicSite: React.FC = () => {
+  const { whatsappUrl } = useSiteConfig();
+  const floatingWhatsAppHref = buildWhatsAppLink(
+    whatsappUrl,
+    'Olá, gostaria de saber mais sobre os serviços do Heroi da Cidade!'
+  );
+
   return (
     <div className="min-h-screen disney-gradient selection:bg-blue-500 selection:text-white">
       <Navbar />
@@ -33,7 +40,7 @@ export const PublicSite: React.FC = () => {
 
       {/* Floating WhatsApp Button */}
       <a 
-        href="https://wa.me/5531999044206?text=Olá, gostaria de saber mais sobre os serviços do Heroi da Cidade!"
+        href={floatingWhatsAppHref}
         target="_blank"
         rel="noopener noreferrer"
         className="fixed bottom-8 right-8 z-50 w-16 h-16 bg-[#25D366] rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-transform active:scale-95 group"
