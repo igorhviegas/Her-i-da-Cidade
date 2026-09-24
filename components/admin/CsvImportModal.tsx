@@ -151,7 +151,6 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
                 )}
               </div>
             )}
-            </div>
           </div>
         )}
       </div>
