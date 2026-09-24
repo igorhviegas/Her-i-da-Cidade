@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useRouter } from "../../lib/router";
 
 const spider = "/images/spider.PNG";
 
 export const Navbar: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
-  const { navigate } = useRouter();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -43,13 +41,9 @@ export const Navbar: React.FC = () => {
           <a href="#feedbacks" className="hover:text-white transition-colors">
             Depoimentos
           </a>
-          <button
-            type="button"
-            onClick={() => navigate("/videos")}
-            className="hover:text-white transition-colors text-purple-400"
-          >
+          <a href="/videos" className="hover:text-white transition-colors text-purple-400">
             Vídeos
-          </button>
+          </a>
           <a
             href="https://www.instagram.com/oheroidacidade/"
             target="_blank"
