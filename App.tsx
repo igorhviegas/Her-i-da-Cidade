@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { RouterProvider, useRouter } from './lib/router';
 import { AuthProvider } from './context/AuthContext';
 import { PublicSite } from './components/PublicSite';
 import { AdminApp } from './components/admin/AdminApp';
+import { VideoCatalog } from './components/VideoCatalog';
 
 const AppContent: React.FC = () => {
   const { path } = useRouter();
@@ -12,18 +12,20 @@ const AppContent: React.FC = () => {
     return <AdminApp />;
   }
 
+  // Rota dedicada para o catálogo de vídeos estilo Netflix
+  if (path === '/videos') {
+    return <VideoCatalog />;
+  }
+
   return <PublicSite />;
 };
 
 export const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <RouterProvider>
+    <RouterProvider>
+      <AuthProvider>
         <AppContent />
-      </RouterProvider>
-    </AuthProvider>
+      </AuthProvider>
+    </RouterProvider>
   );
 };
-
-export default App;
-
