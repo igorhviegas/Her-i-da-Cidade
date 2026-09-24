@@ -8,6 +8,7 @@ import { Feedbacks } from './Feedbacks';
 import { Footer } from './Footer';
 import { BackToTop } from './BackToTop';
 import { useSiteConfig, buildWhatsAppLink } from '../services/siteConfigService';
+import { VideoSection } from './VideoSection';
 
 export const PublicSite: React.FC = () => {
   const { whatsappUrl } = useSiteConfig();
@@ -27,6 +28,7 @@ export const PublicSite: React.FC = () => {
         <div className="relative h-24 bg-gradient-to-b from-transparent to-[#0B1929] z-10 -mt-24" />
         
         <Services />
+        <VideoSection />
         
         <About />
         

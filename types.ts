@@ -52,11 +52,36 @@ export interface FirestoreVideo {
   caption: string;
   description: string;
   thumbnail: string;
+  thumbnailUrl?: string;
   categories: string[];
   tags: string[];
   topics: string[];
   ageRange?: string;
   keywords: string[];
+  searchText?: string;
+  publishedAt?: string;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Interface utilizada nas camadas de UI para representar um vídeo.
+ */
+export interface Video {
+  id: string;
+  title: string;
+  instagramUrl: string;
+  caption: string;
+  description: string;
+  thumbnail: string;
+  thumbnailUrl?: string;
+  categories: string[];
+  tags: string[];
+  topics: string[];
+  ageRange?: string;
+  keywords: string[];
+  searchText?: string;
   publishedAt?: string;
   active: boolean;
   createdAt?: string;

@@ -4,6 +4,7 @@ import { useRouter } from '../../lib/router';
 import { getServices, seedServicesIfEmpty } from '../../services/servicesService';
 import { AdminServices } from './AdminServices';
 import { AdminSettings } from './AdminSettings';
+import { AdminVideosPage } from './AdminVideosPage';
 import { 
   Shield, 
   LayoutDashboard, 
@@ -124,7 +125,7 @@ export const AdminDashboard: React.FC = () => {
   const navItems = [
     { id: 'dashboard' as AdminTab, label: 'Dashboard', icon: LayoutDashboard, status: 'active' },
     { id: 'services' as AdminTab, label: 'Serviços', icon: Sparkles, status: 'active' },
-    { id: 'videos' as AdminTab, label: 'Vídeos', icon: Video, status: 'soon', hint: 'Etapa 5' },
+    { id: 'videos' as AdminTab, label: 'Vídeos', icon: Video, status: 'active', hint: 'Etapa 5' },
     { id: 'content' as AdminTab, label: 'Conteúdo', icon: FileText, status: 'soon', hint: 'Etapa 6' },
     { id: 'settings' as AdminTab, label: 'Configurações', icon: Settings, status: 'active' },
   ];
@@ -590,9 +591,12 @@ export const AdminDashboard: React.FC = () => {
           {currentTab === 'settings' && (
             <AdminSettings />
           )}
+          {currentTab === 'videos' && (
+            <AdminVideosPage />
+          )}
 
           {/* TAB: SUBMÓDULOS EM BREVE */}
-          {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && (
+          {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && (
             <div className="max-w-2xl mx-auto py-12 text-center animate-in fade-in duration-200">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 mb-4 text-blue-400">
                 <Clock className="w-8 h-8" />
