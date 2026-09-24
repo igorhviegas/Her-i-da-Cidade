@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
+import { handleThumbnailUpload } from "./api/upload-thumbnail";
 
 const PORT = 3000;
 
@@ -159,6 +160,11 @@ async function startServer() {
       refreshReviewsInBackground();
     }
     res.json(cachedReviews);
+  });
+
+  // Vercel Blob Thumbnail Upload endpoint
+  app.all("/api/upload-thumbnail", (req, res) => {
+    handleThumbnailUpload(req, res);
   });
 
   // Vite middleware for development

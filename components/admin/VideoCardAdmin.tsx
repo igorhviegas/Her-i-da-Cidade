@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Video } from '../../types';
 import { Pencil, Trash2, Eye, EyeOff, ChevronUp, ChevronDown } from 'lucide-react';
 
@@ -11,6 +11,8 @@ interface VideoCardAdminProps {
 }
 
 export const VideoCardAdmin: React.FC<VideoCardAdminProps> = ({ video, onEdit, onDelete, onToggleActive, onOrderChange }) => {
+  const [imageError, setImageError] = useState(false);
+  const imageUrl = !imageError ? (video.thumbnailUrl || video.thumbnail) : null;
   const isActive = video.active !== false;
   const handleOrderInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value, 10);
@@ -23,9 +25,14 @@ export const VideoCardAdmin: React.FC<VideoCardAdminProps> = ({ video, onEdit, o
     <div className={`bg-[#0D1527] border border-white/10 rounded-2xl p-5 shadow-lg transition-all ${!isActive ? 'opacity-70 bg-[#090E1B]' : ''}`}>
       {/* Header with thumbnail and title */}
       <div className="flex items-start gap-4 mb-3">
-        <div className="w-20 h-20 rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0">
-          {video.thumbnail ? (
-            <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
+        <div className="w-20 h-20 rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0 flex items-center justify-center">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={video.title}
+              onError={() => setImageError(true)}
+              className="w-full h-full object-cover"
+            />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-white/30">
               <Eye className="w-6 h-6" />

@@ -49,10 +49,12 @@ export interface FirestoreVideo {
   id: string;
   title: string;
   instagramUrl: string;
-  caption: string;
-  description: string;
-  thumbnail: string;
+  instagramId?: string;
+  caption?: string;
+  description?: string;
+  thumbnail?: string;
   thumbnailUrl?: string;
+  category?: string;
   categories: string[];
   tags: string[];
   topics: string[];
@@ -61,6 +63,7 @@ export interface FirestoreVideo {
   searchText?: string;
   publishedAt?: string;
   active: boolean;
+  order?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -72,10 +75,12 @@ export interface Video {
   id: string;
   title: string;
   instagramUrl: string;
-  caption: string;
-  description: string;
-  thumbnail: string;
+  instagramId?: string;
+  caption?: string;
+  description?: string;
+  thumbnail?: string;
   thumbnailUrl?: string;
+  category?: string;
   categories: string[];
   tags: string[];
   topics: string[];
@@ -84,6 +89,7 @@ export interface Video {
   searchText?: string;
   publishedAt?: string;
   active: boolean;
+  order?: number;
   createdAt?: string;
   updatedAt?: string;
 }

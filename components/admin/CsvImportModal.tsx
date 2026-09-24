@@ -48,9 +48,10 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
       const parsedData = await parseCsvFile(file);
       const normalized = parsedData.map((row) => ({
         'Nº': row['Nº'] ?? row['Numero'] ?? row['Number'] ?? '',
-        Tema: row['Tema'] ?? '',
-        Categoria: row['Categoria'] ?? '',
-        'Link do Reel': row['Link do Reel'] ?? row['link'] ?? '',
+        Tema: row['Tema'] ?? row['title'] ?? row['Title'] ?? '',
+        Categoria: row['Categoria'] ?? row['category'] ?? row['Category'] ?? '',
+        'Link do Reel': row['Link do Reel'] ?? row['link'] ?? row['instagramUrl'] ?? row['InstagramUrl'] ?? '',
+        Thumbnail: row['Thumbnail'] ?? row['thumbnail'] ?? row['thumbnailUrl'] ?? row['Thumbnail Url'] ?? '',
         ID: row['ID'] ?? row['Id'] ?? '',
         'Palavras-chave / Pesquisa': row['Palavras-chave / Pesquisa'] ?? row['keywords'] ?? '',
       }));
@@ -108,6 +109,7 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
                     <th className="px-3 py-2 text-left">Nº</th>
                     <th className="px-3 py-2 text-left">Tema</th>
                     <th className="px-3 py-2 text-left">Categoria</th>
+                    <th className="px-3 py-2 text-left">Thumbnail</th>
                     <th className="px-3 py-2 text-left">Link do Reel</th>
                     <th className="px-3 py-2 text-left">ID</th>
                     <th className="px-3 py-2 text-left">Palavras-chave / Pesquisa</th>
@@ -119,6 +121,13 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
                       <td className="px-3 py-1 whitespace-nowrap">{row['Nº']}</td>
                       <td className="px-3 py-1 whitespace-nowrap">{row['Tema']}</td>
                       <td className="px-3 py-1 whitespace-nowrap">{row['Categoria']}</td>
+                      <td className="px-3 py-1 whitespace-nowrap max-w-[140px] truncate text-xs" title={row['Thumbnail']}>
+                        {row['Thumbnail'] ? (
+                          <span className="text-emerald-400 font-mono text-[11px] truncate block">{row['Thumbnail']}</span>
+                        ) : (
+                          <span className="text-white/30 italic text-[11px]">Sem thumbnail</span>
+                        )}
+                      </td>
                       <td className="px-3 py-1 whitespace-nowrap break-all">{row['Link do Reel']}</td>
                       <td className="px-3 py-1 whitespace-nowrap">{row['ID']}</td>
                       <td className="px-3 py-1 whitespace-nowrap">{row['Palavras-chave / Pesquisa']}</td>

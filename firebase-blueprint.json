@@ -44,20 +44,25 @@
         "id": { "type": "string" },
         "title": { "type": "string", "maxLength": 150 },
         "instagramUrl": { "type": "string", "maxLength": 500 },
+        "instagramId": { "type": "string", "maxLength": 100 },
         "caption": { "type": "string", "maxLength": 2000 },
         "description": { "type": "string", "maxLength": 2000 },
         "thumbnail": { "type": "string", "maxLength": 500 },
+        "thumbnailUrl": { "type": "string", "maxLength": 1000 },
+        "category": { "type": "string", "maxLength": 100 },
         "categories": { "type": "array" },
         "tags": { "type": "array" },
         "topics": { "type": "array" },
         "ageRange": { "type": "string", "maxLength": 50 },
         "keywords": { "type": "array" },
+        "searchText": { "type": "string", "maxLength": 5000 },
         "publishedAt": { "type": "string" },
         "active": { "type": "boolean" },
+        "order": { "type": "number" },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
-      "required": ["title", "instagramUrl", "thumbnail", "active"]
+      "required": ["title", "instagramUrl", "active"]
     }
   },
   "firestore": {
