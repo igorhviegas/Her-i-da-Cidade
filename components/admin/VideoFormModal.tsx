@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Video } from '../../types';
 import { createVideo, updateVideo, getVideoByInstagramId } from '../../services/videosService';
 import { Image, Upload, Trash2, RefreshCw, Undo2, X } from 'lucide-react';
+import { createCategory } from '../../services/categoriesService';
 
 interface Props {
   video?: Video | null;
@@ -152,16 +153,21 @@ const VideoFormModal: React.FC<Props> = ({ video, existingCategories = [], onClo
   };
 
   // Adiciona nova categoria sem duplicar
-  const handleAddNewCategory = () => {
+  const handleAddNewCategory = async () => {
     const trimmed = newCategory.trim();
     if (!trimmed) return;
     if (categories.some(c => c.trim().toLowerCase() === trimmed.toLowerCase())) {
       setNewCategory('');
       return;
     }
-    setCategories(prev => [...prev, trimmed]);
-    setNewCategory('');
-    setCategoryError(null);
+    try {
+      const category = await createCategory(trimmed);
+      setCategories(prev => [...prev, category.name]);
+      setNewCategory('');
+      setCategoryError(null);
+    } catch (err: any) {
+      setCategoryError(err?.message || 'Não foi possível criar a categoria.');
+    }
   };
 
   const handleClearSelectedFile = () => {

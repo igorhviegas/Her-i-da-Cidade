@@ -2,264 +2,99 @@ import { put } from '@vercel/blob';
 import { getVercelOidcToken } from '@vercel/oidc';
 import crypto from 'crypto';
 import multer from 'multer';
+import type { Request, Response } from 'express';
 
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4 MB
+const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_FILE_SIZE = 4 * 1024 * 1024;
+const BLOB_STORE_ID = process.env.BLOB_STORE_ID || 'store_ZlySBsEZT51qmJ7I';
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-vercel-oidc-token',
-};
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_FILE_SIZE, files: 1 },
+});
 
-const SYMBOL_FOR_REQ_CONTEXT = Symbol.for('@vercel/request-context');
-
-function setupVercelRequestContext(token?: string) {
-  if (token) {
-    (globalThis as any)[SYMBOL_FOR_REQ_CONTEXT] = {
-      get: () => ({
-        headers: {
-          'x-vercel-oidc-token': token,
-        },
-      }),
-    };
-  }
-}
-
-function getSafeExtension(mimetype: string, originalname?: string): string {
+function extensionFor(mimetype: string): string {
   if (mimetype === 'image/png') return 'png';
   if (mimetype === 'image/webp') return 'webp';
-  if (mimetype === 'image/jpeg' || mimetype === 'image/jpg') return 'jpg';
-
-  if (originalname) {
-    const ext = originalname.split('.').pop()?.toLowerCase();
-    if (ext === 'jpeg' || ext === 'jpg') return 'jpg';
-    if (ext === 'png') return 'png';
-    if (ext === 'webp') return 'webp';
-  }
-
   return 'jpg';
 }
 
-// Multer em memória para compatibilidade com ambiente Express local (dev)
-const uploadMiddleware = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_FILE_SIZE },
-});
+function jsonError(res: Response, status: number, error: string): void {
+  res.status(status).json({ success: false, error });
+}
 
-// Helper de obtenção de token OIDC com timeout para não travar conexões sem OIDC
-export async function safeGetOidcToken(fallbackToken?: string): Promise<string | undefined> {
+async function getUploadOptions(mimetype: string) {
+  // O token é obtido somente no runtime da Vercel. Não aceite tokens enviados
+  // pelo navegador e não exponha credenciais no bundle do frontend.
+  let oidcToken: string | undefined;
   try {
-    const oidcPromise = getVercelOidcToken();
-    const timeoutPromise = new Promise<undefined>((_, reject) =>
-      setTimeout(() => reject(new Error('oidc timeout')), 2500)
-    );
-    const token = await Promise.race([oidcPromise, timeoutPromise]);
-    if (token) return token;
-  } catch (_oidcErr) {
-    // Timeout ou erro de ambiente sem OIDC (esperado em dev/local)
+    oidcToken = await getVercelOidcToken();
+  } catch {
+    // Em desenvolvimento local o SDK usa BLOB_READ_WRITE_TOKEN, quando existir.
+    // Em produção a integração do Blob fornece o token OIDC automaticamente.
   }
-  return fallbackToken;
-}
 
-// Helper de upload para Vercel Blob com timeout para nunca pendurar requisição
-export async function safePutBlob(pathname: string, body: Buffer, options: any): Promise<any> {
-  const putPromise = put(pathname, body, options);
-  const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Tempo limite esgotado ao conectar ao Vercel Blob.')), 15000)
-  );
-  return Promise.race([putPromise, timeoutPromise]);
+  return {
+    access: 'public' as const,
+    contentType: mimetype,
+    storeId: BLOB_STORE_ID,
+    ...(oidcToken ? { oidcToken } : {}),
+  };
 }
 
 /**
- * Endpoint POST Web Standard para Vercel Serverless Functions.
- * Obtém o token OIDC da Vercel via getVercelOidcToken() e envia ao Vercel Blob
- * direcionado ao repositório heroidacidade-thumb (BLOB_STORE_ID).
+ * Endpoint Node da Vercel/Express. O runtime de Functions entrega req/res
+ * Node; portanto o multipart precisa ser consumido por multer antes do put.
  */
-export async function POST(request: Request): Promise<Response> {
-  try {
-    const formData = await request.formData();
-    const file = formData.get('file');
-
-    if (!file || typeof file === 'string') {
-      return Response.json(
-        { success: false, error: 'Nenhum arquivo de imagem foi enviado.' },
-        { status: 400, headers: CORS_HEADERS }
-      );
-    }
-
-    const blobFile = file as Blob & { name?: string; size: number; type: string };
-
-    if (!ALLOWED_MIME_TYPES.includes(blobFile.type)) {
-      return Response.json(
-        { success: false, error: 'Formato de arquivo não suportado. Formatos aceitos: JPG, JPEG, PNG e WEBP.' },
-        { status: 400, headers: CORS_HEADERS }
-      );
-    }
-
-    if (blobFile.size > MAX_FILE_SIZE) {
-      return Response.json(
-        { success: false, error: 'O arquivo excede o limite máximo permitido de 4 MB.' },
-        { status: 400, headers: CORS_HEADERS }
-      );
-    }
-
-    const ext = getSafeExtension(blobFile.type, blobFile.name);
-    const uniqueId = crypto.randomUUID();
-    const pathname = `videos/thumbnails/${uniqueId}.${ext}`;
-
-    const arrayBuffer = await blobFile.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const storeId = process.env.BLOB_STORE_ID || 'store_ZlySBsEZT51qmJ7I';
-
-    // Obtenção do token OIDC no momento da requisição com timeout de proteção
-    const incomingHeaderToken =
-      request.headers.get('x-vercel-oidc-token') ||
-      request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
-      process.env.VERCEL_OIDC_TOKEN;
-
-    if (incomingHeaderToken) {
-      setupVercelRequestContext(incomingHeaderToken);
-    }
-
-    const oidcToken = await safeGetOidcToken(incomingHeaderToken || undefined);
-
-    const putOptions: any = {
-      access: 'public',
-      addRandomSuffix: true,
-      contentType: blobFile.type,
-      storeId,
-    };
-
-    if (oidcToken) {
-      putOptions.oidcToken = oidcToken;
-    }
-
-    try {
-      // Upload via @vercel/blob com timeout
-      const blob = await safePutBlob(pathname, buffer, putOptions);
-      return Response.json(
-        { success: true, url: blob.url },
-        { status: 200, headers: CORS_HEADERS }
-      );
-    } catch (uploadErr: any) {
-      console.warn('[Vercel Blob Notice]: Upload via Vercel Blob falhou:', uploadErr?.message || uploadErr);
-      // Fallback em ambiente de desenvolvimento/preview sem credenciais ativas da Vercel
-      const dataUrl = `data:${blobFile.type};base64,${buffer.toString('base64')}`;
-      return Response.json(
-        { success: true, url: dataUrl },
-        { status: 200, headers: CORS_HEADERS }
-      );
-    }
-  } catch (error: any) {
-    console.error('[Upload Thumbnail POST Error]:', error?.message || error);
-    return Response.json(
-      { success: false, error: 'Falha ao processar upload da thumbnail.' },
-      { status: 500, headers: CORS_HEADERS }
-    );
-  }
-}
-
-/**
- * Preflight CORS para Web Standard.
- */
-export async function OPTIONS(): Promise<Response> {
-  return new Response(null, { status: 204, headers: CORS_HEADERS });
-}
-
-/**
- * Handler padrão universal:
- * Suporta invocação como Vercel Function (Web Standard ou Node) e Express local.
- */
-export default async function handler(req: any, res?: any) {
-  // Caso 1: Web Standard Request (Vercel Serverless Function moderna)
-  if (req instanceof Request || (req && typeof req.formData === 'function')) {
-    if (req.method === 'OPTIONS') {
-      return OPTIONS();
-    }
-    return POST(req as Request);
-  }
-
-  // Caso 2: Node.js / Express (ambiente de desenvolvimento local)
-  if (res && typeof res.setHeader === 'function') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-vercel-oidc-token');
-
-    if (req.method === 'OPTIONS') {
-      return res.status(204).end();
-    }
-
-    uploadMiddleware.any()(req, res, async (err: any) => {
-      try {
-        if (err) {
-          if (err.code === 'LIMIT_FILE_SIZE') {
-            return res.status(400).json({ success: false, error: 'O arquivo excede o limite máximo permitido de 4 MB.' });
-          }
-          return res.status(400).json({ success: false, error: err.message || 'Erro ao processar envio do arquivo.' });
-        }
-
-        const files = req.files as Express.Multer.File[] | undefined;
-        const file = files && files.length > 0 ? files[0] : (req.file as Express.Multer.File | undefined);
-
-        if (!file || !file.buffer) {
-          return res.status(400).json({ success: false, error: 'Nenhum arquivo de imagem foi enviado.' });
-        }
-
-        if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-          return res.status(400).json({ success: false, error: 'Formato de arquivo não suportado. Formatos aceitos: JPG, JPEG, PNG e WEBP.' });
-        }
-
-        if (file.size > MAX_FILE_SIZE) {
-          return res.status(400).json({ success: false, error: 'O arquivo excede o tamanho máximo de 4 MB.' });
-        }
-
-        const incomingHeaderToken =
-          (req.headers && (req.headers['x-vercel-oidc-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, ''))) ||
-          process.env.VERCEL_OIDC_TOKEN;
-
-        if (typeof incomingHeaderToken === 'string') {
-          setupVercelRequestContext(incomingHeaderToken);
-        }
-
-        const oidcToken = await safeGetOidcToken(typeof incomingHeaderToken === 'string' ? incomingHeaderToken : undefined);
-
-        const ext = getSafeExtension(file.mimetype, file.originalname);
-        const uniqueId = crypto.randomUUID();
-        const pathname = `videos/thumbnails/${uniqueId}.${ext}`;
-        const storeId = process.env.BLOB_STORE_ID || 'store_ZlySBsEZT51qmJ7I';
-
-        const putOptions: any = {
-          access: 'public',
-          addRandomSuffix: true,
-          contentType: file.mimetype,
-          storeId,
-        };
-
-        if (oidcToken) {
-          putOptions.oidcToken = oidcToken;
-        }
-
-        try {
-          const blob = await safePutBlob(pathname, file.buffer, putOptions);
-          return res.status(200).json({ success: true, url: blob.url });
-        } catch (uploadErr: any) {
-          console.warn('[Vercel Blob Notice]: Upload via Vercel Blob falhou:', uploadErr?.message || uploadErr);
-          const dataUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
-          return res.status(200).json({ success: true, url: dataUrl });
-        }
-      } catch (generalErr: any) {
-        console.error('[Upload Thumbnail Express Error]:', generalErr?.message || generalErr);
-        return res.status(500).json({ success: false, error: 'Falha ao processar upload da thumbnail.' });
-      }
-    });
+export function handleThumbnailUpload(req: Request, res: Response): void {
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
     return;
   }
 
-  return new Response(JSON.stringify({ success: false, error: 'Ambiente de execução não suportado.' }), {
-    status: 500,
-    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+  if (req.method !== 'POST') {
+    jsonError(res, 405, 'Método não permitido.');
+    return;
+  }
+
+  upload.single('file')(req, res, async (parseError) => {
+    if (parseError) {
+      const message = parseError instanceof multer.MulterError && parseError.code === 'LIMIT_FILE_SIZE'
+        ? 'O arquivo excede o limite máximo permitido de 4 MB.'
+        : 'Não foi possível processar o arquivo enviado.';
+      jsonError(res, 400, message);
+      return;
+    }
+
+    const file = req.file;
+    if (!file?.buffer) {
+      jsonError(res, 400, 'Nenhum arquivo de imagem foi enviado.');
+      return;
+    }
+    if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
+      jsonError(res, 400, 'Formato de arquivo não suportado. Formatos aceitos: JPG, JPEG, PNG e WEBP.');
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      if (!res.headersSent) {
+        jsonError(res, 504, 'Tempo limite esgotado ao enviar a imagem ao Vercel Blob. Tente novamente.');
+      }
+    }, 25_000);
+
+    try {
+      const pathname = `videos/thumbnails/${crypto.randomUUID()}.${extensionFor(file.mimetype)}`;
+      const blob = await put(pathname, file.buffer, await getUploadOptions(file.mimetype));
+      if (!res.headersSent) res.status(201).json({ success: true, url: blob.url });
+    } catch (error) {
+      console.error('[upload-thumbnail] Falha no Vercel Blob:', error);
+      if (!res.headersSent) {
+        jsonError(res, 502, 'Não foi possível enviar a imagem ao Vercel Blob. Verifique a configuração do Blob Store e tente novamente.');
+      }
+    } finally {
+      clearTimeout(timeout);
+    }
   });
 }
 
-export const handleThumbnailUpload = handler;
+export default handleThumbnailUpload;
