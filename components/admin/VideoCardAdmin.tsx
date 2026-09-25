@@ -89,42 +89,44 @@ export const VideoCardAdmin: React.FC<VideoCardAdminProps> = ({
       </div>
 
       {/* Controls */}
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5 gap-2 flex-wrap sm:flex-nowrap">
-        {/* Toggles (Active + Featured) */}
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10 gap-2 flex-wrap">
+        {/* Toggles (Active + Featured Star) */}
+        <div className="flex items-center gap-2 flex-shrink-0">
           {/* Active toggle */}
           <button
             type="button"
             onClick={onToggleActive}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all border cursor-pointer ${
               isActive
                 ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
                 : 'bg-white/5 border-white/15 text-white/40 hover:bg-white/10'
             }`}
+            title={isActive ? 'Desativar vídeo' : 'Ativar vídeo'}
+            aria-label={isActive ? 'Desativar vídeo' : 'Ativar vídeo'}
           >
             <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-white/40'}`} />
             <span>{isActive ? 'Ativo' : 'Inativo'}</span>
           </button>
 
-          {/* Featured toggle */}
+          {/* Featured toggle - APENAS ÍCONE DE ESTRELA */}
           <button
             type="button"
             onClick={onToggleFeatured}
             disabled={!isActive && !isFeatured}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border cursor-pointer ${
+            className={`w-8 h-8 flex items-center justify-center rounded-xl text-xs font-semibold transition-all border cursor-pointer ${
               isFeatured
-                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 hover:bg-amber-500/30 shadow-sm'
-                : 'bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                ? 'bg-amber-500/20 border-amber-500/60 text-amber-400 hover:bg-amber-500/30 shadow-sm shadow-amber-500/20'
+                : 'bg-white/5 border-white/10 text-white/40 hover:text-amber-400 hover:border-amber-400/40 hover:bg-white/10'
             } ${!isActive && !isFeatured ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
-            title={isFeatured ? 'Remover dos destaques' : 'Definir como destaque principal do catálogo'}
+            title={isFeatured ? 'Remover destaque' : 'Definir como destaque'}
+            aria-label={isFeatured ? 'Remover destaque' : 'Definir como destaque'}
           >
-            <Star className={`w-3.5 h-3.5 ${isFeatured ? 'fill-amber-400 text-amber-400' : ''}`} />
-            <span>{isFeatured ? 'Destaque' : 'Destacar'}</span>
+            <Star className={`w-4 h-4 ${isFeatured ? 'fill-amber-400 text-amber-400' : 'text-current'}`} />
           </button>
         </div>
 
         {/* Order input + Actions */}
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap ml-auto">
           {/* Order input */}
           <div className="flex items-center gap-1 bg-[#070B14] border border-white/10 px-2 py-1 rounded-xl">
             <span className="text-[11px] text-white/40 font-medium">Ordem:</span>
@@ -133,33 +135,47 @@ export const VideoCardAdmin: React.FC<VideoCardAdminProps> = ({
               min={1}
               defaultValue={video.order ?? 0}
               onBlur={handleOrderInput}
-              className="w-10 text-xs text-center bg-transparent border-none text-white focus:outline-none"
+              className="w-8 text-xs text-center bg-transparent border-none text-white focus:outline-none"
             />
-            <button onClick={() => onOrderChange((video.order ?? 0) + 1)} className="p-0.5 text-white/60 hover:text-white" title="Aumentar ordem">
-              <ChevronUp className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={() => onOrderChange(Math.max(1, (video.order ?? 0) - 1))} className="p-0.5 text-white/60 hover:text-white" title="Diminuir ordem">
-              <ChevronDown className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex flex-col">
+              <button
+                type="button"
+                onClick={() => onOrderChange((video.order ?? 0) + 1)}
+                className="p-0.5 text-white/50 hover:text-white transition-colors"
+                title="Aumentar ordem"
+              >
+                <ChevronUp className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onOrderChange(Math.max(1, (video.order ?? 0) - 1))}
+                className="p-0.5 text-white/50 hover:text-white transition-colors"
+                title="Diminuir ordem"
+              >
+                <ChevronDown className="w-3 h-3" />
+              </button>
+            </div>
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={onEdit}
-              className="p-2 text-white/70 hover:text-white bg-white/5 hover:bg-blue-600 rounded-xl transition-colors border border-white/5"
-              title="Editar vídeo"
-            >
-              <Pencil className="w-4 h-4" />
-            </button>
-            <button
-              onClick={onDelete}
-              className="p-2 text-red-400 hover:text-red-200 bg-red-500/10 hover:bg-red-600 rounded-xl transition-colors border border-red-500/20"
-              title="Excluir vídeo"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onEdit}
+            className="w-8 h-8 flex items-center justify-center text-white/70 hover:text-white bg-white/5 hover:bg-blue-600 rounded-xl transition-colors border border-white/10 cursor-pointer flex-shrink-0"
+            title="Editar vídeo"
+            aria-label="Editar vídeo"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="w-8 h-8 flex items-center justify-center text-red-400 hover:text-white bg-red-500/10 hover:bg-red-600 rounded-xl transition-colors border border-red-500/20 cursor-pointer flex-shrink-0"
+            title="Excluir vídeo"
+            aria-label="Excluir vídeo"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </div>
