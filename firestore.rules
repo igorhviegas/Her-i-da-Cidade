@@ -45,11 +45,10 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Catálogo central de categorias de vídeos. A leitura pública permite que
-    // filtros e o catálogo usem a mesma fonte; somente admins o gerenciam.
+    // Categorias são usadas pelo painel administrativo. Leitura e escrita
+    // exigem o mesmo documento /admins/{uid} usado no restante do admin.
     match /categories/{categoryId} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
 
