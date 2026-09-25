@@ -17,6 +17,13 @@ export const VideoCard: React.FC<VideoCardProps> = ({ video, onClick }) => {
       onClick={onClick}
     >
       <div className="w-full h-48 bg-[#090E1B] relative flex items-center justify-center overflow-hidden">
+        {video.badgeText && (
+          <div className="absolute top-2.5 left-2.5 z-10 pointer-events-none">
+            <span className="inline-block px-2.5 py-0.5 rounded-md bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white font-black text-[10px] tracking-wider uppercase shadow-md shadow-black/60 border border-white/20">
+              {video.badgeText}
+            </span>
+          </div>
+        )}
         {imageUrl ? (
           <img
             src={imageUrl}

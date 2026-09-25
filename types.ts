@@ -64,6 +64,7 @@ export interface FirestoreVideo {
   publishedAt?: string;
   active: boolean;
   featured?: boolean;
+  badgeText?: string;
   order?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -91,6 +92,7 @@ export interface Video {
   publishedAt?: string;
   active: boolean;
   featured?: boolean;
+  badgeText?: string;
   order?: number;
   createdAt?: string;
   updatedAt?: string;

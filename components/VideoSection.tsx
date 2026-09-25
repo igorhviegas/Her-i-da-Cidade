@@ -40,7 +40,7 @@ export const VideoSection: React.FC = () => {
         {/* Badge da plataforma */}
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-400 text-xs font-bold uppercase tracking-wider mb-4 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-          Plataforma de Vídeos
+          Plataforma de vídeos
         </div>
 
         {/* Título principal */}

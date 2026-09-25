@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useRouter } from '../lib/router';
 import { Video } from '../types';
 import { getVideos, subscribeToVideos } from '../services/videosService';
 import { searchVideos } from '../utils/videoSearch';
+import { isValidInstagramUrl } from '../utils/videoHelpers';
 import { VideoPlayerFullscreen } from './VideoPlayerFullscreen';
 import { VideoRow } from './VideoRow';
+import { BackToTop } from './BackToTop';
 
 export const VideoCatalog: React.FC = () => {
   const { navigate, search: routerSearch } = useRouter();
@@ -22,6 +24,60 @@ export const VideoCatalog: React.FC = () => {
   const [search, setSearch] = useState<string>(initialSearch);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Referência e medição dinâmica da altura do header para fixar a barra de categorias sem sobreposição
+  const headerRef = useRef<HTMLElement | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [isNavbarVisible, setIsNavbarVisible] = useState(true);
+  const lastScrollYRef = useRef(0);
+
+  useEffect(() => {
+    document.title = "Plataforma de vídeos - O Herói da Cidade";
+
+    const updateHeaderHeight = () => {
+      if (headerRef.current) {
+        setHeaderHeight(headerRef.current.offsetHeight);
+      }
+    };
+    updateHeaderHeight();
+    window.addEventListener('resize', updateHeaderHeight);
+
+    const threshold = 12;
+    let ticking = false;
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          const diff = currentScrollY - lastScrollYRef.current;
+
+          // Se estiver no topo da página (<= 50px), sempre manter visível
+          if (currentScrollY <= 50) {
+            setIsNavbarVisible(true);
+          } else if (Math.abs(diff) >= threshold) {
+            if (diff > 0) {
+              // Rolando para baixo: recolhe a navbar suavemente
+              setIsNavbarVisible(false);
+            } else {
+              // Rolando para cima: reaparece a navbar suavemente
+              setIsNavbarVisible(true);
+            }
+            lastScrollYRef.current = currentScrollY;
+          }
+
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('resize', updateHeaderHeight);
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   // Carrega vídeos e assina atualizações do Firestore
   useEffect(() => {
@@ -120,7 +176,12 @@ export const VideoCatalog: React.FC = () => {
   return (
     <main className="min-h-screen bg-[#07070b] text-white">
       {/* Header com botão Voltar evidente e campo de busca */}
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#07070b]/95 backdrop-blur-xl shadow-lg">
+      <header
+        ref={headerRef}
+        className={`sticky top-0 z-30 border-b border-white/10 bg-[#07070b]/95 backdrop-blur-xl shadow-lg transition-transform duration-300 ease-in-out ${
+          isNavbarVisible ? 'translate-y-0' : '-translate-y-full'
+        }`}
+      >
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-8">
           <div className="flex items-center gap-3">
             <button
@@ -143,7 +204,7 @@ export const VideoCatalog: React.FC = () => {
               <span>Voltar</span>
             </button>
             <h1 className="text-xl font-black tracking-tight text-white md:text-2xl whitespace-nowrap">
-              Catálogo de Vídeos
+              Plataforma de vídeos
             </h1>
           </div>
 
@@ -183,8 +244,11 @@ export const VideoCatalog: React.FC = () => {
         </div>
       </header>
 
-      {/* Barra de Categorias estilo Plataforma de Streaming (Botões Horizontais com Scroll no Mobile) */}
-      <section className="border-b border-white/10 bg-[#0B132B]/50 backdrop-blur-md">
+      {/* Barra de Categorias estilo Plataforma de Streaming (Fixa abaixo da navbar durante rolagem) */}
+      <section
+        style={{ top: isNavbarVisible ? `${headerHeight}px` : '0px' }}
+        className="sticky z-20 border-b border-white/10 bg-[#07070b]/95 backdrop-blur-xl shadow-md transition-[top] duration-300 ease-in-out"
+      >
         <div className="mx-auto max-w-7xl px-4 py-3 md:px-8">
           <div className="flex items-center gap-2.5 overflow-x-auto scroll-smooth py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {/* Botão Todos */}
@@ -237,9 +301,16 @@ export const VideoCatalog: React.FC = () => {
           />
           <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#07070b] via-[#07070b]/55 to-black/20" />
           <div className="mx-auto w-full max-w-7xl px-4 pb-10 sm:pb-12 md:px-8 md:pb-16">
-            <span className="rounded-full bg-purple-600 px-3 py-1 text-xs font-bold uppercase tracking-wider shadow-md">
-              Em destaque
-            </span>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {featuredVideo.badgeText && (
+                <span className="inline-block px-3 py-1 rounded-md bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white font-black text-xs tracking-wider uppercase shadow-md shadow-black/50 border border-white/20">
+                  {featuredVideo.badgeText}
+                </span>
+              )}
+              <span className="rounded-full bg-purple-600 px-3 py-1 text-xs font-bold uppercase tracking-wider shadow-md">
+                Em destaque
+              </span>
+            </div>
             <h2 className="mt-3 max-w-2xl text-3xl font-black leading-tight sm:text-4xl md:text-6xl text-white">
               {featuredVideo.title}
             </h2>
@@ -248,16 +319,18 @@ export const VideoCatalog: React.FC = () => {
                 {featuredVideo.caption}
               </p>
             )}
-            <button
-              type="button"
-              onClick={() => setSelectedId(featuredVideo.id)}
-              className="mt-5 sm:mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 font-bold text-slate-950 transition hover:bg-white/85 shadow-lg active:scale-95 cursor-pointer"
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              Assistir agora
-            </button>
+            <div className="mt-5 sm:mt-6 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedId(featuredVideo.id)}
+                className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 font-bold text-slate-950 transition hover:bg-white/85 shadow-lg active:scale-95 cursor-pointer"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                Assistir agora
+              </button>
+            </div>
           </div>
         </section>
       )}
@@ -331,6 +404,9 @@ export const VideoCatalog: React.FC = () => {
           }
         />
       )}
+
+      {/* Botão Subir ao Topo com a Teia do Herói da Cidade */}
+      <BackToTop />
     </main>
   );
 };

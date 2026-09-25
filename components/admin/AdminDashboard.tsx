@@ -513,7 +513,7 @@ export const AdminDashboard: React.FC = () => {
                       </span>
                     </div>
                     <h4 className="text-lg font-bold text-white group-hover:text-purple-400 transition-colors mb-2">
-                      Catálogo de Vídeos
+                      Plataforma de vídeos
                     </h4>
                     <p className="text-sm text-white/60 leading-relaxed font-light mb-4">
                       Catálogo e indexação de conteúdos educativos e divertidos do Instagram, categorizados por temas e faixa etária.

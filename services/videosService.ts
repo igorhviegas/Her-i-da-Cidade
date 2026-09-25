@@ -28,6 +28,7 @@ export function mapDocToVideo(docId: string, data: any): Video {
     description: data.description || "",
     thumbnail: data.thumbnail || "",
     ...(data.thumbnailUrl ? { thumbnailUrl: data.thumbnailUrl } : {}),
+    ...(data.badgeText ? { badgeText: data.badgeText } : {}),
     category: data.category || (Array.isArray(data.categories) && data.categories.length > 0 ? data.categories[0] : ""),
     categories: data.categories || (data.category ? [data.category] : []),
     tags: data.tags || [],
@@ -169,6 +170,7 @@ export async function createVideo(
   if (input.caption) payload.caption = input.caption;
   if (input.description) payload.description = input.description;
   if (input.ageRange) payload.ageRange = input.ageRange;
+  if (input.badgeText && input.badgeText.trim()) payload.badgeText = input.badgeText.trim();
 
   // CRITICAL: Apenas incluir thumbnailUrl se existir URL válida.
   // NÃO enviar: thumbnailUrl: undefined (simplesmente omitir o campo).
@@ -215,6 +217,15 @@ export async function updateVideo(
   } else {
     // Se não está substituindo nem removendo, não tocar no campo
     delete payload.thumbnailUrl;
+  }
+
+  // Tratar atualização ou remoção de selo (badgeText)
+  if (updates.badgeText !== undefined) {
+    if (updates.badgeText && updates.badgeText.trim()) {
+      payload.badgeText = updates.badgeText.trim();
+    } else {
+      payload.badgeText = deleteField();
+    }
   }
 
   // Regenerar searchText se campos relevantes mudarem

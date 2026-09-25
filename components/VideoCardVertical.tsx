@@ -22,6 +22,14 @@ export const VideoCardVertical: React.FC<VideoCardVerticalProps> = ({ video, onS
         loading="lazy"
         className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-110"
       />
+      {/* Selo individual (badgeText) no canto superior esquerdo */}
+      {video.badgeText && (
+        <div className="absolute top-2.5 left-2.5 z-10 pointer-events-none">
+          <span className="inline-block px-2 py-0.5 rounded-md bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white font-black text-[10px] tracking-wider uppercase shadow-md shadow-black/60 border border-white/20">
+            {video.badgeText}
+          </span>
+        </div>
+      )}
       <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
       <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-950 shadow-xl">

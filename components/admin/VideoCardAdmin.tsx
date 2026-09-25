@@ -54,6 +54,11 @@ export const VideoCardAdmin: React.FC<VideoCardAdminProps> = ({
               <Eye className="w-6 h-6" />
             </div>
           )}
+          {video.badgeText && (
+            <div className="absolute top-1 left-1 bg-gradient-to-r from-red-600 to-amber-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow z-10 uppercase tracking-wider">
+              {video.badgeText}
+            </div>
+          )}
           {isFeatured && (
             <div className="absolute top-1 right-1 bg-amber-500 text-black p-0.5 rounded-full shadow" title="Vídeo em destaque">
               <Star className="w-3 h-3 fill-black text-black" />
@@ -66,6 +71,11 @@ export const VideoCardAdmin: React.FC<VideoCardAdminProps> = ({
           </div>
           <p className="text-sm text-white/60 line-clamp-2">{video.description}</p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+            {video.badgeText && (
+              <span className="px-2 py-0.5 bg-gradient-to-r from-red-600 to-amber-600 text-white rounded font-black tracking-wider text-[10px] shadow-sm uppercase">
+                Selo: {video.badgeText}
+              </span>
+            )}
             {isFeatured && (
               <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded font-black tracking-wide text-[10px] flex items-center gap-1 shadow-sm">
                 <Star className="w-3 h-3 fill-amber-400 text-amber-400" />

@@ -18,6 +18,21 @@ export function extractInstagramId(url: string): string {
 }
 
 /**
+ * Valida se uma string é uma URL HTTPS legítima do Instagram.
+ */
+export function isValidInstagramUrl(urlStr?: string): boolean {
+  if (!urlStr || typeof urlStr !== 'string') return false;
+  try {
+    const parsed = new URL(urlStr.trim());
+    if (parsed.protocol !== 'https:') return false;
+    const hostname = parsed.hostname.toLowerCase();
+    return hostname === 'instagram.com' || hostname === 'www.instagram.com' || hostname.endsWith('.instagram.com');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Simple keyword generator focused on search intent.
  * It combines title words, categories, and a few common synonyms.
  * The result is a set of 6‑15 keywords.

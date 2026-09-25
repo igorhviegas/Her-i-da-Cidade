@@ -26,6 +26,7 @@ const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
   const [category, setCategory] = useState(video?.category ?? '');
   const [keywords, setKeywords] = useState(video?.keywords?.join(', ') ?? '');
   const [order, setOrder] = useState(video?.order?.toString() ?? '1');
+  const [badgeText, setBadgeText] = useState(video?.badgeText ?? '');
   const [active, setActive] = useState(video?.active ?? true);
   const [featured, setFeatured] = useState(video?.featured === true);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +121,7 @@ const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
       category,
       keywords: keywords.split(',').map(k => k.trim()).filter(Boolean),
       order: Number(order) || 1,
+      badgeText: badgeText.trim(),
       active,
       featured: active ? featured : false,
     };
@@ -308,6 +310,24 @@ const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
                 </button>
               </div>
             )}
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm text-white/70">Selo</label>
+              <span className="text-[11px] text-white/40">{badgeText.length}/20</span>
+            </div>
+            <input
+              type="text"
+              maxLength={20}
+              value={badgeText}
+              onChange={e => setBadgeText(e.target.value)}
+              placeholder="Ex: TOP 1, NOVO, ESPECIAL, MAIS VISTO"
+              className="w-full bg-[#090E1B] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500 uppercase font-bold text-xs tracking-wider"
+            />
+            <p className="text-[11px] text-white/45 mt-1">
+              Opcional — aparece sobre a thumbnail
+            </p>
           </div>
 
           <div>
