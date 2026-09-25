@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Video } from '../../types';
-import { getVideos, deleteVideo, toggleVideoActive, updateVideoOrder, setFeaturedVideo } from '../../services/videosService';
+import { getVideos, deleteVideo, toggleVideoActive, updateVideoOrder, setFeaturedVideo, migrateLegacyVideoCategories } from '../../services/videosService';
 import VideoCardAdmin from './VideoCardAdmin';
 import VideoRowAdmin from './VideoRowAdmin';
 import VideoFormModal from './VideoFormModal';
@@ -26,6 +26,7 @@ export const VideoList: React.FC = () => {
   const fetchVideos = async () => {
     setLoading(true);
     try {
+      await migrateLegacyVideoCategories();
       const data = await getVideos(false); // include inactive videos
       setVideos(data);
       setError(null);
@@ -363,7 +364,7 @@ export const VideoList: React.FC = () => {
       )}
 
       {showForm && (
-        <VideoFormModal video={editVideo} onClose={handleFormClose} />
+        <VideoFormModal video={editVideo} existingCategories={existingCategories} onClose={handleFormClose} />
       )}
 
       {showCsvImport && (

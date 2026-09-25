@@ -209,6 +209,18 @@ export async function updateVideo(
     updatedAt: serverTimestamp(),
   };
 
+  // Sincronizar category/categories: sempre que uma das duas mudar, recalcular a outra
+  // (causa raiz do bug de categoria não persistir — updateDoc espalhava updates sem sincronizar os dois campos)
+  if (updates.categories !== undefined) {
+    const categories = (updates.categories || []).map(c => c.trim()).filter(Boolean);
+    payload.categories = categories;
+    payload.category = categories[0] || "";
+  } else if (updates.category !== undefined) {
+    const category = updates.category.trim();
+    payload.categories = category ? [category] : [];
+    payload.category = category;
+  }
+
   // Tratar remoção ou atualização de thumbnail
   if (options?.removeThumbnail) {
     payload.thumbnailUrl = deleteField();
@@ -229,8 +241,8 @@ export async function updateVideo(
   }
 
   // Regenerar searchText se campos relevantes mudarem
-  if (updates.title || updates.category || updates.keywords) {
-    const categories = updates.categories || (updates.category ? [updates.category] : []);
+  if (updates.title || updates.category || updates.categories || updates.keywords) {
+    const categories = payload.categories !== undefined ? payload.categories : (updates.categories || (updates.category ? [updates.category] : []));
     const generatedKeywords = generateKeywords(updates.title || "", categories);
     const keywords = Array.from(new Set([...(updates.keywords || []), ...generatedKeywords]));
     payload.keywords = keywords;
@@ -274,6 +286,28 @@ export async function updateVideo(
   });
 
   await updateDoc(docRef, payload);
+}
+
+/**
+ * Migração idempotente: para vídeos com apenas `category` (sem `categories`),
+ * grava `categories: [category]` no Firestore. Não sobrescreve `categories` já existente
+ * nem apaga `category`. Segura para rodar múltiplas vezes.
+ */
+export async function migrateLegacyVideoCategories(): Promise<{ migrated: number }> {
+  if (!db) return { migrated: 0 };
+  const snapshot = await getDocs(collection(db, VIDEOS_COLLECTION));
+  const batch = writeBatch(db);
+  let migrated = 0;
+  snapshot.forEach(d => {
+    const data = d.data();
+    const hasCategories = Array.isArray(data.categories) && data.categories.length > 0;
+    if (!hasCategories && data.category) {
+      batch.update(d.ref, { categories: [data.category] });
+      migrated++;
+    }
+  });
+  if (migrated > 0) await batch.commit();
+  return { migrated };
 }
 
 /** Delete video */
