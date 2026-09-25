@@ -54,7 +54,7 @@ export const Footer: React.FC = () => {
               <div className="w-10 h-10 bg-[#0072d2] rounded-full flex items-center justify-center shadow-lg shadow-blue-600/10 overflow-hidden">
                 <img
                   src={spider}
-                  alt="logo"
+                  alt="Logo do Herói da Cidade"
                   className="w-6 h-6 object-contain"
                 />
               </div>

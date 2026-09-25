@@ -15,7 +15,7 @@ export const About: React.FC = () => {
         <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-blue-900/10 group">
           <img 
             src="https://disciplinary-peach-obfj8i7gqu.edgeone.app/profissional%201.jpeg" 
-            alt="Nosso trabalho" 
+            alt="Homem-Aranha em apresentação ao vivo"
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center transition-colors group-hover:bg-black/20">

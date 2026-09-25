@@ -9,7 +9,7 @@ export const Hero: React.FC = () => {
         {/* Hero Image - Optimized for all screens */}
         <img 
           src="https://rising-brown-rufjc3ycjc.edgeone.app/WhatsApp%20Image%202026-01-08%20at%2015.00.34.jpeg" 
-          alt="O Herói da Cidade" 
+          alt="Homem-Aranha em apresentação do Herói da Cidade"
           className="w-full h-full object-cover object-center sm:object-[75%_center] opacity-90 brightness-[0.55] contrast-110 saturate-[1.1] transition-transform duration-[20s] ease-out scale-105"
         />
 

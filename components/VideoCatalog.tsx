@@ -32,7 +32,6 @@ export const VideoCatalog: React.FC = () => {
   const lastScrollYRef = useRef(0);
 
   useEffect(() => {
-    document.title = "Plataforma de vídeos - O Herói da Cidade";
 
     const updateHeaderHeight = () => {
       if (headerRef.current) {
