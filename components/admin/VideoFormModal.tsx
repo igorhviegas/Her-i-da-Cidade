@@ -5,6 +5,7 @@ import { Image, Upload, Trash2, RefreshCw, Undo2 } from 'lucide-react';
 
 interface Props {
   video?: Video | null;
+  existingCategories?: string[];
   onClose: () => void;
 }
 
@@ -19,11 +20,18 @@ const extractInstagramId = (url: string): string => {
   }
 };
 
-const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
+const VideoFormModal: React.FC<Props> = ({ video, existingCategories = [], onClose }) => {
   const isEditMode = Boolean(video);
   const [title, setTitle] = useState(video?.title ?? '');
   const [url, setUrl] = useState(video?.instagramUrl ?? '');
-  const [category, setCategory] = useState(video?.category ?? '');
+  const initialCategories = video?.categories?.length
+    ? video.categories
+    : video?.category
+    ? [video.category]
+    : [];
+  const [categories, setCategories] = useState<string[]>(initialCategories);
+  const [newCategory, setNewCategory] = useState('');
+  const [categoryError, setCategoryError] = useState<string | null>(null);
   const [keywords, setKeywords] = useState(video?.keywords?.join(', ') ?? '');
   const [order, setOrder] = useState(video?.order?.toString() ?? '1');
   const [badgeText, setBadgeText] = useState(video?.badgeText ?? '');
@@ -85,6 +93,31 @@ const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
     setRemoveThumbnail(false);
   };
 
+  const allCategories = Array.from(
+    new Set([...existingCategories, ...categories].map(c => c.trim()).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+  const toggleCategory = (cat: string) => {
+    setCategoryError(null);
+    setCategories(prev =>
+      prev.some(c => c.toLowerCase() === cat.toLowerCase())
+        ? prev.filter(c => c.toLowerCase() !== cat.toLowerCase())
+        : [...prev, cat]
+    );
+  };
+
+  const handleAddNewCategory = () => {
+    const trimmed = newCategory.trim();
+    if (!trimmed) return;
+    if (categories.some(c => c.toLowerCase() === trimmed.toLowerCase())) {
+      setNewCategory('');
+      return;
+    }
+    setCategories(prev => [...prev, trimmed]);
+    setNewCategory('');
+    setCategoryError(null);
+  };
+
   const handleClearSelectedFile = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setSelectedFile(null);
@@ -105,6 +138,11 @@ const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
       setLoading(false);
       return;
     }
+    if (categories.length === 0) {
+      setCategoryError('Selecione ao menos uma categoria.');
+      setLoading(false);
+      return;
+    }
     if (!isEditMode) {
       const existing = await getVideoByInstagramId(instagramId);
       if (existing) {
@@ -118,7 +156,8 @@ const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
       title,
       instagramUrl: url,
       instagramId,
-      category,
+      category: categories[0] || '',
+      categories,
       keywords: keywords.split(',').map(k => k.trim()).filter(Boolean),
       order: Number(order) || 1,
       badgeText: badgeText.trim(),
@@ -179,15 +218,79 @@ const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
           </div>
 
           <div>
-            <label className="block text-sm text-white/70 mb-1">Categoria *</label>
-            <input
-              type="text"
-              value={category}
-              onChange={e => setCategory(e.target.value)}
-              required
-              placeholder="Ex: Hábitos, Educação, Diversão"
-              className="w-full bg-[#090E1B] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm text-white/70">Categorias *</label>
+              {categories.length > 0 && (
+                <span className="text-[11px] text-white/40">{categories.length} selecionada(s)</span>
+              )}
+            </div>
+
+            {categories.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {categories.map(cat => (
+                  <span
+                    key={cat}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 rounded-full text-xs"
+                  >
+                    {cat}
+                    <button
+                      type="button"
+                      onClick={() => toggleCategory(cat)}
+                      className="text-emerald-300/70 hover:text-white"
+                      aria-label={`Remover categoria ${cat}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <div className="max-h-36 overflow-y-auto border border-white/10 bg-[#090E1B] rounded-lg p-2 space-y-1">
+              {allCategories.length === 0 ? (
+                <p className="text-xs text-white/40 px-1 py-1">Nenhuma categoria cadastrada ainda.</p>
+              ) : (
+                allCategories.map(cat => (
+                  <label
+                    key={cat}
+                    className="flex items-center gap-2 px-1 py-1 text-sm text-white/80 cursor-pointer hover:bg-white/5 rounded"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={categories.some(c => c.toLowerCase() === cat.toLowerCase())}
+                      onChange={() => toggleCategory(cat)}
+                      className="rounded accent-emerald-500 cursor-pointer"
+                    />
+                    {cat}
+                  </label>
+                ))
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="text"
+                value={newCategory}
+                onChange={e => setNewCategory(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddNewCategory();
+                  }
+                }}
+                placeholder="Nova categoria (ex: Hábitos)"
+                className="flex-1 bg-[#090E1B] border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500"
+              />
+              <button
+                type="button"
+                onClick={handleAddNewCategory}
+                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-semibold transition"
+              >
+                Adicionar
+              </button>
+            </div>
+
+            {categoryError && <p className="text-xs text-red-400 mt-1">{categoryError}</p>}
           </div>
 
           {/* ========================================================= */}

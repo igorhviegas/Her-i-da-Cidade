@@ -80,7 +80,7 @@ export const VideoRowAdmin: React.FC<VideoRowAdminProps> = ({
           </div>
           <div className="flex items-center gap-2 mt-1 flex-wrap text-xs">
             <span className="px-2 py-0.5 bg-white/5 text-white/70 rounded text-[11px]">
-              {video.category || 'Geral'}
+              {(video.categories?.length ? video.categories : video.category ? [video.category] : ['Geral']).join(' • ')}
             </span>
             {video.badgeText && (
               <span className="px-2 py-0.5 bg-gradient-to-r from-red-600 to-amber-600 text-white rounded font-black tracking-wider text-[9px] shadow-sm uppercase">

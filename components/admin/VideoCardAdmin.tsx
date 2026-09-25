@@ -82,7 +82,9 @@ export const VideoCardAdmin: React.FC<VideoCardAdminProps> = ({
                 ★ EM DESTAQUE
               </span>
             )}
-            <span className="px-2 py-0.5 bg-white/5 text-white/70 rounded">{video.category}</span>
+            <span className="px-2 py-0.5 bg-white/5 text-white/70 rounded">
+              {(video.categories?.length ? video.categories : video.category ? [video.category] : []).join(' • ')}
+            </span>
             <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-300 rounded">Ordem: {video.order ?? 0}</span>
           </div>
         </div>
