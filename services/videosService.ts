@@ -29,8 +29,12 @@ export function mapDocToVideo(docId: string, data: any): Video {
     thumbnail: data.thumbnail || "",
     ...(data.thumbnailUrl ? { thumbnailUrl: data.thumbnailUrl } : {}),
     ...(data.badgeText ? { badgeText: data.badgeText } : {}),
-    category: data.category || (Array.isArray(data.categories) && data.categories.length > 0 ? data.categories[0] : ""),
-    categories: data.categories || (data.category ? [data.category] : []),
+    category: Array.isArray(data.categories)
+      ? (data.categories[0] || "")
+      : (typeof data.category === 'string' ? data.category : ""),
+    categories: Array.isArray(data.categories)
+      ? data.categories
+      : (typeof data.category === 'string' && data.category ? [data.category] : []),
     tags: data.tags || [],
     topics: data.topics || [],
     ageRange: data.ageRange,
@@ -118,11 +122,18 @@ export async function createVideo(
   // 2. Se houver arquivo de thumbnail, fazer upload para Vercel Blob via API
   let finalThumbnailUrl: string | undefined = input.thumbnailUrl?.trim();
   if (thumbnailFile) {
-    finalThumbnailUrl = await uploadThumbnailToVercelBlob(thumbnailFile);
+    try {
+      finalThumbnailUrl = await uploadThumbnailToVercelBlob(thumbnailFile);
+    } catch (uploadErr: any) {
+      console.error('[createVideo] Erro no upload da thumbnail:', uploadErr);
+      throw new Error(`Erro ao enviar a imagem: ${uploadErr?.message || 'Falha no upload'}`);
+    }
   }
 
-  const category = input.category || (input.categories && input.categories[0]) || "Geral";
-  const categories = input.categories && input.categories.length ? input.categories : [category];
+  const categories: string[] = Array.isArray(input.categories)
+    ? input.categories.map(c => c.trim()).filter(Boolean)
+    : (input.category?.trim() ? [input.category.trim()] : []);
+  const category = categories[0] || input.category || "";
   const tags = input.tags || [];
   const topics = input.topics || [];
   const generatedKeywords = generateKeywords(input.title || "", categories);
@@ -201,7 +212,12 @@ export async function updateVideo(
 
   let newThumbnailUrl: string | undefined = updates.thumbnailUrl?.trim();
   if (options?.thumbnailFile) {
-    newThumbnailUrl = await uploadThumbnailToVercelBlob(options.thumbnailFile);
+    try {
+      newThumbnailUrl = await uploadThumbnailToVercelBlob(options.thumbnailFile);
+    } catch (uploadErr: any) {
+      console.error('[updateVideo] Erro no upload da thumbnail:', uploadErr);
+      throw new Error(`Erro ao enviar a imagem: ${uploadErr?.message || 'Falha no upload'}`);
+    }
   }
 
   const payload: any = {
@@ -300,8 +316,9 @@ export async function migrateLegacyVideoCategories(): Promise<{ migrated: number
   let migrated = 0;
   snapshot.forEach(d => {
     const data = d.data();
-    const hasCategories = Array.isArray(data.categories) && data.categories.length > 0;
-    if (!hasCategories && data.category) {
+    // Apenas documentos antigos que NÃO possuem o campo categories definido
+    const hasCategoriesField = data.categories !== undefined;
+    if (!hasCategoriesField && data.category) {
       batch.update(d.ref, { categories: [data.category] });
       migrated++;
     }

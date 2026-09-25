@@ -47,6 +47,30 @@ const uploadMiddleware = multer({
   limits: { fileSize: MAX_FILE_SIZE },
 });
 
+// Helper de obtenção de token OIDC com timeout para não travar conexões sem OIDC
+export async function safeGetOidcToken(fallbackToken?: string): Promise<string | undefined> {
+  try {
+    const oidcPromise = getVercelOidcToken();
+    const timeoutPromise = new Promise<undefined>((_, reject) =>
+      setTimeout(() => reject(new Error('oidc timeout')), 2500)
+    );
+    const token = await Promise.race([oidcPromise, timeoutPromise]);
+    if (token) return token;
+  } catch (_oidcErr) {
+    // Timeout ou erro de ambiente sem OIDC (esperado em dev/local)
+  }
+  return fallbackToken;
+}
+
+// Helper de upload para Vercel Blob com timeout para nunca pendurar requisição
+export async function safePutBlob(pathname: string, body: Buffer, options: any): Promise<any> {
+  const putPromise = put(pathname, body, options);
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Tempo limite esgotado ao conectar ao Vercel Blob.')), 15000)
+  );
+  return Promise.race([putPromise, timeoutPromise]);
+}
+
 /**
  * Endpoint POST Web Standard para Vercel Serverless Functions.
  * Obtém o token OIDC da Vercel via getVercelOidcToken() e envia ao Vercel Blob
@@ -88,7 +112,7 @@ export async function POST(request: Request): Promise<Response> {
     const buffer = Buffer.from(arrayBuffer);
     const storeId = process.env.BLOB_STORE_ID || 'store_ZlySBsEZT51qmJ7I';
 
-    // Obtenção do token OIDC no momento da requisição
+    // Obtenção do token OIDC no momento da requisição com timeout de proteção
     const incomingHeaderToken =
       request.headers.get('x-vercel-oidc-token') ||
       request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ||
@@ -98,14 +122,7 @@ export async function POST(request: Request): Promise<Response> {
       setupVercelRequestContext(incomingHeaderToken);
     }
 
-    let oidcToken: string | undefined;
-    try {
-      oidcToken = await getVercelOidcToken();
-    } catch (_oidcErr: any) {
-      if (incomingHeaderToken) {
-        oidcToken = incomingHeaderToken;
-      }
-    }
+    const oidcToken = await safeGetOidcToken(incomingHeaderToken || undefined);
 
     const putOptions: any = {
       access: 'public',
@@ -119,8 +136,8 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     try {
-      // Upload via @vercel/blob
-      const blob = await put(pathname, buffer, putOptions);
+      // Upload via @vercel/blob com timeout
+      const blob = await safePutBlob(pathname, buffer, putOptions);
       return Response.json(
         { success: true, url: blob.url },
         { status: 200, headers: CORS_HEADERS }
@@ -174,46 +191,39 @@ export default async function handler(req: any, res?: any) {
     }
 
     uploadMiddleware.any()(req, res, async (err: any) => {
-      if (err) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ success: false, error: 'O arquivo excede o limite máximo permitido de 4 MB.' });
-        }
-        return res.status(400).json({ success: false, error: err.message || 'Erro ao processar envio do arquivo.' });
-      }
-
-      const files = req.files as Express.Multer.File[] | undefined;
-      const file = files && files.length > 0 ? files[0] : (req.file as Express.Multer.File | undefined);
-
-      if (!file || !file.buffer) {
-        return res.status(400).json({ success: false, error: 'Nenhum arquivo de imagem foi enviado.' });
-      }
-
-      if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-        return res.status(400).json({ success: false, error: 'Formato de arquivo não suportado. Formatos aceitos: JPG, JPEG, PNG e WEBP.' });
-      }
-
-      if (file.size > MAX_FILE_SIZE) {
-        return res.status(400).json({ success: false, error: 'O arquivo excede o tamanho máximo de 4 MB.' });
-      }
-
-      const incomingHeaderToken =
-        (req.headers && (req.headers['x-vercel-oidc-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, ''))) ||
-        process.env.VERCEL_OIDC_TOKEN;
-
-      if (typeof incomingHeaderToken === 'string') {
-        setupVercelRequestContext(incomingHeaderToken);
-      }
-
-      let oidcToken: string | undefined;
       try {
-        oidcToken = await getVercelOidcToken();
-      } catch (_oidcErr: any) {
+        if (err) {
+          if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ success: false, error: 'O arquivo excede o limite máximo permitido de 4 MB.' });
+          }
+          return res.status(400).json({ success: false, error: err.message || 'Erro ao processar envio do arquivo.' });
+        }
+
+        const files = req.files as Express.Multer.File[] | undefined;
+        const file = files && files.length > 0 ? files[0] : (req.file as Express.Multer.File | undefined);
+
+        if (!file || !file.buffer) {
+          return res.status(400).json({ success: false, error: 'Nenhum arquivo de imagem foi enviado.' });
+        }
+
+        if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+          return res.status(400).json({ success: false, error: 'Formato de arquivo não suportado. Formatos aceitos: JPG, JPEG, PNG e WEBP.' });
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+          return res.status(400).json({ success: false, error: 'O arquivo excede o tamanho máximo de 4 MB.' });
+        }
+
+        const incomingHeaderToken =
+          (req.headers && (req.headers['x-vercel-oidc-token'] || req.headers['authorization']?.replace(/^Bearer\s+/i, ''))) ||
+          process.env.VERCEL_OIDC_TOKEN;
+
         if (typeof incomingHeaderToken === 'string') {
-          oidcToken = incomingHeaderToken;
+          setupVercelRequestContext(incomingHeaderToken);
         }
-      }
 
-      try {
+        const oidcToken = await safeGetOidcToken(typeof incomingHeaderToken === 'string' ? incomingHeaderToken : undefined);
+
         const ext = getSafeExtension(file.mimetype, file.originalname);
         const uniqueId = crypto.randomUUID();
         const pathname = `videos/thumbnails/${uniqueId}.${ext}`;
@@ -231,7 +241,7 @@ export default async function handler(req: any, res?: any) {
         }
 
         try {
-          const blob = await put(pathname, file.buffer, putOptions);
+          const blob = await safePutBlob(pathname, file.buffer, putOptions);
           return res.status(200).json({ success: true, url: blob.url });
         } catch (uploadErr: any) {
           console.warn('[Vercel Blob Notice]: Upload via Vercel Blob falhou:', uploadErr?.message || uploadErr);
