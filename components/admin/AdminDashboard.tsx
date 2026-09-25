@@ -6,6 +6,7 @@ import { AdminServices } from './AdminServices';
 import { AdminSettings } from './AdminSettings';
 import { AdminVideosPage } from './AdminVideosPage';
 import { AdminCategoriesPage } from './AdminCategoriesPage';
+import { AdminContentPage } from './AdminContentPage';
 import { 
   Shield, 
   LayoutDashboard, 
@@ -43,6 +44,8 @@ export const AdminDashboard: React.FC = () => {
       ? 'categories'
       : path === '/admin/videos'
       ? 'videos'
+      : path === '/admin/conteudo'
+      ? 'content'
       : 'dashboard';
 
   const [currentTab, setCurrentTab] = useState<AdminTab>(initialTab);
@@ -59,6 +62,8 @@ export const AdminDashboard: React.FC = () => {
       setCurrentTab('categories');
     } else if (path === '/admin/videos') {
       setCurrentTab('videos');
+    } else if (path === '/admin/conteudo') {
+      setCurrentTab('content');
     } else if (path === '/admin' || path === '/admin/dashboard') {
       setCurrentTab('dashboard');
     }
@@ -74,6 +79,8 @@ export const AdminDashboard: React.FC = () => {
       navigate('/admin/categorias');
     } else if (tabId === 'settings') {
       navigate('/admin/configuracoes');
+    } else if (tabId === 'content') {
+      navigate('/admin/conteudo');
     } else if (tabId === 'dashboard') {
       navigate('/admin');
     }
@@ -140,7 +147,7 @@ export const AdminDashboard: React.FC = () => {
     { id: 'services' as AdminTab, label: 'Serviços', icon: Sparkles, status: 'active' },
     { id: 'videos' as AdminTab, label: 'Vídeos', icon: Video, status: 'active', hint: 'Etapa 5' },
     { id: 'categories' as AdminTab, label: 'Categorias', icon: Layers, status: 'active' },
-    { id: 'content' as AdminTab, label: 'Conteúdo', icon: FileText, status: 'soon', hint: 'Etapa 6' },
+    { id: 'content' as AdminTab, label: 'Conteúdo', icon: FileText, status: 'active' },
     { id: 'settings' as AdminTab, label: 'Configurações', icon: Settings, status: 'active' },
   ];
 
@@ -197,7 +204,7 @@ export const AdminDashboard: React.FC = () => {
                     {item.hint || 'Em breve'}
                   </span>
                 )}
-                {(item.id === 'services' || item.id === 'settings') && (
+                {(item.id === 'services' || item.id === 'settings' || item.id === 'content') && (
                   <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                     Ativo
                   </span>
@@ -278,7 +285,7 @@ export const AdminDashboard: React.FC = () => {
                         {item.hint || 'Em breve'}
                       </span>
                     )}
-                    {(item.id === 'services' || item.id === 'settings') && (
+                      {(item.id === 'services' || item.id === 'settings' || item.id === 'content') && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-medium">
                         Ativo
                       </span>
@@ -540,16 +547,16 @@ export const AdminDashboard: React.FC = () => {
 
                   {/* Card Conteúdo */}
                   <div 
-                    onClick={() => setCurrentTab('content')}
+                    onClick={() => handleTabChange('content')}
                     className="group bg-[#0D1527] hover:bg-[#111B30] border border-white/10 hover:border-emerald-500/40 rounded-2xl p-6 transition-all cursor-pointer shadow-lg"
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
                         <FileText className="w-6 h-6" />
                       </div>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                        <Clock className="w-3 h-3" />
-                        Em breve • Etapa 5
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Ativo
                       </span>
                     </div>
                     <h4 className="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors mb-2">
@@ -601,8 +608,9 @@ export const AdminDashboard: React.FC = () => {
             <AdminServices />
           )}
 
-          {/* TAB: CONFIGURAÇÕES */}
-          {currentTab === 'settings' && (
+            {/* TAB: CONFIGURAÇÕES */}
+            {currentTab === 'content' && <AdminContentPage />}
+            {currentTab === 'settings' && (
             <AdminSettings />
           )}
           {currentTab === 'videos' && (
@@ -613,7 +621,7 @@ export const AdminDashboard: React.FC = () => {
           )}
 
           {/* TAB: SUBMÓDULOS EM BREVE */}
-          {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && currentTab !== 'categories' && (
+            {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && currentTab !== 'categories' && currentTab !== 'content' && (
             <div className="max-w-2xl mx-auto py-12 text-center animate-in fade-in duration-200">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 mb-4 text-blue-400">
                 <Clock className="w-8 h-8" />

@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { PublicSite } from './components/PublicSite';
 import { AdminApp } from './components/admin/AdminApp';
 import { VideoCatalog } from './components/VideoCatalog';
+import { useHomeContent } from './services/homeContentService';
 
 const HOME_TITLE = 'Homem-Aranha Personagem Vivo em BH | Herói da Cidade';
 const HOME_DESCRIPTION = 'Contrate o Homem-Aranha para festas infantis, aniversários e eventos em Belo Horizonte, Betim, Contagem, Nova Lima e região.';
@@ -38,6 +39,7 @@ const AppContent: React.FC = () => {
   const { path } = useRouter();
   const isAdmin = path.startsWith('/admin');
   const isVideos = path === '/videos' || path.startsWith('/videos/');
+  const homeContent = useHomeContent(!isAdmin && !isVideos);
 
   useEffect(() => {
     const structuredDataId = 'site-seo-structured-data';
@@ -52,8 +54,8 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    const title = isVideos ? VIDEO_TITLE : HOME_TITLE;
-    const description = isVideos ? VIDEO_DESCRIPTION : HOME_DESCRIPTION;
+    const title = isVideos ? VIDEO_TITLE : homeContent.seoTitle || HOME_TITLE;
+    const description = isVideos ? VIDEO_DESCRIPTION : homeContent.seoDescription || HOME_DESCRIPTION;
     const url = isVideos ? VIDEO_URL : HOME_URL;
 
     document.title = title;
@@ -112,7 +114,7 @@ const AppContent: React.FC = () => {
       document.head.appendChild(script);
     }
     script.textContent = JSON.stringify(structuredData);
-  }, [isAdmin, isVideos]);
+  }, [isAdmin, isVideos, homeContent.seoTitle, homeContent.seoDescription]);
 
   if (isAdmin) {
     return <AdminApp />;
@@ -123,7 +125,7 @@ const AppContent: React.FC = () => {
     return <VideoCatalog />;
   }
 
-  return <PublicSite />;
+  return <PublicSite homeContent={homeContent} />;
 };
 
 export const App: React.FC = () => {

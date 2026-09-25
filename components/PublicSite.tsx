@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navbar } from './Navbar';
 import { Hero } from './Hero';
 import { Services } from './Services';
@@ -9,32 +9,44 @@ import { Footer } from './Footer';
 import { BackToTop } from './BackToTop';
 import { useSiteConfig, buildWhatsAppLink } from '../services/siteConfigService';
 import { VideoSection } from './VideoSection';
+import { HomeEditorialSection } from './HomeEditorialSection';
+import { isHomeSectionPublished, sortHomeSections } from '../services/homeContentService';
+import type { HomeContent, HomeSection } from '../types/homeContent';
 
-export const PublicSite: React.FC = () => {
+export const PublicSite: React.FC<{ homeContent: HomeContent }> = ({ homeContent }) => {
   const { whatsappUrl } = useSiteConfig();
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const floatingWhatsAppHref = buildWhatsAppLink(
     whatsappUrl,
     'Olá, gostaria de saber mais sobre os serviços do Heroi da Cidade!'
   );
+
+
+  const sections = sortHomeSections(homeContent.sections).filter((section) => isHomeSectionPublished(section, now));
+  const renderSection = (section: HomeSection) => {
+    switch (section.sectionType) {
+      case 'hero': return <React.Fragment key={section.id}><Hero section={section} /><div className="relative h-24 bg-gradient-to-b from-transparent to-[#0B1929] z-10 -mt-24" /></React.Fragment>;
+      case 'services': return <Services key={section.id} section={section} />;
+      case 'video-teaser': return <VideoSection key={section.id} section={section} />;
+      case 'about': return <About key={section.id} section={section} />;
+      case 'booking': return <Booking key={section.id} section={section} />;
+      case 'testimonials': return <Feedbacks key={section.id} />;
+      default: return <HomeEditorialSection key={section.id} section={section} />;
+    }
+  };
 
   return (
     <div className="min-h-screen disney-gradient selection:bg-blue-500 selection:text-white">
       <Navbar />
       
       <main>
-        <Hero />
-        
-        {/* Divider Visual Section */}
-        <div className="relative h-24 bg-gradient-to-b from-transparent to-[#0B1929] z-10 -mt-24" />
-        
-        <Services />
-        <VideoSection />
-        
-        <About />
-        
-        <Booking />
-        
-        <Feedbacks />
+        {sections.map(renderSection)}
       </main>
 
       <Footer />

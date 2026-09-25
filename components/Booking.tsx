@@ -1,7 +1,9 @@
 
 import React, { useEffect } from 'react';
+import type { HomeSection } from '../types/homeContent';
 
-export const Booking: React.FC = () => {
+export const Booking: React.FC<{ section: HomeSection }> = ({ section }) => {
+  const titleLines = section.title.split(/\r?\n/);
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://assets.calendly.com/assets/external/widget.js';
@@ -24,15 +26,10 @@ export const Booking: React.FC = () => {
         <div className="text-center mb-16">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-600/10 rounded-full border border-blue-600/20 mb-6">
             <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-            <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em]">Base de Operações Online</span>
+            <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em]">{section.subtitle}</span>
           </div>
-          <h3 className="text-4xl md:text-6xl font-extrabold uppercase italic tracking-tighter mb-6 leading-none">
-            Agende Sua <br className="sm:hidden" /> <span className="text-white/40">Chamada de Vídeo</span>
-          </h3>
-          <p className="text-white/60 max-w-2xl mx-auto font-light text-sm md:text-base leading-relaxed">
-            Escolha um horário abaixo para uma experiência imersiva com o Herói da Cidade. 
-            Nossa base secreta está pronta para a conexão!
-          </p>
+          <h3 className="text-4xl md:text-6xl font-extrabold uppercase italic tracking-tighter mb-6 leading-none">{titleLines[0]}{titleLines.length > 1 && <> <br className="sm:hidden" /> <span className="text-white/40">{titleLines.slice(1).join(" ")}</span></>}</h3>
+          <p className="text-white/60 max-w-2xl mx-auto font-light text-sm md:text-base leading-relaxed">{section.description}</p>
         </div>
 
         <div className="relative">

@@ -9,7 +9,8 @@
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "firebase:setup": "node scripts/setup-firebase.mjs",
-    "firebase:seed": "node scripts/seed-services.mjs"
+    "firebase:seed": "node scripts/seed-services.mjs",
+    "firebase:seed-home": "node scripts/seed-home-content.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",

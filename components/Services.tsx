@@ -1,10 +1,12 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { ServiceCard } from "./ServiceCard";
+import type { HomeSection } from "../types/homeContent";
 import { useServices } from "../services/servicesService";
 
-export const Services: React.FC = () => {
+export const Services: React.FC<{ section: HomeSection }> = ({ section }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const titleLines = section.title.split(/\r?\n/);
   const { services: servicesList, loading } = useServices({
     onlyActive: true,
     realTime: true,
@@ -53,17 +55,11 @@ export const Services: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 sm:mb-20 gap-8">
         <div className="max-w-2xl">
           <h2 className="text-[10px] sm:text-xs font-black text-blue-500 uppercase tracking-[0.3em] mb-3 sm:mb-4">
-            Nossos serviços
+            {section.subtitle}
           </h2>
-          <h3 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold uppercase italic tracking-tighter leading-none">
-            Escolha Sua <br className="sm:hidden" />{" "}
-            <span className="text-white/40">Próxima Missão</span>
-          </h3>
+          <h3 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold uppercase italic tracking-tighter leading-none">{titleLines[0]}{titleLines.length > 1 && <><br className="sm:hidden" />{" "}<span className="text-white/40">{titleLines.slice(1).join(" ")}</span></>}</h3>
         </div>
-        <p className="text-white/60 max-w-md text-lg sm:text-xl md:text-2xl font-light leading-tight md:text-right italic">
-          Cada vídeo é feito com qualidade e o carinho de uma equipe que ama o
-          que faz, para que a magia seja transformada em boas memórias.
-        </p>
+        <p className="text-white/60 max-w-md text-lg sm:text-xl md:text-2xl font-light leading-tight md:text-right italic">{section.description}</p>
       </div>
 
       <div

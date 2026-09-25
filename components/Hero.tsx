@@ -1,7 +1,10 @@
 
 import React from 'react';
+import type { HomeSection } from '../types/homeContent';
 
-export const Hero: React.FC = () => {
+export const Hero: React.FC<{ section: HomeSection }> = ({ section }) => {
+  const titleLines = section.title.split(/\r?\n/);
+  const descriptionLines = section.description.split(/\r?\n/);
   return (
     <section className="relative h-screen flex flex-col justify-end sm:justify-center items-start overflow-hidden bg-[#0B1929]">
       {/* Background Image Container */}
@@ -23,16 +26,16 @@ export const Hero: React.FC = () => {
       {/* Content Area */}
       <div className="relative z-20 w-full max-w-7xl mx-auto px-6 sm:px-12 md:px-20 pb-16 sm:pb-0 flex flex-col items-start text-left">
         <div className="inline-block px-4 py-1.5 bg-blue-500/10 backdrop-blur-xl rounded-full border border-blue-400/30 mb-6 shadow-[0_0_20px_rgba(59,130,246,0.1)] animate-fade-in-up">
-          <span className="text-[9px] sm:text-xs font-black tracking-[0.4em] uppercase text-blue-400 drop-shadow-sm">Serviços Exclusivos</span>
+          <span className="text-[9px] sm:text-xs font-black tracking-[0.4em] uppercase text-blue-400 drop-shadow-sm">{section.subtitle || 'Serviços Exclusivos'}</span>
         </div>
         
         <h1 className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-black mb-4 sm:mb-6 tracking-tighter leading-[0.85] italic uppercase text-white drop-shadow-[0_10px_40px_rgba(0,0,0,0.7)]">
-          O Herói <br /> 
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 via-blue-500 to-indigo-600">Da Cidade</span>
+          {titleLines[0]}
+          {titleLines.length > 1 && <><br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 via-blue-500 to-indigo-600">{titleLines.slice(1).join(" ")}</span></>}
         </h1>
 
         <p className="text-sm sm:text-lg md:text-xl text-white/90 mb-8 sm:mb-10 max-w-md font-extralight italic leading-relaxed tracking-[0.12em] uppercase drop-shadow-md">
-          Criando memórias <br className="sm:hidden" /> Que nunca serão esquecidas
+          {descriptionLines.map((line, index) => <React.Fragment key={index}>{index > 0 && <br className="sm:hidden" />}{index > 0 && ' '}{line}</React.Fragment>)}
         </p>
 
         <div className="flex flex-col items-start gap-1 opacity-60">

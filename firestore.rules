@@ -84,5 +84,17 @@ service cloud.firestore {
       // Somente administradores autenticados podem criar ou atualizar.
       allow write: if isAdmin();
     }
+
+    // Conteúdo editorial público da página inicial. A leitura é pública;
+    // somente administradores existentes podem gerenciar os dados.
+    match /siteContent/{siteDocumentId} {
+      allow read: if siteDocumentId == 'home';
+      allow write: if siteDocumentId == 'home' && isAdmin();
+
+      match /sections/{sectionId} {
+        allow read: if siteDocumentId == 'home';
+        allow write: if siteDocumentId == 'home' && isAdmin();
+      }
+    }
   }
 }

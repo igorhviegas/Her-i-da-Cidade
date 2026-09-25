@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useRouter } from '../lib/router';
+import type { HomeSection } from '../types/homeContent';
 
-export const VideoSection: React.FC = () => {
+export const VideoSection: React.FC<{ section: HomeSection }> = ({ section }) => {
   const { navigate } = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -40,17 +41,17 @@ export const VideoSection: React.FC = () => {
         {/* Badge da plataforma */}
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-400 text-xs font-bold uppercase tracking-wider mb-4 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-          Plataforma de vídeos
+          {section.subtitle}
         </div>
 
         {/* Título principal */}
         <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
-          Encontre o vídeo certo para cada momento.
+          {section.title}
         </h2>
 
         {/* Texto explicativo conciso */}
         <p className="mt-4 max-w-2xl mx-auto text-sm sm:text-base text-white/70 leading-relaxed">
-          O Herói da Cidade disponibiliza uma plataforma exclusiva onde pais e educadores encontram vídeos por temas específicos para orientar, divertir e inspirar as crianças.
+          {section.description}
         </p>
 
         {/* Campo de pesquisa */}
@@ -107,7 +108,7 @@ export const VideoSection: React.FC = () => {
             <svg className="w-4 h-4 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
               <path d="M8 5v14l11-7z" />
             </svg>
-            <span>Acessar catálogo completo</span>
+            <span>{section.buttonText || "Acessar catálogo completo"}</span>
           </button>
         </div>
       </div>
