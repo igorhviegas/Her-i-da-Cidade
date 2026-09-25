@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Video } from '../../types';
-import { Pencil, Trash2, Eye, EyeOff, ChevronUp, ChevronDown, Star } from 'lucide-react';
+import { Pencil, Trash2, Eye, ChevronUp, ChevronDown, Star } from 'lucide-react';
 
 interface VideoCardAdminProps {
   video: Video;
@@ -23,6 +23,10 @@ export const VideoCardAdmin: React.FC<VideoCardAdminProps> = ({
   const imageUrl = !imageError ? (video.thumbnailUrl || video.thumbnail) : null;
   const isActive = video.active !== false;
   const isFeatured = video.featured === true;
+  const categoriesLabel = (video.categories?.length ? video.categories : (video.category ? [video.category] : ['Geral']))
+    .map((cat) => cat.trim())
+    .filter(Boolean)
+    .join(' • ') || 'Geral';
 
   const handleOrderInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value, 10);
@@ -82,7 +86,7 @@ export const VideoCardAdmin: React.FC<VideoCardAdminProps> = ({
                 ★ EM DESTAQUE
               </span>
             )}
-            <span className="px-2 py-0.5 bg-white/5 text-white/70 rounded">{video.category}</span>
+            <span className="px-2 py-0.5 bg-white/5 text-white/70 rounded">{categoriesLabel}</span>
             <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-300 rounded">Ordem: {video.order ?? 0}</span>
           </div>
         </div>

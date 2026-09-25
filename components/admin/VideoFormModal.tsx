@@ -6,6 +6,7 @@ import { Image, Upload, Trash2, RefreshCw, Undo2 } from 'lucide-react';
 interface Props {
   video?: Video | null;
   onClose: () => void;
+  categoryOptions: string[];
 }
 
 const extractInstagramId = (url: string): string => {
@@ -19,11 +20,18 @@ const extractInstagramId = (url: string): string => {
   }
 };
 
-const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
+const getVideoCategories = (video?: Video | null): string[] => {
+  if (!video) return [];
+  if (video.categories?.length) return video.categories.filter(Boolean).map((cat) => cat.trim()).filter(Boolean);
+  const legacy = video.category?.trim();
+  return legacy ? [legacy] : [];
+};
+
+const VideoFormModal: React.FC<Props> = ({ video, onClose, categoryOptions }) => {
   const isEditMode = Boolean(video);
   const [title, setTitle] = useState(video?.title ?? '');
   const [url, setUrl] = useState(video?.instagramUrl ?? '');
-  const [category, setCategory] = useState(video?.category ?? '');
+  const [categories, setCategories] = useState<string[]>(getVideoCategories(video));
   const [keywords, setKeywords] = useState(video?.keywords?.join(', ') ?? '');
   const [order, setOrder] = useState(video?.order?.toString() ?? '1');
   const [badgeText, setBadgeText] = useState(video?.badgeText ?? '');
@@ -39,6 +47,13 @@ const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
   const existingThumbnail = video?.thumbnailUrl || (video?.thumbnail && video.thumbnail.startsWith('http') ? video.thumbnail : null);
   const [removeThumbnail, setRemoveThumbnail] = useState(false);
   const [thumbnailError, setThumbnailError] = useState<string | null>(null);
+  const availableCategories = React.useMemo(() => {
+    const merged = new Set<string>([
+      ...categoryOptions.map((cat) => cat.trim()).filter(Boolean),
+      ...categories.map((cat) => cat.trim()).filter(Boolean),
+    ]);
+    return Array.from(merged).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [categoryOptions, categories]);
 
   useEffect(() => {
     if (!isEditMode && url) {
@@ -114,16 +129,27 @@ const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
       }
     }
 
+    const normalizedCategories = Array.from(new Set(categories.map((cat) => cat.trim()).filter(Boolean)));
+
     const payload: Partial<Video> = {
       title,
       instagramUrl: url,
       instagramId,
-      category,
+      category: normalizedCategories[0] || '',
+      categories: normalizedCategories,
       keywords: keywords.split(',').map(k => k.trim()).filter(Boolean),
       order: Number(order) || 1,
       badgeText: badgeText.trim(),
       active,
       featured: active ? featured : false,
+    };
+
+    const toggleCategory = (categoryName: string) => {
+      setCategories((previous) => (
+        previous.includes(categoryName)
+          ? previous.filter((cat) => cat !== categoryName)
+          : [...previous, categoryName]
+      ));
     };
 
     try {
@@ -180,14 +206,39 @@ const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
 
           <div>
             <label className="block text-sm text-white/70 mb-1">Categoria *</label>
-            <input
-              type="text"
-              value={category}
-              onChange={e => setCategory(e.target.value)}
-              required
-              placeholder="Ex: Hábitos, Educação, Diversão"
-              className="w-full bg-[#090E1B] border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-emerald-500"
-            />
+            <div className="w-full bg-[#090E1B] border border-white/10 rounded-lg px-3 py-2 text-white">
+              {availableCategories.length === 0 ? (
+                <p className="text-xs text-white/50">Nenhuma categoria disponível para seleção.</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
+                  {availableCategories.map((cat) => {
+                    const isSelected = categories.includes(cat);
+                    return (
+                      <label key={cat} className="flex items-center gap-2 text-xs text-white/80 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleCategory(cat)}
+                          className="rounded accent-emerald-500 cursor-pointer"
+                        />
+                        <span className={isSelected ? 'text-emerald-300 font-semibold' : ''}>{cat}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {categories.length > 0 ? (
+                  categories.map((cat) => (
+                    <span key={cat} className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[11px]">
+                      {cat}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-[11px] text-white/45">Nenhuma categoria selecionada.</span>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* ========================================================= */}

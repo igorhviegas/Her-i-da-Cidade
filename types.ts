@@ -55,7 +55,7 @@ export interface FirestoreVideo {
   thumbnail?: string;
   thumbnailUrl?: string;
   category?: string;
-  categories: string[];
+  categories?: string[];
   tags: string[];
   topics: string[];
   ageRange?: string;
@@ -83,7 +83,7 @@ export interface Video {
   thumbnail?: string;
   thumbnailUrl?: string;
   category?: string;
-  categories: string[];
+  categories?: string[];
   tags: string[];
   topics: string[];
   ageRange?: string;

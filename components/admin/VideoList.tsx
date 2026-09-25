@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Video } from '../../types';
-import { getVideos, deleteVideo, toggleVideoActive, updateVideoOrder, setFeaturedVideo } from '../../services/videosService';
+import { getVideos, deleteVideo, toggleVideoActive, updateVideoOrder, setFeaturedVideo, migrateLegacyVideoCategories } from '../../services/videosService';
 import VideoCardAdmin from './VideoCardAdmin';
 import VideoRowAdmin from './VideoRowAdmin';
 import VideoFormModal from './VideoFormModal';
@@ -8,6 +8,12 @@ import CsvImportModal from './CsvImportModal';
 import { Search, X, LayoutGrid, List } from 'lucide-react';
 
 type SortOption = 'order' | 'title-asc' | 'title-desc' | 'recent' | 'oldest';
+
+const getVideoCategories = (video: Pick<Video, 'categories' | 'category'>): string[] => {
+  if (video.categories?.length) return video.categories.filter(Boolean).map((cat) => cat.trim()).filter(Boolean);
+  const legacy = video.category?.trim();
+  return legacy ? [legacy] : [];
+};
 
 export const VideoList: React.FC = () => {
   const [videos, setVideos] = useState<Video[]>([]);
@@ -22,10 +28,15 @@ export const VideoList: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('Todas');
   const [sortBy, setSortBy] = useState<SortOption>('order');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [hasMigratedLegacyCategories, setHasMigratedLegacyCategories] = useState(false);
 
   const fetchVideos = async () => {
     setLoading(true);
     try {
+      if (!hasMigratedLegacyCategories) {
+        await migrateLegacyVideoCategories();
+        setHasMigratedLegacyCategories(true);
+      }
       const data = await getVideos(false); // include inactive videos
       setVideos(data);
       setError(null);
@@ -44,11 +55,7 @@ export const VideoList: React.FC = () => {
   const existingCategories = useMemo(() => {
     const set = new Set<string>();
     videos.forEach((v) => {
-      if (v.categories?.length) {
-        v.categories.forEach((c) => c && set.add(c.trim()));
-      } else if (v.category) {
-        set.add(v.category.trim());
-      }
+      getVideoCategories(v).forEach((c) => set.add(c));
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [videos]);
@@ -69,11 +76,7 @@ export const VideoList: React.FC = () => {
     const filtered = videos.filter((video) => {
       // Filtro de categoria
       if (selectedCategory !== 'Todas') {
-        const cats = video.categories?.length
-          ? video.categories
-          : video.category
-          ? [video.category]
-          : [];
+        const cats = getVideoCategories(video);
         const matchesCategory = cats.some(
           (c) => c.toLowerCase().trim() === selectedCategory.toLowerCase().trim()
         );
@@ -87,8 +90,7 @@ export const VideoList: React.FC = () => {
         video.title,
         video.caption,
         video.description,
-        video.category,
-        ...(video.categories || []),
+        ...getVideoCategories(video),
         ...(video.tags || []),
         ...(video.keywords || []),
         video.badgeText,
@@ -363,7 +365,7 @@ export const VideoList: React.FC = () => {
       )}
 
       {showForm && (
-        <VideoFormModal video={editVideo} onClose={handleFormClose} />
+        <VideoFormModal video={editVideo} onClose={handleFormClose} categoryOptions={existingCategories} />
       )}
 
       {showCsvImport && (
@@ -373,4 +375,3 @@ export const VideoList: React.FC = () => {
   );
 };
 export default VideoList;
-

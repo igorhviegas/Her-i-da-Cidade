@@ -1,10 +1,34 @@
 import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, Unsubscribe, serverTimestamp, query, where, writeBatch } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { Video, FirestoreVideo } from "../types";
+import { Video } from "../types";
 import { extractInstagramId, generateKeywords, buildSearchText } from "../utils/videoHelpers";
 import { uploadThumbnailToVercelBlob } from "./blobUploadService";
 
 export const VIDEOS_COLLECTION = "videos";
+
+function normalizeCategoryValue(value?: string): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeCategoriesArray(values?: string[]): string[] {
+  if (!Array.isArray(values)) return [];
+  const unique = new Set<string>();
+  values.forEach((value) => {
+    const trimmed = normalizeCategoryValue(value);
+    if (trimmed) unique.add(trimmed);
+  });
+  return Array.from(unique);
+}
+
+function resolveVideoCategories(input: { category?: string; categories?: string[] }): { category: string; categories: string[] } {
+  const normalizedFromArray = normalizeCategoriesArray(input.categories);
+  const legacyCategory = normalizeCategoryValue(input.category);
+  const categories = normalizedFromArray.length
+    ? normalizedFromArray
+    : (legacyCategory ? [legacyCategory] : []);
+  const category = categories[0] || "";
+  return { category, categories };
+}
 
 /** Validador de URL HTTP/HTTPS */
 export function isValidHttpUrl(urlString: string): boolean {
@@ -19,6 +43,11 @@ export function isValidHttpUrl(urlString: string): boolean {
 
 /** Convert Firestore document to UI Video */
 export function mapDocToVideo(docId: string, data: any): Video {
+  const { category, categories } = resolveVideoCategories({
+    category: data.category,
+    categories: data.categories,
+  });
+
   return {
     id: docId,
     title: data.title || "",
@@ -29,8 +58,8 @@ export function mapDocToVideo(docId: string, data: any): Video {
     thumbnail: data.thumbnail || "",
     ...(data.thumbnailUrl ? { thumbnailUrl: data.thumbnailUrl } : {}),
     ...(data.badgeText ? { badgeText: data.badgeText } : {}),
-    category: data.category || (Array.isArray(data.categories) && data.categories.length > 0 ? data.categories[0] : ""),
-    categories: data.categories || (data.category ? [data.category] : []),
+    category,
+    categories,
     tags: data.tags || [],
     topics: data.topics || [],
     ageRange: data.ageRange,
@@ -60,6 +89,53 @@ export async function getVideos(onlyActive: boolean = true): Promise<Video[]> {
     return dateB - dateA;
   });
   return videos;
+}
+
+/** Migração idempotente: adiciona categories:[category] em vídeos legados */
+export async function migrateLegacyVideoCategories(): Promise<number> {
+  if (!db) return 0;
+  const snapshot = await getDocs(collection(db, VIDEOS_COLLECTION));
+  let migratedCount = 0;
+  let pendingDocs: Array<typeof snapshot.docs[number]> = [];
+
+  for (const videoDoc of snapshot.docs) {
+    const data = videoDoc.data();
+    const legacyCategory = normalizeCategoryValue(data.category);
+    const categories = normalizeCategoriesArray(data.categories);
+    if (!legacyCategory || categories.length > 0) continue;
+
+    pendingDocs.push(videoDoc);
+    if (pendingDocs.length < 450) continue;
+
+    const batch = writeBatch(db);
+    pendingDocs.forEach((pendingDoc) => {
+      const pendingCategory = normalizeCategoryValue(pendingDoc.data().category);
+      if (!pendingCategory) return;
+      batch.update(pendingDoc.ref, {
+        categories: [pendingCategory],
+        updatedAt: serverTimestamp(),
+      });
+      migratedCount += 1;
+    });
+    await batch.commit();
+    pendingDocs = [];
+  }
+
+  if (pendingDocs.length > 0) {
+    const batch = writeBatch(db);
+    pendingDocs.forEach((pendingDoc) => {
+      const pendingCategory = normalizeCategoryValue(pendingDoc.data().category);
+      if (!pendingCategory) return;
+      batch.update(pendingDoc.ref, {
+        categories: [pendingCategory],
+        updatedAt: serverTimestamp(),
+      });
+      migratedCount += 1;
+    });
+    await batch.commit();
+  }
+
+  return migratedCount;
 }
 
 /** Real‑time subscription */
@@ -121,8 +197,7 @@ export async function createVideo(
     finalThumbnailUrl = await uploadThumbnailToVercelBlob(thumbnailFile);
   }
 
-  const category = input.category || (input.categories && input.categories[0]) || "Geral";
-  const categories = input.categories && input.categories.length ? input.categories : [category];
+  const { category, categories } = resolveVideoCategories(input);
   const tags = input.tags || [];
   const topics = input.topics || [];
   const generatedKeywords = generateKeywords(input.title || "", categories);
@@ -229,18 +304,51 @@ export async function updateVideo(
   }
 
   // Regenerar searchText se campos relevantes mudarem
-  if (updates.title || updates.category || updates.keywords) {
-    const categories = updates.categories || (updates.category ? [updates.category] : []);
-    const generatedKeywords = generateKeywords(updates.title || "", categories);
-    const keywords = Array.from(new Set([...(updates.keywords || []), ...generatedKeywords]));
+  const categoriesWereUpdated = updates.categories !== undefined || updates.category !== undefined;
+  if (categoriesWereUpdated) {
+    const normalized = resolveVideoCategories({
+      category: updates.category,
+      categories: updates.categories,
+    });
+    payload.categories = normalized.categories;
+    payload.category = normalized.category;
+  }
+
+  const shouldRebuildSearchText = updates.title !== undefined
+    || updates.caption !== undefined
+    || updates.description !== undefined
+    || updates.tags !== undefined
+    || updates.topics !== undefined
+    || updates.keywords !== undefined
+    || categoriesWereUpdated;
+
+  if (shouldRebuildSearchText) {
+    const snapshot = await getDoc(docRef);
+    const currentVideoData = snapshot.exists() ? mapDocToVideo(snapshot.id, snapshot.data()) : null;
+    const mergedForSearch = {
+      title: updates.title ?? currentVideoData?.title ?? "",
+      caption: updates.caption ?? currentVideoData?.caption ?? "",
+      description: updates.description ?? currentVideoData?.description ?? "",
+      tags: updates.tags ?? currentVideoData?.tags ?? [],
+      topics: updates.topics ?? currentVideoData?.topics ?? [],
+      keywords: updates.keywords ?? currentVideoData?.keywords ?? [],
+      category: categoriesWereUpdated ? payload.category : (currentVideoData?.category ?? ""),
+      categories: categoriesWereUpdated ? payload.categories : (currentVideoData?.categories ?? []),
+    };
+    const { categories } = resolveVideoCategories({
+      category: mergedForSearch.category,
+      categories: mergedForSearch.categories,
+    });
+    const generatedKeywords = generateKeywords(mergedForSearch.title, categories);
+    const keywords = Array.from(new Set([...(mergedForSearch.keywords || []), ...generatedKeywords]));
     payload.keywords = keywords;
     payload.searchText = buildSearchText({
-      title: updates.title || "",
-      caption: updates.caption || "",
-      description: updates.description || "",
+      title: mergedForSearch.title,
+      caption: mergedForSearch.caption,
+      description: mergedForSearch.description,
       categories,
-      tags: updates.tags || [],
-      topics: updates.topics || [],
+      tags: mergedForSearch.tags,
+      topics: mergedForSearch.topics,
       keywords,
     });
   }
@@ -353,9 +461,10 @@ export async function importVideosFromCSV(videos: Array<any>): Promise<{
       const instagramId = extractInstagramId(instagramUrl);
       if (!instagramId) continue;
 
-      const categories = row.categories
-        ? String(row.categories).split(/[;,]/).map((c: string) => c.trim()).filter(Boolean)
-        : (row.Categoria ? String(row.Categoria).split(/[;,]/).map((c: string) => c.trim()).filter(Boolean) : []);
+      const legacyCategory = normalizeCategoryValue(
+        row.Categoria ?? row.category ?? row.Category ?? row.categories ?? ""
+      );
+      const categories = legacyCategory ? [legacyCategory] : [];
       const tags = row.tags ? String(row.tags).split(/[;,]/).map((t: string) => t.trim()).filter(Boolean) : [];
       const topics = row.topics ? String(row.topics).split(/[;,]/).map((t: string) => t.trim()).filter(Boolean) : [];
       const keywordsCsv = row.keywords
@@ -394,7 +503,7 @@ export async function importVideosFromCSV(videos: Array<any>): Promise<{
         instagramUrl,
         caption: row.caption ?? '',
         description: row.description ?? '',
-        category: categories[0] || 'Geral',
+        category: categories[0] || '',
         categories,
         tags,
         topics,
