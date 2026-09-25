@@ -13,7 +13,7 @@ const AppContent: React.FC = () => {
   }
 
   // Rota dedicada para o catálogo de vídeos estilo Netflix
-  if (path === '/videos') {
+  if (path === '/videos' || path.startsWith('/videos/')) {
     return <VideoCatalog />;
   }
 

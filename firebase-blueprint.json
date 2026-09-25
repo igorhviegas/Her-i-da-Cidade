@@ -58,6 +58,7 @@
         "searchText": { "type": "string", "maxLength": 5000 },
         "publishedAt": { "type": "string" },
         "active": { "type": "boolean" },
+        "featured": { "type": "boolean" },
         "order": { "type": "number" },
         "createdAt": { "type": "string" },
         "updatedAt": { "type": "string" }

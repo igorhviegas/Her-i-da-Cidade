@@ -27,6 +27,7 @@ const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
   const [keywords, setKeywords] = useState(video?.keywords?.join(', ') ?? '');
   const [order, setOrder] = useState(video?.order?.toString() ?? '1');
   const [active, setActive] = useState(video?.active ?? true);
+  const [featured, setFeatured] = useState(video?.featured === true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -120,6 +121,7 @@ const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
       keywords: keywords.split(',').map(k => k.trim()).filter(Boolean),
       order: Number(order) || 1,
       active,
+      featured: active ? featured : false,
     };
 
     try {
@@ -335,10 +337,34 @@ const VideoFormModal: React.FC<Props> = ({ video, onClose }) => {
               <input
                 type="checkbox"
                 checked={active}
-                onChange={e => setActive(e.target.checked)}
-                className="rounded accent-emerald-500"
+                onChange={e => {
+                  const newActive = e.target.checked;
+                  setActive(newActive);
+                  if (!newActive) setFeatured(false);
+                }}
+                className="rounded accent-emerald-500 cursor-pointer"
               />
               Ativo no catálogo
+            </label>
+          </div>
+
+          <div className="pt-2 pb-1 border-t border-white/5">
+            <label className={`flex items-start gap-2.5 text-sm cursor-pointer ${!active ? 'opacity-40 pointer-events-none' : 'text-white'}`}>
+              <input
+                type="checkbox"
+                checked={active && featured}
+                onChange={e => setFeatured(e.target.checked)}
+                disabled={!active}
+                className="mt-1 rounded accent-amber-500 w-4 h-4 cursor-pointer"
+              />
+              <div>
+                <span className="font-semibold text-amber-300 flex items-center gap-1.5">
+                  ★ Vídeo em destaque
+                </span>
+                <p className="text-xs text-white/50 mt-0.5">
+                  Apenas 1 vídeo pode ser o destaque principal do catálogo. Marcar esta opção desmarcará automaticamente qualquer destaque anterior.
+                </p>
+              </div>
             </label>
           </div>
 

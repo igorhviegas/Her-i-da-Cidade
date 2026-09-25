@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Video } from '../../types';
-import { getVideos, deleteVideo, toggleVideoActive, updateVideoOrder } from '../../services/videosService';
+import { getVideos, deleteVideo, toggleVideoActive, updateVideoOrder, setFeaturedVideo } from '../../services/videosService';
 import VideoCardAdmin from './VideoCardAdmin';
 import VideoFormModal from './VideoFormModal';
 import CsvImportModal from './CsvImportModal';
@@ -39,6 +39,15 @@ export const VideoList: React.FC = () => {
   const handleToggleActive = async (id: string, active: boolean) => {
     await toggleVideoActive(id, !active);
     fetchVideos();
+  };
+
+  const handleToggleFeatured = async (id: string, isCurrentlyFeatured: boolean) => {
+    try {
+      await setFeaturedVideo(id, !isCurrentlyFeatured);
+      fetchVideos();
+    } catch (e: any) {
+      alert(e.message ?? 'Erro ao alterar destaque');
+    }
   };
 
   const handleOrderChange = async (id: string, order: number) => {
@@ -94,6 +103,7 @@ export const VideoList: React.FC = () => {
               onEdit={() => handleEdit(video)}
               onDelete={() => handleDelete(video.id)}
               onToggleActive={() => handleToggleActive(video.id, video.active)}
+              onToggleFeatured={() => handleToggleFeatured(video.id, video.featured === true)}
               onOrderChange={(order) => handleOrderChange(video.id, order)}
             />
           ))}

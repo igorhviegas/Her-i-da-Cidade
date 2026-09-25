@@ -18,13 +18,11 @@ export const Services: React.FC = () => {
     ) as HTMLElement[];
     if (children.length === 0) return;
     const containerRect = container.getBoundingClientRect();
-    const containerCenter = containerRect.left + containerRect.width / 2;
     let bestIndex = 0;
     let minDist = Infinity;
     children.forEach((child, idx) => {
       const rect = child.getBoundingClientRect();
-      const childCenter = rect.left + rect.width / 2;
-      const dist = Math.abs(childCenter - containerCenter);
+      const dist = Math.abs(rect.left - containerRect.left);
       if (dist < minDist) {
         minDist = dist;
         bestIndex = idx;
@@ -70,13 +68,13 @@ export const Services: React.FC = () => {
 
       <div
         ref={containerRef}
-        className="flex overflow-x-auto pb-8 gap-4 snap-x snap-mandatory md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 md:gap-6 md:overflow-visible md:pb-0 scrollbar-hide"
+        className="flex overflow-x-auto pb-8 gap-4 snap-x snap-mandatory md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 md:gap-6 md:overflow-visible md:pb-0 scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {loading && servicesList.length === 0 ? (
           Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="min-w-[85vw] xs:min-w-[45vw] md:min-w-0 snap-start snap-always"
+              className="w-[76vw] min-w-[76vw] sm:w-[45vw] sm:min-w-[45vw] md:w-auto md:min-w-0 snap-start snap-always flex-shrink-0"
             >
               <div className="relative aspect-[2/3] rounded-lg overflow-hidden border-2 border-white/10 bg-white/5 animate-pulse flex flex-col justify-end p-5">
                 <div className="w-16 h-3 bg-white/10 rounded mb-2" />
@@ -89,7 +87,7 @@ export const Services: React.FC = () => {
           servicesList.map((service) => (
             <div
               key={service.id}
-              className="min-w-[85vw] xs:min-w-[45vw] md:min-w-0 snap-start snap-always"
+              className="w-[76vw] min-w-[76vw] sm:w-[45vw] sm:min-w-[45vw] md:w-auto md:min-w-0 snap-start snap-always flex-shrink-0"
             >
               <ServiceCard service={service} />
             </div>

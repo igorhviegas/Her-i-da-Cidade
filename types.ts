@@ -63,6 +63,7 @@ export interface FirestoreVideo {
   searchText?: string;
   publishedAt?: string;
   active: boolean;
+  featured?: boolean;
   order?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -89,6 +90,7 @@ export interface Video {
   searchText?: string;
   publishedAt?: string;
   active: boolean;
+  featured?: boolean;
   order?: number;
   createdAt?: string;
   updatedAt?: string;

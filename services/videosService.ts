@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, Unsubscribe, serverTimestamp, query, where } from "firebase/firestore";
+import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, Unsubscribe, serverTimestamp, query, where, writeBatch } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Video, FirestoreVideo } from "../types";
 import { extractInstagramId, generateKeywords, buildSearchText } from "../utils/videoHelpers";
@@ -37,6 +37,7 @@ export function mapDocToVideo(docId: string, data: any): Video {
     searchText: data.searchText,
     publishedAt: data.publishedAt,
     active: data.active !== false,
+    featured: data.featured === true,
     order: data.order !== undefined ? Number(data.order) : 1,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
@@ -146,10 +147,24 @@ export async function createVideo(
     topics,
     searchText,
     active: input.active !== false,
+    featured: input.featured === true && input.active !== false,
     order: input.order !== undefined ? Number(input.order) : 1,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
+
+  // Se o novo vídeo estiver sendo criado como destaque, desmarcar qualquer destaque anterior
+  if (payload.featured) {
+    const q = query(collection(db, VIDEOS_COLLECTION), where("featured", "==", true));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const batch = writeBatch(db);
+      snap.forEach(d => {
+        batch.update(d.ref, { featured: false, updatedAt: serverTimestamp() });
+      });
+      await batch.commit();
+    }
+  }
 
   if (input.caption) payload.caption = input.caption;
   if (input.description) payload.description = input.description;
@@ -219,6 +234,27 @@ export async function updateVideo(
     });
   }
 
+  // Tratar exclusividade de destaque e desativação
+  if (updates.featured !== undefined) {
+    if (updates.featured === true && updates.active !== false) {
+      const q = query(collection(db, VIDEOS_COLLECTION), where("featured", "==", true));
+      const snap = await getDocs(q);
+      const batch = writeBatch(db);
+      snap.forEach(d => {
+        if (d.id !== id) {
+          batch.update(d.ref, { featured: false, updatedAt: serverTimestamp() });
+        }
+      });
+      await batch.commit();
+      payload.featured = true;
+    } else {
+      payload.featured = false;
+    }
+  } else if (updates.active === false) {
+    // Se o vídeo for desativado, remove automaticamente o destaque
+    payload.featured = false;
+  }
+
   // Sanitizar quaisquer valores undefined para não quebrar o Firestore
   Object.keys(payload).forEach(key => {
     if (payload[key] === undefined) {
@@ -236,11 +272,42 @@ export async function deleteVideo(id: string): Promise<void> {
   await deleteDoc(docRef);
 }
 
-/** Toggle video active status */
+/** Toggle video active status - se desativado, remove automaticamente o destaque */
 export async function toggleVideoActive(id: string, isActive: boolean): Promise<void> {
   if (!db) throw new Error("Firestore não inicializado");
   const docRef = doc(db, VIDEOS_COLLECTION, id);
-  await updateDoc(docRef, { active: isActive, updatedAt: serverTimestamp() });
+  const updates: any = { active: isActive, updatedAt: serverTimestamp() };
+  if (!isActive) {
+    updates.featured = false;
+  }
+  await updateDoc(docRef, updates);
+}
+
+/** Define ou desmarca um vídeo como destaque garantindo exclusividade (máximo 1 em destaque) */
+export async function setFeaturedVideo(id: string, isFeatured: boolean): Promise<void> {
+  if (!db) throw new Error("Firestore não inicializado");
+  const batch = writeBatch(db);
+
+  if (isFeatured) {
+    // 1. Localizar todos os vídeos atualmente marcados como destaque
+    const q = query(collection(db, VIDEOS_COLLECTION), where("featured", "==", true));
+    const snap = await getDocs(q);
+    // 2. Remover featured dos anteriores
+    snap.forEach((d) => {
+      if (d.id !== id) {
+        batch.update(d.ref, { featured: false, updatedAt: serverTimestamp() });
+      }
+    });
+    // 3. Definir featured: true no novo vídeo e garantir que esteja ativo
+    const targetRef = doc(db, VIDEOS_COLLECTION, id);
+    batch.update(targetRef, { featured: true, active: true, updatedAt: serverTimestamp() });
+  } else {
+    // Desmarcar destaque
+    const targetRef = doc(db, VIDEOS_COLLECTION, id);
+    batch.update(targetRef, { featured: false, updatedAt: serverTimestamp() });
+  }
+
+  await batch.commit();
 }
 
 /** Update video display order */

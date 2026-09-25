@@ -46,7 +46,7 @@ export const Footer: React.FC = () => {
   ];
 
   return (
-    <footer className="bg-black pt-24 pb-12 border-t border-white/5">
+    <footer id="contact" className="bg-black pt-24 pb-12 border-t border-white/5">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid md:grid-cols-2 gap-16 mb-16">
           <div className="flex flex-col">

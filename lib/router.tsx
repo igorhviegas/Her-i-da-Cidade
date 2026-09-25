@@ -2,11 +2,13 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 
 interface RouterContextType {
   path: string;
+  search: string;
   navigate: (to: string) => void;
 }
 
 const RouterContext = createContext<RouterContextType>({
   path: '/',
+  search: '',
   navigate: () => {},
 });
 
@@ -18,9 +20,17 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return '/';
   });
 
+  const [search, setSearch] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return window.location.search || '';
+    }
+    return '';
+  });
+
   useEffect(() => {
     const handlePopState = () => {
       setPath(window.location.pathname || '/');
+      setSearch(window.location.search || '');
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -29,16 +39,23 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const navigate = useCallback((to: string) => {
     if (typeof window !== 'undefined') {
-      if (window.location.pathname !== to) {
-        window.history.pushState({}, '', to);
-        setPath(to);
-        window.scrollTo(0, 0);
+      const [targetPathPart, targetQueryPart] = to.split('?');
+      const targetPath = targetPathPart || '/';
+      const targetSearch = targetQueryPart !== undefined ? `?${targetQueryPart}` : '';
+      const targetFull = targetPath + targetSearch;
+      const currentFull = window.location.pathname + window.location.search;
+
+      if (currentFull !== targetFull) {
+        window.history.pushState({}, '', targetFull);
       }
+      setPath(targetPath);
+      setSearch(targetSearch);
+      window.scrollTo(0, 0);
     }
   }, []);
 
   return (
-    <RouterContext.Provider value={{ path, navigate }}>
+    <RouterContext.Provider value={{ path, search, navigate }}>
       {children}
     </RouterContext.Provider>
   );
