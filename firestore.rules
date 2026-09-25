@@ -45,6 +45,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Categorias são usadas pelo painel administrativo. Leitura e escrita
+    // exigem o mesmo documento /admins/{uid} usado no restante do admin.
+    match /categories/{categoryId} {
+      allow read, write: if isAdmin();
+    }
+
 
     // =========================================================
     // ADMINS

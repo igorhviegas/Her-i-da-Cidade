@@ -5,6 +5,7 @@ import { getServices, seedServicesIfEmpty } from '../../services/servicesService
 import { AdminServices } from './AdminServices';
 import { AdminSettings } from './AdminSettings';
 import { AdminVideosPage } from './AdminVideosPage';
+import { AdminCategoriesPage } from './AdminCategoriesPage';
 import { 
   Shield, 
   LayoutDashboard, 
@@ -26,7 +27,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-type AdminTab = 'dashboard' | 'services' | 'videos' | 'content' | 'settings';
+type AdminTab = 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings';
 
 export const AdminDashboard: React.FC = () => {
   const { user, adminData, logout } = useAuth();
@@ -38,6 +39,10 @@ export const AdminDashboard: React.FC = () => {
       ? 'services'
       : path === '/admin/configuracoes' || path === '/admin/settings'
       ? 'settings'
+      : path === '/admin/categorias'
+      ? 'categories'
+      : path === '/admin/videos'
+      ? 'videos'
       : 'dashboard';
 
   const [currentTab, setCurrentTab] = useState<AdminTab>(initialTab);
@@ -50,6 +55,10 @@ export const AdminDashboard: React.FC = () => {
       setCurrentTab('services');
     } else if (path === '/admin/configuracoes' || path === '/admin/settings') {
       setCurrentTab('settings');
+    } else if (path === '/admin/categorias') {
+      setCurrentTab('categories');
+    } else if (path === '/admin/videos') {
+      setCurrentTab('videos');
     } else if (path === '/admin' || path === '/admin/dashboard') {
       setCurrentTab('dashboard');
     }
@@ -59,6 +68,10 @@ export const AdminDashboard: React.FC = () => {
     setCurrentTab(tabId);
     if (tabId === 'services') {
       navigate('/admin/servicos');
+    } else if (tabId === 'videos') {
+      navigate('/admin/videos');
+    } else if (tabId === 'categories') {
+      navigate('/admin/categorias');
     } else if (tabId === 'settings') {
       navigate('/admin/configuracoes');
     } else if (tabId === 'dashboard') {
@@ -126,6 +139,7 @@ export const AdminDashboard: React.FC = () => {
     { id: 'dashboard' as AdminTab, label: 'Dashboard', icon: LayoutDashboard, status: 'active' },
     { id: 'services' as AdminTab, label: 'Serviços', icon: Sparkles, status: 'active' },
     { id: 'videos' as AdminTab, label: 'Vídeos', icon: Video, status: 'active', hint: 'Etapa 5' },
+    { id: 'categories' as AdminTab, label: 'Categorias', icon: Layers, status: 'active' },
     { id: 'content' as AdminTab, label: 'Conteúdo', icon: FileText, status: 'soon', hint: 'Etapa 6' },
     { id: 'settings' as AdminTab, label: 'Configurações', icon: Settings, status: 'active' },
   ];
@@ -594,9 +608,12 @@ export const AdminDashboard: React.FC = () => {
           {currentTab === 'videos' && (
             <AdminVideosPage />
           )}
+          {currentTab === 'categories' && (
+            <AdminCategoriesPage />
+          )}
 
           {/* TAB: SUBMÓDULOS EM BREVE */}
-          {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && (
+          {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && currentTab !== 'categories' && (
             <div className="max-w-2xl mx-auto py-12 text-center animate-in fade-in duration-200">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 mb-4 text-blue-400">
                 <Clock className="w-8 h-8" />

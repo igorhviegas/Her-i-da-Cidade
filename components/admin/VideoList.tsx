@@ -6,6 +6,7 @@ import VideoRowAdmin from './VideoRowAdmin';
 import VideoFormModal from './VideoFormModal';
 import CsvImportModal from './CsvImportModal';
 import { Search, X, LayoutGrid, List } from 'lucide-react';
+import { getCategories, syncCategoriesFromVideos } from '../../services/categoriesService';
 
 type SortOption = 'order' | 'title-asc' | 'title-desc' | 'recent' | 'oldest';
 
@@ -16,6 +17,7 @@ export const VideoList: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editVideo, setEditVideo] = useState<Video | null>(null);
   const [showCsvImport, setShowCsvImport] = useState(false);
+  const [centralCategories, setCentralCategories] = useState<string[]>([]);
 
   // Estados dos controles da Barra de Ferramentas
   const [search, setSearch] = useState('');
@@ -27,8 +29,11 @@ export const VideoList: React.FC = () => {
     setLoading(true);
     try {
       await migrateLegacyVideoCategories();
+      await syncCategoriesFromVideos();
       const data = await getVideos(false); // include inactive videos
+      const categoryData = await getCategories();
       setVideos(data);
+      setCentralCategories(categoryData.map((category) => category.name));
       setError(null);
     } catch (e: any) {
       setError(e.message ?? 'Erro ao carregar vídeos');
@@ -41,7 +46,8 @@ export const VideoList: React.FC = () => {
     fetchVideos();
   }, []);
 
-  // Extrai categorias dinâmicas dos vídeos carregados
+  // Fonte central, com fallback temporário para vídeos legados enquanto a
+  // sincronização inicial está em andamento.
   const existingCategories = useMemo(() => {
     const set = new Set<string>();
     videos.forEach((v) => {
@@ -51,8 +57,8 @@ export const VideoList: React.FC = () => {
         set.add(v.category.trim());
       }
     });
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-  }, [videos]);
+    return Array.from(new Set([...centralCategories, ...set])).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [videos, centralCategories]);
 
   // Função auxiliar de normalização sem acentos e minúsculas
   const normalize = (text: string) =>
@@ -374,4 +380,3 @@ export const VideoList: React.FC = () => {
   );
 };
 export default VideoList;
-
