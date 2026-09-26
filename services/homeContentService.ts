@@ -105,6 +105,12 @@ function homeSectionsCollection() {
   return collection(db, HOME_CONTENT_COLLECTION, HOME_CONTENT_DOCUMENT, HOME_SECTIONS_SUBCOLLECTION);
 }
 
+function withoutUndefinedFields<T extends Record<string, unknown>>(payload: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== undefined)
+  ) as Partial<T>;
+}
+
 export function subscribeToHomeContent(onUpdate: (content: HomeContent) => void, onError?: (error: Error) => void): Unsubscribe {
   if (!db) {
     onUpdate({ seoTitle: HOME_SEO_TITLE, seoDescription: HOME_SEO_DESCRIPTION, sections: DEFAULT_HOME_SECTIONS });
@@ -202,12 +208,12 @@ function sectionWritePayload(input: HomeSectionInput) {
   if (input.imageUrl && !/^https:\/\//i.test(input.imageUrl)) throw new Error('A imagem deve usar uma URL HTTPS.');
   if (input.buttonUrl && !isSafeContentUrl(input.buttonUrl)) throw new Error('O link do botão deve ser HTTPS ou uma rota interna iniciada por /.');
   const { startAt, endAt, ...fields } = input;
-  return {
+  return withoutUndefinedFields({
     ...fields,
     startAt: startAt ? Timestamp.fromDate(startAt instanceof Date ? startAt : new Date(startAt.toMillis())) : null,
     endAt: endAt ? Timestamp.fromDate(endAt instanceof Date ? endAt : new Date(endAt.toMillis())) : null,
     updatedAt: serverTimestamp(),
-  };
+  });
 }
 
 export function isSafeContentUrl(value: string): boolean {
