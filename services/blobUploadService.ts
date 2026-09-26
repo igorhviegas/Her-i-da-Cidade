@@ -1,9 +1,17 @@
+import { auth } from '../lib/firebase';
+
 /**
  * Envia o arquivo de imagem selecionado no frontend para a rota da API (/api/upload-thumbnail),
  * a qual processa o envio seguro para o Vercel Blob e retorna a URL pública.
  * Possui timeout de 25 segundos com AbortController para nunca travar a interface.
  */
-async function uploadImageToVercelBlob(file: File, purpose?: 'service-image'): Promise<string> {
+async function uploadImageToVercelBlob(file: File, purpose?: 'services'): Promise<string> {
+  const user = auth?.currentUser;
+  if (!user) {
+    throw new Error('Faça login como administrador para enviar imagens.');
+  }
+
+  const idToken = await user.getIdToken();
   const formData = new FormData();
   formData.append('file', file);
   if (purpose) formData.append('purpose', purpose);
@@ -15,6 +23,7 @@ async function uploadImageToVercelBlob(file: File, purpose?: 'service-image'): P
   try {
     response = await fetch('/api/upload-thumbnail', {
       method: 'POST',
+      headers: { Authorization: `Bearer ${idToken}` },
       body: formData,
       signal: controller.signal,
     });
@@ -36,7 +45,7 @@ async function uploadImageToVercelBlob(file: File, purpose?: 'service-image'): P
   }
 
   if (!response.ok || !data?.success || !data?.url) {
-    const assetLabel = purpose === 'service-image' ? 'imagem do serviço' : 'thumbnail';
+    const assetLabel = purpose === 'services' ? 'imagem do serviço' : 'thumbnail';
     const errorMessage = data?.error || `Falha no upload da ${assetLabel} (HTTP ${response.status}).`;
     throw new Error(errorMessage);
   }
@@ -49,5 +58,5 @@ export function uploadThumbnailToVercelBlob(file: File): Promise<string> {
 }
 
 export function uploadServiceImageToVercelBlob(file: File): Promise<string> {
-  return uploadImageToVercelBlob(file, 'service-image');
+  return uploadImageToVercelBlob(file, 'services');
 }
