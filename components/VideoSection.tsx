@@ -9,12 +9,6 @@ export const VideoSection: React.FC<{ section: HomeSection }> = ({ section }) =>
   const quickThemes = [
     'Higiene',
     'Alimentação',
-    'Escovar os dentes',
-    'Medo',
-    'Escola',
-    'Amizade',
-    'Hábitos',
-    'Saúde',
   ];
 
   const handleSearch = (termToSearch: string) => {
@@ -38,10 +32,16 @@ export const VideoSection: React.FC<{ section: HomeSection }> = ({ section }) =>
       <div className="absolute top-1/4 right-10 w-[350px] h-[350px] bg-purple-600/10 rounded-full blur-[110px] pointer-events-none" />
 
       <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-        {/* Badge da plataforma */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-400 text-xs font-bold uppercase tracking-wider mb-4 shadow-sm">
-          <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
-          {section.subtitle}
+        {/* Badges da plataforma */}
+        <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-400 text-xs font-bold uppercase tracking-wider shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            {section.subtitle}
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-purple-400/20 bg-purple-500/10 px-2.5 py-1 text-[10px] font-semibold tracking-wide text-purple-200">
+            <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-300" />
+            Novidade exclusiva!
+          </span>
         </div>
 
         {/* Título principal */}
