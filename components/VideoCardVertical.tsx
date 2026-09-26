@@ -14,7 +14,7 @@ export const VideoCardVertical: React.FC<VideoCardVerticalProps> = ({ video, onS
       type="button"
       onClick={onSelect}
       aria-label={`Assistir ${video.title}`}
-      className="group relative flex-none w-[152px] sm:w-[176px] md:w-[198px] aspect-[9/16] overflow-hidden rounded-2xl bg-slate-900 text-left shadow-lg shadow-black/30 transition duration-300 hover:z-10 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-400"
+      className="group relative flex-none w-[152px] h-[270px] sm:w-[176px] sm:h-[312px] md:w-[198px] md:h-[352px] aspect-[9/16] overflow-hidden rounded-2xl bg-slate-900 text-left shadow-lg shadow-black/30 transition duration-300 hover:z-10 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-purple-400"
     >
       <img
         src={cover}
