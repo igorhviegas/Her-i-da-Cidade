@@ -76,6 +76,13 @@ export function handleThumbnailUpload(req: Request, res: Response): void {
       return;
     }
 
+    const purpose = req.body?.purpose;
+    if (purpose !== undefined && purpose !== 'service-image') {
+      jsonError(res, 400, 'Tipo de imagem não suportado.');
+      return;
+    }
+    const blobFolder = purpose === 'service-image' ? 'services/images' : 'videos/thumbnails';
+
     const timeout = setTimeout(() => {
       if (!res.headersSent) {
         jsonError(res, 504, 'Tempo limite esgotado ao enviar a imagem ao Vercel Blob. Tente novamente.');
@@ -83,7 +90,7 @@ export function handleThumbnailUpload(req: Request, res: Response): void {
     }, 25_000);
 
     try {
-      const pathname = `videos/thumbnails/${crypto.randomUUID()}.${extensionFor(file.mimetype)}`;
+      const pathname = `${blobFolder}/${crypto.randomUUID()}.${extensionFor(file.mimetype)}`;
       const blob = await put(pathname, file.buffer, await getUploadOptions(file.mimetype));
       if (!res.headersSent) res.status(201).json({ success: true, url: blob.url });
     } catch (error) {

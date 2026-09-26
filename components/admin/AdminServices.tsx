@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { 
   Sparkles, 
   Plus, 
@@ -19,7 +19,8 @@ import {
   Tag,
   DollarSign,
   Layers,
-  Info
+  Info,
+  Upload
 } from 'lucide-react';
 import { 
   useServices, 
@@ -32,6 +33,7 @@ import {
   UpdateServiceInput
 } from '../../services/servicesService';
 import { Service } from '../../types';
+import { uploadServiceImageToVercelBlob } from '../../services/blobUploadService';
 
 interface ServiceFormData {
   title: string;
@@ -76,6 +78,12 @@ export const AdminServices: React.FC = () => {
   });
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof ServiceFormData, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const serviceImageInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedServiceImage, setSelectedServiceImage] = useState<File | null>(null);
+  const [serviceImagePreviewUrl, setServiceImagePreviewUrl] = useState<string | null>(null);
+  const [isServiceImageUploading, setIsServiceImageUploading] = useState(false);
+  const [serviceImageUploadError, setServiceImageUploadError] = useState<string | null>(null);
+  const [serviceImageUploadComplete, setServiceImageUploadComplete] = useState(false);
 
   // Modal de Confirmação de Exclusão
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
@@ -89,6 +97,62 @@ export const AdminServices: React.FC = () => {
     setTimeout(() => {
       setFeedback((current) => (current?.message === message ? null : current));
     }, 4500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (serviceImagePreviewUrl) URL.revokeObjectURL(serviceImagePreviewUrl);
+    };
+  }, [serviceImagePreviewUrl]);
+
+  const clearSelectedServiceImage = () => {
+    setSelectedServiceImage(null);
+    setServiceImagePreviewUrl(null);
+    setServiceImageUploadError(null);
+    if (serviceImageInputRef.current) serviceImageInputRef.current.value = '';
+  };
+
+  const handleServiceImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setServiceImageUploadError(null);
+    setServiceImageUploadComplete(false);
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+    if (!allowedMimeTypes.includes(file.type) && !allowedExtensions.includes(extension)) {
+      setServiceImageUploadError('Formato não permitido. Utilize arquivos JPG, PNG ou WEBP.');
+      event.target.value = '';
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      setServiceImageUploadError('O arquivo selecionado excede o limite máximo permitido de 4 MB.');
+      event.target.value = '';
+      return;
+    }
+
+    setSelectedServiceImage(file);
+    setServiceImagePreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleUploadServiceImage = async () => {
+    if (!selectedServiceImage || isServiceImageUploading) return;
+    setIsServiceImageUploading(true);
+    setServiceImageUploadError(null);
+    try {
+      const imageUrl = await uploadServiceImageToVercelBlob(selectedServiceImage);
+      setFormData((current) => ({ ...current, imageUrl }));
+      setSelectedServiceImage(null);
+      setServiceImagePreviewUrl(null);
+      setServiceImageUploadComplete(true);
+      setFormErrors((current) => ({ ...current, imageUrl: undefined }));
+      if (serviceImageInputRef.current) serviceImageInputRef.current.value = '';
+    } catch (error: any) {
+      setServiceImageUploadError(error?.message || 'Não foi possível enviar a imagem. Tente novamente.');
+    } finally {
+      setIsServiceImageUploading(false);
+    }
   };
 
   // Filtragem e busca no frontend
@@ -126,6 +190,8 @@ export const AdminServices: React.FC = () => {
       active: true,
     });
     setFormErrors({});
+    clearSelectedServiceImage();
+    setServiceImageUploadComplete(false);
     setIsFormModalOpen(true);
   };
 
@@ -144,6 +210,8 @@ export const AdminServices: React.FC = () => {
       active: service.active !== false,
     });
     setFormErrors({});
+    clearSelectedServiceImage();
+    setServiceImageUploadComplete(false);
     setIsFormModalOpen(true);
   };
 
@@ -163,7 +231,9 @@ export const AdminServices: React.FC = () => {
     if (!formData.category.trim()) {
       errors.category = 'A categoria é obrigatória.';
     }
-    if (!formData.imageUrl.trim()) {
+    if (selectedServiceImage) {
+      errors.imageUrl = 'Envie a imagem selecionada antes de salvar o serviço.';
+    } else if (!formData.imageUrl.trim()) {
       errors.imageUrl = 'A URL da imagem é obrigatória.';
     } else if (!formData.imageUrl.startsWith('http://') && !formData.imageUrl.startsWith('https://')) {
       errors.imageUrl = 'Informe uma URL válida iniciada por https:// ou http://';
@@ -179,7 +249,7 @@ export const AdminServices: React.FC = () => {
   // Salvar serviço (Criação ou Edição)
   const handleSubmitService = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    if (isServiceImageUploading || !validateForm()) return;
 
     setIsSubmitting(true);
     try {
@@ -721,7 +791,7 @@ export const AdminServices: React.FC = () => {
           {/* Backdrop */}
           <div 
             className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
-            onClick={() => !isSubmitting && setIsFormModalOpen(false)}
+            onClick={() => !isSubmitting && !isServiceImageUploading && setIsFormModalOpen(false)}
           />
 
           {/* Dialog Container */}
@@ -743,8 +813,8 @@ export const AdminServices: React.FC = () => {
               </div>
 
               <button
-                onClick={() => !isSubmitting && setIsFormModalOpen(false)}
-                disabled={isSubmitting}
+                onClick={() => !isSubmitting && !isServiceImageUploading && setIsFormModalOpen(false)}
+                disabled={isSubmitting || isServiceImageUploading}
                 className="p-2 text-white/50 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -862,32 +932,85 @@ export const AdminServices: React.FC = () => {
                 )}
               </div>
 
-              {/* URL da Imagem & Preview */}
+              {/* URL ou upload da Imagem & Preview */}
               <div>
                 <label className="block text-xs font-semibold text-white/80 uppercase tracking-wider mb-1.5">
-                  URL da Imagem <span className="text-red-400">*</span>
+                  Imagem do Serviço <span className="text-red-400">*</span>
                 </label>
                 <div className="flex gap-3 items-start">
                   <div className="flex-1">
                     <input
                       type="url"
                       value={formData.imageUrl}
-                      onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                      onChange={(e) => {
+                        if (selectedServiceImage) clearSelectedServiceImage();
+                        setServiceImageUploadComplete(false);
+                        setFormData({ ...formData, imageUrl: e.target.value });
+                      }}
+                      disabled={isServiceImageUploading}
                       placeholder="https://exemplo.com/imagem.jpeg"
                       className={`w-full px-3.5 py-2.5 bg-[#070B14] border rounded-xl text-sm text-white placeholder-white/40 focus:outline-none transition-colors ${
                         formErrors.imageUrl ? 'border-red-500 focus:border-red-400' : 'border-white/10 focus:border-blue-500'
                       }`}
                     />
                     <p className="text-[11px] text-white/40 mt-1">
-                      Link direto para imagem (JPG, PNG ou WEBP em proporção vertical recomendada 2:3).
+                      URL externa existente ou imagem enviada ao Vercel Blob. JPG, PNG ou WEBP (máx. 4 MB).
                     </p>
+                    <input
+                      ref={serviceImageInputRef}
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                      onChange={handleServiceImageFileChange}
+                      className="hidden"
+                      disabled={isSubmitting || isServiceImageUploading}
+                    />
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => serviceImageInputRef.current?.click()}
+                        disabled={isSubmitting || isServiceImageUploading}
+                        className="inline-flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-300 transition hover:bg-blue-500/20 disabled:opacity-50"
+                      >
+                        <ImageIcon className="h-3.5 w-3.5" />
+                        {selectedServiceImage ? 'Escolher outra imagem' : formData.imageUrl ? 'Substituir por upload' : 'Escolher imagem'}
+                      </button>
+                      {selectedServiceImage && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleUploadServiceImage}
+                            disabled={isSubmitting || isServiceImageUploading}
+                            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                          >
+                            {isServiceImageUploading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                            {isServiceImageUploading ? 'Enviando imagem...' : 'Enviar imagem'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={clearSelectedServiceImage}
+                            disabled={isSubmitting || isServiceImageUploading}
+                            className="rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+                          >
+                            Cancelar seleção
+                          </button>
+                        </>
+                      )}
+                    </div>
+                    {selectedServiceImage && (
+                      <p className="mt-2 truncate text-[11px] text-amber-300">
+                        {selectedServiceImage.name} · {(selectedServiceImage.size / (1024 * 1024)).toFixed(2)} MB — envie antes de salvar.
+                      </p>
+                    )}
+                    {isServiceImageUploading && <p className="mt-2 text-[11px] text-blue-300">Enviando a imagem com segurança para o Vercel Blob…</p>}
+                    {serviceImageUploadComplete && <p className="mt-2 text-[11px] text-emerald-300">Imagem carregada no Vercel Blob e pronta para salvar o serviço.</p>}
+                    {serviceImageUploadError && <p className="mt-2 text-xs text-red-400">{serviceImageUploadError}</p>}
                   </div>
 
                   {/* Preview Container */}
                   <div className="w-16 h-24 rounded-xl overflow-hidden bg-black/40 border border-white/10 shrink-0 flex items-center justify-center">
-                    {formData.imageUrl ? (
+                    {serviceImagePreviewUrl || formData.imageUrl ? (
                       <img
-                        src={formData.imageUrl}
+                        src={serviceImagePreviewUrl || formData.imageUrl}
                         alt="Preview"
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover"
@@ -959,7 +1082,7 @@ export const AdminServices: React.FC = () => {
               <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
                 <button
                   type="button"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isServiceImageUploading}
                   onClick={() => setIsFormModalOpen(false)}
                   className="px-4 py-2.5 text-xs font-semibold text-white/70 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-colors"
                 >
@@ -967,7 +1090,7 @@ export const AdminServices: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isServiceImageUploading || Boolean(selectedServiceImage)}
                   className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-blue-600/30 transition-all disabled:opacity-50"
                 >
                   {isSubmitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}

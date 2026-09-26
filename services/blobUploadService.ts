@@ -3,9 +3,10 @@
  * a qual processa o envio seguro para o Vercel Blob e retorna a URL pública.
  * Possui timeout de 25 segundos com AbortController para nunca travar a interface.
  */
-export async function uploadThumbnailToVercelBlob(file: File): Promise<string> {
+async function uploadImageToVercelBlob(file: File, purpose?: 'service-image'): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
+  if (purpose) formData.append('purpose', purpose);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 25000);
@@ -35,9 +36,18 @@ export async function uploadThumbnailToVercelBlob(file: File): Promise<string> {
   }
 
   if (!response.ok || !data?.success || !data?.url) {
-    const errorMessage = data?.error || `Falha no upload da thumbnail (HTTP ${response.status}).`;
+    const assetLabel = purpose === 'service-image' ? 'imagem do serviço' : 'thumbnail';
+    const errorMessage = data?.error || `Falha no upload da ${assetLabel} (HTTP ${response.status}).`;
     throw new Error(errorMessage);
   }
 
   return data.url;
+}
+
+export function uploadThumbnailToVercelBlob(file: File): Promise<string> {
+  return uploadImageToVercelBlob(file);
+}
+
+export function uploadServiceImageToVercelBlob(file: File): Promise<string> {
+  return uploadImageToVercelBlob(file, 'service-image');
 }
