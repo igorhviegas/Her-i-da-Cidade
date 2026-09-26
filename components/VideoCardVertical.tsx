@@ -19,7 +19,6 @@ export const VideoCardVertical: React.FC<VideoCardVerticalProps> = ({ video, onS
       <img
         src={cover}
         alt={video.title}
-        loading="lazy"
         className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-110"
       />
       {/* Selo individual (badgeText) no canto superior esquerdo */}
