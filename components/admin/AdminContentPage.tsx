@@ -282,26 +282,48 @@ export const AdminContentPage: React.FC = () => {
         </form>
       </section>
 
-      {draft && <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/75 p-3 py-8 sm:items-center sm:p-6" role="presentation">
-        <div role="dialog" aria-modal="true" aria-labelledby="home-section-editor-title" className="w-full max-w-2xl rounded-2xl border border-white/10 bg-[#0D1527] p-5 shadow-2xl sm:p-7">
-          <div className="mb-5 flex items-start justify-between gap-4"><div><h2 id="home-section-editor-title" className="text-xl font-bold text-white">{editingId ? 'Editar seção' : 'Nova seção'}</h2><p className="mt-1 text-xs text-white/50">Os campos são exibidos em layouts controlados pelo site.</p></div><button type="button" aria-label="Fechar" onClick={() => setDraft(null)} className="rounded-lg p-2 text-white/60 hover:bg-white/10"><X className="h-5 w-5" /></button></div>
-          <form onSubmit={handleSaveSection} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="text-xs font-semibold text-white/70">Nome interno<input required maxLength={100} value={draft.internalName} onChange={(event) => setDraft({ ...draft, internalName: event.target.value })} className="mt-2 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label>
-              {typeEditable ? <label className="text-xs font-semibold text-white/70">Tipo de seção<select value={draft.sectionType} onChange={(event) => setDraft({ ...draft, sectionType: event.target.value as HomeSectionType, imageUrl: '', buttonText: '', buttonUrl: '' })} className="mt-2 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white">{CREATE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label> : <div className="text-xs font-semibold text-white/70">Tipo de seção<div className="mt-2 rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white/60">{draft.sectionType}</div></div>}
+      {draft && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-black/75 p-2 sm:p-4" role="presentation">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="home-section-editor-title"
+            className="flex max-h-[90vh] w-full max-w-[900px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0D1527] shadow-2xl"
+          >
+            <div className="flex shrink-0 items-start justify-between gap-4 border-b border-white/10 px-4 py-4 sm:px-7">
+              <div>
+                <h2 id="home-section-editor-title" className="text-xl font-bold text-white">{editingId ? 'Editar seção' : 'Nova seção'}</h2>
+                <p className="mt-1 text-xs text-white/50">Os campos são exibidos em layouts controlados pelo site.</p>
+              </div>
+              <button type="button" aria-label="Fechar" onClick={() => setDraft(null)} className="shrink-0 rounded-lg p-2 text-white/60 hover:bg-white/10">
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <label className="block text-xs font-semibold text-white/70">Título<textarea required rows={2} maxLength={180} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} className="mt-2 w-full resize-y rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /><span className="mt-1 block font-normal text-white/40">Quebras de linha são mantidas nos títulos.</span></label>
-            <label className="block text-xs font-semibold text-white/70">Subtítulo ou chamada curta<input value={draft.subtitle} onChange={(event) => setDraft({ ...draft, subtitle: event.target.value })} className="mt-2 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label>
-            <label className="block text-xs font-semibold text-white/70">Texto<textarea rows={5} maxLength={12000} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className="mt-2 w-full resize-y rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm leading-relaxed text-white" /></label>
-            {canEditImage && <label className="block text-xs font-semibold text-white/70">URL da imagem (HTTPS)<input type="url" value={draft.imageUrl || ''} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value })} className="mt-2 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label>}
-            {canEditButton && <div className="grid gap-4 sm:grid-cols-2"><label className="text-xs font-semibold text-white/70">Texto do botão<input value={draft.buttonText || ''} onChange={(event) => setDraft({ ...draft, buttonText: event.target.value })} className="mt-2 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label>{canEditButtonUrl && <label className="text-xs font-semibold text-white/70">Link HTTPS ou rota interna<input type="text" placeholder="https://… ou /videos" value={draft.buttonUrl || ''} onChange={(event) => setDraft({ ...draft, buttonUrl: event.target.value })} className="mt-2 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label>}</div>}
-            <div className="grid gap-4 sm:grid-cols-2"><label className="text-xs font-semibold text-white/70">Início da publicação<input type="datetime-local" value={toDateTimeLocal(draft.startAt)} onChange={(event) => setDraft({ ...draft, startAt: event.target.value ? new Date(event.target.value) : null })} className="mt-2 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label><label className="text-xs font-semibold text-white/70">Fim da publicação<input type="datetime-local" value={toDateTimeLocal(draft.endAt)} onChange={(event) => setDraft({ ...draft, endAt: event.target.value ? new Date(event.target.value) : null })} className="mt-2 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label></div>
-            <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#070B14] p-3 text-sm text-white"><input type="checkbox" checked={draft.active} onChange={(event) => setDraft({ ...draft, active: event.target.checked })} className="h-4 w-4 accent-blue-500" />Seção ativa</label>
-            {feedback?.type === 'error' && <p className="text-sm text-red-300">{feedback.message}</p>}
-            <div className="flex flex-col-reverse gap-3 border-t border-white/10 pt-4 sm:flex-row sm:justify-end"><button type="button" onClick={() => setDraft(null)} className="min-h-11 rounded-xl border border-white/10 px-5 text-sm text-white/70 hover:bg-white/5">Cancelar</button><button type="submit" disabled={savingSection} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{savingSection && <Loader2 className="h-4 w-4 animate-spin" />}Salvar seção</button></div>
-          </form>
+
+            <form onSubmit={handleSaveSection} className="flex min-h-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4 sm:px-7 sm:py-6">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="min-w-0 text-xs font-semibold text-white/70">Nome interno<input required maxLength={100} value={draft.internalName} onChange={(event) => setDraft({ ...draft, internalName: event.target.value })} className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label>
+                  {typeEditable ? <label className="min-w-0 text-xs font-semibold text-white/70">Tipo de seção<select value={draft.sectionType} onChange={(event) => setDraft({ ...draft, sectionType: event.target.value as HomeSectionType, imageUrl: '', buttonText: '', buttonUrl: '' })} className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white">{CREATE_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></label> : <div className="min-w-0 text-xs font-semibold text-white/70">Tipo de seção<div className="mt-2 rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white/60">{draft.sectionType}</div></div>}
+                </div>
+                <label className="block min-w-0 text-xs font-semibold text-white/70">Título<textarea required rows={2} maxLength={180} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} className="mt-2 w-full min-w-0 resize-y rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /><span className="mt-1 block font-normal text-white/40">Quebras de linha são mantidas nos títulos.</span></label>
+                <label className="block min-w-0 text-xs font-semibold text-white/70">Subtítulo ou chamada curta<input value={draft.subtitle} onChange={(event) => setDraft({ ...draft, subtitle: event.target.value })} className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label>
+                <label className="block min-w-0 text-xs font-semibold text-white/70">Texto<textarea rows={5} maxLength={12000} value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className="mt-2 w-full min-w-0 resize-y rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm leading-relaxed text-white" /></label>
+                {canEditImage && <label className="block min-w-0 text-xs font-semibold text-white/70">URL da imagem (HTTPS)<input type="url" value={draft.imageUrl || ''} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value })} className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label>}
+                {canEditButton && <div className="grid gap-4 sm:grid-cols-2"><label className="min-w-0 text-xs font-semibold text-white/70">Texto do botão<input value={draft.buttonText || ''} onChange={(event) => setDraft({ ...draft, buttonText: event.target.value })} className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label>{canEditButtonUrl && <label className="min-w-0 text-xs font-semibold text-white/70">Link HTTPS ou rota interna<input type="text" placeholder="https://… ou /videos" value={draft.buttonUrl || ''} onChange={(event) => setDraft({ ...draft, buttonUrl: event.target.value })} className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label>}</div>}
+                <div className="grid gap-4 sm:grid-cols-2"><label className="min-w-0 text-xs font-semibold text-white/70">Início da publicação<input type="datetime-local" value={toDateTimeLocal(draft.startAt)} onChange={(event) => setDraft({ ...draft, startAt: event.target.value ? new Date(event.target.value) : null })} className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label><label className="min-w-0 text-xs font-semibold text-white/70">Fim da publicação<input type="datetime-local" value={toDateTimeLocal(draft.endAt)} onChange={(event) => setDraft({ ...draft, endAt: event.target.value ? new Date(event.target.value) : null })} className="mt-2 w-full min-w-0 rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-sm text-white" /></label></div>
+                <label className="flex min-w-0 items-center gap-3 rounded-xl border border-white/10 bg-[#070B14] p-3 text-sm text-white"><input type="checkbox" checked={draft.active} onChange={(event) => setDraft({ ...draft, active: event.target.checked })} className="h-4 w-4 accent-blue-500" />Seção ativa</label>
+                {feedback?.type === 'error' && <p className="text-sm text-red-300">{feedback.message}</p>}
+              </div>
+
+              <div className="flex shrink-0 flex-col-reverse gap-3 border-t border-white/10 bg-[#0D1527] px-4 py-4 sm:flex-row sm:justify-end sm:px-7">
+                <button type="button" onClick={() => setDraft(null)} className="min-h-11 rounded-xl border border-white/10 px-5 text-sm text-white/70 hover:bg-white/5">Cancelar</button>
+                <button type="submit" disabled={savingSection} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">{savingSection && <Loader2 className="h-4 w-4 animate-spin" />}Salvar seção</button>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>}
+      )}
     </div>
   );
 };
