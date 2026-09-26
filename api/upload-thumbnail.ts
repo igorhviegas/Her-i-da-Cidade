@@ -3,13 +3,13 @@ import { getVercelOidcToken } from '@vercel/oidc';
 import crypto from 'crypto';
 import multer from 'multer';
 import type { Request, Response } from 'express';
-import firebaseAppletConfig from '../firebase-applet-config.json';
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const BLOB_STORE_ID = process.env.BLOB_STORE_ID || 'store_ZlySBsEZT51qmJ7I';
-const FIREBASE_PROJECT_ID = process.env.VITE_FIREBASE_PROJECT_ID || firebaseAppletConfig.projectId;
-const FIREBASE_API_KEY = process.env.VITE_FIREBASE_API_KEY || firebaseAppletConfig.apiKey;
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || '';
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || '';
+const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || process.env.VITE_FIRESTORE_DATABASE_ID || '(default)';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -36,6 +36,8 @@ function extensionFor(mimetype: string): string {
 }
 
 async function verifyFirebaseIdToken(idToken: string): Promise<string | null> {
+  if (!FIREBASE_API_KEY) throw new Error('Firebase API key não configurada.');
+
   const response = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(FIREBASE_API_KEY)}`,
     {
@@ -53,9 +55,10 @@ async function verifyFirebaseIdToken(idToken: string): Promise<string | null> {
 }
 
 async function isAdminInFirestore(idToken: string, uid: string): Promise<boolean> {
-  const databaseId = firebaseAppletConfig.firestoreDatabaseId || '(default)';
+  if (!FIREBASE_PROJECT_ID) throw new Error('Firebase project ID não configurado.');
+
   const documentUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(FIREBASE_PROJECT_ID)}` +
-    `/databases/${encodeURIComponent(databaseId)}/documents/admins/${encodeURIComponent(uid)}`;
+    `/databases/${encodeURIComponent(FIRESTORE_DATABASE_ID)}/documents/admins/${encodeURIComponent(uid)}`;
   const response = await fetch(documentUrl, {
     headers: { Authorization: `Bearer ${idToken}` },
   });
