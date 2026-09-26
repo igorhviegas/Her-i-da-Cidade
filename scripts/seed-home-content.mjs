@@ -21,6 +21,8 @@ const INITIAL_SECTIONS = [
   { id: 'home-testimonials', internalName: 'Depoimentos', sectionType: 'testimonials', title: 'Depoimentos', subtitle: '', description: '', active: true, order: 5 },
 ];
 
+const EXPECTED_PROJECT_ID = 'heroi-da-cidade';
+
 async function run() {
   let credPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   if (!credPath) {
@@ -34,6 +36,13 @@ async function run() {
   if (!credPath || !fs.existsSync(credPath)) throw new Error('Service Account não encontrada para execução do seed.');
 
   const serviceAccount = JSON.parse(fs.readFileSync(credPath, 'utf8'));
+  if (serviceAccount.project_id !== EXPECTED_PROJECT_ID) {
+    throw new Error(
+      `Seed abortado: a Service Account pertence ao projeto "${serviceAccount.project_id || '(project_id ausente)'}", ` +
+      `mas o projeto esperado é "${EXPECTED_PROJECT_ID}". O seed não foi executado.`
+    );
+  }
+
   if (!admin.apps.length) {
     admin.initializeApp({ credential: admin.credential.cert(serviceAccount), projectId: serviceAccount.project_id });
   }
@@ -41,9 +50,19 @@ async function run() {
   const db = admin.firestore();
   const homeRef = db.collection('siteContent').doc('home');
   const homeSnapshot = await homeRef.get();
+  const existingSections = await homeRef.collection('sections').get();
+
   if (homeSnapshot.exists) {
     console.log('siteContent/home já existe. Nenhum dado foi alterado.');
     return;
+  }
+
+  if (!existingSections.empty) {
+    const ids = existingSections.docs.map((section) => section.id);
+    throw new Error(
+      `Seed abortado: siteContent/home não existe, mas foram encontradas ${ids.length} seção(ões) órfã(s) ` +
+      `em siteContent/home/sections: ${ids.join(', ')}. Nenhum dado foi alterado; revise manualmente antes de inicializar o CMS.`
+    );
   }
 
   const timestamp = admin.firestore.FieldValue.serverTimestamp();
