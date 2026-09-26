@@ -3,23 +3,13 @@ import { Video } from '../../types';
 import { createVideo, updateVideo, getVideoByInstagramId } from '../../services/videosService';
 import { Image, Upload, Trash2, RefreshCw, Undo2, X } from 'lucide-react';
 import { createCategory } from '../../services/categoriesService';
+import { extractInstagramId } from '../../utils/videoHelpers';
 
 interface Props {
   video?: Video | null;
   existingCategories?: string[];
   onClose: () => void;
 }
-
-const extractInstagramId = (url: string): string => {
-  try {
-    const normalized = url.replace(/\\?\\?/, '/');
-    const parts = normalized.split('/');
-    const id = parts.filter(Boolean).pop();
-    return id || '';
-  } catch {
-    return '';
-  }
-};
 
 const VideoFormModal: React.FC<Props> = ({ video, existingCategories = [], onClose }) => {
   const isEditMode = Boolean(video);
