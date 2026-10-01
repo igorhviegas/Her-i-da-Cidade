@@ -1,6 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { logger } from 'firebase-functions';
 
 const CLIENTS = 'clients';
 const ORDERS = 'orders';
@@ -55,7 +54,7 @@ function secretsMatch(providedHeader, expectedSecret) {
   return supplied.length === expected.length && timingSafeEqual(supplied, expected);
 }
 
-export async function handleManyChatOrderRequest(req, res, { database, secret }) {
+export async function handleManyChatOrderRequest(req, res, { database, secret, logger: customLogger = console } = {}) {
   res.set('Cache-Control', 'no-store');
   if (req.method !== 'POST') return jsonError(res, 405, 'method_not_allowed', 'Use POST.', { allowedMethods: ['POST'] });
   if (!req.is('application/json')) return jsonError(res, 415, 'unsupported_media_type', 'Envie application/json.');
@@ -171,7 +170,8 @@ export async function handleManyChatOrderRequest(req, res, { database, secret })
       technicalPurchaseId: transactionResult.technicalPurchaseId,
     });
   } catch (error) {
-    logger.error('Falha ao processar webhook ManyChat.', { orderId: orderRef.id, error: error instanceof Error ? error.message : String(error) });
+    const log = customLogger || console;
+    log.error('Falha ao processar webhook ManyChat.', { orderId: orderRef.id, error: error instanceof Error ? error.message : String(error) });
     return jsonError(res, 500, 'internal_error', 'Não foi possível registrar a confirmação. Verifique o CRM antes de reenviar para evitar um pedido duplicado.');
   }
 }

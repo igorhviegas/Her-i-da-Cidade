@@ -2,6 +2,7 @@ import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
+import { logger } from 'firebase-functions';
 import { handleManyChatOrderRequest } from './manychat-handler.js';
 
 const MANYCHAT_WEBHOOK_SECRET = defineSecret('MANYCHAT_WEBHOOK_SECRET');
@@ -19,4 +20,5 @@ export const receiveManyChatOrder = onRequest({
 }, async (req, res) => handleManyChatOrderRequest(req, res, {
   database: db,
   secret: MANYCHAT_WEBHOOK_SECRET.value(),
+  logger,
 }));

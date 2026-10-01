@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { handleThumbnailUpload } from "./api/upload-thumbnail";
+import { handleManyChatWebhook } from "./api/manychat";
 
 const PORT = 3000;
 
@@ -165,6 +166,11 @@ async function startServer() {
   // Vercel Blob Thumbnail Upload endpoint
   app.all("/api/upload-thumbnail", (req, res) => {
     handleThumbnailUpload(req, res);
+  });
+
+  // ManyChat Webhook endpoint
+  app.all("/api/manychat", (req, res) => {
+    handleManyChatWebhook(req, res);
   });
 
   // Vite middleware for development
