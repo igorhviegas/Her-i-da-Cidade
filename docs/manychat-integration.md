@@ -8,7 +8,7 @@ Um único endpoint recebe a confirmação de pagamento de **todos** os serviços
 |---|---|
 | Método | `POST` |
 | URL (Vercel) | `https://<domínio-do-site>/api/manychat` |
-| URL (Firebase Functions) | `https://us-central1-<projeto>.cloudfunctions.net/receiveManyChatOrder` |
+| URL (Firebase Functions) | `https://us-central1-heroi-da-cidade.cloudfunctions.net/receiveManyChatOrder` (projeto `heroi-da-cidade`) |
 | `Content-Type` | `application/json` |
 | `Authorization` | `Bearer <MANYCHAT_WEBHOOK_SECRET>` (o segredo fica nas variáveis do servidor; nunca no corpo, no código ou neste arquivo) |
 
