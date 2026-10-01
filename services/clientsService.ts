@@ -75,6 +75,15 @@ export async function getClientById(id: string): Promise<Client | null> {
   return snapshot.exists() ? mapClient(snapshot.id, snapshot.data()) : null;
 }
 
+/** Lista cadastros de clientes, omitindo documentos auxiliares e o cliente técnico interno. */
+export async function listClients(): Promise<Client[]> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  const result = await getDocs(collection(db, CLIENTS_COLLECTION));
+  return result.docs
+    .filter((item) => item.data().recordType !== 'whatsapp-index' && item.data().internalOnly !== true)
+    .map((item) => mapClient(item.id, item.data()));
+}
+
 /** Cliente técnico sem telefone usado para representar a equipe nos pedidos internos de conteúdo. */
 export async function ensureInternalContentClient(): Promise<Client> {
   if (!db) throw new Error("Firebase Firestore não inicializado.");
