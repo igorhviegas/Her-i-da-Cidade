@@ -155,18 +155,19 @@ export const AdminScriptsPage: React.FC = () => {
           : !error && hierarchyRows.length === 0 ? <p className="rounded-xl border border-white/10 bg-[#0D1527] p-5 text-center text-sm text-white/55">Nenhum roteiro corresponde aos filtros escolhidos.</p>
             : !error && <div className="space-y-3">
               {hierarchyRows.map(({ script, depth }) => <article key={script.id} style={{ marginLeft: `${Math.min(depth, 5) * 22}px` }} className={`${depth ? 'border-l border-blue-400/20 pl-3 sm:pl-5' : ''}`}>
-                <div className="rounded-2xl border border-white/10 bg-[#0D1527] p-4 transition-colors hover:border-blue-400/35">
-                  <button type="button" onClick={() => openEdit(script)} className="group block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
-                <div className="flex items-start justify-between gap-3"><h3 className="line-clamp-2 text-base font-bold text-white">{script.title}</h3><span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-bold ${productionStyles[script.productionStatus]}`}>{productionLabels[script.productionStatus]}</span></div>
-                <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm leading-5 text-white/50">{script.content}</p>
-                <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/[0.07] pt-3 text-[11px]">
-                  {script.category ? <span className="rounded-full border border-blue-400/15 bg-blue-400/5 px-2.5 py-1 font-semibold text-blue-200/80">{script.category}</span> : <span className="text-white/35">Sem categoria</span>}
-                  <span className={`rounded-full border px-2.5 py-1 font-semibold ${script.publicationStatus === 'published' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-white/5 text-white/55'}`}>{publicationLabels[script.publicationStatus]}</span>
-                  <span className="ml-auto text-white/40">Atualizado {formatDate(script.updatedAt)}</span>
-                </div>
+                <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[#0D1527] px-3 py-2.5 transition-colors hover:border-blue-400/35 sm:flex-row sm:items-center sm:justify-between">
+                  <button type="button" onClick={() => openEdit(script)} className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
+                    <span className="block truncate text-sm font-bold text-white">{script.title}</span>
+                    <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
+                      {script.category ? <span className="max-w-44 truncate rounded-full border border-blue-400/15 bg-blue-400/5 px-2 py-0.5 font-semibold text-blue-200/80">{script.category}</span> : <span className="text-white/35">Sem categoria</span>}
+                      <span className={`rounded-full border px-2 py-0.5 font-bold ${productionStyles[script.productionStatus]}`}>{productionLabels[script.productionStatus]}</span>
+                      <span className={`rounded-full border px-2 py-0.5 font-semibold ${script.publicationStatus === 'published' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-white/5 text-white/55'}`}>{publicationLabels[script.publicationStatus]}</span>
+                      <span className="text-white/40">Atualizado {formatDate(script.updatedAt)}</span>
+                    </span>
                   </button>
-                  <div className="mt-3 border-t border-white/[0.07] pt-2">
-                    <button type="button" onClick={() => openNewChild(script.id)} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-200/75 transition-colors hover:bg-blue-500/10 hover:text-blue-200"><Plus className="h-3.5 w-3.5" /> Adicionar roteiro filho</button>
+                  <div className="flex shrink-0 items-center gap-1 border-t border-white/[0.07] pt-1.5 sm:border-0 sm:pt-0">
+                    <button type="button" onClick={() => openEdit(script)} className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-white/55 transition-colors hover:bg-white/5 hover:text-white">Editar</button>
+                    <button type="button" onClick={() => openNewChild(script.id)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-blue-200/75 transition-colors hover:bg-blue-500/10 hover:text-blue-200"><Plus className="h-3.5 w-3.5" /> Filho</button>
                   </div>
                 </div>
               </article>)}
