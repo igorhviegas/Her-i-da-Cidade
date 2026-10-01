@@ -133,7 +133,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
       const orderData = {
         clientId: clientRef.id,
         serviceId: ANNIVERSARY_SERVICE_ID,
-        status: 'completed',
+        status: 'delivery',
         paidAt,
         content: `Aniversariante: ${input.childName.trim()}`,
         servicePrice,
@@ -143,7 +143,6 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
         source: 'manychat',
         technicalPurchaseId: orderRef.id,
         createdAt: FieldValue.serverTimestamp(),
-        completedAt: paidAt,
       };
 
       if (shouldCreateClient) {

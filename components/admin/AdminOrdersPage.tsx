@@ -6,16 +6,17 @@ import { deleteOrder, listOrders, updateOrder } from '../../services/ordersServi
 import { getContentScriptsByIds } from '../../services/contentScriptsService';
 import { getServiceById } from '../../services/servicesService';
 import { formatOrderReference } from '../../services/orderReference.js';
+import { buildDeliveryWhatsAppUrl } from '../../services/digitalDelivery.js';
 import type { Client, ContentScript, Order, OrderStatus, Service } from '../../types';
 import { CreateOrderModal } from './CreateOrderModal';
 import { EditOrderModal } from './EditOrderModal';
 
 type OrderView = { order: Order; client?: Client | null; service?: Service | null; script?: ContentScript | null };
 const COLUMNS = [
-  { status: 'scheduled', label: 'AGENDADO', accent: 'border-blue-400' },
+  { status: 'delivery', label: 'ENTREGAR', accent: 'border-emerald-400' },
   { status: 'recording', label: 'GRAVAR', accent: 'border-amber-400' },
   { status: 'editing', label: 'EDITAR', accent: 'border-violet-400' },
-  { status: 'delivery', label: 'ENTREGAR', accent: 'border-emerald-400' },
+  { status: 'scheduled', label: 'AGENDADO', accent: 'border-blue-400' },
   { status: 'completed', label: 'CONCLUÍDO', accent: 'border-slate-400' },
 ] as const;
 
@@ -80,6 +81,7 @@ export const AdminOrdersPage: React.FC = () => {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [orderActionError, setOrderActionError] = useState('');
+  const [completedOpen, setCompletedOpen] = useState(false);
   const [draggingOrderId, setDraggingOrderId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<OrderStatus | null>(null);
   const allOrderRecords = useMemo(() => [...orders, ...completedOrders].map(({ order }) => order), [orders, completedOrders]);
@@ -357,6 +359,22 @@ export const AdminOrdersPage: React.FC = () => {
                             </div>
                           )}
                           <p className="mt-3 text-sm font-extrabold text-emerald-300">{formatMoney(order.totalPaid)}</p>
+                          {order.status === 'delivery' && (() => {
+                            const deliveryUrl = buildDeliveryWhatsAppUrl(client?.whatsapp, order.content);
+                            return deliveryUrl ? (
+                              <a
+                                href={deliveryUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                draggable={false}
+                                onClick={(event) => event.stopPropagation()}
+                                onKeyDown={(event) => event.stopPropagation()}
+                                className="mt-2.5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/15 px-3 text-xs font-bold text-emerald-100 hover:bg-emerald-500/25"
+                              >
+                                <MessageCircle className="h-4 w-4" /> Enviar pelo WhatsApp
+                              </a>
+                            ) : <p className="mt-2 text-[11px] text-white/35">WhatsApp indisponível</p>;
+                          })()}
                         </article>
                       );
                     })}
@@ -371,11 +389,16 @@ export const AdminOrdersPage: React.FC = () => {
 
       {!loading && !error && completedOrders.length > 0 && (
         <section className="space-y-3 border-t border-white/10 pt-5">
-          <div>
-            <h3 className="text-sm font-bold text-white">Pedidos concluídos</h3>
-            <p className="mt-0.5 text-xs text-white/45">Ficam fora das colunas do Kanban. Se necessário, abra um pedido para reabri-lo em outra etapa.</p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-white">Pedidos concluídos ({search.trim() ? `${filteredCompletedOrders.length} de ${completedOrders.length}` : completedOrders.length})</h3>
+              <p className="mt-0.5 text-xs text-white/45">Ficam fora das colunas do Kanban. Se necessário, abra um pedido para reabri-lo em outra etapa.</p>
+            </div>
+            <button type="button" onClick={() => setCompletedOpen((open) => !open)} aria-expanded={completedOpen} className="min-h-10 shrink-0 rounded-lg border border-white/10 px-3 text-xs font-semibold text-white/75 hover:bg-white/5">
+              {completedOpen ? 'Ver menos' : 'Ver mais'}
+            </button>
           </div>
-          {filteredCompletedOrders.length > 0 ? (
+          {!completedOpen ? null : filteredCompletedOrders.length > 0 ? (
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {filteredCompletedOrders.map(({ order, client, service, script }) => (
                 <button key={order.id} type="button" onClick={() => { setSelectedOrder({ order, client, service, script }); setEditOrderOpen(false); setOrderActionError(''); }} className="rounded-xl border border-white/10 bg-[#0D1527] p-3.5 text-left transition-colors hover:border-emerald-400/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
