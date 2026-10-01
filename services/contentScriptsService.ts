@@ -1,4 +1,4 @@
-import { collection, deleteField, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteField, doc, documentId, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../types';
 
@@ -59,6 +59,28 @@ export async function listContentScripts(): Promise<ContentScript[]> {
     logContentScriptsError(`getDocs(collection(db, '${CONTENT_SCRIPTS_COLLECTION}'))`, error);
     throw error;
   }
+}
+
+/** Busca roteiros associados a pedidos em consultas agrupadas, evitando uma leitura por pedido. */
+export async function getContentScriptsByIds(ids: string[]): Promise<ContentScript[]> {
+  if (!db) throw new Error('Firestore não inicializado.');
+  const uniqueIds = Array.from(new Set(ids.filter((id) => typeof id === 'string' && id.trim())));
+  if (uniqueIds.some((id) => id.includes('/'))) throw new Error('A lista contém um ID inválido de roteiro.');
+  const results: ContentScript[] = [];
+  for (let start = 0; start < uniqueIds.length; start += 30) {
+    const idBatch = uniqueIds.slice(start, start + 30);
+    try {
+      const snapshot = await getDocs(query(
+        collection(db, CONTENT_SCRIPTS_COLLECTION),
+        where(documentId(), 'in', idBatch),
+      ));
+      results.push(...snapshot.docs.map((item) => mapScript(item.id, item.data())));
+    } catch (error) {
+      logContentScriptsError(`buscar roteiros em lote por IDs (${idBatch.join(', ')})`, error);
+      throw error;
+    }
+  }
+  return results;
 }
 
 export async function getContentScriptById(id: string): Promise<ContentScript | null> {

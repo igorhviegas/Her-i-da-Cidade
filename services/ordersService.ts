@@ -1,5 +1,5 @@
 import {
-  collection, deleteDoc, deleteField, doc, getDoc, getDocs, orderBy, query, runTransaction, serverTimestamp, where, setDoc,
+  collection, deleteField, doc, getDoc, getDocs, orderBy, query, runTransaction, serverTimestamp, where, setDoc,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Order, OrderStatus, ProductionType, OrderSource } from "../types";
@@ -162,7 +162,32 @@ export async function getOrderById(id: string): Promise<Order | null> {
 export async function deleteOrder(id: string): Promise<void> {
   if (!db) throw new Error("Firebase Firestore não inicializado.");
   if (!id) throw new Error("ID do pedido é obrigatório.");
-  await deleteDoc(doc(db, ORDERS_COLLECTION, id));
+  const firestore = db;
+  const orderRef = doc(firestore, ORDERS_COLLECTION, id);
+  await runTransaction(firestore, async (transaction) => {
+    const orderSnapshot = await transaction.get(orderRef);
+    if (!orderSnapshot.exists()) throw new Error('Pedido não encontrado para exclusão.');
+
+    const order = orderSnapshot.data();
+    let linkedScriptRef: ReturnType<typeof doc> | null = null;
+    let linkedScript: Record<string, any> | null = null;
+    if (typeof order.scriptId === 'string' && order.scriptId) {
+      if (order.scriptId.includes('/')) throw new Error('O pedido possui um scriptId inválido; nenhum documento foi alterado.');
+      linkedScriptRef = doc(firestore, CONTENT_SCRIPTS_COLLECTION, order.scriptId);
+      const scriptSnapshot = await transaction.get(linkedScriptRef);
+      if (scriptSnapshot.exists()) linkedScript = scriptSnapshot.data();
+    }
+
+    transaction.delete(orderRef);
+    if (linkedScriptRef && linkedScript?.orderId === id) {
+      const scriptUpdates: Record<string, unknown> = {
+        orderId: deleteField(),
+        updatedAt: serverTimestamp(),
+      };
+      if (linkedScript.productionStatus === 'in_production') scriptUpdates.productionStatus = 'ready';
+      transaction.update(linkedScriptRef, scriptUpdates);
+    }
+  });
 }
 
 export async function listOrders(): Promise<Order[]> {

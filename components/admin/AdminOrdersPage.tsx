@@ -3,12 +3,13 @@ import { AlertCircle, CalendarDays, CheckCircle2, Copy, Loader2, MessageCircle, 
 import { useRouter } from '../../lib/router';
 import { getClientById, normalizeWhatsApp } from '../../services/clientsService';
 import { deleteOrder, listOrders, updateOrder } from '../../services/ordersService';
+import { getContentScriptsByIds } from '../../services/contentScriptsService';
 import { getServiceById } from '../../services/servicesService';
-import type { Client, Order, OrderStatus, Service } from '../../types';
+import type { Client, ContentScript, Order, OrderStatus, Service } from '../../types';
 import { CreateOrderModal } from './CreateOrderModal';
 import { EditOrderModal } from './EditOrderModal';
 
-type OrderView = { order: Order; client?: Client | null; service?: Service | null };
+type OrderView = { order: Order; client?: Client | null; service?: Service | null; script?: ContentScript | null };
 const COLUMNS = [
   { status: 'scheduled', label: 'AGENDADO', accent: 'border-blue-400' },
   { status: 'recording', label: 'GRAVAR', accent: 'border-amber-400' },
@@ -89,16 +90,20 @@ export const AdminOrdersPage: React.FC = () => {
       setTotalOrderCount(allOrders.length);
       const clientIds = [...new Set(allOrders.map((order) => order.clientId).filter(Boolean))];
       const serviceIds = [...new Set(allOrders.map((order) => order.serviceId).filter(Boolean))];
-      const [clients, services] = await Promise.all([
+      const scriptIds = [...new Set(allOrders.map((order) => order.scriptId).filter((id): id is string => Boolean(id)))];
+      const [clients, services, scripts] = await Promise.all([
         Promise.all(clientIds.map((id) => getClientById(id))),
         Promise.all(serviceIds.map((id) => getServiceById(id))),
+        getContentScriptsByIds(scriptIds),
       ]);
       const clientsById = new Map(clientIds.map((id, index) => [id, clients[index]]));
       const servicesById = new Map(serviceIds.map((id, index) => [id, services[index]]));
+      const scriptsById = new Map(scripts.map((script) => [script.id, script]));
       const allOrderViews = allOrders.map((order) => ({
         order,
         client: clientsById.get(order.clientId),
         service: servicesById.get(order.serviceId),
+        script: order.scriptId ? scriptsById.get(order.scriptId) || null : null,
       }));
       setOrders(allOrderViews.filter(({ order }) => order.status !== 'completed'));
       setCompletedOrders(allOrderViews.filter(({ order }) => order.status === 'completed'));
@@ -156,7 +161,8 @@ export const AdminOrdersPage: React.FC = () => {
   };
 
   const handleOrderSaved = (order: Order, client: Client, service: Service) => {
-    const updatedView: OrderView = { order, client, service };
+    const existingView = [...orders, ...completedOrders].find(({ order: currentOrder }) => currentOrder.id === order.id);
+    const updatedView: OrderView = { order, client, service, script: existingView?.script || null };
     setOrders((current) => {
       const others = current.filter(({ order: currentOrder }) => currentOrder.id !== order.id)
         .map((view) => view.client?.id === client.id ? { ...view, client } : view);
@@ -196,16 +202,18 @@ export const AdminOrdersPage: React.FC = () => {
 
   const filteredOrders = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('pt-BR');
-    return orders.filter(({ client, service }) => !term ||
+    return orders.filter(({ client, service, script }) => !term ||
       (client?.name || '').toLocaleLowerCase('pt-BR').includes(term) ||
-      (service?.title || '').toLocaleLowerCase('pt-BR').includes(term));
+      (service?.title || '').toLocaleLowerCase('pt-BR').includes(term) ||
+      (script?.title || '').toLocaleLowerCase('pt-BR').includes(term));
   }, [orders, search]);
 
   const filteredCompletedOrders = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('pt-BR');
-    return completedOrders.filter(({ client, service }) => !term ||
+    return completedOrders.filter(({ client, service, script }) => !term ||
       (client?.name || '').toLocaleLowerCase('pt-BR').includes(term) ||
-      (service?.title || '').toLocaleLowerCase('pt-BR').includes(term));
+      (service?.title || '').toLocaleLowerCase('pt-BR').includes(term) ||
+      (script?.title || '').toLocaleLowerCase('pt-BR').includes(term));
   }, [completedOrders, search]);
 
   const duplicateInitialValues = useMemo(() => {
@@ -307,7 +315,7 @@ export const AdminOrdersPage: React.FC = () => {
                     <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold text-white/65">{columnOrders.length}</span>
                   </header>
                   <div className="space-y-2.5">
-                    {columnOrders.map(({ order, client, service }) => {
+                    {columnOrders.map(({ order, client, service, script }) => {
                       const state = deadlineState(order.internalDueDate);
                       const internalDate = formatDate(order.internalDueDate);
                       const eventDate = formatDate(order.eventDate);
@@ -324,18 +332,19 @@ export const AdminOrdersPage: React.FC = () => {
                             setDraggingOrderId(order.id);
                           }}
                           onDragEnd={() => { setDraggingOrderId(null); setDragOverStatus(null); }}
-                          onClick={() => { setSelectedOrder({ order, client, service }); setEditOrderOpen(false); setOrderActionError(''); }}
+                          onClick={() => { setSelectedOrder({ order, client, service, script }); setEditOrderOpen(false); setOrderActionError(''); }}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
                               event.preventDefault();
-                              setSelectedOrder({ order, client, service });
+                              setSelectedOrder({ order, client, service, script });
                               setOrderActionError('');
                             }
                           }}
-                          className={`cursor-pointer rounded-xl border bg-[#0D1527] p-3.5 shadow-lg outline-none transition-colors hover:border-blue-400/50 focus-visible:ring-2 focus-visible:ring-blue-400 ${state === 'overdue' ? 'border-red-500/45' : state === 'soon' ? 'border-amber-400/35' : 'border-white/10'}`}
+                          className={`cursor-pointer rounded-xl border bg-[#0D1527] p-3.5 shadow-lg outline-none transition-colors hover:border-blue-400/50 focus-visible:ring-2 focus-visible:ring-blue-400 ${order.scriptId ? 'ring-1 ring-inset ring-blue-400/10' : ''} ${state === 'overdue' ? 'border-red-500/45' : state === 'soon' ? 'border-amber-400/35' : 'border-white/10'}`}
                         >
                           <h4 className="truncate text-sm font-bold text-white">{client?.name || 'Cliente não encontrado'}</h4>
                           <p className="mt-0.5 truncate text-xs text-white/55">{service?.title || 'Serviço não encontrado'}</p>
+                          {order.scriptId && <p className="mt-1 truncate text-[11px] text-blue-200/75"><span className="mr-1 rounded bg-blue-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">Roteiro</span>{script?.title || 'Roteiro não encontrado'}</p>}
                           {(eventDate || internalDate) && (
                             <div className="mt-3 space-y-1 border-t border-white/5 pt-2.5 text-[11px]">
                               {eventDate && <p className="text-white/55">Evento/entrega: <span className="text-white/80">{eventDate}</span></p>}
@@ -365,10 +374,11 @@ export const AdminOrdersPage: React.FC = () => {
           </div>
           {filteredCompletedOrders.length > 0 ? (
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredCompletedOrders.map(({ order, client, service }) => (
-                <button key={order.id} type="button" onClick={() => { setSelectedOrder({ order, client, service }); setEditOrderOpen(false); setOrderActionError(''); }} className="rounded-xl border border-white/10 bg-[#0D1527] p-3.5 text-left transition-colors hover:border-emerald-400/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
+              {filteredCompletedOrders.map(({ order, client, service, script }) => (
+                <button key={order.id} type="button" onClick={() => { setSelectedOrder({ order, client, service, script }); setEditOrderOpen(false); setOrderActionError(''); }} className="rounded-xl border border-white/10 bg-[#0D1527] p-3.5 text-left transition-colors hover:border-emerald-400/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
                   <span className="block truncate text-sm font-bold text-white">{client?.name || 'Cliente não encontrado'}</span>
                   <span className="mt-0.5 block truncate text-xs text-white/50">{service?.title || 'Serviço não encontrado'}</span>
+                  {order.scriptId && <span className="mt-1 block truncate text-[11px] text-blue-200/75">Roteiro: {script?.title || 'Roteiro não encontrado'}</span>}
                   <span className="mt-2 block text-xs font-semibold text-emerald-300">Concluído · {formatMoney(order.totalPaid)}</span>
                 </button>
               ))}
