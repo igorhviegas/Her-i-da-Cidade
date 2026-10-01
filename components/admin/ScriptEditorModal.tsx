@@ -1,0 +1,120 @@
+import React, { FormEvent, useState } from 'react';
+import { AlertCircle, Loader2, Save, X } from 'lucide-react';
+import { createContentScript, updateContentScript } from '../../services/contentScriptsService';
+import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../../types';
+
+interface ScriptEditorModalProps {
+  script: ContentScript | null;
+  categories: string[];
+  onClose: () => void;
+  onSaved: (script: ContentScript) => void;
+}
+
+const productionOptions: Array<[ScriptProductionStatus, string]> = [
+  ['draft', 'Rascunho'],
+  ['ready', 'Pronto para gravar'],
+  ['in_production', 'Em produção'],
+  ['produced', 'Produzido'],
+];
+const publicationOptions: Array<[ScriptPublicationStatus, string]> = [
+  ['unpublished', 'Não publicado'],
+  ['published', 'Publicado'],
+];
+const inputClass = 'mt-1.5 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-blue-500/60 disabled:opacity-50';
+const labelClass = 'block text-xs font-semibold text-white/70';
+
+function toDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof (value as any)?.toDate === 'function') return (value as any).toDate();
+  const parsed = new Date(value as string | number);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function dateInput(value: unknown): string {
+  const date = toDate(value);
+  if (!date) return '';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatDate(value: unknown): string {
+  const date = toDate(value);
+  return date ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(date) : '—';
+}
+
+function dateFromInput(value: string): Date | null {
+  if (!value) return null;
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day, 12);
+}
+
+export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, categories, onClose, onSaved }) => {
+  const [title, setTitle] = useState(script?.title || '');
+  const [category, setCategory] = useState(script?.category || '');
+  const [content, setContent] = useState(script?.content || '');
+  const [notes, setNotes] = useState(script?.notes || '');
+  const [productionStatus, setProductionStatus] = useState<ScriptProductionStatus>(script?.productionStatus || 'draft');
+  const [publicationStatus, setPublicationStatus] = useState<ScriptPublicationStatus>(script?.publicationStatus || 'unpublished');
+  const [publishedDate, setPublishedDate] = useState(dateInput(script?.publishedAt));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError('');
+    setSaving(true);
+    try {
+      const input = {
+        title,
+        category,
+        content,
+        notes,
+        productionStatus,
+        publicationStatus,
+        publishedAt: dateFromInput(publishedDate),
+      };
+      const saved = script
+        ? (await updateContentScript(script.id, input), { ...script, ...input, publishedAt: input.publishedAt || undefined })
+        : await createContentScript(input);
+      onSaved(saved);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar o roteiro.');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/80 p-3 backdrop-blur-sm sm:p-6">
+      <section role="dialog" aria-modal="true" aria-labelledby="script-editor-title" className="my-auto flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0D1527] shadow-2xl">
+        <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-5 py-4 sm:px-6">
+          <div><p className="text-[11px] font-bold uppercase tracking-[0.15em] text-blue-300">Biblioteca permanente</p><h2 id="script-editor-title" className="mt-1 text-lg font-bold text-white">{script ? 'Editar roteiro' : 'Novo roteiro'}</h2>{script && <p className="mt-1 text-[11px] text-white/40">Criado em {formatDate(script.createdAt)} · Atualizado em {formatDate(script.updatedAt)}</p>}</div>
+          <button type="button" onClick={onClose} disabled={saving} aria-label="Fechar editor" className="rounded-lg p-2 text-white/50 hover:bg-white/10 hover:text-white disabled:opacity-40"><X className="h-5 w-5" /></button>
+        </header>
+        <form onSubmit={handleSubmit} className="min-h-0 overflow-y-auto">
+          <div className="space-y-5 p-5 sm:p-6">
+            {error && <p role="alert" className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-200"><AlertCircle className="h-4 w-4 shrink-0" />{error}</p>}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className={labelClass}>Título *<input required maxLength={180} value={title} onChange={(event) => setTitle(event.target.value)} disabled={saving} className={inputClass} placeholder="Ex.: Chupeta — versão para cliente" /></label>
+              <label className={labelClass}>Categoria / assunto
+                <input list="script-categories" value={category} onChange={(event) => setCategory(event.target.value)} disabled={saving} className={inputClass} placeholder="Escolha ou digite um assunto" />
+                <datalist id="script-categories">{categories.map((item) => <option key={item} value={item} />)}</datalist>
+                <span className="mt-1 block text-[10px] font-normal text-white/40">Reaproveite o mesmo assunto em vários roteiros.</span>
+              </label>
+            </div>
+            <label className={labelClass}>Conteúdo do roteiro *<textarea required value={content} onChange={(event) => setContent(event.target.value)} disabled={saving} rows={18} className={`${inputClass} min-h-[20rem] resize-y leading-6`} placeholder="Escreva ou cole o roteiro completo…" /></label>
+            <label className={labelClass}>Observações e anotações<textarea value={notes} onChange={(event) => setNotes(event.target.value)} disabled={saving} rows={4} className={`${inputClass} resize-y`} placeholder="Referências, ideias para versões futuras, observações de produção…" /></label>
+            <div className="grid gap-3 border-t border-white/10 pt-4 sm:grid-cols-3">
+              <label className={labelClass}>Status de produção<select value={productionStatus} onChange={(event) => setProductionStatus(event.target.value as ScriptProductionStatus)} disabled={saving} className={inputClass}>{productionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label className={labelClass}>Status de publicação<select value={publicationStatus} onChange={(event) => setPublicationStatus(event.target.value as ScriptPublicationStatus)} disabled={saving} className={inputClass}>{publicationOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label className={labelClass}>Data de publicação<input type="date" value={publishedDate} onChange={(event) => setPublishedDate(event.target.value)} disabled={saving} className={inputClass} /></label>
+            </div>
+          </div>
+          <footer className="flex flex-col-reverse gap-2 border-t border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:justify-end sm:px-6">
+            <button type="button" onClick={onClose} disabled={saving} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/65 hover:bg-white/5 disabled:opacity-40">Cancelar</button>
+            <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{saving ? 'Salvando…' : 'Salvar roteiro'}</button>
+          </footer>
+        </form>
+      </section>
+    </div>
+  );
+};

@@ -8,6 +8,7 @@ import { AdminVideosPage } from './AdminVideosPage';
 import { AdminCategoriesPage } from './AdminCategoriesPage';
 import { AdminContentPage } from './AdminContentPage';
 import { AdminOrdersPage } from './AdminOrdersPage';
+import { AdminScriptsPage } from './AdminScriptsPage';
 import { 
   Shield, 
   LayoutDashboard, 
@@ -27,10 +28,11 @@ import {
   UserCheck,
   RefreshCw,
   AlertCircle,
-  ClipboardList
+  ClipboardList,
+  BookOpen
 } from 'lucide-react';
 
-type AdminTab = 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders';
+type AdminTab = 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts';
 
 export const AdminDashboard: React.FC = () => {
   const { user, adminData, logout } = useAuth();
@@ -50,6 +52,8 @@ export const AdminDashboard: React.FC = () => {
       ? 'content'
       : path === '/admin/pedidos'
       ? 'orders'
+      : path === '/admin/roteiros'
+      ? 'scripts'
       : 'dashboard';
 
   const [currentTab, setCurrentTab] = useState<AdminTab>(initialTab);
@@ -70,6 +74,8 @@ export const AdminDashboard: React.FC = () => {
       setCurrentTab('content');
     } else if (path === '/admin/pedidos') {
       setCurrentTab('orders');
+    } else if (path === '/admin/roteiros') {
+      setCurrentTab('scripts');
     } else if (path === '/admin' || path === '/admin/dashboard') {
       setCurrentTab('dashboard');
     }
@@ -89,6 +95,8 @@ export const AdminDashboard: React.FC = () => {
       navigate('/admin/conteudo');
     } else if (tabId === 'orders') {
       navigate('/admin/pedidos');
+    } else if (tabId === 'scripts') {
+      navigate('/admin/roteiros');
     } else if (tabId === 'dashboard') {
       navigate('/admin');
     }
@@ -157,6 +165,7 @@ export const AdminDashboard: React.FC = () => {
     { id: 'categories' as AdminTab, label: 'Categorias', icon: Layers, status: 'active' },
     { id: 'content' as AdminTab, label: 'Conteúdo', icon: FileText, status: 'active' },
     { id: 'orders' as AdminTab, label: 'Pedidos', icon: ClipboardList, status: 'active' },
+    { id: 'scripts' as AdminTab, label: 'Roteiros', icon: BookOpen, status: 'active' },
     { id: 'settings' as AdminTab, label: 'Configurações', icon: Settings, status: 'active' },
   ];
 
@@ -629,9 +638,10 @@ export const AdminDashboard: React.FC = () => {
             <AdminCategoriesPage />
           )}
           {currentTab === 'orders' && <AdminOrdersPage />}
+          {currentTab === 'scripts' && <AdminScriptsPage />}
 
           {/* TAB: SUBMÓDULOS EM BREVE */}
-            {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && currentTab !== 'categories' && currentTab !== 'content' && currentTab !== 'orders' && (
+            {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && currentTab !== 'categories' && currentTab !== 'content' && currentTab !== 'orders' && currentTab !== 'scripts' && (
             <div className="max-w-2xl mx-auto py-12 text-center animate-in fade-in duration-200">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 mb-4 text-blue-400">
                 <Clock className="w-8 h-8" />

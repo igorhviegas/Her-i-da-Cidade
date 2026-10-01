@@ -51,6 +51,11 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Biblioteca interna de roteiros, acessível somente a administradores.
+    match /contentScripts/{scriptId} {
+      allow read, write: if isAdmin();
+    }
+
     // Dados internos do CRM: acesso restrito aos administradores autenticados.
     match /clients/{clientId} {
       allow read, write: if isAdmin();

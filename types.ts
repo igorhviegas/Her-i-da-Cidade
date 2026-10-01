@@ -58,6 +58,27 @@ export interface Order {
 
 export interface FirestoreOrder extends Order {}
 
+export type ScriptProductionStatus = 'draft' | 'ready' | 'in_production' | 'produced';
+export type ScriptPublicationStatus = 'unpublished' | 'published';
+
+/** Material permanente da biblioteca; status não determina remoção ou vínculo com pedido. */
+export interface ContentScript {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  productionStatus: ScriptProductionStatus;
+  publicationStatus: ScriptPublicationStatus;
+  createdAt?: any;
+  updatedAt?: any;
+  publishedAt?: any;
+  notes: string;
+  /** Reservado para relacionamento futuro; não é preenchido nesta etapa. */
+  orderId?: string;
+  /** Reservado para rastrear futuramente o roteiro de origem. */
+  sourceScriptId?: string;
+}
+
 /**
  * Modelo oficial de documento no Firestore para a coleção 'services'.
  */
