@@ -7,6 +7,7 @@ import { getContentScriptsByIds } from '../../services/contentScriptsService';
 import { getServiceById } from '../../services/servicesService';
 import { formatOrderReference, extractBirthdayPerson } from '../../services/orderReference.js';
 import { buildDeliveryWhatsAppUrl } from '../../services/digitalDelivery.js';
+import { getServiceColor, type ServiceColor } from '../../services/serviceColors.js';
 import type { Client, ContentScript, Order, OrderStatus, Service } from '../../types';
 import { CreateOrderModal } from './CreateOrderModal';
 import { EditOrderModal } from './EditOrderModal';
@@ -19,6 +20,15 @@ const COLUMNS = [
   { status: 'scheduled', label: 'AGENDADO', accent: 'border-blue-400' },
   { status: 'completed', label: 'CONCLUÍDO', accent: 'border-slate-400' },
 ] as const;
+
+// Classes estáticas (o Tailwind precisa enxergá-las por completo): fundo do card e título do serviço.
+const SERVICE_COLOR_CLASSES: Record<ServiceColor, { card: string; title: string }> = {
+  red: { card: 'bg-gradient-to-b from-red-500/10 to-red-500/10', title: 'text-red-300' },
+  yellow: { card: 'bg-gradient-to-b from-yellow-400/10 to-yellow-400/10', title: 'text-yellow-300' },
+  blue: { card: 'bg-gradient-to-b from-blue-500/10 to-blue-500/10', title: 'text-blue-300' },
+  purple: { card: 'bg-gradient-to-b from-purple-500/10 to-purple-500/10', title: 'text-purple-300' },
+  green: { card: 'bg-gradient-to-b from-green-500/10 to-green-500/10', title: 'text-green-300' },
+};
 
 function toDate(value: unknown): Date | null {
   if (!value) return null;
@@ -356,7 +366,9 @@ export const AdminOrdersPage: React.FC = () => {
                       const internalDate = formatDate(order.internalDueDate);
                       const eventDate = formatDate(order.eventDate);
                       const childName = extractBirthdayPerson(order);
-                      const deliveryUrl = order.status === 'delivery' ? buildDeliveryWhatsAppUrl(client?.whatsapp, order, service) : null;
+                      const deliveryUrl = buildDeliveryWhatsAppUrl(client?.whatsapp, order, service);
+                      const serviceColor = getServiceColor(service);
+                      const colorClasses = serviceColor ? SERVICE_COLOR_CLASSES[serviceColor] : null;
                       const completing = updatingOrderId === order.id;
                       return (
                         <article
@@ -379,11 +391,11 @@ export const AdminOrdersPage: React.FC = () => {
                               setOrderActionError('');
                             }
                           }}
-                          className={`cursor-pointer rounded-xl border bg-[#0D1527] p-3.5 shadow-lg outline-none transition-colors hover:border-blue-400/50 focus-visible:ring-2 focus-visible:ring-blue-400 ${order.scriptId ? 'ring-1 ring-inset ring-blue-400/10' : ''} ${state === 'overdue' ? 'border-red-500/45' : state === 'soon' ? 'border-amber-400/35' : 'border-white/10'}`}
+                          className={`cursor-pointer rounded-xl border bg-[#0D1527] ${colorClasses?.card ?? ''} p-3.5 shadow-lg outline-none transition-colors hover:border-blue-400/50 focus-visible:ring-2 focus-visible:ring-blue-400 ${order.scriptId ? 'ring-1 ring-inset ring-blue-400/10' : ''} ${state === 'overdue' ? 'border-red-500/45' : state === 'soon' ? 'border-amber-400/35' : 'border-white/10'}`}
                         >
                           <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-white/35">Pedido {formatOrderReference(order, allOrderRecords)}</p>
                           <h4 className="truncate text-sm font-bold text-white">{client?.name || 'Cliente não encontrado'}</h4>
-                          <p className="mt-0.5 truncate text-xs text-white/55">{service?.title || 'Serviço não encontrado'}</p>
+                          <p className={`mt-0.5 truncate text-xs ${colorClasses ? `font-semibold ${colorClasses.title}` : 'text-white/55'}`}>{service?.title || 'Serviço não encontrado'}</p>
                           {childName && <p className="mt-0.5 truncate text-xs text-white/70">Criança: <span className="font-semibold text-white/90">{childName}</span></p>}
                           {order.scriptId && <p className="mt-1 truncate text-[11px] text-blue-200/75"><span className="mr-1 rounded bg-blue-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">Roteiro</span>{script?.title || 'Roteiro não encontrado'}</p>}
                           {(eventDate || internalDate) && (
@@ -396,7 +408,7 @@ export const AdminOrdersPage: React.FC = () => {
                           )}
                           <p className="mt-3 text-sm font-extrabold text-emerald-300">{formatMoney(order.totalPaid)}</p>
                           <div className="mt-2.5 flex flex-wrap gap-2">
-                            {order.status === 'delivery' && (deliveryUrl ? (
+                            {(deliveryUrl ? (
                               <a
                                 href={deliveryUrl}
                                 target="_blank"
@@ -408,7 +420,7 @@ export const AdminOrdersPage: React.FC = () => {
                               >
                                 <MessageCircle className="h-4 w-4 shrink-0" /> Enviar pelo WhatsApp
                               </a>
-                            ) : <p className="w-full text-[11px] text-white/35">WhatsApp indisponível</p>)}
+                            ) : order.status === 'delivery' ? <p className="w-full text-[11px] text-white/35">WhatsApp indisponível</p> : null)}
                             <button
                               type="button"
                               draggable={false}

@@ -11,8 +11,7 @@ test('colunas do Kanban: Entregar, Gravar, Editar, Agendado, Concluído', () => 
   assert.deepEqual(order, ['delivery', 'recording', 'editing', 'scheduled', 'completed']);
 });
 
-test('botão de WhatsApp na etapa Entregar não move nem abre o card', () => {
-  assert.match(source, /order\.status === 'delivery'/);
+test('botão de WhatsApp nos cards não move nem abre o card', () => {
   assert.match(source, /Enviar pelo WhatsApp/);
   assert.match(source, /buildDeliveryWhatsAppUrl\(client\?\.whatsapp, order, service\)/);
   assert.match(source, /draggable=\{false\}/);
@@ -36,4 +35,9 @@ test('Concluir em todos os cards: confirma, reutiliza handleStatusChange e não 
 test('cards exibem o nome da criança e há botão de atualizar', () => {
   assert.match(source, /Criança: /);
   assert.match(source, /aria-label="Atualizar pedidos"/);
+});
+
+test('cards ganham cor por serviço', () => {
+  assert.match(source, /getServiceColor\(service\)/);
+  assert.match(source, /SERVICE_COLOR_CLASSES/);
 });
