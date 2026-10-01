@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleManyChatWebhook } from '../api/manychat.ts';
+import {
+  handleManyChatWebhook,
+  parseServiceAccountCredentials,
+  resetAdminFirestore,
+} from '../api/manychat.ts';
 import { handleManyChatOrderRequest } from '../functions/manychat-handler.js';
 
 const TEST_SECRET = 'vercel-test-secret-12345';
@@ -109,6 +113,81 @@ function createFakeFirestore({ serviceExists = true, servicePrice = 'Apenas R$ 3
     },
   };
 }
+
+test('parseServiceAccountCredentials: converts literal \\n to actual newlines', () => {
+  const rawJsonWithEscapedNewlines = JSON.stringify({
+    project_id: 'test-project',
+    client_email: 'test@test-project.iam.gserviceaccount.com',
+    private_key: '-----BEGIN PRIVATE KEY-----\\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\\n-----END PRIVATE KEY-----\\n',
+  });
+
+  const parsed = parseServiceAccountCredentials(rawJsonWithEscapedNewlines);
+  assert.equal(parsed.projectId, 'test-project');
+  assert.equal(parsed.clientEmail, 'test@test-project.iam.gserviceaccount.com');
+  assert.ok(parsed.privateKey.includes('\n'));
+  assert.ok(!parsed.privateKey.includes('\\n'));
+  assert.ok(parsed.privateKey.startsWith('-----BEGIN PRIVATE KEY-----'));
+  assert.ok(parsed.privateKey.endsWith('-----END PRIVATE KEY-----\n'));
+});
+
+test('parseServiceAccountCredentials: accepts Base64 encoded JSON and strips outer quotes', () => {
+  const rawJson = JSON.stringify({
+    project_id: 'base64-project',
+    client_email: 'b64@example.com',
+    private_key: '-----BEGIN PRIVATE KEY-----\\nMIIB\\n-----END PRIVATE KEY-----\\n',
+  });
+
+  const base64String = Buffer.from(rawJson).toString('base64');
+  const wrappedInQuotes = `"${base64String}"`;
+
+  const parsed = parseServiceAccountCredentials(wrappedInQuotes);
+  assert.equal(parsed.projectId, 'base64-project');
+  assert.equal(parsed.clientEmail, 'b64@example.com');
+  assert.ok(parsed.privateKey.includes('\n'));
+});
+
+test('parseServiceAccountCredentials: throws on invalid JSON or corrupt Base64', () => {
+  assert.throws(
+    () => parseServiceAccountCredentials('not a valid json {'),
+    /Falha ao decodificar JSON/
+  );
+});
+
+test('parseServiceAccountCredentials: throws on missing required fields', () => {
+  assert.throws(
+    () => parseServiceAccountCredentials(JSON.stringify({ client_email: 'a@b.com', private_key: 'pk' })),
+    /Campo obrigatório project_id ausente/
+  );
+
+  assert.throws(
+    () => parseServiceAccountCredentials(JSON.stringify({ project_id: 'p', private_key: 'pk' })),
+    /Campo obrigatório client_email ausente/
+  );
+
+  assert.throws(
+    () => parseServiceAccountCredentials(JSON.stringify({ project_id: 'p', client_email: 'a@b.com' })),
+    /Campo obrigatório private_key ausente/
+  );
+});
+
+test('GET request returns 405 without attempting to connect to database or checking secret', async () => {
+  const originalSecret = process.env.MANYCHAT_WEBHOOK_SECRET;
+  delete process.env.MANYCHAT_WEBHOOK_SECRET;
+
+  try {
+    const req = createMockRequest({ method: 'GET' });
+    const res = createMockResponse();
+
+    await handleManyChatWebhook(req, res);
+
+    assert.equal(res.statusCode, 405);
+    assert.equal(res.body.ok, false);
+    assert.equal(res.body.error.code, 'method_not_allowed');
+    assert.deepEqual(res.body.allowedMethods, ['POST']);
+  } finally {
+    if (originalSecret) process.env.MANYCHAT_WEBHOOK_SECRET = originalSecret;
+  }
+});
 
 test('returns 500 when MANYCHAT_WEBHOOK_SECRET is not configured', async () => {
   const originalSecret = process.env.MANYCHAT_WEBHOOK_SECRET;
