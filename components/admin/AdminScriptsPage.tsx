@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowUpRight, BookOpen, CheckCircle2, Loader2, Plus, Search } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, BookOpen, CheckCircle2, Copy, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { getCategories } from '../../services/categoriesService';
-import { listContentScripts } from '../../services/contentScriptsService';
+import { createContentScript, deleteContentScript, listContentScripts } from '../../services/contentScriptsService';
 import { sendScriptToRecording } from '../../services/scriptProductionService';
 import { useRouter } from '../../lib/router';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../../types';
@@ -54,6 +54,7 @@ export const AdminScriptsPage: React.FC = () => {
   const [editingScript, setEditingScript] = useState<ContentScript | null>(null);
   const [initialParentScriptId, setInitialParentScriptId] = useState<string | undefined>();
   const [sendingScriptId, setSendingScriptId] = useState<string | null>(null);
+  const [scriptActionId, setScriptActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
 
   useEffect(() => {
@@ -81,7 +82,7 @@ export const AdminScriptsPage: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
-  const categoriesInLibrary = useMemo(() => Array.from(new Set(scripts.map((item) => item.category.trim()).filter(Boolean)))
+  const categoriesInLibrary = useMemo(() => Array.from(new Set<string>(scripts.map((item) => item.category.trim()).filter(Boolean)))
     .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })), [scripts]);
 
   const hierarchyRows = useMemo(() => {
@@ -92,7 +93,7 @@ export const AdminScriptsPage: React.FC = () => {
         (!productionFilter || script.productionStatus === productionFilter) &&
         (!publicationFilter || script.publicationStatus === publicationFilter);
     });
-    const scriptsById = new Map(scripts.map((script) => [script.id, script]));
+    const scriptsById = new Map<string, ContentScript>(scripts.map((script) => [script.id, script] as const));
     const visible = new Set(matches.map((script) => script.id));
     // Inclui os pais como contexto quando um resultado da busca é filho.
     matches.forEach((script) => {
@@ -128,33 +129,78 @@ export const AdminScriptsPage: React.FC = () => {
   const openNew = () => { setEditingScript(null); setInitialParentScriptId(undefined); setEditorOpen(true); };
   const openNewChild = (parentScriptId: string) => { setEditingScript(null); setInitialParentScriptId(parentScriptId); setEditorOpen(true); };
   const openEdit = (script: ContentScript) => { setEditingScript(script); setInitialParentScriptId(undefined); setEditorOpen(true); };
-  const handleSendToRecording = async (script: ContentScript) => {
-    if (sendingScriptId) return;
+  const handleSendToRecording = async (script: ContentScript, showPageError = true): Promise<ContentScript> => {
+    if (sendingScriptId) throw new Error('Aguarde o envio da produção em andamento.');
     setSendingScriptId(script.id);
     setActionError('');
     try {
       const order = await sendScriptToRecording(script.id);
-      setScripts((current) => current.map((item) => item.id === script.id
-        ? { ...item, productionStatus: 'in_production', orderId: order.id, updatedAt: new Date() }
-        : item));
+      const updatedScript = { ...script, productionStatus: 'in_production' as const, orderId: order.id, updatedAt: new Date() };
+      setScripts((current) => current.map((item) => item.id === script.id ? updatedScript : item));
+      setEditingScript((current) => current?.id === script.id ? updatedScript : current);
       setSuccess('Pedido de gravação criado e vinculado ao roteiro.');
       window.setTimeout(() => setSuccess(''), 4000);
+      return updatedScript;
     } catch (sendError) {
       logScriptOperationError(`enviar roteiro ${script.id} para gravação`, sendError);
-      setActionError(sendError instanceof Error ? sendError.message : 'Não foi possível enviar o roteiro para gravação.');
+      if (showPageError) setActionError(sendError instanceof Error ? sendError.message : 'Não foi possível enviar o roteiro para gravação.');
+      throw sendError;
     } finally {
       setSendingScriptId(null);
     }
   };
-  const handleSaved = (saved: ContentScript) => {
+  const handleSaved = (saved: ContentScript, closeEditor = true) => {
     const now = new Date();
     const complete = { ...saved, createdAt: saved.createdAt || now, updatedAt: now };
     setScripts((current) => [complete, ...current.filter((item) => item.id !== complete.id)]
       .sort((a, b) => (toDate(b.updatedAt)?.getTime() || 0) - (toDate(a.updatedAt)?.getTime() || 0)));
+    setEditingScript((current) => current?.id === complete.id ? complete : current);
     if (complete.category && !categories.includes(complete.category)) setCategories((current) => [...current, complete.category].sort((a, b) => a.localeCompare(b, 'pt-BR')));
-    setEditorOpen(false);
-    setSuccess(saved.createdAt ? 'Roteiro atualizado.' : 'Roteiro criado.');
-    window.setTimeout(() => setSuccess(''), 4000);
+    if (closeEditor) {
+      setEditorOpen(false);
+      setSuccess(saved.createdAt ? 'Roteiro atualizado.' : 'Roteiro criado.');
+      window.setTimeout(() => setSuccess(''), 4000);
+    }
+  };
+  const handleDuplicateScript = async (script: ContentScript) => {
+    if (scriptActionId) return;
+    if (!window.confirm(`Duplicar o roteiro “${script.title}”? A cópia começará como Rascunho e Não publicado.`)) return;
+    setScriptActionId(script.id);
+    setActionError('');
+    try {
+      const duplicate = await createContentScript({
+        title: `${script.title} (cópia)`.slice(0, 180),
+        content: script.content,
+        category: script.category,
+        notes: script.notes,
+        productionStatus: 'draft',
+        publicationStatus: 'unpublished',
+        parentScriptId: script.parentScriptId || null,
+      });
+      handleSaved(duplicate);
+    } catch (duplicateError) {
+      logScriptOperationError(`duplicar roteiro ${script.id}`, duplicateError);
+      setActionError(duplicateError instanceof Error ? duplicateError.message : 'Não foi possível duplicar o roteiro.');
+    } finally {
+      setScriptActionId(null);
+    }
+  };
+  const handleDeleteScript = async (script: ContentScript) => {
+    if (scriptActionId) return;
+    if (!window.confirm(`Excluir definitivamente o roteiro “${script.title}”? Roteiros filhos e pedidos não serão excluídos.`)) return;
+    setScriptActionId(script.id);
+    setActionError('');
+    try {
+      await deleteContentScript(script.id);
+      setScripts((current) => current.filter((item) => item.id !== script.id));
+      setSuccess('Roteiro excluído. Nenhum pedido ou outro roteiro foi removido.');
+      window.setTimeout(() => setSuccess(''), 4000);
+    } catch (deleteError) {
+      logScriptOperationError(`excluir roteiro ${script.id}`, deleteError);
+      setActionError(deleteError instanceof Error ? deleteError.message : 'Não foi possível excluir o roteiro.');
+    } finally {
+      setScriptActionId(null);
+    }
   };
 
   return (
@@ -207,6 +253,8 @@ export const AdminScriptsPage: React.FC = () => {
                   <div className="flex shrink-0 items-center gap-1 border-t border-white/[0.07] pt-1.5 sm:border-0 sm:pt-0">
                     <button type="button" onClick={() => openEdit(script)} className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-white/55 transition-colors hover:bg-white/5 hover:text-white">Editar</button>
                     <button type="button" onClick={() => openNewChild(script.id)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-blue-200/75 transition-colors hover:bg-blue-500/10 hover:text-blue-200"><Plus className="h-3.5 w-3.5" /> Filho</button>
+                    <button type="button" onClick={() => void handleDuplicateScript(script)} disabled={scriptActionId !== null} aria-label={`Duplicar roteiro ${script.title}`} title="Duplicar roteiro" className="rounded-lg p-1.5 text-white/45 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-40">{scriptActionId === script.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />}</button>
+                    <button type="button" onClick={() => void handleDeleteScript(script)} disabled={scriptActionId !== null} aria-label={`Excluir roteiro ${script.title}`} title="Excluir roteiro" className="rounded-lg p-1.5 text-red-200/55 transition-colors hover:bg-red-500/10 hover:text-red-200 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button>
                     {script.orderId ? <button type="button" onClick={() => navigate(`/admin/pedidos?orderId=${encodeURIComponent(script.orderId!)}`)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-emerald-200/80 transition-colors hover:bg-emerald-500/10 hover:text-emerald-200"><ArrowUpRight className="h-3.5 w-3.5" /> Produção</button>
                       : script.productionStatus === 'ready' ? <button type="button" onClick={() => void handleSendToRecording(script)} disabled={sendingScriptId !== null} className="inline-flex items-center gap-1 rounded-lg bg-blue-600/15 px-2.5 py-1.5 text-[11px] font-bold text-blue-200 transition-colors hover:bg-blue-600/25 disabled:opacity-50">{sendingScriptId === script.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{sendingScriptId === script.id ? 'Enviando…' : 'Enviar para gravação'}</button> : null}
                   </div>
@@ -214,7 +262,7 @@ export const AdminScriptsPage: React.FC = () => {
               </article>)}
             </div>}
 
-      {editorOpen && <ScriptEditorModal script={editingScript} initialParentScriptId={initialParentScriptId} scripts={scripts} categories={categories} onClose={() => setEditorOpen(false)} onSaved={handleSaved} />}
+      {editorOpen && <ScriptEditorModal script={editingScript} initialParentScriptId={initialParentScriptId} scripts={scripts} categories={categories} onClose={() => setEditorOpen(false)} onSaved={handleSaved} onSendToRecording={(script) => handleSendToRecording(script, false)} onOpenOrder={(orderId) => { setEditorOpen(false); navigate(`/admin/pedidos?orderId=${encodeURIComponent(orderId)}`); }} />}
     </section>
   );
 };

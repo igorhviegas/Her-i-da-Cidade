@@ -1,4 +1,4 @@
-import { collection, deleteField, doc, documentId, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, deleteField, doc, documentId, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../types';
 
@@ -122,6 +122,41 @@ export async function updateContentScript(id: string, input: ContentScriptInput)
     publishedAt: publishedAt || deleteField(),
     parentScriptId: parentScriptId || deleteField(),
     updatedAt: serverTimestamp(),
+  });
+}
+
+/** Exclui apenas um roteiro sem tocar em filhos ou pedidos relacionados. */
+export async function deleteContentScript(id: string): Promise<void> {
+  if (!db) throw new Error('Firestore não inicializado.');
+  if (typeof id !== 'string' || !id.trim() || id.includes('/')) throw new Error('ID de roteiro inválido para exclusão.');
+  const firestore = db;
+  const scriptRef = doc(firestore, CONTENT_SCRIPTS_COLLECTION, id);
+
+  const [childrenSnapshot, linkedOrdersSnapshot] = await Promise.all([
+    getDocs(query(collection(firestore, CONTENT_SCRIPTS_COLLECTION), where('parentScriptId', '==', id))),
+    getDocs(query(collection(firestore, 'orders'), where('scriptId', '==', id))),
+  ]);
+  if (!childrenSnapshot.empty) throw new Error('Este roteiro possui roteiros filhos. Remova ou reassocie os filhos antes de excluí-lo.');
+  const activeOrders = linkedOrdersSnapshot.docs.filter((order) => order.data().status !== 'completed');
+  if (activeOrders.length) throw new Error('Este roteiro possui um pedido ativo. Resolva o pedido antes de excluí-lo.');
+  if (!linkedOrdersSnapshot.empty) throw new Error('Este roteiro possui pedidos concluídos. A exclusão foi bloqueada para preservar o histórico de produção.');
+
+  await runTransaction(firestore, async (transaction) => {
+    const scriptSnapshot = await transaction.get(scriptRef);
+    if (!scriptSnapshot.exists()) throw new Error('Roteiro não encontrado para exclusão.');
+    const current = scriptSnapshot.data();
+    if (typeof current.orderId === 'string' && current.orderId) {
+      if (current.orderId.includes('/')) throw new Error('O roteiro possui um vínculo de pedido inválido; nenhum documento foi alterado.');
+      const linkedOrderRef = doc(firestore, 'orders', current.orderId);
+      const linkedOrderSnapshot = await transaction.get(linkedOrderRef);
+      if (linkedOrderSnapshot.exists()) {
+        const linkedOrder = linkedOrderSnapshot.data();
+        if (linkedOrder.scriptId !== id) throw new Error('O vínculo do roteiro aponta para um pedido associado a outro roteiro; a exclusão foi bloqueada.');
+        if (linkedOrder.status === 'completed') throw new Error('Este roteiro possui um pedido concluído. A exclusão foi bloqueada para preservar o histórico de produção.');
+        throw new Error('Este roteiro possui um pedido ativo. Resolva o pedido antes de excluí-lo.');
+      }
+    }
+    transaction.delete(scriptRef);
   });
 }
 

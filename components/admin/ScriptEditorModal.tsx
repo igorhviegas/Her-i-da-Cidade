@@ -1,5 +1,5 @@
-import React, { FormEvent, useState } from 'react';
-import { AlertCircle, Loader2, Save, X } from 'lucide-react';
+import React, { FormEvent, useRef, useState } from 'react';
+import { AlertCircle, ArrowUpRight, Loader2, Save, Video, X } from 'lucide-react';
 import { createContentScript, updateContentScript } from '../../services/contentScriptsService';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../../types';
 
@@ -9,7 +9,9 @@ interface ScriptEditorModalProps {
   scripts: ContentScript[];
   categories: string[];
   onClose: () => void;
-  onSaved: (script: ContentScript) => void;
+  onSaved: (script: ContentScript, closeEditor?: boolean) => void;
+  onSendToRecording: (script: ContentScript) => Promise<ContentScript>;
+  onOpenOrder: (orderId: string) => void;
 }
 
 const productionOptions: Array<[ScriptProductionStatus, string]> = [
@@ -55,7 +57,8 @@ function todayInput(): string {
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 }
 
-export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, initialParentScriptId, scripts, categories, onClose, onSaved }) => {
+export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, initialParentScriptId, scripts, categories, onClose, onSaved, onSendToRecording, onOpenOrder }) => {
+  const [persistedScript, setPersistedScript] = useState(script);
   const [title, setTitle] = useState(script?.title || '');
   const [category, setCategory] = useState(script?.category || '');
   const [parentScriptId, setParentScriptId] = useState(script?.parentScriptId || initialParentScriptId || '');
@@ -65,29 +68,69 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, in
   const [publicationStatus, setPublicationStatus] = useState<ScriptPublicationStatus>(script?.publicationStatus || 'unpublished');
   const [publishedDate, setPublishedDate] = useState(dateInput(script?.publishedAt));
   const [saving, setSaving] = useState(false);
+  const [sendingToProduction, setSendingToProduction] = useState(false);
+  const [linkedOrderId, setLinkedOrderId] = useState(script?.orderId || '');
+  const operationLock = useRef(false);
   const [error, setError] = useState('');
+
+  const persistScript = async (): Promise<ContentScript> => {
+    const input = {
+      title,
+      category,
+      content,
+      notes,
+      productionStatus,
+      publicationStatus,
+      publishedAt: dateFromInput(publishedDate),
+      parentScriptId: parentScriptId || null,
+    };
+    if (persistedScript) {
+      await updateContentScript(persistedScript.id, input);
+      const saved = { ...persistedScript, ...input, publishedAt: input.publishedAt || undefined, parentScriptId: input.parentScriptId || undefined };
+      setPersistedScript(saved);
+      return saved;
+    }
+    const created = await createContentScript(input);
+    setPersistedScript(created);
+    return created;
+  };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (operationLock.current) return;
+    operationLock.current = true;
     setError('');
     setSaving(true);
     try {
-      const input = {
-        title,
-        category,
-        content,
-        notes,
-        productionStatus,
-        publicationStatus,
-        publishedAt: dateFromInput(publishedDate),
-        parentScriptId: parentScriptId || null,
-      };
-      const saved = script
-        ? (await updateContentScript(script.id, input), { ...script, ...input, publishedAt: input.publishedAt || undefined, parentScriptId: input.parentScriptId || undefined })
-        : await createContentScript(input);
+      const saved = await persistScript();
       onSaved(saved);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar o roteiro.');
+    } finally {
+      operationLock.current = false;
+      setSaving(false);
+    }
+  };
+
+  const handleSendToRecording = async () => {
+    if (operationLock.current || saving || productionStatus !== 'ready' || linkedOrderId) return;
+    operationLock.current = true;
+    setError('');
+    setSaving(true);
+    setSendingToProduction(true);
+    try {
+      const saved = await persistScript();
+      onSaved(saved, false);
+      const linked = await onSendToRecording(saved);
+      setLinkedOrderId(linked.orderId || '');
+      setProductionStatus(linked.productionStatus);
+      setPersistedScript(linked);
+      onSaved(linked, false);
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : 'Não foi possível enviar o roteiro para produção.');
+    } finally {
+      operationLock.current = false;
+      setSendingToProduction(false);
       setSaving(false);
     }
   };
@@ -116,6 +159,7 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, in
         <form onSubmit={handleSubmit} className="min-h-0 overflow-y-auto">
           <div className="space-y-5 p-5 sm:p-6">
             {error && <p role="alert" className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-200"><AlertCircle className="h-4 w-4 shrink-0" />{error}</p>}
+            {linkedOrderId && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] p-3 text-xs text-emerald-100"><span>Produção vinculada ao pedido {linkedOrderId}</span><button type="button" onClick={() => onOpenOrder(linkedOrderId)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold hover:bg-emerald-500/10"><ArrowUpRight className="h-3.5 w-3.5" />Abrir pedido</button></div>}
             <div className="grid gap-3 sm:grid-cols-2">
               <label className={labelClass}>Título *<input required maxLength={180} value={title} onChange={(event) => setTitle(event.target.value)} disabled={saving} className={inputClass} placeholder="Ex.: Chupeta — versão para cliente" /></label>
               <label className={labelClass}>Categoria / assunto
@@ -139,8 +183,11 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, in
               <label className={labelClass}>Data de publicação<input type="date" value={publishedDate} onChange={(event) => setPublishedDate(event.target.value)} disabled={saving} className={inputClass} /></label>
             </div>
           </div>
-          <footer className="flex flex-col-reverse gap-2 border-t border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:justify-end sm:px-6">
-            <button type="button" onClick={onClose} disabled={saving} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/65 hover:bg-white/5 disabled:opacity-40">Cancelar</button>
+          <footer className="flex flex-col-reverse gap-2 border-t border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {productionStatus === 'ready' && !linkedOrderId && <button type="button" onClick={() => void handleSendToRecording()} disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-400/25 bg-blue-500/10 px-4 py-2.5 text-sm font-bold text-blue-100 hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-50">{sendingToProduction ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}{sendingToProduction ? 'Enviando…' : 'Enviar para produção'}</button>}
+              <button type="button" onClick={onClose} disabled={saving} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/65 hover:bg-white/5 disabled:opacity-40">Cancelar</button>
+            </div>
             <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}{saving ? 'Salvando…' : 'Salvar roteiro'}</button>
           </footer>
         </form>
