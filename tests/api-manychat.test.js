@@ -285,7 +285,7 @@ test('successfully processes valid order with Firestore automatic ID without seq
   // Valida que escreveu client, whatsapp index e order
   const orderWrite = fakeDb.writes.find(w => w.collection === 'orders');
   assert.ok(orderWrite);
-  assert.equal(orderWrite.data.status, 'completed');
+  assert.equal(orderWrite.data.status, 'delivery');
   assert.equal(orderWrite.data.servicePrice, 30);
   assert.equal(orderWrite.data.totalPaid, 30);
   assert.equal(orderWrite.data.productionType, 'immediate');

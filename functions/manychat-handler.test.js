@@ -127,14 +127,14 @@ test('successful request atomically creates a completed order using its document
   const clientWrite = writes.find(({ reference }) => reference.collectionName === 'clients' && reference.id !== 'whatsapp_5531999990000');
   const indexWrite = writes.find(({ reference }) => reference.collectionName === 'clients' && reference.id === 'whatsapp_5531999990000');
   assert.equal(orderWrite.reference.id, response.body.orderId);
-  assert.equal(orderWrite.value.status, 'completed');
+  assert.equal(orderWrite.value.status, 'delivery');
   assert.equal(orderWrite.value.content, 'Aniversariante: Criança');
   assert.equal(orderWrite.value.servicePrice, 30);
   assert.equal(orderWrite.value.totalPaid, 30);
   assert.equal(orderWrite.value.orderNumber, undefined);
   assert.equal(orderWrite.value.orderNumberDisplay, undefined);
   assert.equal(orderWrite.value.technicalPurchaseId, orderWrite.reference.id);
-  assert.equal(orderWrite.value.paidAt, orderWrite.value.completedAt);
+  assert.equal(orderWrite.value.completedAt, undefined);
   assert.ok(clientWrite);
   assert.ok(indexWrite);
   assert.deepEqual(writes.map(({ reference }) => reference.collectionName).sort(), ['clients', 'clients', 'orders']);
