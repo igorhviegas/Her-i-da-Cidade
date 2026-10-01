@@ -14,7 +14,11 @@ export type CreateOrderInput = Omit<Order, "id" | "createdAt" | "completedAt" | 
   customerDueDate?: Date | null;
   internalDueDate?: Date | null;
 };
-export type UpdateOrderInput = Partial<Omit<Order, "id" | "createdAt">>;
+export type UpdateOrderInput = Partial<Omit<Order, "id" | "createdAt" | "paidAt" | "eventDate" | "deliveryDays">> & {
+  paidAt?: Date | null;
+  eventDate?: Date | null;
+  deliveryDays?: number | null;
+};
 
 function mapOrder(id: string, data: Record<string, any>): Order {
   return { ...data, id } as Order;
@@ -58,19 +62,27 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
   if (!db) throw new Error("Firebase Firestore não inicializado.");
   if (!id) throw new Error("ID do pedido é obrigatório.");
   const payload: Record<string, unknown> = { ...updates, updatedAt: serverTimestamp() };
+  if (updates.eventDate === null) payload.eventDate = deleteField();
+  if (updates.deliveryDays === null) payload.deliveryDays = deleteField();
   if (updates.status === 'completed' && updates.completedAt === undefined) {
     payload.completedAt = serverTimestamp();
   } else if (updates.status !== undefined && updates.status !== 'completed' && updates.completedAt === undefined) {
     payload.completedAt = deleteField();
   }
-  if (updates.paidAt !== undefined || updates.deliveryDays !== undefined) {
+  const deliveryDaysChanged = Object.prototype.hasOwnProperty.call(updates, 'deliveryDays');
+  if (updates.paidAt !== undefined || deliveryDaysChanged) {
     const current = await getDoc(doc(db, ORDERS_COLLECTION, id));
     if (!current.exists()) throw new Error("Pedido não encontrado.");
     const currentData = current.data();
     const paidAtValue = updates.paidAt !== undefined ? updates.paidAt : currentData.paidAt;
     const paidAt = paidAtValue instanceof Date ? paidAtValue : paidAtValue?.toDate?.();
-    const deliveryDays = updates.deliveryDays ?? currentData.deliveryDays;
-    if (paidAt) Object.assign(payload, calculateOrderDeadlines(paidAt, deliveryDays));
+    const deliveryDays = deliveryDaysChanged ? updates.deliveryDays : currentData.deliveryDays;
+    if (paidAt && Number.isInteger(deliveryDays) && deliveryDays >= 0) {
+      Object.assign(payload, calculateOrderDeadlines(paidAt, deliveryDays));
+    } else {
+      payload.customerDueDate = deleteField();
+      payload.internalDueDate = deleteField();
+    }
   }
   await updateDoc(doc(db, ORDERS_COLLECTION, id), payload);
 }

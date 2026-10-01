@@ -1,8 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { RouterProvider, useRouter } from './lib/router';
 import { AuthProvider } from './context/AuthContext';
 import { PublicSite } from './components/PublicSite';
-import { AdminApp } from './components/admin/AdminApp';
 import { VideoCatalog } from './components/VideoCatalog';
 import { useHomeContent } from './services/homeContentService';
 
@@ -14,6 +13,8 @@ const HOME_URL = 'https://www.heroidacidade.com/';
 const VIDEO_URL = 'https://www.heroidacidade.com/videos';
 const SOCIAL_IMAGE = 'https://www.heroidacidade.com/images/spider.PNG';
 const SITE_NAME = 'O Herói da Cidade';
+
+const AdminApp = lazy(() => import('./components/admin/AdminApp').then(({ AdminApp: component }) => ({ default: component })));
 
 function setMeta(attribute: 'name' | 'property', key: string, content: string) {
   let element = document.head.querySelector<HTMLMetaElement>(`meta[${attribute}="${key}"]`);
@@ -117,7 +118,11 @@ const AppContent: React.FC = () => {
   }, [isAdmin, isVideos, homeContent.seoTitle, homeContent.seoDescription]);
 
   if (isAdmin) {
-    return <AdminApp />;
+    return (
+      <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#070B14] text-sm text-white/60">Carregando painel...</div>}>
+        <AdminApp />
+      </Suspense>
+    );
   }
 
   // Rota dedicada para o catálogo de vídeos estilo Netflix

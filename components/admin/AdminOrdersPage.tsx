@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CalendarDays, CheckCircle2, Loader2, MessageCircle, Plus, Search, X } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Loader2, MessageCircle, Pencil, Plus, Search, X } from 'lucide-react';
 import { getClientById, normalizeWhatsApp } from '../../services/clientsService';
 import { listOrders, updateOrder } from '../../services/ordersService';
 import { getServiceById } from '../../services/servicesService';
 import type { Client, Order, OrderStatus, Service } from '../../types';
 import { CreateOrderModal } from './CreateOrderModal';
+import { EditOrderModal } from './EditOrderModal';
 
 type OrderView = { order: Order; client?: Client | null; service?: Service | null };
 const COLUMNS = [
@@ -70,6 +71,7 @@ export const AdminOrdersPage: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [success, setSuccess] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<OrderView | null>(null);
+  const [editOrderOpen, setEditOrderOpen] = useState(false);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [orderActionError, setOrderActionError] = useState('');
   const [draggingOrderId, setDraggingOrderId] = useState<string | null>(null);
@@ -115,6 +117,23 @@ export const AdminOrdersPage: React.FC = () => {
     setCreateOpen(false);
     setSuccess('Pedido criado com sucesso.');
     await loadOrders();
+  };
+
+  const handleOrderSaved = (order: Order, client: Client, service: Service) => {
+    const updatedView: OrderView = { order, client, service };
+    setOrders((current) => {
+      const others = current.filter(({ order: currentOrder }) => currentOrder.id !== order.id)
+        .map((view) => view.client?.id === client.id ? { ...view, client } : view);
+      return order.status === 'completed' ? others : [...others, updatedView];
+    });
+    setCompletedOrders((current) => {
+      const others = current.filter(({ order: currentOrder }) => currentOrder.id !== order.id)
+        .map((view) => view.client?.id === client.id ? { ...view, client } : view);
+      return order.status === 'completed' ? [...others, updatedView] : others;
+    });
+    setSelectedOrder(updatedView);
+    setEditOrderOpen(false);
+    setSuccess('Pedido atualizado com sucesso.');
   };
 
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {
@@ -253,7 +272,7 @@ export const AdminOrdersPage: React.FC = () => {
                             setDraggingOrderId(order.id);
                           }}
                           onDragEnd={() => { setDraggingOrderId(null); setDragOverStatus(null); }}
-                          onClick={() => { setSelectedOrder({ order, client, service }); setOrderActionError(''); }}
+                          onClick={() => { setSelectedOrder({ order, client, service }); setEditOrderOpen(false); setOrderActionError(''); }}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
                               event.preventDefault();
@@ -295,7 +314,7 @@ export const AdminOrdersPage: React.FC = () => {
           {filteredCompletedOrders.length > 0 ? (
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {filteredCompletedOrders.map(({ order, client, service }) => (
-                <button key={order.id} type="button" onClick={() => { setSelectedOrder({ order, client, service }); setOrderActionError(''); }} className="rounded-xl border border-white/10 bg-[#0D1527] p-3.5 text-left transition-colors hover:border-emerald-400/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
+                <button key={order.id} type="button" onClick={() => { setSelectedOrder({ order, client, service }); setEditOrderOpen(false); setOrderActionError(''); }} className="rounded-xl border border-white/10 bg-[#0D1527] p-3.5 text-left transition-colors hover:border-emerald-400/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
                   <span className="block truncate text-sm font-bold text-white">{client?.name || 'Cliente não encontrado'}</span>
                   <span className="mt-0.5 block truncate text-xs text-white/50">{service?.title || 'Serviço não encontrado'}</span>
                   <span className="mt-2 block text-xs font-semibold text-emerald-300">Concluído · {formatMoney(order.totalPaid)}</span>
@@ -375,6 +394,9 @@ export const AdminOrdersPage: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <button type="button" onClick={() => setEditOrderOpen(true)} disabled={Boolean(updatingOrderId)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-500/25 bg-blue-500/10 px-4 py-2.5 text-sm font-semibold text-blue-200 hover:bg-blue-500/20 disabled:opacity-50">
+                    <Pencil className="h-4 w-4" /> Editar pedido
+                  </button>
                   {whatsappUrl ? (
                     <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20">
                       <MessageCircle className="h-4 w-4" /> Abrir WhatsApp
@@ -386,6 +408,15 @@ export const AdminOrdersPage: React.FC = () => {
           </div>
         );
       })()}
+      {selectedOrder && editOrderOpen && (
+        <EditOrderModal
+          order={selectedOrder.order}
+          client={selectedOrder.client}
+          service={selectedOrder.service}
+          onClose={() => setEditOrderOpen(false)}
+          onSaved={handleOrderSaved}
+        />
+      )}
     </section>
   );
 };
