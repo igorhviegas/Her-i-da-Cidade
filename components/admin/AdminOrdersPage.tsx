@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CalendarDays, CheckCircle2, Loader2, MessageCircle, Pencil, Plus, Search, X } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Copy, Loader2, MessageCircle, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { getClientById, normalizeWhatsApp } from '../../services/clientsService';
-import { listOrders, updateOrder } from '../../services/ordersService';
+import { deleteOrder, listOrders, updateOrder } from '../../services/ordersService';
 import { getServiceById } from '../../services/servicesService';
 import type { Client, Order, OrderStatus, Service } from '../../types';
 import { CreateOrderModal } from './CreateOrderModal';
@@ -69,10 +69,12 @@ export const AdminOrdersPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [duplicateSource, setDuplicateSource] = useState<OrderView | null>(null);
   const [success, setSuccess] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<OrderView | null>(null);
   const [editOrderOpen, setEditOrderOpen] = useState(false);
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [orderActionError, setOrderActionError] = useState('');
   const [draggingOrderId, setDraggingOrderId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<OrderStatus | null>(null);
@@ -115,8 +117,28 @@ export const AdminOrdersPage: React.FC = () => {
 
   const handleOrderCreated = async () => {
     setCreateOpen(false);
+    setDuplicateSource(null);
     setSuccess('Pedido criado com sucesso.');
     await loadOrders();
+  };
+
+  const handleDeleteOrder = async (view: OrderView) => {
+    const customerName = view.client?.name || 'este cliente';
+    if (!window.confirm(`Excluir definitivamente o pedido de ${customerName}? O cadastro do cliente será mantido.`)) return;
+    setDeletingOrderId(view.order.id);
+    setOrderActionError('');
+    try {
+      await deleteOrder(view.order.id);
+      setOrders((current) => current.filter(({ order }) => order.id !== view.order.id));
+      setCompletedOrders((current) => current.filter(({ order }) => order.id !== view.order.id));
+      setTotalOrderCount((current) => Math.max(0, current - 1));
+      setSelectedOrder(null);
+      setSuccess('Pedido excluído. O cadastro do cliente foi mantido.');
+    } catch (deleteError) {
+      setOrderActionError(deleteError instanceof Error ? deleteError.message : 'Não foi possível excluir o pedido.');
+    } finally {
+      setDeletingOrderId(null);
+    }
   };
 
   const handleOrderSaved = (order: Order, client: Client, service: Service) => {
@@ -171,6 +193,22 @@ export const AdminOrdersPage: React.FC = () => {
       (client?.name || '').toLocaleLowerCase('pt-BR').includes(term) ||
       (service?.title || '').toLocaleLowerCase('pt-BR').includes(term));
   }, [completedOrders, search]);
+
+  const duplicateInitialValues = useMemo(() => {
+    if (!duplicateSource) return undefined;
+    const { order, client } = duplicateSource;
+    return {
+      name: client?.name || '',
+      whatsapp: client?.whatsapp || '',
+      serviceId: order.serviceId,
+      eventDate: toDate(order.eventDate) || undefined,
+      deliveryDays: order.deliveryDays,
+      content: order.content || '',
+      servicePrice: order.servicePrice,
+      rushFee: order.rushFee,
+      totalPaid: order.totalPaid,
+    };
+  }, [duplicateSource]);
 
   const handleDropOrder = (event: React.DragEvent, status: OrderStatus) => {
     event.preventDefault();
@@ -326,9 +364,10 @@ export const AdminOrdersPage: React.FC = () => {
       )}
 
       {createOpen && <CreateOrderModal onClose={() => setCreateOpen(false)} onCreated={handleOrderCreated} />}
+      {duplicateInitialValues && <CreateOrderModal initialValues={duplicateInitialValues} onClose={() => setDuplicateSource(null)} onCreated={handleOrderCreated} />}
       {selectedOrder && (() => {
         const { order, client, service } = selectedOrder;
-        const isUpdatingSelectedOrder = updatingOrderId === order.id;
+        const isUpdatingSelectedOrder = updatingOrderId === order.id || deletingOrderId === order.id;
         let whatsappUrl: string | null = null;
         if (client?.whatsapp) {
           try {
@@ -393,9 +432,16 @@ export const AdminOrdersPage: React.FC = () => {
                   <p className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85">{order.content || '—'}</p>
                 </div>
 
-                <div className="flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                  <button type="button" onClick={() => setEditOrderOpen(true)} disabled={Boolean(updatingOrderId)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-500/25 bg-blue-500/10 px-4 py-2.5 text-sm font-semibold text-blue-200 hover:bg-blue-500/20 disabled:opacity-50">
+                <div className="flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:items-center">
+                  <button type="button" onClick={() => setEditOrderOpen(true)} disabled={Boolean(updatingOrderId || deletingOrderId)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-500/25 bg-blue-500/10 px-4 py-2.5 text-sm font-semibold text-blue-200 hover:bg-blue-500/20 disabled:opacity-50">
                     <Pencil className="h-4 w-4" /> Editar pedido
+                  </button>
+                  <button type="button" onClick={() => { setDuplicateSource(selectedOrder); setSelectedOrder(null); }} disabled={Boolean(updatingOrderId || deletingOrderId)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/70 hover:bg-white/5 disabled:opacity-50">
+                    <Copy className="h-4 w-4" /> Duplicar
+                  </button>
+                  <button type="button" onClick={() => void handleDeleteOrder(selectedOrder)} disabled={Boolean(updatingOrderId || deletingOrderId)} aria-label="Excluir pedido" title="Excluir pedido" className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-sm font-semibold text-red-200 hover:bg-red-500/20 disabled:opacity-50 sm:ml-auto">
+                    {deletingOrderId === order.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    <span>{deletingOrderId === order.id ? 'Excluindo…' : 'Excluir'}</span>
                   </button>
                   {whatsappUrl ? (
                     <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20">

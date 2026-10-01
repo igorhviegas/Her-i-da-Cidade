@@ -1,5 +1,5 @@
 import {
-  collection, deleteField, doc, getDoc, getDocs, orderBy, query, serverTimestamp, updateDoc, where, setDoc,
+  collection, deleteDoc, deleteField, doc, getDoc, getDocs, orderBy, query, serverTimestamp, updateDoc, where, setDoc,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Order, OrderStatus, ProductionType, OrderSource } from "../types";
@@ -50,6 +50,13 @@ export async function getOrderById(id: string): Promise<Order | null> {
   if (!id) return null;
   const snapshot = await getDoc(doc(db, ORDERS_COLLECTION, id));
   return snapshot.exists() ? mapOrder(snapshot.id, snapshot.data()) : null;
+}
+
+/** Exclui definitivamente o pedido sem afetar o cadastro do cliente. */
+export async function deleteOrder(id: string): Promise<void> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  if (!id) throw new Error("ID do pedido é obrigatório.");
+  await deleteDoc(doc(db, ORDERS_COLLECTION, id));
 }
 
 export async function listOrders(): Promise<Order[]> {

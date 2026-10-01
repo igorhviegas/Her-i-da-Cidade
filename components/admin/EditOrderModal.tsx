@@ -108,49 +108,62 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
 
     setSaving(true);
     try {
+      const existingClient = await getClientByWhatsApp(normalizedWhatsApp);
       let updatedClient: Client;
-      if (client) {
+      if (existingClient) {
+        if (client?.id === existingClient.id) {
+          await updateClient(client.id, { name: cleanName, whatsapp: whatsapp.trim() });
+          updatedClient = { ...client, name: cleanName, whatsapp: whatsapp.trim(), whatsappNormalized: normalizedWhatsApp };
+        } else {
+          // Um WhatsApp já cadastrado aponta para o cliente canônico; não cria duplicata nem sobrescreve seu nome.
+          updatedClient = existingClient;
+        }
+      } else if (client) {
         await updateClient(client.id, { name: cleanName, whatsapp: whatsapp.trim() });
-        updatedClient = {
-          ...client,
-          name: cleanName,
-          whatsapp: whatsapp.trim(),
-          whatsappNormalized: normalizedWhatsApp,
-        };
+        updatedClient = { ...client, name: cleanName, whatsapp: whatsapp.trim(), whatsappNormalized: normalizedWhatsApp };
       } else {
-        const existingClient = await getClientByWhatsApp(whatsapp.trim());
-        updatedClient = existingClient || await createClient({ name: cleanName, whatsapp: whatsapp.trim() });
+        updatedClient = await createClient({ name: cleanName, whatsapp: whatsapp.trim() });
       }
 
       const paidAt = dateFromInput(paidDate);
       const eventAt = eventDate ? dateFromInput(eventDate) : null;
-      const calculatedDeadlines = days !== null ? calculateOrderDeadlines(paidAt, days) : null;
-      await updateOrder(order.id, {
+      const paidAtChanged = dateInput(order.paidAt) !== paidDate;
+      const eventDateChanged = dateInput(order.eventDate) !== eventDate;
+      const deliveryDaysChanged = (order.deliveryDays === undefined ? '' : String(order.deliveryDays)) !== deliveryDays.trim();
+      const orderUpdates: Parameters<typeof updateOrder>[1] = {
         clientId: updatedClient.id,
         serviceId: selectedService.id,
-        paidAt,
-        eventDate: eventAt,
-        deliveryDays: days,
-        content: content.trim(),
-        servicePrice: serviceAmount,
-        rushFee: rushAmount,
-        totalPaid: paidTotal,
-      });
-
-      const updatedOrder: Order = {
-        ...order,
-        clientId: updatedClient.id,
-        serviceId: selectedService.id,
-        paidAt,
-        eventDate: eventAt || undefined,
-        deliveryDays: days === null ? undefined : days,
-        customerDueDate: calculatedDeadlines?.customerDueDate,
-        internalDueDate: calculatedDeadlines?.internalDueDate,
         content: content.trim(),
         servicePrice: serviceAmount,
         rushFee: rushAmount,
         totalPaid: paidTotal,
       };
+      if (paidAtChanged) orderUpdates.paidAt = paidAt;
+      if (eventDateChanged) orderUpdates.eventDate = eventAt;
+      if (deliveryDaysChanged) orderUpdates.deliveryDays = days;
+      await updateOrder(order.id, orderUpdates);
+
+      const updatedOrder: Order = {
+        ...order,
+        clientId: updatedClient.id,
+        serviceId: selectedService.id,
+        ...(paidAtChanged ? { paidAt } : {}),
+        ...(eventDateChanged ? { eventDate: eventAt || undefined } : {}),
+        ...(deliveryDaysChanged ? { deliveryDays: days === null ? undefined : days } : {}),
+        content: content.trim(),
+        servicePrice: serviceAmount,
+        rushFee: rushAmount,
+        totalPaid: paidTotal,
+      };
+      if (paidAtChanged || deliveryDaysChanged) {
+        const deadlinePaidAt = paidAtChanged ? paidAt : toDate(order.paidAt);
+        const deadlineDays = deliveryDaysChanged ? days : order.deliveryDays;
+        const deadlines = deadlinePaidAt && deadlineDays !== null && deadlineDays !== undefined
+          ? calculateOrderDeadlines(deadlinePaidAt, deadlineDays)
+          : null;
+        updatedOrder.customerDueDate = deadlines?.customerDueDate;
+        updatedOrder.internalDueDate = deadlines?.internalDueDate;
+      }
       onSaved(updatedOrder, updatedClient, selectedService);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar as alterações do pedido.');

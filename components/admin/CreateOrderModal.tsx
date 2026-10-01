@@ -9,6 +9,17 @@ import type { Order, OrderStatus, ProductionType, Service } from '../../types';
 interface CreateOrderModalProps {
   onClose: () => void;
   onCreated: (order: Order) => Promise<void>;
+  initialValues?: {
+    name: string;
+    whatsapp: string;
+    serviceId: string;
+    eventDate?: Date;
+    deliveryDays?: number;
+    content: string;
+    servicePrice: number;
+    rushFee: number;
+    totalPaid: number;
+  };
 }
 
 const statusLabels: Record<OrderStatus, string> = {
@@ -29,6 +40,11 @@ function formatShortDate(value: Date): string {
 
 function formatMoney(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+}
+
+function dateInput(value?: Date): string {
+  if (!value || Number.isNaN(value.getTime())) return '';
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
 }
 
 /** Obtém o valor anunciado quando existe; serviços "sob consulta" iniciam em branco. */
@@ -52,32 +68,33 @@ function inputAmount(value: string): number | null {
 const inputClass = 'mt-1.5 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-blue-500/60 disabled:opacity-50';
 const labelClass = 'block text-xs font-semibold text-white/70';
 
-export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onCreated }) => {
+export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onCreated, initialValues }) => {
   const [services, setServices] = useState<Service[]>([]);
   const [loadingServices, setLoadingServices] = useState(true);
   const [servicesError, setServicesError] = useState('');
-  const [serviceId, setServiceId] = useState('');
-  const [name, setName] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
+  const [serviceId, setServiceId] = useState(initialValues?.serviceId || '');
+  const [name, setName] = useState(initialValues?.name || '');
+  const [whatsapp, setWhatsapp] = useState(initialValues?.whatsapp || '');
   const [lookupState, setLookupState] = useState<'idle' | 'checking' | 'found' | 'new' | 'error'>('idle');
   const [lookupMessage, setLookupMessage] = useState('');
   const [paidDate, setPaidDate] = useState('');
-  const [eventDate, setEventDate] = useState('');
-  const [deliveryDays, setDeliveryDays] = useState('');
-  const [content, setContent] = useState('');
-  const [servicePrice, setServicePrice] = useState('');
-  const [rushFee, setRushFee] = useState('0');
+  const [eventDate, setEventDate] = useState(dateInput(initialValues?.eventDate));
+  const [deliveryDays, setDeliveryDays] = useState(initialValues?.deliveryDays === undefined ? '' : String(initialValues.deliveryDays));
+  const [content, setContent] = useState(initialValues?.content || '');
+  const [servicePrice, setServicePrice] = useState(initialValues ? String(initialValues.servicePrice) : '');
+  const [rushFee, setRushFee] = useState(initialValues ? String(initialValues.rushFee) : '0');
+  const [totalPaid, setTotalPaid] = useState(initialValues ? String(initialValues.totalPaid) : '');
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    getServices({ onlyActive: true, fallbackOnError: false })
+    getServices({ onlyActive: !initialValues, fallbackOnError: false })
       .then((items) => { if (!cancelled) setServices(items); })
       .catch((error) => { if (!cancelled) setServicesError(error instanceof Error ? error.message : 'Não foi possível carregar os serviços.'); })
       .finally(() => { if (!cancelled) setLoadingServices(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [initialValues]);
 
   const selectedService = services.find((service) => service.id === serviceId);
   const serviceConfigured = Boolean(
@@ -87,7 +104,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
   const initialStatus: OrderStatus | null = selectedService
     ? (selectedService.autoComplete || selectedService.initialStatus === 'completed' ? 'completed' : selectedService.initialStatus || null)
     : null;
-  const total = (inputAmount(servicePrice) ?? 0) + (inputAmount(rushFee) ?? 0);
+  const total = totalPaid.trim() ? inputAmount(totalPaid) ?? 0 : (inputAmount(servicePrice) ?? 0) + (inputAmount(rushFee) ?? 0);
   const deadlinePreview = useMemo(() => {
     if (!paidDate || !deliveryDays) return null;
     try {
@@ -102,6 +119,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
     setServiceId(id);
     setServicePrice(service ? priceFromService(service.price) : '');
     setRushFee('0');
+    setTotalPaid('');
     setDeliveryDays(service?.defaultDeliveryDays !== undefined ? String(service.defaultDeliveryDays) : '');
   };
 
@@ -176,7 +194,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
         content: content.trim(),
         servicePrice: serviceAmount,
         rushFee: rushAmount,
-        totalPaid: serviceAmount + rushAmount,
+        totalPaid: initialValues && totalPaid.trim() ? inputAmount(totalPaid)! : serviceAmount + rushAmount,
         productionType: selectedService.productionType,
         source: 'manual',
         ...(completed ? { completedAt: new Date() } : {}),
@@ -200,7 +218,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
         <header className="flex shrink-0 items-center justify-between border-b border-white/10 bg-white/[0.02] px-5 py-4 sm:px-6">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-blue-500/30 bg-blue-600/20 text-blue-300"><Plus className="h-5 w-5" /></span>
-            <div><h2 id="create-order-title" className="text-lg font-bold text-white">Novo Pedido</h2><p className="text-xs text-white/45">Cadastro manual de pedido</p></div>
+            <div><h2 id="create-order-title" className="text-lg font-bold text-white">{initialValues ? 'Duplicar pedido' : 'Novo Pedido'}</h2><p className="text-xs text-white/45">{initialValues ? 'Revise os dados antes de criar o novo pedido' : 'Cadastro manual de pedido'}</p></div>
           </div>
           <button type="button" onClick={onClose} disabled={submitting} className="rounded-lg p-2 text-white/50 hover:bg-white/10 hover:text-white disabled:opacity-40" aria-label="Fechar"><X className="h-5 w-5" /></button>
         </header>
@@ -243,7 +261,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
                 <label className={labelClass}>Prazo contratado
                   <select value={deliveryDays} onChange={(event) => setDeliveryDays(event.target.value)} className={inputClass}>
                     <option value="">Sem prazo</option>
-                    {deliveryOptions.map((days) => <option key={days} value={days}>{days} dias corridos{days === selectedService?.defaultDeliveryDays ? ' · Padrão do serviço' : ''}</option>)}
+                    {deliveryOptions.concat(deliveryDays && !deliveryOptions.includes(Number(deliveryDays)) ? [Number(deliveryDays)] : []).map((days) => <option key={days} value={days}>{days} dias corridos{days === selectedService?.defaultDeliveryDays ? ' · Padrão do serviço' : ''}</option>)}
                   </select>
                 </label>
               </div>
@@ -254,9 +272,10 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
             <section className="space-y-3 border-t border-white/10 pt-4">
               <h3 className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-blue-300">Valores</h3>
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className={labelClass}>Valor do serviço *<input required type="number" min="0" step="0.01" value={servicePrice} onChange={(event) => setServicePrice(event.target.value)} className={inputClass} placeholder="0,00" /></label>
-                <label className={labelClass}>Taxa de urgência<input type="number" min="0" step="0.01" value={rushFee} onChange={(event) => setRushFee(event.target.value)} className={inputClass} placeholder="0,00" /></label>
+                <label className={labelClass}>Valor do serviço *<input required type="number" min="0" step="0.01" value={servicePrice} onChange={(event) => { setServicePrice(event.target.value); setTotalPaid(''); }} className={inputClass} placeholder="0,00" /></label>
+                <label className={labelClass}>Taxa de urgência<input type="number" min="0" step="0.01" value={rushFee} onChange={(event) => { setRushFee(event.target.value); setTotalPaid(''); }} className={inputClass} placeholder="0,00" /></label>
               </div>
+              {initialValues && <label className={labelClass}>Total pago *<input required type="number" min="0" step="0.01" value={totalPaid || String(total)} onChange={(event) => setTotalPaid(event.target.value)} className={inputClass} /></label>}
               <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-3"><span className="text-xs font-semibold text-white/60">Total pago</span><strong className="text-base text-emerald-300">{formatMoney(total)}</strong></div>
             </section>
           </div>
@@ -264,7 +283,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
           <footer className="flex flex-col-reverse gap-2 border-t border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:justify-end sm:px-6">
             <button type="button" onClick={onClose} disabled={submitting} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/65 hover:bg-white/5 disabled:opacity-40">Cancelar</button>
             <button type="submit" disabled={submitting || loadingServices || !services.length} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/20 hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50">
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}{submitting ? 'Criando pedido…' : 'Criar Pedido'}
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}{submitting ? 'Criando pedido…' : initialValues ? 'Criar pedido duplicado' : 'Criar Pedido'}
             </button>
           </footer>
         </form>
