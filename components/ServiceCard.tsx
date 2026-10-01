@@ -23,6 +23,14 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service }) => {
           loading="lazy"
           className="w-full h-full object-cover transition-transform duration-700 sm:group-hover:scale-110"
         />
+
+        {service.badgeText?.trim() && (
+          <div className="absolute top-2.5 left-2.5 z-10 pointer-events-none">
+            <span className="inline-block px-2 py-0.5 rounded-md bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 text-white font-black text-[10px] tracking-wider uppercase shadow-md shadow-black/60 border border-white/20">
+              {service.badgeText}
+            </span>
+          </div>
+        )}
         
         {/* Overlay - Desktop Hover / Mobile Interaction */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#0B1929] via-[#0B1929]/70 to-transparent opacity-0 sm:group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-6 sm:p-6">

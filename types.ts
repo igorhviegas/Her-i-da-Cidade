@@ -7,6 +7,7 @@ export interface Service {
   imageUrl: string;
   category: string;
   whatsappUrl: string;
+  badgeText?: string;
   active?: boolean;
   order?: number;
   createdAt?: any;
@@ -24,6 +25,7 @@ export interface FirestoreService {
   imageUrl: string;
   category: string;
   whatsappUrl: string;
+  badgeText?: string;
   active: boolean;
   order: number;
   createdAt?: any;
@@ -125,7 +127,8 @@ export function adaptFirestoreServiceToLegacy(doc: FirestoreService): Service {
     price: doc.price,
     description: doc.shortDescription || doc.description,
     imageUrl: doc.image,
-    category: doc.category || 'Geral'
+    category: doc.category || 'Geral',
+    badgeText: doc.badgeText
   };
 }
 

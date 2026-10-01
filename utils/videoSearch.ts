@@ -59,6 +59,7 @@ export function searchVideos(videos: Video[], query: string): Video[] {
       video.caption,
       ...(video.categories || []),
       ...(video.tags || []),
+      ...(video.keywords || []),
     ];
 
     return searchableFields.some((field) => isApproximateMatch(normalizedQuery, field || ''));

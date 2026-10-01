@@ -43,6 +43,7 @@ interface ServiceFormData {
   category: string;
   order: number;
   active: boolean;
+  badgeText: string;
 }
 
 const DEFAULT_CATEGORIES = [
@@ -75,6 +76,7 @@ export const AdminServices: React.FC = () => {
     category: 'Pronta entrega',
     order: 1,
     active: true,
+    badgeText: '',
   });
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof ServiceFormData, string>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -188,6 +190,7 @@ export const AdminServices: React.FC = () => {
       category: 'Pronta entrega',
       order: nextOrder,
       active: true,
+      badgeText: '',
     });
     setFormErrors({});
     clearSelectedServiceImage();
@@ -208,6 +211,7 @@ export const AdminServices: React.FC = () => {
       category: service.category,
       order: service.order ?? 1,
       active: service.active !== false,
+      badgeText: service.badgeText ?? '',
     });
     setFormErrors({});
     clearSelectedServiceImage();
@@ -263,6 +267,7 @@ export const AdminServices: React.FC = () => {
           category: formData.category,
           order: formData.order,
           active: formData.active,
+          badgeText: formData.badgeText,
         };
         await updateService(editingServiceId, updates);
         showFeedback('success', `Serviço "${formData.title}" atualizado com sucesso! Alterações já visíveis no site.`);
@@ -276,6 +281,7 @@ export const AdminServices: React.FC = () => {
           category: formData.category,
           order: formData.order,
           active: formData.active,
+          badgeText: formData.badgeText,
         };
         await createService(newServicePayload);
         showFeedback('success', `Novo serviço "${formData.title}" cadastrado com sucesso!`);
@@ -911,6 +917,20 @@ export const AdminServices: React.FC = () => {
                   )}
                 </div>
 
+              </div>
+
+              {/* Selo opcional */}
+              <div>
+                <label className="block text-xs font-semibold text-white/80 uppercase tracking-wider mb-1.5">
+                  Selo
+                </label>
+                <input
+                  type="text"
+                  value={formData.badgeText}
+                  onChange={(e) => setFormData({ ...formData, badgeText: e.target.value })}
+                  placeholder="Ex: Mais pedido, Novidade, Exclusivo"
+                  className="w-full px-3.5 py-2.5 bg-[#070B14] border border-white/10 rounded-xl text-sm text-white placeholder-white/40 focus:outline-none focus:border-blue-500"
+                />
               </div>
 
               {/* Descrição */}

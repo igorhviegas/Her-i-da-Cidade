@@ -9,7 +9,8 @@ import {
   deleteDoc,
   onSnapshot,
   Unsubscribe,
-  serverTimestamp
+  serverTimestamp,
+  deleteField
 } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import { Service, FirestoreService } from "../types";
@@ -83,6 +84,7 @@ export interface CreateServiceInput {
   whatsappUrl: string;
   active?: boolean;
   order?: number;
+  badgeText?: string;
 }
 
 export interface UpdateServiceInput {
@@ -94,6 +96,7 @@ export interface UpdateServiceInput {
   whatsappUrl?: string;
   active?: boolean;
   order?: number;
+  badgeText?: string;
 }
 
 /**
@@ -148,6 +151,7 @@ export function mapDocToService(docId: string, data: any): Service {
     whatsappUrl: data.whatsappUrl || defaultWhatsapp,
     active: data.active !== false,
     order: typeof data.order === "number" ? data.order : 0,
+    badgeText: data.badgeText || undefined,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
   };
@@ -505,6 +509,7 @@ export async function createService(input: CreateServiceInput): Promise<Service>
     whatsappUrl,
     active: input.active !== false,
     order,
+    ...(input.badgeText?.trim() ? { badgeText: input.badgeText.trim() } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -528,6 +533,7 @@ export async function createService(input: CreateServiceInput): Promise<Service>
     whatsappUrl,
     active: input.active !== false,
     order,
+    ...(input.badgeText?.trim() ? { badgeText: input.badgeText.trim() } : {}),
   };
 }
 
@@ -595,6 +601,11 @@ export async function updateService(id: string, updates: UpdateServiceInput): Pr
     if (!isNaN(parsedOrder)) {
       payload.order = parsedOrder;
     }
+  }
+
+  if (updates.badgeText !== undefined) {
+    const trimmed = updates.badgeText.trim();
+    payload.badgeText = trimmed || deleteField();
   }
 
   const docRef = doc(db, SERVICES_COLLECTION, id);
