@@ -5,6 +5,7 @@ import { db } from "../lib/firebase";
 import { Client } from "../types";
 
 export const CLIENTS_COLLECTION = "clients";
+export const INTERNAL_CONTENT_CLIENT_ID = 'internal-content-team';
 const whatsappIndexId = (normalized: string) => `whatsapp_${normalized}`;
 
 /** Remove símbolos e aplica o código do Brasil quando informado um número nacional. */
@@ -19,7 +20,7 @@ export function normalizeWhatsApp(value: string): string {
 function mapClient(id: string, data: Record<string, any>): Client {
   return {
     id, name: data.name || "", whatsapp: data.whatsapp || "",
-    whatsappNormalized: data.whatsappNormalized || normalizeWhatsApp(data.whatsapp || ""),
+    whatsappNormalized: data.whatsappNormalized || (data.whatsapp ? normalizeWhatsApp(data.whatsapp) : ""),
     createdAt: data.createdAt, updatedAt: data.updatedAt,
   };
 }
@@ -72,6 +73,31 @@ export async function getClientById(id: string): Promise<Client | null> {
   if (!id) return null;
   const snapshot = await getDoc(doc(db, CLIENTS_COLLECTION, id));
   return snapshot.exists() ? mapClient(snapshot.id, snapshot.data()) : null;
+}
+
+/** Cliente técnico sem telefone usado para representar a equipe nos pedidos internos de conteúdo. */
+export async function ensureInternalContentClient(): Promise<Client> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  const reference = doc(db, CLIENTS_COLLECTION, INTERNAL_CONTENT_CLIENT_ID);
+  return runTransaction(db, async (transaction) => {
+    const snapshot = await transaction.get(reference);
+    if (snapshot.exists()) return mapClient(snapshot.id, snapshot.data());
+    const client: Client = {
+      id: INTERNAL_CONTENT_CLIENT_ID,
+      name: 'Equipe de Conteúdo',
+      whatsapp: '',
+      whatsappNormalized: '',
+    };
+    transaction.set(reference, {
+      name: client.name,
+      whatsapp: '',
+      whatsappNormalized: '',
+      internalOnly: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    return client;
+  });
 }
 
 export async function updateClient(id: string, updates: { name?: string; whatsapp?: string }): Promise<void> {

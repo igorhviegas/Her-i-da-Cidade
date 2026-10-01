@@ -1,4 +1,4 @@
-import { collection, deleteField, doc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteField, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../types';
 
@@ -47,6 +47,13 @@ export async function listContentScripts(): Promise<ContentScript[]> {
   return snapshot.docs
     .map((item) => mapScript(item.id, item.data()))
     .sort((a, b) => toMillis(b.updatedAt) - toMillis(a.updatedAt));
+}
+
+export async function getContentScriptById(id: string): Promise<ContentScript | null> {
+  if (!db) throw new Error('Firestore não inicializado.');
+  if (!id) return null;
+  const snapshot = await getDoc(doc(db, CONTENT_SCRIPTS_COLLECTION, id));
+  return snapshot.exists() ? mapScript(snapshot.id, snapshot.data()) : null;
 }
 
 export async function createContentScript(input: ContentScriptInput): Promise<ContentScript> {

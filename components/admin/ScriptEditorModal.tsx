@@ -50,6 +50,11 @@ function dateFromInput(value: string): Date | null {
   return new Date(year, month - 1, day, 12);
 }
 
+function todayInput(): string {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+}
+
 export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, initialParentScriptId, scripts, categories, onClose, onSaved }) => {
   const [title, setTitle] = useState(script?.title || '');
   const [category, setCategory] = useState(script?.category || '');
@@ -130,7 +135,7 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, in
             <label className={labelClass}>Observações e anotações<textarea value={notes} onChange={(event) => setNotes(event.target.value)} disabled={saving} rows={4} className={`${inputClass} resize-y`} placeholder="Referências, ideias para versões futuras, observações de produção…" /></label>
             <div className="grid gap-3 border-t border-white/10 pt-4 sm:grid-cols-3">
               <label className={labelClass}>Status de produção<select value={productionStatus} onChange={(event) => setProductionStatus(event.target.value as ScriptProductionStatus)} disabled={saving} className={inputClass}>{productionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label className={labelClass}>Status de publicação<select value={publicationStatus} onChange={(event) => setPublicationStatus(event.target.value as ScriptPublicationStatus)} disabled={saving} className={inputClass}>{publicationOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label className={labelClass}>Status de publicação<select value={publicationStatus} onChange={(event) => { const next = event.target.value as ScriptPublicationStatus; setPublicationStatus(next); if (next === 'published' && !publishedDate) setPublishedDate(todayInput()); }} disabled={saving} className={inputClass}>{publicationOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label className={labelClass}>Data de publicação<input type="date" value={publishedDate} onChange={(event) => setPublishedDate(event.target.value)} disabled={saving} className={inputClass} /></label>
             </div>
           </div>

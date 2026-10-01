@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CalendarDays, CheckCircle2, Copy, Loader2, MessageCircle, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { useRouter } from '../../lib/router';
 import { getClientById, normalizeWhatsApp } from '../../services/clientsService';
 import { deleteOrder, listOrders, updateOrder } from '../../services/ordersService';
 import { getServiceById } from '../../services/servicesService';
@@ -62,6 +63,7 @@ function dueTime(order: Order): number {
 }
 
 export const AdminOrdersPage: React.FC = () => {
+  const { search: routeSearch, navigate } = useRouter();
   const [orders, setOrders] = useState<OrderView[]>([]);
   const [completedOrders, setCompletedOrders] = useState<OrderView[]>([]);
   const [totalOrderCount, setTotalOrderCount] = useState(0);
@@ -108,6 +110,18 @@ export const AdminOrdersPage: React.FC = () => {
   }, []);
 
   useEffect(() => { void loadOrders(); }, [loadOrders]);
+
+  useEffect(() => {
+    if (loading) return;
+    const orderId = new URLSearchParams(routeSearch).get('orderId');
+    if (!orderId) return;
+    const view = [...orders, ...completedOrders].find(({ order }) => order.id === orderId);
+    if (!view) return;
+    setSelectedOrder(view);
+    setEditOrderOpen(false);
+    setOrderActionError('');
+    navigate('/admin/pedidos');
+  }, [routeSearch, loading, orders, completedOrders, navigate]);
 
   useEffect(() => {
     if (!success) return;

@@ -17,6 +17,7 @@ export interface Service {
   initialStatus?: OrderStatus;
   autoComplete?: boolean;
   defaultDeliveryDays?: number;
+  internalOnly?: boolean;
 }
 
 export type ProductionType = 'scheduled' | 'recording' | 'editing' | 'immediate';
@@ -54,6 +55,7 @@ export interface Order {
   productionType: ProductionType;
   completedAt?: any;
   source: OrderSource;
+  scriptId?: string;
 }
 
 export interface FirestoreOrder extends Order {}
@@ -73,7 +75,7 @@ export interface ContentScript {
   updatedAt?: any;
   publishedAt?: any;
   notes: string;
-  /** Reservado para relacionamento futuro; não é preenchido nesta etapa. */
+  /** Pedido de produção associado a este roteiro, quando enviado. */
   orderId?: string;
   /** Reservado para rastrear futuramente o roteiro de origem. */
   sourceScriptId?: string;
@@ -102,6 +104,7 @@ export interface FirestoreService {
   initialStatus?: OrderStatus;
   autoComplete?: boolean;
   defaultDeliveryDays?: number;
+  internalOnly?: boolean;
 }
 
 /**

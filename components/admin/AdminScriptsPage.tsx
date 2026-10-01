@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, BookOpen, CheckCircle2, Loader2, Plus, Search } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, BookOpen, CheckCircle2, Loader2, Plus, Search } from 'lucide-react';
 import { getCategories } from '../../services/categoriesService';
 import { listContentScripts } from '../../services/contentScriptsService';
+import { sendScriptToRecording } from '../../services/scriptProductionService';
+import { useRouter } from '../../lib/router';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../../types';
 import { ScriptEditorModal } from './ScriptEditorModal';
 
@@ -32,6 +34,7 @@ function formatDate(value: unknown): string {
 }
 
 export const AdminScriptsPage: React.FC = () => {
+  const { navigate } = useRouter();
   const [scripts, setScripts] = useState<ContentScript[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +47,8 @@ export const AdminScriptsPage: React.FC = () => {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingScript, setEditingScript] = useState<ContentScript | null>(null);
   const [initialParentScriptId, setInitialParentScriptId] = useState<string | undefined>();
+  const [sendingScriptId, setSendingScriptId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +114,23 @@ export const AdminScriptsPage: React.FC = () => {
   const openNew = () => { setEditingScript(null); setInitialParentScriptId(undefined); setEditorOpen(true); };
   const openNewChild = (parentScriptId: string) => { setEditingScript(null); setInitialParentScriptId(parentScriptId); setEditorOpen(true); };
   const openEdit = (script: ContentScript) => { setEditingScript(script); setInitialParentScriptId(undefined); setEditorOpen(true); };
+  const handleSendToRecording = async (script: ContentScript) => {
+    if (sendingScriptId) return;
+    setSendingScriptId(script.id);
+    setActionError('');
+    try {
+      const order = await sendScriptToRecording(script.id);
+      setScripts((current) => current.map((item) => item.id === script.id
+        ? { ...item, productionStatus: 'in_production', orderId: order.id, updatedAt: new Date() }
+        : item));
+      setSuccess('Pedido de gravação criado e vinculado ao roteiro.');
+      window.setTimeout(() => setSuccess(''), 4000);
+    } catch (sendError) {
+      setActionError(sendError instanceof Error ? sendError.message : 'Não foi possível enviar o roteiro para gravação.');
+    } finally {
+      setSendingScriptId(null);
+    }
+  };
   const handleSaved = (saved: ContentScript) => {
     const now = new Date();
     const complete = { ...saved, createdAt: saved.createdAt || now, updatedAt: now };
@@ -133,6 +155,7 @@ export const AdminScriptsPage: React.FC = () => {
 
       {success && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-200"><CheckCircle2 className="h-4 w-4" />{success}</div>}
       {error && <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200"><AlertCircle className="h-4 w-4 shrink-0" />Não foi possível carregar a biblioteca. {error}</div>}
+      {actionError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-sm text-red-200"><AlertCircle className="h-4 w-4 shrink-0" />{actionError}</div>}
 
       <div className="grid gap-2 rounded-2xl border border-white/10 bg-[#0D1527] p-3 sm:grid-cols-2 xl:grid-cols-4">
         <label className="relative block sm:col-span-2 xl:col-span-1">
@@ -168,6 +191,8 @@ export const AdminScriptsPage: React.FC = () => {
                   <div className="flex shrink-0 items-center gap-1 border-t border-white/[0.07] pt-1.5 sm:border-0 sm:pt-0">
                     <button type="button" onClick={() => openEdit(script)} className="rounded-lg px-2 py-1.5 text-[11px] font-semibold text-white/55 transition-colors hover:bg-white/5 hover:text-white">Editar</button>
                     <button type="button" onClick={() => openNewChild(script.id)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-blue-200/75 transition-colors hover:bg-blue-500/10 hover:text-blue-200"><Plus className="h-3.5 w-3.5" /> Filho</button>
+                    {script.orderId ? <button type="button" onClick={() => navigate(`/admin/pedidos?orderId=${encodeURIComponent(script.orderId!)}`)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-emerald-200/80 transition-colors hover:bg-emerald-500/10 hover:text-emerald-200"><ArrowUpRight className="h-3.5 w-3.5" /> Produção</button>
+                      : script.productionStatus === 'ready' ? <button type="button" onClick={() => void handleSendToRecording(script)} disabled={sendingScriptId !== null} className="inline-flex items-center gap-1 rounded-lg bg-blue-600/15 px-2.5 py-1.5 text-[11px] font-bold text-blue-200 transition-colors hover:bg-blue-600/25 disabled:opacity-50">{sendingScriptId === script.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}{sendingScriptId === script.id ? 'Enviando…' : 'Enviar para gravação'}</button> : null}
                   </div>
                 </div>
               </article>)}
