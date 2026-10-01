@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CalendarDays, CheckCircle2, Loader2, Plus, Search } from 'lucide-react';
-import { getClientById } from '../../services/clientsService';
-import { listOrders } from '../../services/ordersService';
+import { AlertCircle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Loader2, MessageCircle, Plus, Search, X } from 'lucide-react';
+import { getClientById, normalizeWhatsApp } from '../../services/clientsService';
+import { completeOrder, listOrders, updateOrder } from '../../services/ordersService';
 import { getServiceById } from '../../services/servicesService';
-import type { Client, Order, Service } from '../../types';
+import type { Client, Order, OrderStatus, Service } from '../../types';
 import { CreateOrderModal } from './CreateOrderModal';
 
 type OrderView = { order: Order; client?: Client | null; service?: Service | null };
@@ -24,7 +24,20 @@ function toDate(value: unknown): Date | null {
 
 function formatDate(value: unknown): string | null {
   const date = toDate(value);
-  return date ? new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }).format(date) : null;
+  return date ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(date) : null;
+}
+
+const STATUS_FLOW: OrderStatus[] = ['scheduled', 'recording', 'editing', 'delivery', 'completed'];
+const STATUS_LABELS: Record<OrderStatus, string> = {
+  scheduled: 'Agendado', recording: 'Gravar', editing: 'Editar', delivery: 'Entregar', completed: 'Concluído',
+};
+
+function displayDate(value: unknown): string {
+  return formatDate(value) || '—';
+}
+
+function displayDays(value: number | undefined): string {
+  return value === undefined ? 'Sem prazo' : `${value} ${value === 1 ? 'dia corrido' : 'dias corridos'}`;
 }
 
 function formatMoney(value: number): string {
@@ -54,6 +67,9 @@ export const AdminOrdersPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [success, setSuccess] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<OrderView | null>(null);
+  const [updatingOrder, setUpdatingOrder] = useState(false);
+  const [orderActionError, setOrderActionError] = useState('');
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -94,6 +110,28 @@ export const AdminOrdersPage: React.FC = () => {
     setCreateOpen(false);
     setSuccess('Pedido criado com sucesso.');
     await loadOrders();
+  };
+
+  const handleStatusChange = async (status: OrderStatus) => {
+    if (!selectedOrder || updatingOrder) return;
+    setUpdatingOrder(true);
+    setOrderActionError('');
+    try {
+      if (status === 'completed') {
+        await completeOrder(selectedOrder.order.id);
+        setSelectedOrder(null);
+        setSuccess('Pedido marcado como concluído.');
+      } else {
+        await updateOrder(selectedOrder.order.id, { status });
+        setSelectedOrder((current) => current ? { ...current, order: { ...current.order, status } } : current);
+        setSuccess(`Pedido movido para ${STATUS_LABELS[status].toLocaleLowerCase('pt-BR')}.`);
+      }
+      await loadOrders();
+    } catch (actionError) {
+      setOrderActionError(actionError instanceof Error ? actionError.message : 'Não foi possível atualizar o pedido.');
+    } finally {
+      setUpdatingOrder(false);
+    }
   };
 
   const filteredOrders = useMemo(() => {
@@ -176,7 +214,21 @@ export const AdminOrdersPage: React.FC = () => {
                       const internalDate = formatDate(order.internalDueDate);
                       const eventDate = formatDate(order.eventDate);
                       return (
-                        <article key={order.id} className={`rounded-xl border bg-[#0D1527] p-3.5 shadow-lg ${state === 'overdue' ? 'border-red-500/45' : state === 'soon' ? 'border-amber-400/35' : 'border-white/10'}`}>
+                        <article
+                          key={order.id}
+                          role="button"
+                          tabIndex={0}
+                          aria-haspopup="dialog"
+                          onClick={() => { setSelectedOrder({ order, client, service }); setOrderActionError(''); }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              setSelectedOrder({ order, client, service });
+                              setOrderActionError('');
+                            }
+                          }}
+                          className={`cursor-pointer rounded-xl border bg-[#0D1527] p-3.5 shadow-lg outline-none transition-colors hover:border-blue-400/50 focus-visible:ring-2 focus-visible:ring-blue-400 ${state === 'overdue' ? 'border-red-500/45' : state === 'soon' ? 'border-amber-400/35' : 'border-white/10'}`}
+                        >
                           <h4 className="truncate text-sm font-bold text-white">{client?.name || 'Cliente não encontrado'}</h4>
                           <p className="mt-0.5 truncate text-xs text-white/55">{service?.title || 'Serviço não encontrado'}</p>
                           {(eventDate || internalDate) && (
@@ -201,6 +253,91 @@ export const AdminOrdersPage: React.FC = () => {
       ) : null}
 
       {createOpen && <CreateOrderModal onClose={() => setCreateOpen(false)} onCreated={handleOrderCreated} />}
+      {selectedOrder && (() => {
+        const { order, client, service } = selectedOrder;
+        const currentStatusIndex = STATUS_FLOW.indexOf(order.status);
+        const previousStatus = currentStatusIndex > 0 ? STATUS_FLOW[currentStatusIndex - 1] : null;
+        const nextStatus = currentStatusIndex >= 0 && currentStatusIndex < STATUS_FLOW.length - 1 ? STATUS_FLOW[currentStatusIndex + 1] : null;
+        let whatsappUrl: string | null = null;
+        if (client?.whatsapp) {
+          try {
+            const phone = normalizeWhatsApp(client.whatsapp);
+            const message = `Olá, ${client.name}! Estou entrando em contato sobre seu pedido de ${service?.title || 'serviço'} na Central do Herói.`;
+            whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+          } catch {
+            whatsappUrl = null;
+          }
+        }
+        const detailRows: Array<[string, string]> = [
+          ['Cliente', client?.name || 'Cliente não encontrado'],
+          ['WhatsApp', client?.whatsapp || '—'],
+          ['Serviço', service?.title || 'Serviço não encontrado'],
+          ['Status', STATUS_LABELS[order.status] || order.status],
+          ['Data do pagamento', displayDate(order.paidAt)],
+          ['Data do evento/entrega', displayDate(order.eventDate)],
+          ['Prazo contratado', displayDays(order.deliveryDays)],
+          ['Prazo do cliente', displayDate(order.customerDueDate)],
+          ['Prazo interno', displayDate(order.internalDueDate)],
+          ['Valor do serviço', formatMoney(order.servicePrice)],
+          ['Taxa de urgência', formatMoney(order.rushFee)],
+          ['Total pago', formatMoney(order.totalPaid)],
+        ];
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-3 backdrop-blur-sm sm:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !updatingOrder) setSelectedOrder(null); }}>
+            <section role="dialog" aria-modal="true" aria-labelledby="order-details-title" className="my-auto max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/15 bg-[#0D1527] shadow-2xl">
+              <header className="sticky top-0 flex items-start justify-between gap-4 border-b border-white/10 bg-[#0D1527]/95 px-5 py-4 backdrop-blur sm:px-6">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-300">Detalhes do pedido</p>
+                  <h2 id="order-details-title" className="mt-1 truncate text-lg font-bold text-white">{client?.name || 'Cliente não encontrado'}</h2>
+                  <p className="mt-0.5 truncate text-sm text-white/50">{service?.title || 'Serviço não encontrado'}</p>
+                </div>
+                <button type="button" onClick={() => setSelectedOrder(null)} disabled={updatingOrder} aria-label="Fechar detalhes" className="rounded-lg p-2 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-40"><X className="h-5 w-5" /></button>
+              </header>
+
+              <div className="space-y-5 p-5 sm:p-6">
+                {orderActionError && <p role="alert" className="rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-sm text-red-200">{orderActionError}</p>}
+                <dl className="grid gap-3 sm:grid-cols-2">
+                  {detailRows.map(([label, value]) => (
+                    <div key={label} className="min-w-0 rounded-xl border border-white/8 bg-white/[0.025] px-3.5 py-3">
+                      <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/40">{label}</dt>
+                      <dd className={`mt-1 break-words text-sm ${label === 'Total pago' ? 'font-extrabold text-emerald-300' : 'text-white/85'}`}>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <div className="rounded-xl border border-white/8 bg-white/[0.025] px-3.5 py-3">
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/40">Conteúdo</h3>
+                  <p className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85">{order.content || '—'}</p>
+                </div>
+
+                <div className="flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:flex-wrap sm:justify-between">
+                  {whatsappUrl ? (
+                    <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20">
+                      <MessageCircle className="h-4 w-4" /> Abrir WhatsApp
+                    </a>
+                  ) : <span className="text-xs text-white/40">WhatsApp indisponível para este cliente.</span>}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                    <button type="button" onClick={() => previousStatus && void handleStatusChange(previousStatus)} disabled={!previousStatus || updatingOrder} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-3.5 py-2.5 text-sm font-semibold text-white/75 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-35">
+                      {updatingOrder ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeft className="h-4 w-4" />} Voltar status
+                    </button>
+                    {nextStatus ? (
+                      <button type="button" onClick={() => void handleStatusChange(nextStatus)} disabled={updatingOrder} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">
+                        Avançar para {STATUS_LABELS[nextStatus]} <ArrowRight className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => void handleStatusChange('completed')} disabled={updatingOrder} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50">
+                        {updatingOrder ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Concluir pedido
+                      </button>
+                    )}
+                    {order.status !== 'completed' && (
+                      <button type="button" onClick={() => void handleStatusChange('completed')} disabled={updatingOrder} className="rounded-xl border border-emerald-500/25 px-3.5 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/10 disabled:opacity-50">Marcar como concluído</button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        );
+      })()}
     </section>
   );
 };
