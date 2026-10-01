@@ -5,7 +5,7 @@ import { getClientById, normalizeWhatsApp } from '../../services/clientsService'
 import { deleteOrder, listOrders, updateOrder } from '../../services/ordersService';
 import { getContentScriptsByIds } from '../../services/contentScriptsService';
 import { getServiceById } from '../../services/servicesService';
-import { formatOrderReference } from '../../services/orderReference.js';
+import { formatOrderReference, extractBirthdayPerson } from '../../services/orderReference.js';
 import type { Client, ContentScript, Order, OrderStatus, Service } from '../../types';
 import { CreateOrderModal } from './CreateOrderModal';
 import { EditOrderModal } from './EditOrderModal';
@@ -212,10 +212,14 @@ export const AdminOrdersPage: React.FC = () => {
 
   const filteredCompletedOrders = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('pt-BR');
-    return completedOrders.filter(({ client, service, script }) => !term ||
-      (client?.name || '').toLocaleLowerCase('pt-BR').includes(term) ||
-      (service?.title || '').toLocaleLowerCase('pt-BR').includes(term) ||
-      (script?.title || '').toLocaleLowerCase('pt-BR').includes(term));
+    return completedOrders.filter(({ order, client, service, script }) => {
+      const birthday = extractBirthdayPerson(order);
+      return !term ||
+        (client?.name || '').toLocaleLowerCase('pt-BR').includes(term) ||
+        (service?.title || '').toLocaleLowerCase('pt-BR').includes(term) ||
+        (script?.title || '').toLocaleLowerCase('pt-BR').includes(term) ||
+        (birthday || '').toLocaleLowerCase('pt-BR').includes(term);
+    });
   }, [completedOrders, search]);
 
   const duplicateInitialValues = useMemo(() => {
@@ -377,15 +381,23 @@ export const AdminOrdersPage: React.FC = () => {
           </div>
           {filteredCompletedOrders.length > 0 ? (
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {filteredCompletedOrders.map(({ order, client, service, script }) => (
-                <button key={order.id} type="button" onClick={() => { setSelectedOrder({ order, client, service, script }); setEditOrderOpen(false); setOrderActionError(''); }} className="rounded-xl border border-white/10 bg-[#0D1527] p-3.5 text-left transition-colors hover:border-emerald-400/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-white/35">Pedido {formatOrderReference(order, allOrderRecords)}</span>
-                  <span className="block truncate text-sm font-bold text-white">{client?.name || 'Cliente não encontrado'}</span>
-                  <span className="mt-0.5 block truncate text-xs text-white/50">{service?.title || 'Serviço não encontrado'}</span>
-                  {order.scriptId && <span className="mt-1 block truncate text-[11px] text-blue-200/75">Roteiro: {script?.title || 'Roteiro não encontrado'}</span>}
-                  <span className="mt-2 block text-xs font-semibold text-emerald-300">Concluído · {formatMoney(order.totalPaid)}</span>
-                </button>
-              ))}
+              {filteredCompletedOrders.map(({ order, client, service, script }) => {
+                const birthdayPerson = extractBirthdayPerson(order);
+                return (
+                  <button key={order.id} type="button" onClick={() => { setSelectedOrder({ order, client, service, script }); setEditOrderOpen(false); setOrderActionError(''); }} className="rounded-xl border border-white/10 bg-[#0D1527] p-3.5 text-left transition-colors hover:border-emerald-400/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
+                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-white/35">Pedido {formatOrderReference(order, allOrderRecords)}</span>
+                    <span className="block truncate text-sm font-bold text-white">{client?.name || 'Cliente não encontrado'}</span>
+                    <span className="mt-0.5 block truncate text-xs text-white/50">{service?.title || 'Serviço não encontrado'}</span>
+                    {birthdayPerson && (
+                      <span className="mt-0.5 block truncate text-xs text-white/60">
+                        Aniversariante: <span className="font-medium text-white/80">{birthdayPerson}</span>
+                      </span>
+                    )}
+                    {order.scriptId && <span className="mt-1 block truncate text-[11px] text-blue-200/75">Roteiro: {script?.title || 'Roteiro não encontrado'}</span>}
+                    <span className="mt-2 block text-xs font-semibold text-emerald-300">Concluído · {formatMoney(order.totalPaid)}</span>
+                  </button>
+                );
+              })}
             </div>
           ) : <p className="rounded-xl border border-white/10 bg-[#0D1527] p-4 text-center text-xs text-white/45">Nenhum pedido concluído corresponde à busca.</p>}
         </section>
