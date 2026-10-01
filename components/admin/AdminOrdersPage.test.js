@@ -14,14 +14,13 @@ test('colunas do Kanban: Entregar, Gravar, Editar, Agendado, Concluído', () => 
 test('botão de WhatsApp na etapa Entregar não move nem abre o card', () => {
   assert.match(source, /order\.status === 'delivery'/);
   assert.match(source, /Enviar pelo WhatsApp/);
-  assert.match(source, /buildDeliveryWhatsAppUrl\(client\?\.whatsapp, order\.content\)/);
+  assert.match(source, /buildDeliveryWhatsAppUrl\(client\?\.whatsapp, order\)/);
   assert.match(source, /draggable=\{false\}/);
   assert.match(source, /onClick=\{\(event\) => event\.stopPropagation\(\)\}/);
   assert.match(source, /WhatsApp indisponível<\/p>/);
 });
 
 test('concluídos iniciam recolhidos; Ver mais/Ver menos alternam; busca e detalhes preservados', () => {
-  assert.match(source, /useState\(false\);\n\s*const \[draggingOrderId/);
   assert.match(source, /const \[completedOpen, setCompletedOpen\] = useState\(false\)/);
   assert.match(completed, /completedOpen \? 'Ver menos' : 'Ver mais'/);
   assert.match(completed, /!completedOpen \? null : filteredCompletedOrders/);

@@ -1,3 +1,5 @@
+import { extractBirthdayPerson } from './orderReference.js';
+
 // Serviços digitais: não passam por gravação/edição, nascem direto em "Entregar".
 // IDs do catálogo (seed): 1 = Aniversário, 5 = Temático. "Missão Digital" não tem ID fixo
 // (criada pelo admin), então cai no fallback por título normalizado.
@@ -16,19 +18,12 @@ export function initialStatusFor(service, configuredStatus) {
   return isDigitalDeliveryService(service) ? 'delivery' : configuredStatus;
 }
 
-/** Nome da criança a partir do conteúdo do pedido ("Aniversariante: X", "Criança: X"…). Retorna null se ausente. */
-export function extractBirthdayPerson(content) {
-  const match = String(content ?? '').match(/(?:aniversariante|crian[cç]a|nome(?: da crian[cç]a)?)\s*:\s*([^\n,;]+)/i);
-  const name = match?.[1]?.trim();
-  return name || null;
-}
-
 /** Link wa.me com a mensagem de entrega, ou null se o telefone for inválido. Nunca envia sozinho. */
-export function buildDeliveryWhatsAppUrl(whatsapp, content) {
+export function buildDeliveryWhatsAppUrl(whatsapp, order) {
   const digits = String(whatsapp ?? '').replace(/\D/g, '');
   const phone = digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
   if (!/^55\d{10,11}$/.test(phone)) return null;
-  const child = extractBirthdayPerson(content) || 'seu pequeno herói';
+  const child = extractBirthdayPerson(order) || 'seu pequeno herói';
   const message = `Olááá! 🕸️ Aqui está o vídeo para ${child}! 🥰 Espero que gostem, foi feito com muito carinho pelo Homem-Aranha!`;
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }

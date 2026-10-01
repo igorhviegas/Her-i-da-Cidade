@@ -21,3 +21,29 @@ export function formatOrderReference(order, orders = []) {
   }
   return `#${id}`;
 }
+
+/** Extrai com segurança o nome do aniversariante a partir do pedido; retorna null se ausente ou inválido. */
+export function extractBirthdayPerson(order) {
+  if (!order || typeof order !== 'object') return null;
+
+  if (typeof order.childName === 'string') {
+    const candidate = order.childName.trim();
+    if (candidate && candidate.toLowerCase() !== 'undefined' && candidate.toLowerCase() !== 'null') {
+      return candidate;
+    }
+  }
+
+  const content = typeof order.content === 'string' ? order.content.trim() : '';
+  if (!content) return null;
+
+  const match = content.match(/(?:nome\s+do\s+aniversariante|aniversariante)\s*[:\-]\s*([^\r\n]+)/i);
+  if (match && match[1]) {
+    const rawName = match[1].trim();
+    const cleaned = rawName.replace(/[.,;]+$/, '').trim();
+    if (cleaned && cleaned.toLowerCase() !== 'undefined' && cleaned.toLowerCase() !== 'null') {
+      return cleaned;
+    }
+  }
+
+  return null;
+}
