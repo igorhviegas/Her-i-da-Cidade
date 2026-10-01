@@ -1,5 +1,5 @@
 import {
-  collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, updateDoc, where, setDoc,
+  collection, deleteField, doc, getDoc, getDocs, orderBy, query, serverTimestamp, updateDoc, where, setDoc,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Order, OrderStatus, ProductionType, OrderSource } from "../types";
@@ -58,6 +58,11 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
   if (!db) throw new Error("Firebase Firestore não inicializado.");
   if (!id) throw new Error("ID do pedido é obrigatório.");
   const payload: Record<string, unknown> = { ...updates, updatedAt: serverTimestamp() };
+  if (updates.status === 'completed' && updates.completedAt === undefined) {
+    payload.completedAt = serverTimestamp();
+  } else if (updates.status !== undefined && updates.status !== 'completed' && updates.completedAt === undefined) {
+    payload.completedAt = deleteField();
+  }
   if (updates.paidAt !== undefined || updates.deliveryDays !== undefined) {
     const current = await getDoc(doc(db, ORDERS_COLLECTION, id));
     if (!current.exists()) throw new Error("Pedido não encontrado.");

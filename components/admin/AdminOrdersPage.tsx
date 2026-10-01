@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Loader2, MessageCircle, Plus, Search, X } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Loader2, MessageCircle, Plus, Search, X } from 'lucide-react';
 import { getClientById, normalizeWhatsApp } from '../../services/clientsService';
-import { completeOrder, listOrders, updateOrder } from '../../services/ordersService';
+import { listOrders, updateOrder } from '../../services/ordersService';
 import { getServiceById } from '../../services/servicesService';
 import type { Client, Order, OrderStatus, Service } from '../../types';
 import { CreateOrderModal } from './CreateOrderModal';
@@ -12,6 +12,7 @@ const COLUMNS = [
   { status: 'recording', label: 'GRAVAR', accent: 'border-amber-400' },
   { status: 'editing', label: 'EDITAR', accent: 'border-violet-400' },
   { status: 'delivery', label: 'ENTREGAR', accent: 'border-emerald-400' },
+  { status: 'completed', label: 'CONCLUÍDO', accent: 'border-slate-400' },
 ] as const;
 
 function toDate(value: unknown): Date | null {
@@ -61,6 +62,7 @@ function dueTime(order: Order): number {
 
 export const AdminOrdersPage: React.FC = () => {
   const [orders, setOrders] = useState<OrderView[]>([]);
+  const [completedOrders, setCompletedOrders] = useState<OrderView[]>([]);
   const [totalOrderCount, setTotalOrderCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,8 +70,10 @@ export const AdminOrdersPage: React.FC = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [success, setSuccess] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<OrderView | null>(null);
-  const [updatingOrder, setUpdatingOrder] = useState(false);
+  const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [orderActionError, setOrderActionError] = useState('');
+  const [draggingOrderId, setDraggingOrderId] = useState<string | null>(null);
+  const [dragOverStatus, setDragOverStatus] = useState<OrderStatus | null>(null);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -77,20 +81,21 @@ export const AdminOrdersPage: React.FC = () => {
     try {
       const allOrders = await listOrders();
       setTotalOrderCount(allOrders.length);
-      const visibleOrders = allOrders.filter((order) => order.status !== 'completed');
-      const clientIds = [...new Set(visibleOrders.map((order) => order.clientId).filter(Boolean))];
-      const serviceIds = [...new Set(visibleOrders.map((order) => order.serviceId).filter(Boolean))];
+      const clientIds = [...new Set(allOrders.map((order) => order.clientId).filter(Boolean))];
+      const serviceIds = [...new Set(allOrders.map((order) => order.serviceId).filter(Boolean))];
       const [clients, services] = await Promise.all([
         Promise.all(clientIds.map((id) => getClientById(id))),
         Promise.all(serviceIds.map((id) => getServiceById(id))),
       ]);
       const clientsById = new Map(clientIds.map((id, index) => [id, clients[index]]));
       const servicesById = new Map(serviceIds.map((id, index) => [id, services[index]]));
-      setOrders(visibleOrders.map((order) => ({
+      const allOrderViews = allOrders.map((order) => ({
         order,
         client: clientsById.get(order.clientId),
         service: servicesById.get(order.serviceId),
-      })));
+      }));
+      setOrders(allOrderViews.filter(({ order }) => order.status !== 'completed'));
+      setCompletedOrders(allOrderViews.filter(({ order }) => order.status === 'completed'));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar os pedidos.');
     } finally {
@@ -112,25 +117,25 @@ export const AdminOrdersPage: React.FC = () => {
     await loadOrders();
   };
 
-  const handleStatusChange = async (status: OrderStatus) => {
-    if (!selectedOrder || updatingOrder) return;
-    setUpdatingOrder(true);
+  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
+    if (updatingOrderId) return;
+    const orderView = [...orders, ...completedOrders].find(({ order }) => order.id === orderId);
+    if (!orderView || orderView.order.status === status) return;
+    setUpdatingOrderId(orderId);
     setOrderActionError('');
     try {
-      if (status === 'completed') {
-        await completeOrder(selectedOrder.order.id);
-        setSelectedOrder(null);
-        setSuccess('Pedido marcado como concluído.');
-      } else {
-        await updateOrder(selectedOrder.order.id, { status });
-        setSelectedOrder((current) => current ? { ...current, order: { ...current.order, status } } : current);
-        setSuccess(`Pedido movido para ${STATUS_LABELS[status].toLocaleLowerCase('pt-BR')}.`);
-      }
+      await updateOrder(orderId, { status });
+      setSelectedOrder((current) => current?.order.id === orderId
+        ? status === 'completed' ? null : { ...current, order: { ...current.order, status } }
+        : current);
+      setSuccess(status === 'completed'
+        ? 'Pedido marcado como concluído.'
+        : `Pedido movido para ${STATUS_LABELS[status].toLocaleLowerCase('pt-BR')}.`);
       await loadOrders();
     } catch (actionError) {
       setOrderActionError(actionError instanceof Error ? actionError.message : 'Não foi possível atualizar o pedido.');
     } finally {
-      setUpdatingOrder(false);
+      setUpdatingOrderId(null);
     }
   };
 
@@ -140,6 +145,21 @@ export const AdminOrdersPage: React.FC = () => {
       (client?.name || '').toLocaleLowerCase('pt-BR').includes(term) ||
       (service?.title || '').toLocaleLowerCase('pt-BR').includes(term));
   }, [orders, search]);
+
+  const filteredCompletedOrders = useMemo(() => {
+    const term = search.trim().toLocaleLowerCase('pt-BR');
+    return completedOrders.filter(({ client, service }) => !term ||
+      (client?.name || '').toLocaleLowerCase('pt-BR').includes(term) ||
+      (service?.title || '').toLocaleLowerCase('pt-BR').includes(term));
+  }, [completedOrders, search]);
+
+  const handleDropOrder = (event: React.DragEvent, status: OrderStatus) => {
+    event.preventDefault();
+    const orderId = event.dataTransfer.getData('text/plain') || draggingOrderId;
+    setDragOverStatus(null);
+    setDraggingOrderId(null);
+    if (orderId) void handleStatusChange(orderId, status);
+  };
 
   return (
     <section className="animate-in fade-in duration-200 space-y-5">
@@ -197,13 +217,20 @@ export const AdminOrdersPage: React.FC = () => {
         <p className="rounded-xl border border-white/10 bg-[#0D1527] p-5 text-center text-sm text-white/55">Nenhum pedido encontrado para essa busca.</p>
       ) : !error ? (
         <div className="-mx-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
-          <div className="grid min-w-max grid-cols-4 gap-3 lg:min-w-0 lg:gap-4">
+          <div className="grid min-w-max grid-cols-5 gap-3 lg:min-w-0 lg:gap-3">
             {COLUMNS.map((column) => {
               const columnOrders = filteredOrders
                 .filter(({ order }) => order.status === column.status)
                 .sort((a, b) => dueTime(a.order) - dueTime(b.order));
               return (
-                <section key={column.status} aria-label={column.label} className="w-[min(78vw,290px)] lg:w-auto lg:min-w-0">
+                <section
+                  key={column.status}
+                  aria-label={column.label}
+                  onDragOver={(event) => { event.preventDefault(); if (draggingOrderId) setDragOverStatus(column.status); }}
+                  onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragOverStatus(null); }}
+                  onDrop={(event) => handleDropOrder(event, column.status)}
+                  className={`w-[min(72vw,270px)] rounded-xl transition-colors lg:w-auto lg:min-w-0 ${dragOverStatus === column.status ? 'bg-blue-500/10 ring-1 ring-blue-400/50' : ''}`}
+                >
                   <header className={`mb-3 flex items-center justify-between border-t-2 ${column.accent} rounded-t-sm bg-[#0B1120] px-3 py-3`}>
                     <h3 className="text-xs font-extrabold tracking-[0.12em] text-white/80">{column.label}</h3>
                     <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold text-white/65">{columnOrders.length}</span>
@@ -218,7 +245,14 @@ export const AdminOrdersPage: React.FC = () => {
                           key={order.id}
                           role="button"
                           tabIndex={0}
+                          draggable={updatingOrderId !== order.id}
                           aria-haspopup="dialog"
+                          onDragStart={(event) => {
+                            event.dataTransfer.effectAllowed = 'move';
+                            event.dataTransfer.setData('text/plain', order.id);
+                            setDraggingOrderId(order.id);
+                          }}
+                          onDragEnd={() => { setDraggingOrderId(null); setDragOverStatus(null); }}
                           onClick={() => { setSelectedOrder({ order, client, service }); setOrderActionError(''); }}
                           onKeyDown={(event) => {
                             if (event.key === 'Enter' || event.key === ' ') {
@@ -243,7 +277,7 @@ export const AdminOrdersPage: React.FC = () => {
                         </article>
                       );
                     })}
-                    {columnOrders.length === 0 && <p className="rounded-xl border border-dashed border-white/10 px-3 py-5 text-center text-xs text-white/30">Nenhum pedido nesta etapa</p>}
+                    {columnOrders.length === 0 && <p className="rounded-xl border border-dashed border-white/10 px-3 py-5 text-center text-xs text-white/30">{column.status === 'completed' ? 'Solte aqui para concluir; ele sairá do Kanban.' : 'Nenhum pedido nesta etapa'}</p>}
                   </div>
                 </section>
               );
@@ -252,12 +286,30 @@ export const AdminOrdersPage: React.FC = () => {
         </div>
       ) : null}
 
+      {!loading && !error && completedOrders.length > 0 && (
+        <section className="space-y-3 border-t border-white/10 pt-5">
+          <div>
+            <h3 className="text-sm font-bold text-white">Pedidos concluídos</h3>
+            <p className="mt-0.5 text-xs text-white/45">Ficam fora das colunas do Kanban. Se necessário, abra um pedido para reabri-lo em outra etapa.</p>
+          </div>
+          {filteredCompletedOrders.length > 0 ? (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {filteredCompletedOrders.map(({ order, client, service }) => (
+                <button key={order.id} type="button" onClick={() => { setSelectedOrder({ order, client, service }); setOrderActionError(''); }} className="rounded-xl border border-white/10 bg-[#0D1527] p-3.5 text-left transition-colors hover:border-emerald-400/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
+                  <span className="block truncate text-sm font-bold text-white">{client?.name || 'Cliente não encontrado'}</span>
+                  <span className="mt-0.5 block truncate text-xs text-white/50">{service?.title || 'Serviço não encontrado'}</span>
+                  <span className="mt-2 block text-xs font-semibold text-emerald-300">Concluído · {formatMoney(order.totalPaid)}</span>
+                </button>
+              ))}
+            </div>
+          ) : <p className="rounded-xl border border-white/10 bg-[#0D1527] p-4 text-center text-xs text-white/45">Nenhum pedido concluído corresponde à busca.</p>}
+        </section>
+      )}
+
       {createOpen && <CreateOrderModal onClose={() => setCreateOpen(false)} onCreated={handleOrderCreated} />}
       {selectedOrder && (() => {
         const { order, client, service } = selectedOrder;
-        const currentStatusIndex = STATUS_FLOW.indexOf(order.status);
-        const previousStatus = currentStatusIndex > 0 ? STATUS_FLOW[currentStatusIndex - 1] : null;
-        const nextStatus = currentStatusIndex >= 0 && currentStatusIndex < STATUS_FLOW.length - 1 ? STATUS_FLOW[currentStatusIndex + 1] : null;
+        const isUpdatingSelectedOrder = updatingOrderId === order.id;
         let whatsappUrl: string | null = null;
         if (client?.whatsapp) {
           try {
@@ -272,7 +324,6 @@ export const AdminOrdersPage: React.FC = () => {
           ['Cliente', client?.name || 'Cliente não encontrado'],
           ['WhatsApp', client?.whatsapp || '—'],
           ['Serviço', service?.title || 'Serviço não encontrado'],
-          ['Status', STATUS_LABELS[order.status] || order.status],
           ['Data do pagamento', displayDate(order.paidAt)],
           ['Data do evento/entrega', displayDate(order.eventDate)],
           ['Prazo contratado', displayDays(order.deliveryDays)],
@@ -283,7 +334,7 @@ export const AdminOrdersPage: React.FC = () => {
           ['Total pago', formatMoney(order.totalPaid)],
         ];
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-3 backdrop-blur-sm sm:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !updatingOrder) setSelectedOrder(null); }}>
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-3 backdrop-blur-sm sm:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !updatingOrderId) setSelectedOrder(null); }}>
             <section role="dialog" aria-modal="true" aria-labelledby="order-details-title" className="my-auto max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/15 bg-[#0D1527] shadow-2xl">
               <header className="sticky top-0 flex items-start justify-between gap-4 border-b border-white/10 bg-[#0D1527]/95 px-5 py-4 backdrop-blur sm:px-6">
                 <div className="min-w-0">
@@ -291,47 +342,44 @@ export const AdminOrdersPage: React.FC = () => {
                   <h2 id="order-details-title" className="mt-1 truncate text-lg font-bold text-white">{client?.name || 'Cliente não encontrado'}</h2>
                   <p className="mt-0.5 truncate text-sm text-white/50">{service?.title || 'Serviço não encontrado'}</p>
                 </div>
-                <button type="button" onClick={() => setSelectedOrder(null)} disabled={updatingOrder} aria-label="Fechar detalhes" className="rounded-lg p-2 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-40"><X className="h-5 w-5" /></button>
+                <button type="button" onClick={() => setSelectedOrder(null)} disabled={isUpdatingSelectedOrder} aria-label="Fechar detalhes" className="rounded-lg p-2 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-40"><X className="h-5 w-5" /></button>
               </header>
 
               <div className="space-y-5 p-5 sm:p-6">
                 {orderActionError && <p role="alert" className="rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-sm text-red-200">{orderActionError}</p>}
-                <dl className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-blue-500/20 bg-blue-500/[0.04] px-3.5 py-3">
+                  <label htmlFor="order-status" className="block text-[10px] font-bold uppercase tracking-[0.12em] text-blue-200/75">Alterar status</label>
+                  <select
+                    id="order-status"
+                    value={order.status}
+                    disabled={isUpdatingSelectedOrder}
+                    onChange={(event) => void handleStatusChange(order.id, event.target.value as OrderStatus)}
+                    className="mt-1.5 w-full rounded-lg border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm font-semibold text-white outline-none focus:border-blue-400/60 disabled:opacity-50 sm:max-w-xs"
+                  >
+                    {STATUS_FLOW.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
+                  </select>
+                  {isUpdatingSelectedOrder && <span className="ml-3 inline-flex items-center gap-1.5 text-xs text-white/45"><Loader2 className="h-3.5 w-3.5 animate-spin" />Salvando</span>}
+                </div>
+
+                <dl className="grid gap-x-5 sm:grid-cols-2">
                   {detailRows.map(([label, value]) => (
-                    <div key={label} className="min-w-0 rounded-xl border border-white/8 bg-white/[0.025] px-3.5 py-3">
+                    <div key={label} className="min-w-0 border-b border-white/[0.07] py-2.5">
                       <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/40">{label}</dt>
-                      <dd className={`mt-1 break-words text-sm ${label === 'Total pago' ? 'font-extrabold text-emerald-300' : 'text-white/85'}`}>{value}</dd>
+                      <dd className={`mt-0.5 break-words text-sm ${label === 'Total pago' ? 'font-extrabold text-emerald-300' : 'text-white/85'}`}>{value}</dd>
                     </div>
                   ))}
                 </dl>
-                <div className="rounded-xl border border-white/8 bg-white/[0.025] px-3.5 py-3">
+                <div className="border-b border-white/[0.07] pb-3">
                   <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/40">Conteúdo</h3>
                   <p className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85">{order.content || '—'}</p>
                 </div>
 
-                <div className="flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:flex-wrap sm:justify-between">
+                <div className="flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
                   {whatsappUrl ? (
                     <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20">
                       <MessageCircle className="h-4 w-4" /> Abrir WhatsApp
                     </a>
                   ) : <span className="text-xs text-white/40">WhatsApp indisponível para este cliente.</span>}
-                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-                    <button type="button" onClick={() => previousStatus && void handleStatusChange(previousStatus)} disabled={!previousStatus || updatingOrder} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-3.5 py-2.5 text-sm font-semibold text-white/75 hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-35">
-                      {updatingOrder ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeft className="h-4 w-4" />} Voltar status
-                    </button>
-                    {nextStatus ? (
-                      <button type="button" onClick={() => void handleStatusChange(nextStatus)} disabled={updatingOrder} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50">
-                        Avançar para {STATUS_LABELS[nextStatus]} <ArrowRight className="h-4 w-4" />
-                      </button>
-                    ) : (
-                      <button type="button" onClick={() => void handleStatusChange('completed')} disabled={updatingOrder} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50">
-                        {updatingOrder ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Concluir pedido
-                      </button>
-                    )}
-                    {order.status !== 'completed' && (
-                      <button type="button" onClick={() => void handleStatusChange('completed')} disabled={updatingOrder} className="rounded-xl border border-emerald-500/25 px-3.5 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/10 disabled:opacity-50">Marcar como concluído</button>
-                    )}
-                  </div>
                 </div>
               </div>
             </section>
