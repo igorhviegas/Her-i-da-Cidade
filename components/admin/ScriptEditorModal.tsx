@@ -5,6 +5,8 @@ import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } f
 
 interface ScriptEditorModalProps {
   script: ContentScript | null;
+  initialParentScriptId?: string;
+  scripts: ContentScript[];
   categories: string[];
   onClose: () => void;
   onSaved: (script: ContentScript) => void;
@@ -48,9 +50,10 @@ function dateFromInput(value: string): Date | null {
   return new Date(year, month - 1, day, 12);
 }
 
-export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, categories, onClose, onSaved }) => {
+export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, initialParentScriptId, scripts, categories, onClose, onSaved }) => {
   const [title, setTitle] = useState(script?.title || '');
   const [category, setCategory] = useState(script?.category || '');
+  const [parentScriptId, setParentScriptId] = useState(script?.parentScriptId || initialParentScriptId || '');
   const [content, setContent] = useState(script?.content || '');
   const [notes, setNotes] = useState(script?.notes || '');
   const [productionStatus, setProductionStatus] = useState<ScriptProductionStatus>(script?.productionStatus || 'draft');
@@ -72,9 +75,10 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, ca
         productionStatus,
         publicationStatus,
         publishedAt: dateFromInput(publishedDate),
+        parentScriptId: parentScriptId || null,
       };
       const saved = script
-        ? (await updateContentScript(script.id, input), { ...script, ...input, publishedAt: input.publishedAt || undefined })
+        ? (await updateContentScript(script.id, input), { ...script, ...input, publishedAt: input.publishedAt || undefined, parentScriptId: input.parentScriptId || undefined })
         : await createContentScript(input);
       onSaved(saved);
     } catch (saveError) {
@@ -82,6 +86,20 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, ca
       setSaving(false);
     }
   };
+
+  const parentOptions = scripts.filter((candidate) => {
+    if (candidate.id === script?.id) return false;
+    let current = candidate;
+    const visited = new Set<string>();
+    while (current.parentScriptId && !visited.has(current.id)) {
+      if (current.parentScriptId === script?.id) return false;
+      visited.add(current.id);
+      const parent = scripts.find((item) => item.id === current.parentScriptId);
+      if (!parent) break;
+      current = parent;
+    }
+    return true;
+  }).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' }));
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/80 p-3 backdrop-blur-sm sm:p-6">
@@ -101,6 +119,13 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, ca
                 <span className="mt-1 block text-[10px] font-normal text-white/40">Reaproveite o mesmo assunto em vários roteiros.</span>
               </label>
             </div>
+            <label className={labelClass}>Roteiro pai
+              <select value={parentScriptId} onChange={(event) => setParentScriptId(event.target.value)} disabled={saving} className={inputClass}>
+                <option value="">Nenhum — roteiro principal</option>
+                {parentOptions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+              </select>
+              <span className="mt-1 block text-[10px] font-normal text-white/40">O roteiro continua independente; esta opção apenas organiza a relação na biblioteca.</span>
+            </label>
             <label className={labelClass}>Conteúdo do roteiro *<textarea required value={content} onChange={(event) => setContent(event.target.value)} disabled={saving} rows={18} className={`${inputClass} min-h-[20rem] resize-y leading-6`} placeholder="Escreva ou cole o roteiro completo…" /></label>
             <label className={labelClass}>Observações e anotações<textarea value={notes} onChange={(event) => setNotes(event.target.value)} disabled={saving} rows={4} className={`${inputClass} resize-y`} placeholder="Referências, ideias para versões futuras, observações de produção…" /></label>
             <div className="grid gap-3 border-t border-white/10 pt-4 sm:grid-cols-3">

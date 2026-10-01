@@ -12,6 +12,7 @@ export type ContentScriptInput = {
   publicationStatus: ScriptPublicationStatus;
   publishedAt?: Date | null;
   notes: string;
+  parentScriptId?: string | null;
 };
 
 function mapScript(id: string, data: Record<string, any>): ContentScript {
@@ -28,6 +29,7 @@ function mapScript(id: string, data: Record<string, any>): ContentScript {
     notes: data.notes || '',
     ...(typeof data.orderId === 'string' ? { orderId: data.orderId } : {}),
     ...(typeof data.sourceScriptId === 'string' ? { sourceScriptId: data.sourceScriptId } : {}),
+    ...(typeof data.parentScriptId === 'string' ? { parentScriptId: data.parentScriptId } : {}),
   };
 }
 
@@ -50,27 +52,47 @@ export async function listContentScripts(): Promise<ContentScript[]> {
 export async function createContentScript(input: ContentScriptInput): Promise<ContentScript> {
   if (!db) throw new Error('Firestore não inicializado.');
   const clean = validate(input);
+  await validateParent(undefined, clean.parentScriptId);
   const reference = doc(collection(db, CONTENT_SCRIPTS_COLLECTION));
-  const { publishedAt, ...fields } = clean;
+  const { publishedAt, parentScriptId, ...fields } = clean;
   await setDoc(reference, {
     ...fields,
     ...(publishedAt ? { publishedAt } : {}),
+    ...(parentScriptId ? { parentScriptId } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  return { ...clean, id: reference.id };
+  return { ...clean, ...(parentScriptId ? { parentScriptId } : {}), id: reference.id };
 }
 
 export async function updateContentScript(id: string, input: ContentScriptInput): Promise<void> {
   if (!db) throw new Error('Firestore não inicializado.');
   if (!id) throw new Error('ID do roteiro é obrigatório.');
   const clean = validate(input);
-  const { publishedAt, ...fields } = clean;
+  await validateParent(id, clean.parentScriptId);
+  const { publishedAt, parentScriptId, ...fields } = clean;
   await updateDoc(doc(db, CONTENT_SCRIPTS_COLLECTION, id), {
     ...fields,
     publishedAt: publishedAt || deleteField(),
+    parentScriptId: parentScriptId || deleteField(),
     updatedAt: serverTimestamp(),
   });
+}
+
+async function validateParent(scriptId: string | undefined, parentScriptId: string | null | undefined): Promise<void> {
+  if (!parentScriptId) return;
+  if (scriptId && parentScriptId === scriptId) throw new Error('Um roteiro não pode ser seu próprio roteiro pai.');
+  const scripts = await listContentScripts();
+  const scriptsById = new Map(scripts.map((script) => [script.id, script]));
+  if (!scriptsById.has(parentScriptId)) throw new Error('O roteiro pai selecionado não foi encontrado.');
+  const visited = new Set<string>();
+  let currentId: string | undefined = parentScriptId;
+  while (currentId) {
+    if (currentId === scriptId) throw new Error('Esta relação criaria um ciclo na hierarquia de roteiros.');
+    if (visited.has(currentId)) throw new Error('A hierarquia existente contém uma relação circular.');
+    visited.add(currentId);
+    currentId = scriptsById.get(currentId)?.parentScriptId;
+  }
 }
 
 function toMillis(value: unknown): number {

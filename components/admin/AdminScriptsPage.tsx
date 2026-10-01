@@ -43,6 +43,7 @@ export const AdminScriptsPage: React.FC = () => {
   const [publicationFilter, setPublicationFilter] = useState<ScriptPublicationStatus | ''>('');
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingScript, setEditingScript] = useState<ContentScript | null>(null);
+  const [initialParentScriptId, setInitialParentScriptId] = useState<string | undefined>();
 
   useEffect(() => {
     let cancelled = false;
@@ -64,18 +65,50 @@ export const AdminScriptsPage: React.FC = () => {
   const categoriesInLibrary = useMemo(() => Array.from(new Set(scripts.map((item) => item.category.trim()).filter(Boolean)))
     .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })), [scripts]);
 
-  const filteredScripts = useMemo(() => {
+  const hierarchyRows = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('pt-BR');
-    return scripts.filter((script) => {
+    const matches = scripts.filter((script) => {
       const matchesSearch = !term || script.title.toLocaleLowerCase('pt-BR').includes(term) || script.content.toLocaleLowerCase('pt-BR').includes(term);
       return matchesSearch && (!categoryFilter || script.category === categoryFilter) &&
         (!productionFilter || script.productionStatus === productionFilter) &&
         (!publicationFilter || script.publicationStatus === publicationFilter);
     });
+    const scriptsById = new Map(scripts.map((script) => [script.id, script]));
+    const visible = new Set(matches.map((script) => script.id));
+    // Inclui os pais como contexto quando um resultado da busca é filho.
+    matches.forEach((script) => {
+      let parentId = script.parentScriptId;
+      const visited = new Set<string>();
+      while (parentId && !visited.has(parentId)) {
+        visible.add(parentId);
+        visited.add(parentId);
+        parentId = scriptsById.get(parentId)?.parentScriptId;
+      }
+    });
+    const children = new Map<string, ContentScript[]>();
+    scripts.forEach((script) => {
+      if (!script.parentScriptId || !scriptsById.has(script.parentScriptId) || script.parentScriptId === script.id) return;
+      children.set(script.parentScriptId, [...(children.get(script.parentScriptId) || []), script]);
+    });
+    const rows: Array<{ script: ContentScript; depth: number }> = [];
+    const emitted = new Set<string>();
+    const append = (script: ContentScript, depth: number, ancestors: Set<string>) => {
+      if (!visible.has(script.id) || ancestors.has(script.id) || emitted.has(script.id)) return;
+      emitted.add(script.id);
+      rows.push({ script, depth });
+      const nextAncestors = new Set(ancestors).add(script.id);
+      (children.get(script.id) || []).forEach((child) => append(child, depth + 1, nextAncestors));
+    };
+    const roots = scripts.filter((script) => !script.parentScriptId || !scriptsById.has(script.parentScriptId) || script.parentScriptId === script.id);
+    roots.forEach((script) => append(script, 0, new Set()));
+    // Fallback para documentos legados com ciclos, para nunca ocultar roteiros.
+    scripts.filter((script) => visible.has(script.id) && !emitted.has(script.id)).forEach((script) => append(script, 0, new Set()));
+    return rows;
   }, [scripts, search, categoryFilter, productionFilter, publicationFilter]);
 
-  const openNew = () => { setEditingScript(null); setEditorOpen(true); };
-  const openEdit = (script: ContentScript) => { setEditingScript(script); setEditorOpen(true); };
+  const openNew = () => { setEditingScript(null); setInitialParentScriptId(undefined); setEditorOpen(true); };
+  const openNewChild = (parentScriptId: string) => { setEditingScript(null); setInitialParentScriptId(parentScriptId); setEditorOpen(true); };
+  const openEdit = (script: ContentScript) => { setEditingScript(script); setInitialParentScriptId(undefined); setEditorOpen(true); };
   const handleSaved = (saved: ContentScript) => {
     const now = new Date();
     const complete = { ...saved, createdAt: saved.createdAt || now, updatedAt: now };
@@ -119,9 +152,11 @@ export const AdminScriptsPage: React.FC = () => {
 
       {loading ? <div className="flex min-h-52 items-center justify-center gap-3 text-sm text-white/55"><Loader2 className="h-5 w-5 animate-spin text-blue-400" />Carregando roteiros…</div>
         : !error && scripts.length === 0 ? <div className="rounded-2xl border border-dashed border-white/15 bg-[#0D1527]/60 px-5 py-14 text-center"><BookOpen className="mx-auto h-8 w-8 text-white/30" /><p className="mt-3 text-base font-semibold text-white">Sua biblioteca começa aqui.</p><p className="mt-1 text-sm text-white/45">Crie roteiros que continuarão disponíveis mesmo depois de produzidos ou publicados.</p></div>
-          : !error && filteredScripts.length === 0 ? <p className="rounded-xl border border-white/10 bg-[#0D1527] p-5 text-center text-sm text-white/55">Nenhum roteiro corresponde aos filtros escolhidos.</p>
-            : !error && <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {filteredScripts.map((script) => <button key={script.id} type="button" onClick={() => openEdit(script)} className="group rounded-2xl border border-white/10 bg-[#0D1527] p-4 text-left transition-colors hover:border-blue-400/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
+          : !error && hierarchyRows.length === 0 ? <p className="rounded-xl border border-white/10 bg-[#0D1527] p-5 text-center text-sm text-white/55">Nenhum roteiro corresponde aos filtros escolhidos.</p>
+            : !error && <div className="space-y-3">
+              {hierarchyRows.map(({ script, depth }) => <article key={script.id} style={{ marginLeft: `${Math.min(depth, 5) * 22}px` }} className={`${depth ? 'border-l border-blue-400/20 pl-3 sm:pl-5' : ''}`}>
+                <div className="rounded-2xl border border-white/10 bg-[#0D1527] p-4 transition-colors hover:border-blue-400/35">
+                  <button type="button" onClick={() => openEdit(script)} className="group block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
                 <div className="flex items-start justify-between gap-3"><h3 className="line-clamp-2 text-base font-bold text-white">{script.title}</h3><span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-bold ${productionStyles[script.productionStatus]}`}>{productionLabels[script.productionStatus]}</span></div>
                 <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm leading-5 text-white/50">{script.content}</p>
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/[0.07] pt-3 text-[11px]">
@@ -129,10 +164,15 @@ export const AdminScriptsPage: React.FC = () => {
                   <span className={`rounded-full border px-2.5 py-1 font-semibold ${script.publicationStatus === 'published' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200' : 'border-white/10 bg-white/5 text-white/55'}`}>{publicationLabels[script.publicationStatus]}</span>
                   <span className="ml-auto text-white/40">Atualizado {formatDate(script.updatedAt)}</span>
                 </div>
-              </button>)}
+                  </button>
+                  <div className="mt-3 border-t border-white/[0.07] pt-2">
+                    <button type="button" onClick={() => openNewChild(script.id)} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold text-blue-200/75 transition-colors hover:bg-blue-500/10 hover:text-blue-200"><Plus className="h-3.5 w-3.5" /> Adicionar roteiro filho</button>
+                  </div>
+                </div>
+              </article>)}
             </div>}
 
-      {editorOpen && <ScriptEditorModal script={editingScript} categories={categories} onClose={() => setEditorOpen(false)} onSaved={handleSaved} />}
+      {editorOpen && <ScriptEditorModal script={editingScript} initialParentScriptId={initialParentScriptId} scripts={scripts} categories={categories} onClose={() => setEditorOpen(false)} onSaved={handleSaved} />}
     </section>
   );
 };

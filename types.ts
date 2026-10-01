@@ -77,6 +77,8 @@ export interface ContentScript {
   orderId?: string;
   /** Reservado para rastrear futuramente o roteiro de origem. */
   sourceScriptId?: string;
+  /** ID de outro documento contentScripts; ausente identifica um roteiro principal. */
+  parentScriptId?: string;
 }
 
 /**
