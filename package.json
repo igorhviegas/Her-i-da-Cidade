@@ -8,7 +8,7 @@
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
-    "test": "node --test services/serviceColors.test.js tests/api-manychat.test.js services/orderReference.test.js services/ordersService.test.js services/digitalDelivery.test.js components/admin/AdminOrdersPage.test.js",
+    "test": "node --test functions/manychat-services.test.js functions/manychat-handler.test.js services/serviceColors.test.js tests/api-manychat.test.js services/orderReference.test.js services/ordersService.test.js services/digitalDelivery.test.js components/admin/AdminOrdersPage.test.js",
     "firebase:setup": "node scripts/setup-firebase.mjs",
     "firebase:seed": "node scripts/seed-services.mjs",
     "firebase:seed-home": "node scripts/seed-home-content.mjs"
