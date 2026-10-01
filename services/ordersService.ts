@@ -51,24 +51,64 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
 /** Cria uma única produção interna para um roteiro pronto e vincula os dois documentos atomicamente. */
 export async function createRecordingOrderFromScript(input: { scriptId: string; clientId: string; serviceId: string }): Promise<Order> {
   if (!db) throw new Error("Firebase Firestore não inicializado.");
-  if (!input.scriptId || !input.clientId || !input.serviceId) throw new Error('Roteiro, cliente interno e serviço interno são obrigatórios.');
+  const validateDocumentId = (id: string, label: string) => {
+    if (typeof id !== 'string' || !id.trim() || id.includes('/')) {
+      throw new Error(`ID inválido para referência de ${label}: ${String(id)}.`);
+    }
+  };
+  validateDocumentId(input.scriptId, 'roteiro');
+  validateDocumentId(input.clientId, 'cliente interno');
+  validateDocumentId(input.serviceId, 'serviço interno');
+
   const firestore = db;
-  const scriptRef = doc(firestore, CONTENT_SCRIPTS_COLLECTION, input.scriptId);
-  const clientRef = doc(firestore, CLIENTS_COLLECTION, input.clientId);
-  const serviceRef = doc(firestore, SERVICES_COLLECTION, input.serviceId);
-  const orderRef = doc(collection(firestore, ORDERS_COLLECTION));
+  let scriptRef: ReturnType<typeof doc>;
+  let clientRef: ReturnType<typeof doc>;
+  let serviceRef: ReturnType<typeof doc>;
+  let orderRef: ReturnType<typeof doc>;
+  try {
+    scriptRef = doc(firestore, CONTENT_SCRIPTS_COLLECTION, input.scriptId);
+    clientRef = doc(firestore, CLIENTS_COLLECTION, input.clientId);
+    serviceRef = doc(firestore, SERVICES_COLLECTION, input.serviceId);
+    orderRef = doc(collection(firestore, ORDERS_COLLECTION));
+  } catch (error) {
+    throw new Error(`Falha ao criar referências Firestore para a produção do roteiro ${input.scriptId}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  for (const [label, reference] of [
+    ['roteiro', scriptRef],
+    ['cliente interno', clientRef],
+    ['serviço interno', serviceRef],
+    ['novo pedido', orderRef],
+  ] as const) {
+    if (!reference || typeof reference.path !== 'string' || !reference.path || !reference.id) {
+      throw new Error(`Referência Firestore inválida para ${label} na produção do roteiro ${input.scriptId}.`);
+    }
+  }
+
+  // Web Firestore transactions only accept document references in transaction.get().
+  // Check legacy/orphaned links before the transaction; scriptRef.orderId is rechecked
+  // transactionally to prevent concurrent duplicate orders.
+  let existingOrders;
+  try {
+    existingOrders = await getDocs(query(
+      collection(firestore, ORDERS_COLLECTION),
+      where('scriptId', '==', input.scriptId),
+    ));
+  } catch (error) {
+    throw new Error(`Falha ao verificar pedidos previamente vinculados ao roteiro ${input.scriptId}: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  if (!existingOrders.empty) throw new Error('Este roteiro já possui um pedido de produção vinculado.');
 
   const created = await runTransaction(firestore, async (transaction) => {
-    const [scriptSnapshot, clientSnapshot, serviceSnapshot, existingOrders] = await Promise.all([
+    const [scriptSnapshot, clientSnapshot, serviceSnapshot] = await Promise.all([
       transaction.get(scriptRef),
       transaction.get(clientRef),
       transaction.get(serviceRef),
-      transaction.get(query(collection(firestore, ORDERS_COLLECTION), where('scriptId', '==', input.scriptId))),
     ]);
     if (!scriptSnapshot.exists()) throw new Error('Roteiro não encontrado.');
     const script = scriptSnapshot.data();
     if (script.productionStatus !== 'ready') throw new Error('Somente roteiros prontos para gravar podem ser enviados.');
-    if (script.orderId || !existingOrders.empty) throw new Error('Este roteiro já possui uma produção vinculada.');
+    if (script.orderId) throw new Error('Este roteiro já possui uma produção vinculada.');
     if (!clientSnapshot.exists()) throw new Error('Cliente interno de Conteúdo não encontrado.');
     if (!serviceSnapshot.exists()) throw new Error('Serviço interno de Conteúdo não encontrado.');
     const service = serviceSnapshot.data();
