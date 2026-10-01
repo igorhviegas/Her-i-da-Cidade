@@ -13,7 +13,7 @@ import {
   deleteField
 } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
-import { Service, FirestoreService } from "../types";
+import { Service, FirestoreService, OrderStatus, ProductionType } from "../types";
 import { SERVICES as FALLBACK_SERVICES } from "../constants";
 
 export const SERVICES_COLLECTION = "services";
@@ -85,6 +85,11 @@ export interface CreateServiceInput {
   active?: boolean;
   order?: number;
   badgeText?: string;
+  generateOrder?: boolean;
+  productionType?: ProductionType;
+  initialStatus?: OrderStatus;
+  autoComplete?: boolean;
+  defaultDeliveryDays?: number;
 }
 
 export interface UpdateServiceInput {
@@ -97,6 +102,11 @@ export interface UpdateServiceInput {
   active?: boolean;
   order?: number;
   badgeText?: string;
+  generateOrder?: boolean;
+  productionType?: ProductionType | null;
+  initialStatus?: OrderStatus | null;
+  autoComplete?: boolean;
+  defaultDeliveryDays?: number | null;
 }
 
 /**
@@ -154,6 +164,11 @@ export function mapDocToService(docId: string, data: any): Service {
     badgeText: data.badgeText || undefined,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
+    ...(data.generateOrder !== undefined ? { generateOrder: data.generateOrder } : {}),
+    ...(data.productionType !== undefined ? { productionType: data.productionType } : {}),
+    ...(data.initialStatus !== undefined ? { initialStatus: data.initialStatus } : {}),
+    ...(data.autoComplete !== undefined ? { autoComplete: data.autoComplete } : {}),
+    ...(data.defaultDeliveryDays !== undefined ? { defaultDeliveryDays: data.defaultDeliveryDays } : {}),
   };
 }
 
@@ -510,6 +525,11 @@ export async function createService(input: CreateServiceInput): Promise<Service>
     active: input.active !== false,
     order,
     ...(input.badgeText?.trim() ? { badgeText: input.badgeText.trim() } : {}),
+    ...(input.generateOrder !== undefined ? { generateOrder: input.generateOrder } : {}),
+    ...(input.productionType !== undefined ? { productionType: input.productionType } : {}),
+    ...(input.initialStatus !== undefined ? { initialStatus: input.initialStatus } : {}),
+    ...(input.autoComplete !== undefined ? { autoComplete: input.autoComplete } : {}),
+    ...(input.defaultDeliveryDays !== undefined ? { defaultDeliveryDays: input.defaultDeliveryDays } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -558,6 +578,10 @@ export async function updateService(id: string, updates: UpdateServiceInput): Pr
     if (!trimmed) throw new Error("O nome do serviço não pode ser vazio.");
     payload.title = trimmed;
     payload.name = trimmed;
+  }
+
+  for (const field of ["generateOrder", "productionType", "initialStatus", "autoComplete", "defaultDeliveryDays"] as const) {
+    if (updates[field] !== undefined) payload[field] = updates[field] === null ? deleteField() : updates[field];
   }
 
   if (updates.price !== undefined) {

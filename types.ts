@@ -12,7 +12,51 @@ export interface Service {
   order?: number;
   createdAt?: any;
   updatedAt?: any;
+  generateOrder?: boolean;
+  productionType?: ProductionType;
+  initialStatus?: OrderStatus;
+  autoComplete?: boolean;
+  defaultDeliveryDays?: number;
 }
+
+export type ProductionType = 'scheduled' | 'recording' | 'editing' | 'immediate';
+export type OrderStatus = 'scheduled' | 'recording' | 'editing' | 'delivery' | 'completed';
+export type OrderSource = 'manual' | 'manychat';
+
+/** Cliente interno do CRM. whatsappNormalized é a chave lógica de busca. */
+export interface Client {
+  id: string;
+  name: string;
+  whatsapp: string;
+  whatsappNormalized: string;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export interface FirestoreClient extends Client {}
+
+/** Snapshot operacional e financeiro do pedido; preços são os praticados na venda. */
+export interface Order {
+  id: string;
+  clientId: string;
+  serviceId: string;
+  status: OrderStatus;
+  createdAt?: any;
+  paidAt?: any;
+  eventDate?: any;
+  content: string;
+  deliveryDays?: number;
+  customerDueDate?: any;
+  internalDueDate?: any;
+  servicePrice: number;
+  rushFee: number;
+  totalPaid: number;
+  productionType: ProductionType;
+  completedAt?: any;
+  source: OrderSource;
+}
+
+export interface FirestoreOrder extends Order {}
 
 /**
  * Modelo oficial de documento no Firestore para a coleção 'services'.
@@ -30,6 +74,11 @@ export interface FirestoreService {
   order: number;
   createdAt?: any;
   updatedAt?: any;
+  generateOrder?: boolean;
+  productionType?: ProductionType;
+  initialStatus?: OrderStatus;
+  autoComplete?: boolean;
+  defaultDeliveryDays?: number;
 }
 
 /**
