@@ -1,0 +1,222 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================
+    // ADMIN
+    // =========================================================
+
+    // Um usuário é administrador somente se existir um documento
+    // com seu UID na coleção /admins.
+    function isAdmin() {
+      return request.auth != null
+        && exists(
+          /databases/$(database)/documents/admins/$(request.auth.uid)
+        );
+    }
+
+    function orderDocumentPath(orderId) {
+      return /databases/$(database)/documents/orders/$(orderId);
+    }
+
+    function globalOrderCounterPath() {
+      return /databases/$(database)/documents/systemCounters/globalOrderSequence;
+    }
+
+    function formattedOrderNumber(number) {
+      return number < 10 ? '000' + string(number)
+        : number < 100 ? '00' + string(number)
+        : number < 1000 ? '0' + string(number)
+        : string(number);
+    }
+
+    function validNumberedOrder(orderId, data) {
+      return data.orderNumber is int
+        && data.orderNumber >= 1
+        && data.orderNumberDisplay is string
+        && data.orderNumberDisplay == formattedOrderNumber(data.orderNumber)
+        && getAfter(orderDocumentPath(orderId)).data.orderNumber == data.orderNumber
+        && getAfter(orderDocumentPath(orderId)).data.orderNumberDisplay == data.orderNumberDisplay;
+    }
+
+    function validUnnumberedOrder(orderId, data) {
+      return data.keys().hasAll([
+          'clientId', 'serviceId', 'status', 'content', 'servicePrice',
+          'rushFee', 'totalPaid', 'productionType', 'source', 'createdAt'
+        ])
+        && data.clientId is string
+        && data.clientId.size() > 0
+        && data.serviceId is string
+        && data.serviceId.size() > 0
+        && data.status in ['scheduled', 'recording', 'editing', 'delivery', 'completed']
+        && data.content is string
+        && data.servicePrice is number
+        && data.servicePrice >= 0
+        && data.rushFee is number
+        && data.rushFee >= 0
+        && data.totalPaid is number
+        && data.totalPaid >= 0
+        && data.productionType in ['scheduled', 'recording', 'editing', 'immediate']
+        && data.source in ['manual', 'manychat']
+        && data.createdAt is timestamp
+        && data.createdAt == request.time
+        && (!data.keys().hasAny(['paidAt']) || data.paidAt is timestamp)
+        && (!data.keys().hasAny(['eventDate']) || data.eventDate is timestamp)
+        && (!data.keys().hasAny(['completedAt']) || data.completedAt is timestamp)
+        && (!data.keys().hasAny(['deliveryDays']) || (data.deliveryDays is int && data.deliveryDays >= 0))
+        && (!data.keys().hasAny(['technicalPurchaseId'])
+          || (data.technicalPurchaseId is string && data.technicalPurchaseId == orderId));
+    }
+
+    function validCounter(data) {
+      return data.keys().hasAll(['lastIssued', 'lastOrderId', 'updatedAt'])
+        && data.keys().hasOnly(['lastIssued', 'lastOrderId', 'updatedAt'])
+        && data.lastIssued is int
+        && data.lastIssued >= 1
+        && data.lastOrderId is string
+        && data.lastOrderId.size() > 0
+        && data.lastOrderId.matches('[^/]+')
+        && data.updatedAt is timestamp
+        && data.updatedAt == request.time
+        && !exists(orderDocumentPath(data.lastOrderId))
+        && existsAfter(orderDocumentPath(data.lastOrderId))
+        && getAfter(orderDocumentPath(data.lastOrderId)).data.orderNumber == data.lastIssued
+        && getAfter(orderDocumentPath(data.lastOrderId)).data.orderNumberDisplay == formattedOrderNumber(data.lastIssued);
+    }
+
+
+    // =========================================================
+    // SERVICES
+    // =========================================================
+
+    match /services/{serviceId} {
+
+      // Os serviços ativos são utilizados pelo site público.
+      // A leitura pública é necessária para o funcionamento atual.
+      allow read: if true;
+
+      // Somente administradores podem criar, editar ou excluir serviços.
+      allow write: if isAdmin();
+    }
+
+
+    // =========================================================
+    // VIDEOS
+    // =========================================================
+
+    match /videos/{videoId} {
+
+      // Futuramente o catálogo público poderá consultar os vídeos.
+      allow read: if true;
+
+      // Somente administradores poderão gerenciar os vídeos.
+      allow write: if isAdmin();
+    }
+
+    // Categorias são usadas pelo painel administrativo. Leitura e escrita
+    // exigem o mesmo documento /admins/{uid} usado no restante do admin.
+    match /categories/{categoryId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Biblioteca interna de roteiros, acessível somente a administradores.
+    match /contentScripts/{scriptId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Dados internos do CRM: acesso restrito aos administradores autenticados.
+    match /clients/{clientId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAdmin();
+      // Local transition: old clients may still create numbered orders paired
+      // atomically with the counter; new clients may create schema-valid orders
+      // without sequence fields or a counter write.
+      // These local rules do not establish compatibility with deployed rules.
+      allow create: if isAdmin() && (
+        (!request.resource.data.keys().hasAny(['orderNumber', 'orderNumberDisplay'])
+          && validUnnumberedOrder(orderId, request.resource.data))
+        || (validNumberedOrder(orderId, request.resource.data)
+          && (!exists(globalOrderCounterPath())
+            || get(globalOrderCounterPath()).data.lastOrderId != orderId)
+          && getAfter(globalOrderCounterPath()).data.lastOrderId == orderId
+          && getAfter(globalOrderCounterPath()).data.lastIssued == request.resource.data.orderNumber)
+      );
+      // Existing numbers are immutable. Historical orders with no number remain
+      // editable as long as the fields remain absent.
+      allow update: if isAdmin()
+        && request.resource.data.keys().hasAny(['orderNumber']) == resource.data.keys().hasAny(['orderNumber'])
+        && request.resource.data.keys().hasAny(['orderNumberDisplay']) == resource.data.keys().hasAny(['orderNumberDisplay'])
+        && request.resource.data.get('orderNumber', null) == resource.data.get('orderNumber', null)
+        && request.resource.data.get('orderNumberDisplay', null) == resource.data.get('orderNumberDisplay', null);
+      allow delete: if isAdmin();
+    }
+
+    // Shared sequence: each increment must be +1 and point to the numbered
+    // order created in the same atomic transaction. Initial creation starts at 1.
+    match /systemCounters/{counterId} {
+      allow read: if counterId == 'globalOrderSequence' && isAdmin();
+      allow create: if counterId == 'globalOrderSequence'
+        && isAdmin()
+        && validCounter(request.resource.data)
+        && request.resource.data.lastIssued == 1;
+      allow update: if counterId == 'globalOrderSequence'
+        && isAdmin()
+        && validCounter(request.resource.data)
+        && resource.data.lastIssued is int
+        && resource.data.lastIssued >= 1
+        && request.resource.data.lastIssued == resource.data.lastIssued + 1
+        && !exists(orderDocumentPath(request.resource.data.lastOrderId));
+      allow delete: if false;
+    }
+
+
+    // =========================================================
+    // ADMINS
+    // =========================================================
+
+    match /admins/{adminId} {
+
+      // Somente administradores já existentes podem consultar
+      // documentos administrativos.
+      allow read: if isAdmin();
+
+      // Nenhum administrador poderá criar outro administrador
+      // diretamente pelo frontend.
+      //
+      // A criação inicial de administradores será feita pelo
+      // Firebase Console ou por uma ferramenta administrativa segura.
+      allow write: if false;
+    }
+
+
+    // =========================================================
+    // SITE CONFIG (Configurações do Site)
+    // =========================================================
+
+    match /siteConfig/{configId} {
+
+      // Leitura pública permitida para o documento 'public'.
+      // Outros documentos requerem privilégios de administrador.
+      allow read: if configId == 'public' || isAdmin();
+
+      // Somente administradores autenticados podem criar ou atualizar.
+      allow write: if isAdmin();
+    }
+
+    // Conteúdo editorial público da página inicial. A leitura é pública;
+    // somente administradores existentes podem gerenciar os dados.
+    match /siteContent/{siteDocumentId} {
+      allow read: if siteDocumentId == 'home';
+      allow write: if siteDocumentId == 'home' && isAdmin();
+
+      match /sections/{sectionId} {
+        allow read: if siteDocumentId == 'home';
+        allow write: if siteDocumentId == 'home' && isAdmin();
+      }
+    }
+  }
+}
