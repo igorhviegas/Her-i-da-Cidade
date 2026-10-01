@@ -33,12 +33,18 @@ function formatDate(value: unknown): string {
   return date ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(date) : '—';
 }
 
+function logScriptOperationError(operation: string, error: unknown): void {
+  const stack = error instanceof Error ? error.stack : undefined;
+  console.error(`[AdminScriptsPage] Falha na operação: ${operation}`, { error, stack });
+}
+
 export const AdminScriptsPage: React.FC = () => {
   const { navigate } = useRouter();
   const [scripts, setScripts] = useState<ContentScript[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [categoryLoadError, setCategoryLoadError] = useState('');
   const [success, setSuccess] = useState('');
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -52,7 +58,12 @@ export const AdminScriptsPage: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([listContentScripts(), getCategories().catch(() => [])])
+    const categoriesPromise = getCategories().catch((categoryError) => {
+      logScriptOperationError('carregar categorias da coleção categories', categoryError);
+      if (!cancelled) setCategoryLoadError(categoryError instanceof Error ? categoryError.message : String(categoryError));
+      return [];
+    });
+    Promise.all([listContentScripts(), categoriesPromise])
       .then(([items, existingCategories]) => {
         if (!cancelled) {
           setScripts(items);
@@ -62,7 +73,10 @@ export const AdminScriptsPage: React.FC = () => {
           ])).sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })));
         }
       })
-      .catch((loadError) => { if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar a biblioteca.'); })
+      .catch((loadError) => {
+        logScriptOperationError('listar documentos da coleção contentScripts', loadError);
+        if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar a biblioteca.');
+      })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -126,6 +140,7 @@ export const AdminScriptsPage: React.FC = () => {
       setSuccess('Pedido de gravação criado e vinculado ao roteiro.');
       window.setTimeout(() => setSuccess(''), 4000);
     } catch (sendError) {
+      logScriptOperationError(`enviar roteiro ${script.id} para gravação`, sendError);
       setActionError(sendError instanceof Error ? sendError.message : 'Não foi possível enviar o roteiro para gravação.');
     } finally {
       setSendingScriptId(null);
@@ -155,6 +170,7 @@ export const AdminScriptsPage: React.FC = () => {
 
       {success && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-200"><CheckCircle2 className="h-4 w-4" />{success}</div>}
       {error && <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200"><AlertCircle className="h-4 w-4 shrink-0" />Não foi possível carregar a biblioteca. {error}</div>}
+      {categoryLoadError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-200"><AlertCircle className="h-4 w-4 shrink-0" />Falha ao carregar categorias; a biblioteca segue usando as categorias dos roteiros. {categoryLoadError}</div>}
       {actionError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-sm text-red-200"><AlertCircle className="h-4 w-4 shrink-0" />{actionError}</div>}
 
       <div className="grid gap-2 rounded-2xl border border-white/10 bg-[#0D1527] p-3 sm:grid-cols-2 xl:grid-cols-4">

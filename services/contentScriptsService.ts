@@ -4,6 +4,13 @@ import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } f
 
 export const CONTENT_SCRIPTS_COLLECTION = 'contentScripts';
 
+function logContentScriptsError(operation: string, error: unknown): void {
+  console.error(`[contentScriptsService] Falha na operação: ${operation}`, {
+    error,
+    stack: error instanceof Error ? error.stack : undefined,
+  });
+}
+
 export type ContentScriptInput = {
   title: string;
   content: string;
@@ -43,17 +50,27 @@ function validate(input: ContentScriptInput): ContentScriptInput {
 
 export async function listContentScripts(): Promise<ContentScript[]> {
   if (!db) throw new Error('Firestore não inicializado.');
-  const snapshot = await getDocs(collection(db, CONTENT_SCRIPTS_COLLECTION));
-  return snapshot.docs
-    .map((item) => mapScript(item.id, item.data()))
-    .sort((a, b) => toMillis(b.updatedAt) - toMillis(a.updatedAt));
+  try {
+    const snapshot = await getDocs(collection(db, CONTENT_SCRIPTS_COLLECTION));
+    return snapshot.docs
+      .map((item) => mapScript(item.id, item.data()))
+      .sort((a, b) => toMillis(b.updatedAt) - toMillis(a.updatedAt));
+  } catch (error) {
+    logContentScriptsError(`getDocs(collection(db, '${CONTENT_SCRIPTS_COLLECTION}'))`, error);
+    throw error;
+  }
 }
 
 export async function getContentScriptById(id: string): Promise<ContentScript | null> {
   if (!db) throw new Error('Firestore não inicializado.');
   if (!id) return null;
-  const snapshot = await getDoc(doc(db, CONTENT_SCRIPTS_COLLECTION, id));
-  return snapshot.exists() ? mapScript(snapshot.id, snapshot.data()) : null;
+  try {
+    const snapshot = await getDoc(doc(db, CONTENT_SCRIPTS_COLLECTION, id));
+    return snapshot.exists() ? mapScript(snapshot.id, snapshot.data()) : null;
+  } catch (error) {
+    logContentScriptsError(`getDoc(doc(db, '${CONTENT_SCRIPTS_COLLECTION}', '${id}'))`, error);
+    throw error;
+  }
 }
 
 export async function createContentScript(input: ContentScriptInput): Promise<ContentScript> {
