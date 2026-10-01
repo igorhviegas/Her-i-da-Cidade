@@ -1,0 +1,17 @@
+{
+  "name": "heroi-da-cidade-functions",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "check": "node --check index.js && node --check manychat-handler.js && node --check order-sequence.js && node --check technical-purchase-id.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.4.0"
+  }
+}

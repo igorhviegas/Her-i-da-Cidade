@@ -1,5 +1,5 @@
 import {
-  collection, deleteField, doc, getDoc, getDocs, orderBy, query, runTransaction, serverTimestamp, where, setDoc,
+  collection, deleteField, doc, getDoc, getDocs, orderBy, query, runTransaction, serverTimestamp, setDoc, where,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Order, OrderStatus, ProductionType, OrderSource } from "../types";
@@ -10,14 +10,14 @@ import { SERVICES_COLLECTION } from "./servicesService";
 
 export const ORDERS_COLLECTION = "orders";
 
-export type CreateOrderInput = Omit<Order, "id" | "createdAt" | "completedAt" | "customerDueDate" | "internalDueDate"> & {
+export type CreateOrderInput = Omit<Order, "id" | "orderNumber" | "orderNumberDisplay" | "technicalPurchaseId" | "createdAt" | "completedAt" | "customerDueDate" | "internalDueDate"> & {
   paidAt?: Date | null;
   eventDate?: Date | null;
   completedAt?: Date | null;
   customerDueDate?: Date | null;
   internalDueDate?: Date | null;
 };
-export type UpdateOrderInput = Partial<Omit<Order, "id" | "createdAt" | "paidAt" | "eventDate" | "deliveryDays">> & {
+export type UpdateOrderInput = Partial<Omit<Order, "id" | "orderNumber" | "orderNumberDisplay" | "technicalPurchaseId" | "createdAt" | "paidAt" | "eventDate" | "deliveryDays">> & {
   paidAt?: Date | null;
   eventDate?: Date | null;
   deliveryDays?: number | null;
@@ -38,13 +38,12 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     ? calculateOrderDeadlines(input.paidAt, input.deliveryDays)
     : {};
   const { completedAt, ...fields } = input;
-  const payload = {
+  await setDoc(reference, {
     ...fields,
     ...(deadlines.customerDueDate ? deadlines : {}),
     createdAt: serverTimestamp(),
     ...(completedAt ? { completedAt } : {}),
-  };
-  await setDoc(reference, payload);
+  });
   return { ...input, ...deadlines, id: reference.id, createdAt: undefined };
 }
 
@@ -205,7 +204,11 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     const current = await transaction.get(orderRef);
     if (!current.exists()) throw new Error("Pedido não encontrado.");
     const currentData = current.data();
-    const payload: Record<string, unknown> = { ...updates, updatedAt: serverTimestamp() };
+    const safeUpdates = { ...updates } as Record<string, unknown>;
+    delete safeUpdates.orderNumber;
+    delete safeUpdates.orderNumberDisplay;
+    delete safeUpdates.technicalPurchaseId;
+    const payload: Record<string, unknown> = { ...safeUpdates, updatedAt: serverTimestamp() };
     if (updates.eventDate === null) payload.eventDate = deleteField();
     if (updates.deliveryDays === null) payload.deliveryDays = deleteField();
     if (updates.status === 'completed' && updates.completedAt === undefined) {

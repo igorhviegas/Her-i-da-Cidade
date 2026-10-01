@@ -39,6 +39,11 @@ export interface FirestoreClient extends Client {}
 /** Snapshot operacional e financeiro do pedido; preços são os praticados na venda. */
 export interface Order {
   id: string;
+  /** Legacy sequential number retained on older orders; new orders omit it. */
+  orderNumber?: number;
+  orderNumberDisplay?: string;
+  /** Legacy ManyChat field; newly received orders use the document ID as this value. */
+  technicalPurchaseId?: string;
   clientId: string;
   serviceId: string;
   status: OrderStatus;

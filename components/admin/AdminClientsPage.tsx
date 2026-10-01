@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ArrowLeft, CalendarDays, Search, Users } from 'lucide-react';
 import { listClients } from '../../services/clientsService';
 import { listOrders } from '../../services/ordersService';
+import { formatOrderReference } from '../../services/orderReference.js';
 import { getServiceById } from '../../services/servicesService';
 import type { Client, Order, OrderStatus } from '../../types';
 import { useRouter } from '../../lib/router';
@@ -118,7 +119,7 @@ export const AdminClientsPage: React.FC = () => {
             {selected.orders.length === 0 ? <p className="p-8 text-center text-sm text-white/45">Este cliente ainda não possui pedidos.</p> : (
               <div className="divide-y divide-white/5">
                 {selected.orders.map((order) => <button key={order.id} type="button" onClick={() => navigate(`/admin/pedidos?orderId=${encodeURIComponent(order.id)}`)} className="grid w-full gap-2 px-5 py-4 text-left transition-colors hover:bg-white/[0.03] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-                  <span className="min-w-0"><span className="block truncate text-sm font-semibold text-white">{serviceNames.get(order.serviceId) || `Serviço indisponível (${order.serviceId})`}</span><span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/45"><span>Pedido: {formatDate(order.createdAt)}</span>{order.paidAt && <span>Pago: {formatDate(order.paidAt)}</span>}{order.customerDueDate && <span>Prazo: {formatDate(order.customerDueDate)}</span>}</span></span>
+                  <span className="min-w-0"><span className="block truncate text-sm font-semibold text-white"><span className="mr-2 text-white/40">{formatOrderReference(order, orders)}</span>{serviceNames.get(order.serviceId) || `Serviço indisponível (${order.serviceId})`}</span><span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/45"><span>Pedido: {formatDate(order.createdAt)}</span>{order.paidAt && <span>Pago: {formatDate(order.paidAt)}</span>}{order.customerDueDate && <span>Prazo: {formatDate(order.customerDueDate)}</span>}</span></span>
                   <span className="flex items-center justify-between gap-4 sm:justify-end"><span className="text-sm font-bold text-emerald-300">{validPaidAmount(order) !== null ? money(validPaidAmount(order)!) : 'Pago não registrado'}</span><span className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-white/65">{statusNames[order.status] || order.status}</span></span>
                 </button>)}
               </div>

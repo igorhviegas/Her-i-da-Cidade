@@ -5,6 +5,7 @@ import { getClientById, normalizeWhatsApp } from '../../services/clientsService'
 import { deleteOrder, listOrders, updateOrder } from '../../services/ordersService';
 import { getContentScriptsByIds } from '../../services/contentScriptsService';
 import { getServiceById } from '../../services/servicesService';
+import { formatOrderReference } from '../../services/orderReference.js';
 import type { Client, ContentScript, Order, OrderStatus, Service } from '../../types';
 import { CreateOrderModal } from './CreateOrderModal';
 import { EditOrderModal } from './EditOrderModal';
@@ -81,6 +82,7 @@ export const AdminOrdersPage: React.FC = () => {
   const [orderActionError, setOrderActionError] = useState('');
   const [draggingOrderId, setDraggingOrderId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<OrderStatus | null>(null);
+  const allOrderRecords = useMemo(() => [...orders, ...completedOrders].map(({ order }) => order), [orders, completedOrders]);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -342,6 +344,7 @@ export const AdminOrdersPage: React.FC = () => {
                           }}
                           className={`cursor-pointer rounded-xl border bg-[#0D1527] p-3.5 shadow-lg outline-none transition-colors hover:border-blue-400/50 focus-visible:ring-2 focus-visible:ring-blue-400 ${order.scriptId ? 'ring-1 ring-inset ring-blue-400/10' : ''} ${state === 'overdue' ? 'border-red-500/45' : state === 'soon' ? 'border-amber-400/35' : 'border-white/10'}`}
                         >
+                          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-white/35">Pedido {formatOrderReference(order, allOrderRecords)}</p>
                           <h4 className="truncate text-sm font-bold text-white">{client?.name || 'Cliente não encontrado'}</h4>
                           <p className="mt-0.5 truncate text-xs text-white/55">{service?.title || 'Serviço não encontrado'}</p>
                           {order.scriptId && <p className="mt-1 truncate text-[11px] text-blue-200/75"><span className="mr-1 rounded bg-blue-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">Roteiro</span>{script?.title || 'Roteiro não encontrado'}</p>}
@@ -376,6 +379,7 @@ export const AdminOrdersPage: React.FC = () => {
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {filteredCompletedOrders.map(({ order, client, service, script }) => (
                 <button key={order.id} type="button" onClick={() => { setSelectedOrder({ order, client, service, script }); setEditOrderOpen(false); setOrderActionError(''); }} className="rounded-xl border border-white/10 bg-[#0D1527] p-3.5 text-left transition-colors hover:border-emerald-400/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
+                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-white/35">Pedido {formatOrderReference(order, allOrderRecords)}</span>
                   <span className="block truncate text-sm font-bold text-white">{client?.name || 'Cliente não encontrado'}</span>
                   <span className="mt-0.5 block truncate text-xs text-white/50">{service?.title || 'Serviço não encontrado'}</span>
                   {order.scriptId && <span className="mt-1 block truncate text-[11px] text-blue-200/75">Roteiro: {script?.title || 'Roteiro não encontrado'}</span>}
@@ -403,6 +407,8 @@ export const AdminOrdersPage: React.FC = () => {
           }
         }
         const detailRows: Array<[string, string]> = [
+          ['Referência do pedido', formatOrderReference(order, allOrderRecords)],
+          ['ID do documento', order.id],
           ['Cliente', client?.name || 'Cliente não encontrado'],
           ['WhatsApp', client?.whatsapp || '—'],
           ['Serviço', service?.title || 'Serviço não encontrado'],
