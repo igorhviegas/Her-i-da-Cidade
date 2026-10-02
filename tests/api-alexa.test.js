@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Timestamp } from 'firebase-admin/firestore';
 import { handleAlexa, isValidCertUrl, verifyAlexaRequest } from '../api/alexa.ts';
-import { extractDueDate, handleAlexaEnvelope, missionIdFor } from '../functions/missions-alexa.js';
+import { extractDueDate, extractTime, handleAlexaEnvelope, missionIdFor } from '../functions/missions-alexa.js';
 
 const SKILL = 'amzn1.ask.skill.test';
 const USER = 'amzn1.ask.account.TESTUSER';
@@ -66,16 +66,49 @@ test('sem data: missão sem prazo; data dentro do texto da tarefa é extraída; 
   assert.equal([...r.db.docs.values()][0].title, 'Pagar a conta');
   assert.equal([...r.db.docs.values()][0].dueAt.toDate().toISOString(), '2026-10-03T02:59:59.999Z');
 
-  r = await run(envelope({ tarefa: 'ligar para o cliente', data: '2026-10-02', hora: '15:30' }));
+  r = await run(envelope({ tarefa: 'ligar para o cliente', data: '2026-10-02' }));
+  assert.equal(r.db.docs.size, 1);
+});
+
+test('extractTime: horários falados em vários formatos, sem confundir "as 3 propostas"', () => {
+  const t = (text) => extractTime(text);
+  assert.deepEqual(t('ligar para o cliente às 15h'), { title: 'ligar para o cliente', time: '15:00' });
+  assert.equal(t('ligar às 15:30').time, '15:30');
+  assert.equal(t('ligar às 15h30').time, '15:30');
+  assert.equal(t('ligar às 9 horas').time, '09:00');
+  assert.equal(t('ligar às 3 da tarde').time, '15:00');
+  assert.equal(t('ligar às três e meia da tarde').time, '15:30');
+  assert.equal(t('ligar às 8 da manhã').time, '08:00');
+  assert.equal(t('ligar às 10 e 15 da noite').time, '22:15');
+  assert.equal(t('almoço com cliente ao meio-dia').time, '12:00');
+  assert.equal(t('fechar caixa à meia-noite').time, '00:00');
+  assert.equal(t('amanhã às 15h ligar').title, 'amanhã ligar');
+  assert.equal(t('ligar às 25 horas').time, 'invalid');
+  assert.deepEqual(t('revisar as 3 propostas'), { title: 'revisar as 3 propostas', time: null });
+});
+
+test('horário falado: com dia vira prazo exato; sem dia usa o próximo horário que chegar', async () => {
+  // NOW = quinta 01/10 12:00 em Brasília
+  let r = await run(envelope({ tarefa: 'ligar para o cliente amanhã às 15h30' }));
+  assert.match(speech(r.out), /Missão criada para 2 de outubro às 15h30: Ligar para o cliente./);
   assert.equal([...r.db.docs.values()][0].dueAt.toDate().toISOString(), '2026-10-02T18:30:00.000Z');
+
+  r = await run(envelope({ tarefa: 'ligar para o cliente às 3 da tarde' })); // 15:00 ainda não passou: hoje
+  assert.match(speech(r.out), /1 de outubro às 15h/);
+  assert.equal([...r.db.docs.values()][0].dueAt.toDate().toISOString(), '2026-10-01T18:00:00.000Z');
+
+  r = await run(envelope({ tarefa: 'tomar remédio às 8 da manhã' })); // 08:00 já passou: amanhã
+  assert.match(speech(r.out), /2 de outubro às 8h/);
+
+  r = await run(envelope({ tarefa: 'ligar às 25 horas' }));
+  assert.match(speech(r.out), /Não entendi o horário/);
+  assert.equal(r.db.docs.size, 0);
 });
 
 test('pede esclarecimento em vez de gravar quando falta tarefa, a data é vaga ou há hora sem dia', async () => {
   for (const [slots, expected] of [
     [{}, /O que você quer/],
     [{ tarefa: 'revisar pedidos', data: '2026-W41' }, /Não entendi o dia/],
-    [{ tarefa: 'revisar pedidos', hora: '15:00' }, /Para qual dia/],
-    [{ tarefa: 'revisar pedidos', data: '2026-10-02', hora: 'AF' }, /Não entendi o horário/],
     [{ tarefa: 'x'.repeat(121) }, /longa demais/],
   ]) {
     const { out, db } = await run(envelope(slots));
