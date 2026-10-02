@@ -42,7 +42,14 @@ export function subscribeCompletedOrders(onData: (orders: Order[]) => void, onEr
         lastOrders = snapshot.docs.map((item) => ({ ...item.data(), id: item.id } as Order));
         listeners.forEach((l) => l.onData(lastOrders!));
       },
-      (error) => listeners.forEach((l) => l.onError(error)),
+      (error) => {
+        // O Firestore encerra a escuta após um erro: limpa o estado para que a próxima assinatura crie uma nova (sem dados velhos nem escuta morta).
+        stopListening = null;
+        lastOrders = null;
+        const failed = [...listeners];
+        listeners.clear();
+        failed.forEach((l) => l.onError(error));
+      },
     );
   }
   return () => {
