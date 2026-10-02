@@ -125,7 +125,7 @@ export async function handleAlexaEnvelope(envelope, { database, config, now = ne
   }
 
   if (request.type === 'LaunchRequest') {
-    return say('Herói da Cidade. Diga, por exemplo: me lembrar de gravar três vídeos amanhã.', { end: false, reprompt: 'O que você quer registrar como missão?' });
+    return say('Qual missão você quer criar?', { end: false, reprompt: 'Qual missão você quer criar?' });
   }
   if (request.type !== 'IntentRequest') return say('Não consegui processar esse pedido.');
 
