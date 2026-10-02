@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CalendarDays, CheckCircle2, Copy, Loader2, MessageCircle, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Copy, Loader2, MessageCircle, Pencil, Plus, RefreshCw, Search, Trash2, Tv, X } from 'lucide-react';
 import { useRouter } from '../../lib/router';
 import { getClientById, normalizeWhatsApp } from '../../services/clientsService';
 import { deleteOrder, listOrders, updateOrder } from '../../services/ordersService';
@@ -11,6 +11,8 @@ import { getServiceColor, type ServiceColor } from '../../services/serviceColors
 import type { Client, ContentScript, Order, OrderStatus, Service } from '../../types';
 import { CreateOrderModal } from './CreateOrderModal';
 import { EditOrderModal } from './EditOrderModal';
+import { TeleprompterModal } from './TeleprompterModal';
+import { getTeleprompterText } from '../../services/teleprompter.js';
 
 type OrderView = { order: Order; client?: Client | null; service?: Service | null; script?: ContentScript | null };
 const COLUMNS = [
@@ -92,6 +94,7 @@ export const AdminOrdersPage: React.FC = () => {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [orderActionError, setOrderActionError] = useState('');
+  const [teleprompterView, setTeleprompterView] = useState<OrderView | null>(null);
   const [completedOpen, setCompletedOpen] = useState(false);
   const [draggingOrderId, setDraggingOrderId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<OrderStatus | null>(null);
@@ -202,9 +205,9 @@ export const AdminOrdersPage: React.FC = () => {
   };
 
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {
-    if (updatingOrderId) return;
+    if (updatingOrderId) return false;
     const orderView = [...orders, ...completedOrders].find(({ order }) => order.id === orderId);
-    if (!orderView || orderView.order.status === status) return;
+    if (!orderView || orderView.order.status === status) return false;
     setUpdatingOrderId(orderId);
     setOrderActionError('');
     try {
@@ -216,11 +219,18 @@ export const AdminOrdersPage: React.FC = () => {
         ? 'Pedido marcado como concluído.'
         : `Pedido movido para ${STATUS_LABELS[status].toLocaleLowerCase('pt-BR')}.`);
       await loadOrders();
+      return true;
     } catch (actionError) {
       setOrderActionError(actionError instanceof Error ? actionError.message : 'Não foi possível atualizar o pedido.');
+      return false;
     } finally {
       setUpdatingOrderId(null);
     }
+  };
+
+  const handleSendToEditing = async () => {
+    if (!teleprompterView) return;
+    if (await handleStatusChange(teleprompterView.order.id, 'editing')) setTeleprompterView(null);
   };
 
   const handleCompleteOrder = async (view: OrderView) => {
@@ -421,6 +431,19 @@ export const AdminOrdersPage: React.FC = () => {
                                 <MessageCircle className="h-4 w-4 shrink-0" /> Enviar pelo WhatsApp
                               </a>
                             ) : order.status === 'delivery' ? <p className="w-full text-[11px] text-white/35">WhatsApp indisponível</p> : null)}
+                            {getTeleprompterText({ order, service, script }) !== null && (
+                              <button
+                                type="button"
+                                draggable={false}
+                                title="Abrir teleprompter"
+                                aria-label="Abrir teleprompter"
+                                onClick={(event) => { event.stopPropagation(); setOrderActionError(''); setTeleprompterView({ order, client, service, script }); }}
+                                onKeyDown={(event) => event.stopPropagation()}
+                                className="inline-flex min-h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/60 hover:bg-white/10 hover:text-white"
+                              >
+                                <Tv className="h-4 w-4" />
+                              </button>
+                            )}
                             <button
                               type="button"
                               draggable={false}
@@ -552,6 +575,11 @@ export const AdminOrdersPage: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:items-center">
+                  {getTeleprompterText(selectedOrder) !== null && (
+                    <button type="button" onClick={() => { setOrderActionError(''); setTeleprompterView(selectedOrder); }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/70 hover:bg-white/5">
+                      <Tv className="h-4 w-4" /> Teleprompter
+                    </button>
+                  )}
                   <button type="button" onClick={() => setEditOrderOpen(true)} disabled={Boolean(updatingOrderId || deletingOrderId)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-500/25 bg-blue-500/10 px-4 py-2.5 text-sm font-semibold text-blue-200 hover:bg-blue-500/20 disabled:opacity-50">
                     <Pencil className="h-4 w-4" /> Editar pedido
                   </button>
@@ -573,6 +601,17 @@ export const AdminOrdersPage: React.FC = () => {
           </div>
         );
       })()}
+      {teleprompterView && (
+        <TeleprompterModal
+          title={[teleprompterView.client?.name, teleprompterView.service?.title].filter(Boolean).join(' · ')}
+          text={getTeleprompterText(teleprompterView) || ''}
+          canSendToEditing={(orders.find(({ order }) => order.id === teleprompterView.order.id)?.order.status ?? teleprompterView.order.status) !== 'editing'}
+          sending={updatingOrderId === teleprompterView.order.id}
+          error={orderActionError}
+          onBack={() => setTeleprompterView(null)}
+          onSendToEditing={() => void handleSendToEditing()}
+        />
+      )}
       {selectedOrder && editOrderOpen && (
         <EditOrderModal
           order={selectedOrder.order}
