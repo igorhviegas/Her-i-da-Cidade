@@ -14,6 +14,9 @@ import { AdminMissionsPage } from './AdminMissionsPage';
 import { NotificationsBell } from './NotificationsBell';
 import { AdminFinancePage } from './AdminFinancePage';
 import { FinanceRevenueBadge } from './FinanceRevenueBadge';
+import { AdminHomePage } from './AdminHomePage';
+import { AdminNav, useNavOrder, type NavItem } from './AdminNav';
+import { subscribeActiveOrders } from '../../services/ordersService';
 import { 
   Shield, 
   LayoutDashboard, 
@@ -36,10 +39,27 @@ import {
   ClipboardList,
   BookOpen,
   Target,
-  Wallet
+  Wallet,
+  House
 } from 'lucide-react';
 
-type AdminTab = 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance';
+type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance';
+
+// Módulos reorganizáveis (ordem padrão). "Principal" é fixo no topo e fica fora desta lista.
+const NAV_ITEMS: NavItem<AdminTab>[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'services', label: 'Serviços', icon: Sparkles },
+  { id: 'videos', label: 'Vídeos', icon: Video },
+  { id: 'categories', label: 'Categorias', icon: Layers },
+  { id: 'content', label: 'Conteúdo', icon: FileText },
+  { id: 'orders', label: 'Pedidos', icon: ClipboardList },
+  { id: 'clients', label: 'Clientes', icon: UserCheck },
+  { id: 'scripts', label: 'Roteiros', icon: BookOpen },
+  { id: 'missions', label: 'Missões', icon: Target },
+  { id: 'finance', label: 'Financeiro', icon: Wallet },
+  { id: 'settings', label: 'Configurações', icon: Settings },
+];
+const NAV_ORDER = NAV_ITEMS.map((item) => item.id);
 
 export const AdminDashboard: React.FC = () => {
   const { user, adminData, logout } = useAuth();
@@ -67,7 +87,9 @@ export const AdminDashboard: React.FC = () => {
       ? 'missions'
       : path === '/admin/financeiro'
       ? 'finance'
-      : 'dashboard';
+      : path === '/admin/dashboard'
+      ? 'dashboard'
+      : 'home';
 
   const [currentTab, setCurrentTab] = useState<AdminTab>(initialTab);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -95,8 +117,10 @@ export const AdminDashboard: React.FC = () => {
       setCurrentTab('missions');
     } else if (path === '/admin/financeiro') {
       setCurrentTab('finance');
-    } else if (path === '/admin' || path === '/admin/dashboard') {
+    } else if (path === '/admin/dashboard') {
       setCurrentTab('dashboard');
+    } else if (path === '/admin') {
+      setCurrentTab('home');
     }
   }, [path]);
 
@@ -123,6 +147,8 @@ export const AdminDashboard: React.FC = () => {
     } else if (tabId === 'finance') {
       navigate('/admin/financeiro');
     } else if (tabId === 'dashboard') {
+      navigate('/admin/dashboard');
+    } else if (tabId === 'home') {
       navigate('/admin');
     }
   };
@@ -183,19 +209,34 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const navItems = [
-    { id: 'dashboard' as AdminTab, label: 'Dashboard', icon: LayoutDashboard, status: 'active' },
-    { id: 'services' as AdminTab, label: 'Serviços', icon: Sparkles, status: 'active' },
-    { id: 'videos' as AdminTab, label: 'Vídeos', icon: Video, status: 'active', hint: 'Etapa 5' },
-    { id: 'categories' as AdminTab, label: 'Categorias', icon: Layers, status: 'active' },
-    { id: 'content' as AdminTab, label: 'Conteúdo', icon: FileText, status: 'active' },
-    { id: 'orders' as AdminTab, label: 'Pedidos', icon: ClipboardList, status: 'active' },
-    { id: 'clients' as AdminTab, label: 'Clientes', icon: UserCheck, status: 'active' },
-    { id: 'scripts' as AdminTab, label: 'Roteiros', icon: BookOpen, status: 'active' },
-    { id: 'missions' as AdminTab, label: 'Missões', icon: Target, status: 'active' },
-    { id: 'finance' as AdminTab, label: 'Financeiro', icon: Wallet, status: 'active' },
-    { id: 'settings' as AdminTab, label: 'Configurações', icon: Settings, status: 'active' },
-  ];
+  const pinnedItem: NavItem<AdminTab> = { id: 'home', label: 'Principal', icon: House };
+  const navItems: NavItem<AdminTab>[] = NAV_ITEMS;
+  const { order: navOrder, setOrder: setNavOrder, reset: resetNavOrder, customized: navCustomized } = useNavOrder<AdminTab>(user?.uid, NAV_ORDER);
+
+  // Contador do menu: pedidos em andamento (todas as etapas do Kanban, exceto Concluído), em tempo real e compartilhado com o widget da Principal.
+  // null = ainda carregando ou indisponível (erro de conexão/permissão): nunca é exibido como zero.
+  const [activeOrdersCount, setActiveOrdersCount] = useState<number | null>(null);
+  const [ordersCountFailed, setOrdersCountFailed] = useState(false);
+  useEffect(() => subscribeActiveOrders(
+    (orders) => { setActiveOrdersCount(orders.length); setOrdersCountFailed(false); },
+    () => { setActiveOrdersCount(null); setOrdersCountFailed(true); },
+  ), []);
+
+  const renderNav = (variant: 'desktop' | 'mobile', afterSelect?: () => void) => (
+    <AdminNav<AdminTab>
+      pinned={pinnedItem}
+      items={navItems}
+      order={navOrder}
+      onReorder={setNavOrder}
+      onReset={resetNavOrder}
+      customized={navCustomized}
+      current={currentTab}
+      onSelect={(id) => { handleTabChange(id); afterSelect?.(); }}
+      ordersCount={activeOrdersCount}
+      ordersCountFailed={ordersCountFailed}
+      variant={variant}
+    />
+  );
 
   return (
     <div className="min-h-screen bg-[#070B14] text-white flex flex-col lg:flex-row antialiased selection:bg-blue-600 selection:text-white">
@@ -222,42 +263,7 @@ export const AdminDashboard: React.FC = () => {
           <div className="px-3 py-2 text-[10px] font-semibold text-white/40 uppercase tracking-widest">
             Navegação Principal
           </div>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  handleTabChange(item.id);
-                }}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  isActive
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20'
-                    : 'text-white/70 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-white/50'}`} />
-                  <span>{item.label}</span>
-                </div>
-                {item.status === 'soon' && (
-                  <span className={`text-[10px] px-2 py-0.5 rounded-md font-semibold ${
-                    isActive 
-                      ? 'bg-blue-800/60 text-blue-100' 
-                      : 'bg-white/10 text-white/50'
-                  }`}>
-                    {item.hint || 'Em breve'}
-                  </span>
-                )}
-                {(item.id === 'services' || item.id === 'settings' || item.id === 'content') && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    Ativo
-                  </span>
-                )}
-              </button>
-            );
-          })}
+          {renderNav('desktop')}
         </nav>
 
         {/* Sidebar Footer Link to Public Site */}
@@ -306,39 +312,7 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = currentTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      handleTabChange(item.id);
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                      isActive
-                        ? 'bg-blue-600 text-white'
-                        : 'text-white/70 hover:bg-white/5 hover:text-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Icon className="w-4 h-4" />
-                      <span>{item.label}</span>
-                    </div>
-                    {item.status === 'soon' && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-white/50 font-medium">
-                        {item.hint || 'Em breve'}
-                      </span>
-                    )}
-                      {(item.id === 'services' || item.id === 'settings' || item.id === 'content') && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-medium">
-                        Ativo
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+              {renderNav('mobile', () => setMobileMenuOpen(false))}
             </nav>
 
             <div className="p-4 border-t border-white/10 space-y-2">
@@ -424,6 +398,8 @@ export const AdminDashboard: React.FC = () => {
         {/* CONTENT VIEWPORT */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           
+          {currentTab === 'home' && <AdminHomePage onNavigate={handleTabChange} />}
+
           {/* TAB: DASHBOARD */}
           {currentTab === 'dashboard' && (
             <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
