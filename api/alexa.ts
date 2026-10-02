@@ -1,6 +1,5 @@
 import { X509Certificate, createVerify } from 'node:crypto';
 import type { Request, Response } from 'express';
-import { getAdminFirestore } from './manychat.ts';
 import { handleAlexaEnvelope, parseAllowedUsers } from '../functions/missions-alexa.js';
 
 const MAX_SKEW_MS = 150_000; // limite da Amazon para o timestamp da requisição
@@ -115,7 +114,8 @@ export async function handleAlexa(req: Request | any, res: Response | any, deps:
   }
 
   try {
-    const database = deps.database ?? getAdminFirestore();
+    // import tardio: importar './manychat.ts' no topo derruba a função na Vercel (FUNCTION_INVOCATION_FAILED).
+    const database = deps.database ?? (await import('./manychat.js')).getAdminFirestore();
     return send(200, await handleAlexaEnvelope(envelope, { database, config, now: deps.now, logger: console }));
   } catch (error) {
     console.error('[Alexa] Falha ao processar requisição:', error instanceof Error ? error.message : String(error));
