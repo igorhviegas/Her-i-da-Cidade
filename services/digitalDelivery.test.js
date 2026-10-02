@@ -1,14 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildDeliveryWhatsAppUrl, initialStatusFor, isDigitalDeliveryService, isInviteVideoService } from './digitalDelivery.js';
-
-test('os três serviços digitais nascem em Entregar; os demais preservam o status', () => {
-  assert.equal(initialStatusFor({ id: '1', title: 'x' }, 'completed'), 'delivery');
-  assert.equal(initialStatusFor({ id: '5', title: 'Vídeo Temático' }, 'editing'), 'delivery');
-  assert.equal(initialStatusFor({ id: 'abc', title: 'Missão Digital' }, 'recording'), 'delivery');
-  assert.equal(initialStatusFor({ id: '3', title: 'Vídeo Personalizado' }, 'recording'), 'recording');
-  assert.equal(isDigitalDeliveryService(null), false);
-});
+import { buildDeliveryWhatsAppUrl, isInviteVideoService } from './digitalDelivery.js';
 
 test('WhatsApp usa telefone e nome corretos, com mensagem codificada', () => {
   const url = buildDeliveryWhatsAppUrl('(31) 98765-4321', { content: 'Aniversariante: Pedro' });

@@ -49,31 +49,31 @@ export function validateManyChatOrderInput(body) {
 const VALID_STATUSES = ['scheduled', 'recording', 'editing', 'delivery', 'completed'];
 const VALID_PRODUCTION_TYPES = ['scheduled', 'recording', 'editing', 'immediate'];
 const DEFAULT_SERVICE = 'birthday-video';
-const MAX_AMOUNT = 10000;
+
+const tiers = (price7, price4, price2) => ({
+  '7_days': { days: 7, price: price7 },
+  '4_days': { days: 4, price: price4 },
+  '2_days': { days: 2, price: price2 },
+});
 
 /**
  * Serviços aceitos por este endpoint, identificados pelo campo opcional `service` do payload.
- * - pricing 'catalog': preço fixo lido de services/{id}; o payload não pode enviar valor.
- * - pricing 'payload': preço variável no catálogo ("A partir de…"); o valor pago vem em `amountPaid`.
+ * - pricing 'catalog': preço lido de services/{id} ("Apenas R$ …"); o payload não envia valor.
+ * - pricing 'fixed': preço fixo definido aqui.
+ * - pricing 'tiers': preço e prazo vêm da modalidade (`modality`); o payload não envia valor.
  * - fields: 'required' | 'optional' | ausente (campo não aceito para o serviço).
- * - directDelivery: serviço digital que nasce em "Entregar" (espelha initialStatusFor do frontend).
- * Status, tipo de produção e prazo padrão dos serviços novos vêm da configuração do serviço no CRM.
+ * Status inicial, tipo de produção e prazo padrão vêm da configuração do serviço no CRM (Admin → Serviços);
+ * a modalidade sobrepõe apenas o prazo.
  */
 export const SERVICE_PROFILES = {
-  'birthday-video': { serviceId: '1', title: 'Vídeo Especial de Aniversário', pricing: 'catalog', legacy: true, directDelivery: true, fields: { childName: 'required' } },
-  'themed-video': { serviceId: '5', title: 'Vídeo Temático', pricing: 'catalog', directDelivery: true, fields: { childName: 'required' } },
-  'custom-video': { serviceId: '3', title: 'Vídeo Personalizado', pricing: 'payload', fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
-  'invite-video': { serviceId: '4', title: 'Vídeo Convite', pricing: 'payload', fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
-  'live-call': { serviceId: '2', title: 'Vídeo Chamada ao Vivo', pricing: 'payload', fields: { childName: 'optional', details: 'optional', eventDate: 'required' } },
+  'birthday-video': { serviceId: '1', title: 'Vídeo Especial de Aniversário', pricing: 'catalog', fields: { childName: 'required' } },
+  'themed-video': { serviceId: '5', title: 'Vídeo Temático', pricing: 'catalog', fields: { childName: 'required' } },
+  'custom-video': { serviceId: '3', title: 'Vídeo Personalizado', pricing: 'tiers', tiers: tiers(60, 75, 85), fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
+  'invite-video': { serviceId: '4', title: 'Vídeo Convite', pricing: 'tiers', tiers: tiers(65, 80, 95), fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
+  'live-call': { serviceId: '2', title: 'Vídeo Chamada ao Vivo', pricing: 'fixed', price: 75, fields: { childName: 'optional', details: 'optional' } },
 };
 
 const normalizeTitle = (value) => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
-
-function parseAmount(value) {
-  if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value * 100) / 100 : null;
-  if (typeof value !== 'string' || !/^\d+(?:[.,]\d{1,2})?$/.test(value.trim())) return null;
-  return Math.round(Number(value.trim().replace(',', '.')) * 100) / 100;
-}
 
 /** Aceita YYYY-MM-DD ou data/hora ISO com fuso. Datas simples ficam às 12:00 de Brasília, como no cadastro manual. */
 function parseEventDate(value) {
@@ -101,7 +101,7 @@ export function validateManyChatPayload(body) {
   if (!profile) return { errors: [`service deve ser um destes valores: ${Object.keys(SERVICE_PROFILES).join(', ')}.`], profile: null };
 
   const errors = [];
-  const accepted = new Set(['eventType', 'service', 'customer', ...Object.keys(profile.fields), ...(profile.pricing === 'payload' ? ['amountPaid'] : [])]);
+  const accepted = new Set(['eventType', 'service', 'customer', ...Object.keys(profile.fields), ...(profile.tiers ? ['modality'] : [])]);
   const unexpected = Object.keys(body).filter((key) => !accepted.has(key));
   if (unexpected.length) errors.push(`Campos não aceitos para ${body.service}: ${unexpected.join(', ')}.`);
   if (body.eventType !== 'payment.paid') errors.push('eventType deve ser exatamente payment.paid.');
@@ -126,21 +126,21 @@ export function validateManyChatPayload(body) {
   if (profile.fields.eventDate) {
     const value = body.eventDate;
     const absent = value === undefined || value === null || value === '';
-    if (absent) { if (profile.fields.eventDate === 'required') errors.push('eventDate é obrigatório (YYYY-MM-DD ou data/hora ISO 8601 com fuso).'); }
-    else if (!parseEventDate(value)) errors.push('eventDate deve ser YYYY-MM-DD ou data/hora ISO 8601 com fuso.');
+    if (!absent && !parseEventDate(value)) errors.push('eventDate deve ser YYYY-MM-DD ou data/hora ISO 8601 com fuso.');
   }
-  if (profile.pricing === 'payload') {
-    const amount = parseAmount(body.amountPaid);
-    if (amount === null || amount <= 0 || amount > MAX_AMOUNT) errors.push(`amountPaid é obrigatório: valor pago em reais, maior que 0 e até ${MAX_AMOUNT} (ex.: 75 ou "75,50").`);
+  if (profile.tiers && !(typeof body.modality === 'string' && Object.hasOwn(profile.tiers, body.modality))) {
+    errors.push(`modality é obrigatório e deve ser um destes valores: ${Object.keys(profile.tiers).join(', ')}.`);
   }
   return { errors, profile };
 }
 
-/** Status inicial como no cadastro manual: serviços digitais vão direto para Entregar; os demais seguem a configuração do serviço. */
-function resolveInitialStatus(profile, service) {
-  if (profile.directDelivery) return 'delivery';
-  const status = service.autoComplete === true || service.initialStatus === 'completed' ? 'completed' : service.initialStatus;
-  return VALID_STATUSES.includes(status) ? status : null;
+/**
+ * Status inicial do pedido: o configurado em Admin → Serviços. "Concluir automaticamente" só serve de
+ * alternativa quando nenhum status inicial foi configurado. Espelha resolveInitialStatus de services/orderInitialStatus.js.
+ */
+export function resolveInitialStatus(service) {
+  if (VALID_STATUSES.includes(service?.initialStatus)) return service.initialStatus;
+  return service?.autoComplete === true ? 'completed' : null;
 }
 
 function calculateDeadlines(paidAt, deliveryDays) {
@@ -151,28 +151,25 @@ function calculateDeadlines(paidAt, deliveryDays) {
   return { customerDueDate, internalDueDate };
 }
 
-/** Confere se o serviço do CRM está configurado para gerar pedidos. Retorna { problem } ou { price, status, productionType }. */
-function evaluateService(profile, service) {
+/** Confere se o serviço do CRM está configurado para gerar pedidos. Retorna { problem } ou { price, status, productionType, deliveryDays }. */
+function evaluateService(profile, service, modality) {
   const serviceName = service.title || service.name || '';
-  if (profile.legacy) {
-    const servicePrice = parseCatalogPrice(service.price);
-    if (serviceName !== profile.title || service.active !== true || service.category !== 'Pronta entrega' || service.generateOrder !== true || service.productionType !== 'immediate' || service.initialStatus !== 'completed' || service.autoComplete !== true || (service.defaultDeliveryDays !== undefined && service.defaultDeliveryDays !== null)) {
-      return { problem: 'service_configuration_changed' };
-    }
-    if (servicePrice === null) return { problem: 'service_price_unavailable' };
-    return { price: servicePrice, status: 'delivery', productionType: 'immediate' };
-  }
-  const status = resolveInitialStatus(profile, service);
+  const status = resolveInitialStatus(service);
   if (normalizeTitle(serviceName) !== normalizeTitle(profile.title) || service.active !== true || service.generateOrder !== true
     || !VALID_PRODUCTION_TYPES.includes(service.productionType) || !status) {
     return { problem: 'service_configuration_changed' };
   }
-  let price = null;
+  let price;
+  let days = service.defaultDeliveryDays;
   if (profile.pricing === 'catalog') {
     price = parseCatalogPrice(service.price);
     if (price === null) return { problem: 'service_price_unavailable' };
+  } else if (profile.pricing === 'fixed') {
+    price = profile.price;
+  } else {
+    price = profile.tiers[modality].price;
+    days = profile.tiers[modality].days; // o prazo contratado vale mais que o prazo padrão do serviço
   }
-  const days = service.defaultDeliveryDays;
   return { price, status, productionType: service.productionType, deliveryDays: Number.isInteger(days) && days >= 0 ? days : undefined };
 }
 
@@ -225,11 +222,11 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
         transaction.get(serviceRef),
         transaction.get(whatsappIndexRef),
       ]);
+
       if (!serviceSnapshot.exists) return { problem: 'service_not_found' };
 
-      const evaluation = evaluateService(profile, serviceSnapshot.data());
+      const evaluation = evaluateService(profile, serviceSnapshot.data(), input.modality);
       if (evaluation.problem) return { problem: evaluation.problem };
-      const servicePrice = profile.pricing === 'payload' ? parseAmount(input.amountPaid) : evaluation.price;
 
       let clientRef = null;
       let shouldCreateClient = false;
@@ -267,25 +264,23 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
         serviceId: profile.serviceId,
         status: evaluation.status,
         paidAt,
-        content: profile.legacy ? `Aniversariante: ${input.childName.trim()}` : buildOrderContent(input),
-        servicePrice,
+        content: buildOrderContent(input),
+        servicePrice: evaluation.price,
         rushFee: 0,
-        totalPaid: servicePrice,
+        totalPaid: evaluation.price,
         productionType: evaluation.productionType,
         source: 'manychat',
         technicalPurchaseId: orderRef.id,
         createdAt: FieldValue.serverTimestamp(),
       };
-      if (!profile.legacy) {
-        if (input.eventDate) orderData.eventDate = Timestamp.fromDate(parseEventDate(input.eventDate));
-        if (evaluation.deliveryDays !== undefined) {
-          const deadlines = calculateDeadlines(paidAt.toDate(), evaluation.deliveryDays);
-          orderData.deliveryDays = evaluation.deliveryDays;
-          orderData.customerDueDate = Timestamp.fromDate(deadlines.customerDueDate);
-          orderData.internalDueDate = Timestamp.fromDate(deadlines.internalDueDate);
-        }
-        if (evaluation.status === 'completed') orderData.completedAt = paidAt;
+      if (input.eventDate) orderData.eventDate = Timestamp.fromDate(parseEventDate(input.eventDate));
+      if (evaluation.deliveryDays !== undefined) {
+        const deadlines = calculateDeadlines(paidAt.toDate(), evaluation.deliveryDays);
+        orderData.deliveryDays = evaluation.deliveryDays;
+        orderData.customerDueDate = Timestamp.fromDate(deadlines.customerDueDate);
+        orderData.internalDueDate = Timestamp.fromDate(deadlines.internalDueDate);
       }
+      if (evaluation.status === 'completed') orderData.completedAt = paidAt;
 
       if (shouldCreateClient) {
         transaction.set(clientRef, {
@@ -298,7 +293,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
       }
       if (shouldCreateIndex) transaction.set(whatsappIndexRef, { clientId: clientRef.id, whatsappNormalized: normalizedWhatsApp, recordType: 'whatsapp-index' });
       transaction.set(orderRef, orderData);
-      return { orderId: orderRef.id, technicalPurchaseId: orderRef.id };
+      return { orderId: orderRef.id };
     });
 
     if (transactionResult.problem === 'service_not_found') return jsonError(res, 422, 'service_not_found', `O serviço services/${profile.serviceId} não existe.`);
@@ -308,7 +303,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
     return res.status(200).json({
       ok: true,
       orderId: transactionResult.orderId,
-      technicalPurchaseId: transactionResult.technicalPurchaseId,
+      technicalPurchaseId: transactionResult.orderId,
     });
   } catch (error) {
     const log = customLogger || console;

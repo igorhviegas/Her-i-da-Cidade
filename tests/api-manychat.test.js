@@ -71,8 +71,8 @@ function createFakeFirestore({ serviceExists = true, servicePrice = 'Apenas R$ 3
     category: 'Pronta entrega',
     generateOrder: true,
     productionType: 'immediate',
-    initialStatus: 'completed',
-    autoComplete: true,
+    initialStatus: 'delivery',
+    autoComplete: false,
   };
 
   return {

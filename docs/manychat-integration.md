@@ -25,36 +25,59 @@ Use apenas uma das duas URLs (a que estiver publicada). O limite do corpo é 256
 
 Qualquer campo fora da lista do serviço é rejeitado com `400`.
 
-## Serviços
+## Serviços, modalidades e preços
 
-| Serviço | `service` | Preço | Nome da criança | Outros campos |
+| Serviço | `service` | Preço | `childName` | Outros campos |
 |---|---|---|---|---|
-| Vídeo Especial de Aniversário | `birthday-video` | catálogo (R$ 30) | `childName` **obrigatório** | — |
-| Vídeo Temático | `themed-video` | catálogo (R$ 20) | `childName` **obrigatório** | — |
-| Vídeo Personalizado | `custom-video` | `amountPaid` **obrigatório** | `childName` opcional | `details` e `eventDate` opcionais |
-| Vídeo Convite | `invite-video` | `amountPaid` **obrigatório** | `childName` opcional | `details` e `eventDate` opcionais |
-| Vídeo Chamada ao Vivo | `live-call` | `amountPaid` **obrigatório** | `childName` opcional | `eventDate` **obrigatório**, `details` opcional |
+| Vídeo Especial de Aniversário | `birthday-video` | R$ 30, lido do catálogo | **obrigatório** | — |
+| Vídeo Temático | `themed-video` | R$ 20, lido do catálogo | **obrigatório** | — |
+| Vídeo Personalizado | `custom-video` | pela modalidade (tabela abaixo) | opcional | `modality` **obrigatório**; `details` e `eventDate` opcionais |
+| Vídeo Convite | `invite-video` | pela modalidade (tabela abaixo) | opcional | `modality` **obrigatório**; `details` e `eventDate` opcionais |
+| Vídeo Chamada ao Vivo | `live-call` | **R$ 75,00 fixo** | opcional | `details` opcional. **Sem data de agendamento** |
 
-Serviços Presenciais ("Sob consulta") e Missão Digital não fazem parte desta integração.
+O ManyChat **não envia preço** nos serviços de Personalizado, Convite e Chamada ao Vivo: o CRM calcula o valor.
+
+### Modalidade (`modality`) — Personalizado e Convite
+
+| `modality` | Prazo contratado | Vídeo Personalizado | Vídeo Convite |
+|---|---|---:|---:|
+| `7_days` | 7 dias | R$ 60,00 | R$ 65,00 |
+| `4_days` | 4 dias | R$ 75,00 | R$ 80,00 |
+| `2_days` | 2 dias | R$ 85,00 | R$ 95,00 |
+
+Valores diferentes dos três acima (inclusive `7`, `"7 dias"`, `"7_DAYS"`) são rejeitados com `400` e nada é criado.
+
+O pedido grava `servicePrice` e `totalPaid` com o preço da tabela (taxa de urgência `0`; a diferença entre as modalidades já está no preço) e `deliveryDays` com o prazo da modalidade. O prazo da modalidade **substitui** o "Prazo de entrega" padrão do serviço em Admin → Serviços. Os prazos do cliente e interno são calculados a partir da data do pagamento (interno = prazo do cliente − 1 dia).
+
+Serviços sem modalidade (Aniversário, Temático e Chamada ao Vivo) usam o "Prazo de entrega" padrão do serviço, se houver um configurado.
 
 ### Tipos dos campos específicos
 
 - `childName`: string, até 100 caracteres.
 - `details`: string, até 1000 caracteres (observações do pedido).
-- `amountPaid`: valor pago em reais, maior que 0 e até 10000. Aceita número (`75`, `85.5`) ou texto (`"85,50"`). Só é aceito nos serviços de preço variável; nos de preço de catálogo é rejeitado.
-- `eventDate`: `YYYY-MM-DD` (gravada às 12:00 de Brasília) ou data/hora ISO 8601 com fuso (`2026-11-21T16:30:00-03:00`).
+- `modality`: `"7_days"`, `"4_days"` ou `"2_days"`.
+- `eventDate`: `YYYY-MM-DD` (gravada às 12:00 de Brasília) ou data/hora ISO 8601 com fuso (`2026-11-21T16:30:00-03:00`). Só Personalizado e Convite.
+
+### Campos que NÃO devem mais ser enviados
+
+| Campo | Onde |
+|---|---|
+| `amountPaid` | Todos os serviços. O preço vem do catálogo, da tabela de modalidades ou do valor fixo. Enviá-lo gera `400`. |
+| `eventDate` | `live-call`. A Chamada ao Vivo não exige agendamento; enviá-lo gera `400`. |
+| `modality` | `birthday-video`, `themed-video`, `live-call`. |
 
 ### Como o pedido aparece no CRM
 
 - Cliente: criado ou reaproveitado pelo WhatsApp.
-- `Aniversariante: <childName>` e `Detalhes: <details>` vão no conteúdo do pedido; sem nenhum dos dois, o conteúdo fica "Pedido recebido via ManyChat.". Sem `childName`, o pedido e a mensagem de WhatsApp funcionam normalmente.
-- Vídeo Especial de Aniversário e Vídeo Temático nascem em **Entregar**.
-- Personalizado, Convite e Chamada ao Vivo usam o **status inicial, tipo de produção e prazo padrão configurados no serviço** (Admin → Serviços, "Gerar pedido"). Se o serviço estiver inativo, sem "Gerar pedido" ou sem status inicial, a resposta é `422` e nada é criado.
+- Data do pagamento (`paidAt`): o momento em que o CRM recebe a requisição (para a Chamada ao Vivo, é a única data registrada).
+- `Aniversariante: <childName>` e `Detalhes: <details>` vão no conteúdo do pedido; sem nenhum dos dois, o conteúdo fica "Pedido recebido via ManyChat.".
+- **Status inicial, tipo de produção e prazo padrão vêm da configuração do serviço** (Admin → Serviços → "Configuração de Pedido"), igual ao cadastro manual. Nada é forçado no código: um serviço imediato configurado como "Entregar" nasce em Entregar; configurado como "Concluído", nasce concluído. "Concluir automaticamente" só é usado como alternativa se nenhum status inicial estiver configurado.
+- Se o serviço estiver inativo, sem "Gerar pedido no CRM", sem tipo de produção ou sem status inicial, a resposta é `422` e nada é criado.
 - Origem do pedido: `manychat`.
 
 ## Exemplos de payload
 
-Vídeo Especial de Aniversário (formato original, ainda válido sem `service`):
+Vídeo Especial de Aniversário:
 ```json
 { "eventType": "payment.paid", "service": "birthday-video",
   "customer": { "name": "Maria Silva", "whatsapp": "+55 31 99999-0000" },
@@ -68,29 +91,49 @@ Vídeo Temático:
   "childName": "Helena" }
 ```
 
-Vídeo Personalizado:
+Vídeo Personalizado (7 dias, R$ 60,00):
 ```json
 { "eventType": "payment.paid", "service": "custom-video",
   "customer": { "name": "Maria Silva", "whatsapp": "+55 31 99999-0000" },
-  "amountPaid": "85,50", "childName": "Davi",
+  "modality": "7_days", "childName": "Davi",
   "details": "Incentivar a escovar os dentes", "eventDate": "2026-11-10" }
 ```
 
-Vídeo Convite:
+Vídeo Convite (2 dias, R$ 95,00), só com os campos obrigatórios:
 ```json
 { "eventType": "payment.paid", "service": "invite-video",
   "customer": { "name": "Maria Silva", "whatsapp": "+55 31 99999-0000" },
-  "amountPaid": 65, "childName": "Pedro", "eventDate": "2026-11-20" }
+  "modality": "2_days" }
 ```
 
-Vídeo Chamada ao Vivo:
+Vídeo Chamada ao Vivo (R$ 75,00, sem data):
 ```json
 { "eventType": "payment.paid", "service": "live-call",
   "customer": { "name": "Maria Silva", "whatsapp": "+55 31 99999-0000" },
-  "amountPaid": 75, "eventDate": "2026-11-21T16:30:00-03:00" }
+  "childName": "Lia", "details": "Conversar sobre o aniversário" }
 ```
 
-No ManyChat, `childName`, `details`, `amountPaid` e `eventDate` devem vir de campos personalizados. Para campos opcionais ainda inexistentes, simplesmente **não inclua a chave** (evite enviar o texto de uma variável vazia).
+Contrato antigo do Aniversário (sem `service`; ainda aceito):
+```json
+{ "eventType": "payment.paid",
+  "customer": { "name": "Maria Silva", "whatsapp": "+55 31 99999-0000" },
+  "childName": "Lucas" }
+```
+
+## Configurar os campos no ManyChat
+
+No ManyChat, o corpo do External Request é montado com campos personalizados (*Custom User Fields*) e do sistema:
+
+1. **`service`**: texto fixo por fluxo (um External Request por serviço, ou um campo preenchido pelo fluxo). Use exatamente os identificadores da tabela.
+2. **`modality`** (Personalizado e Convite): crie o campo personalizado de texto `modalidade` e preencha-o no fluxo com exatamente `7_days`, `4_days` ou `2_days` conforme a opção contratada. **Não monte `modality` a partir de texto digitado pelo cliente.**
+3. `childName` e `details` vêm de campos personalizados. Para campos opcionais ainda vazios, **não inclua a chave** no JSON (evite enviar o texto de uma variável vazia).
+4. Remova do corpo `amountPaid` e, na Chamada ao Vivo, `eventDate`.
+5. Envolva todos os valores em aspas: o CRM só aceita texto.
+6. Header `Authorization: Bearer <segredo>` e `Content-Type: application/json`.
+
+## Requisições repetidas
+
+**Não há deduplicação.** O ManyChat não fornece um identificador único por pedido ou pagamento, então cada chamada aceita cria um novo pedido. Em caso de timeout ou erro, confira o CRM antes de reenviar. Se aparecer um pedido duplicado, ele deve ser identificado e removido manualmente no CRM (o cliente é reaproveitado pelo WhatsApp, então só o pedido precisa ser removido).
 
 ## Respostas
 
@@ -99,19 +142,33 @@ Sucesso (`200`):
 { "ok": true, "orderId": "<id>", "technicalPurchaseId": "<id>" }
 ```
 
-Erro: `{ "ok": false, "error": { "code": "...", "message": "..." }, "details": [ ... ] }`
+Erro de validação (`400`), por exemplo modalidade inválida:
+```json
+{ "ok": false, "error": { "code": "validation_error", "message": "Revise os campos da requisição." },
+  "details": ["modality é obrigatório e deve ser um destes valores: 7_days, 4_days, 2_days."] }
+```
 
 | HTTP | `error.code` | Quando |
 |---|---|---|
-| 400 | `validation_error` | Campo ausente, inválido ou não aceito (`details` lista cada problema). |
+| 400 | `validation_error` | Campo ausente, inválido ou não aceito (`details` lista cada problema), incluindo `modality` inválida. |
 | 401 | `unauthorized` | Header `Authorization` ausente ou errado. |
 | 405 / 413 / 415 | `method_not_allowed` / `payload_too_large` / `unsupported_media_type` | Método, tamanho ou tipo inválido. |
 | 409 | `invalid_client_index` / `ambiguous_client` | Cadastro de WhatsApp inconsistente ou duplicado; resolver no CRM. |
-| 422 | `service_not_found` / `service_configuration_changed` / `service_price_unavailable` | Serviço inexistente, não configurado para gerar pedidos ou preço de catálogo ilegível. |
-| 500 | `internal_error` / `server_misconfigured` / `database_unavailable` | Falha do servidor. **Confira o CRM antes de repetir.** |
+| 422 | `service_not_found` / `service_configuration_changed` / `service_price_unavailable` | Serviço inexistente, não configurado para gerar pedidos (inativo, sem "Gerar pedido", sem tipo de produção ou sem status inicial) ou preço de catálogo ilegível (só Aniversário e Temático). |
+| 500 | `internal_error` / `server_misconfigured` / `database_unavailable` | Falha do servidor. Confira o CRM antes de repetir. |
 
 O ManyChat trata respostas diferentes de 200 como falha e não exibe o texto do erro; use os logs do servidor para diagnosticar.
 
-## Requisições repetidas
+## Conferência manual em Admin → Serviços (antes de ligar o ManyChat)
 
-Não há deduplicação: cada chamada aceita cria um novo pedido (não existe ID de compra estável no ManyChat). Em caso de timeout ou erro, confira o CRM antes de reenviar.
+O CRM não pode ser conferido a partir do código. Em cada serviço abaixo, abra Admin → Serviços → editar → "Configuração de Pedido" e confirme:
+
+| Serviço (ID) | Ativo | Gerar pedido | Tipo de produção | Status inicial |
+|---|---|---|---|---|
+| Vídeo Especial de Aniversário (`1`) | sim | sim | Imediato | **Entregar** |
+| Vídeo Chamada ao Vivo (`2`) | sim | sim | conforme a operação (ex.: Agendado) | conforme a operação (ex.: Agendado) |
+| Vídeo Personalizado (`3`) | sim | sim | Gravação | Gravar |
+| Vídeo Convite (`4`) | sim | sim | Gravação | Gravar |
+| Vídeo Temático (`5`) | sim | sim | Imediato | **Entregar** |
+
+O título precisa continuar igual ao nome da tabela (sem diferença de acento ou caixa). Serviços que hoje estão como "Concluído" por causa da regra antiga **precisam ser alterados para Entregar**: o CRM agora respeita o que está salvo.

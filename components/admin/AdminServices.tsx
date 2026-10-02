@@ -34,6 +34,7 @@ import {
 } from '../../services/servicesService';
 import { Service } from '../../types';
 import type { OrderStatus, ProductionType } from '../../types';
+import { defaultInitialStatus } from '../../services/orderInitialStatus.js';
 import { uploadServiceImageToVercelBlob } from '../../services/blobUploadService';
 
 interface ServiceFormData {
@@ -279,10 +280,6 @@ export const AdminServices: React.FC = () => {
     }
     if (!formData.productionType || !formData.initialStatus) {
       setOrderConfigError('Selecione o tipo de produção e o status inicial para habilitar pedidos no CRM.');
-      return false;
-    }
-    if ((formData.autoComplete || formData.productionType === 'immediate') && formData.initialStatus !== 'completed') {
-      setOrderConfigError('Serviços imediatos ou com conclusão automática devem iniciar como Concluído.');
       return false;
     }
     if (formData.defaultDeliveryDays && (!/^\d+$/.test(formData.defaultDeliveryDays) || Number(formData.defaultDeliveryDays) < 1)) {
@@ -1189,7 +1186,8 @@ export const AdminServices: React.FC = () => {
                       onChange={(event) => {
                         setOrderConfigTouched(true);
                         setOrderConfigError('');
-                        setFormData({ ...formData, productionType: event.target.value as ProductionType | '' });
+                        const productionType = event.target.value as ProductionType | '';
+                        setFormData({ ...formData, productionType, initialStatus: formData.initialStatus || defaultInitialStatus(productionType) });
                       }}
                       className="mt-1.5 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/60 disabled:cursor-not-allowed"
                     >
