@@ -21,3 +21,9 @@ test('script production keeps its atomic order-script transaction without sequen
   assert.match(scriptCreation, /orderId: orderRef\.id/);
   assert.doesNotMatch(scriptCreation, /allocateOrderNumber|ORDER_COUNTER/);
 });
+
+const financeSource = await readFile(new URL('./financeService.ts', import.meta.url), 'utf8');
+test('financeiro usa um único listener compartilhado de pedidos concluídos (tempo real)', () => {
+  assert.match(financeSource, /onSnapshot\(\s*query\(collection\(requireDb\(\), "orders"\), where\("status", "==", "completed"\)\)/);
+  assert.match(financeSource, /listeners\.size === 0/);
+});

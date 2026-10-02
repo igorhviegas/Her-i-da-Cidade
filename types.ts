@@ -61,6 +61,8 @@ export interface Order {
   completedAt?: any;
   source: OrderSource;
   scriptId?: string;
+  /** Impressão digital do PDF importado (sha256 do texto normalizado); evita importar o mesmo formulário duas vezes. */
+  importFingerprint?: string;
 }
 
 export interface FirestoreOrder extends Order {}

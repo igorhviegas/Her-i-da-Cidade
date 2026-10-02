@@ -12,6 +12,8 @@ import { AdminScriptsPage } from './AdminScriptsPage';
 import { AdminClientsPage } from './AdminClientsPage';
 import { AdminMissionsPage } from './AdminMissionsPage';
 import { NotificationsBell } from './NotificationsBell';
+import { AdminFinancePage } from './AdminFinancePage';
+import { FinanceRevenueBadge } from './FinanceRevenueBadge';
 import { 
   Shield, 
   LayoutDashboard, 
@@ -33,10 +35,11 @@ import {
   AlertCircle,
   ClipboardList,
   BookOpen,
-  Target
+  Target,
+  Wallet
 } from 'lucide-react';
 
-type AdminTab = 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions';
+type AdminTab = 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance';
 
 export const AdminDashboard: React.FC = () => {
   const { user, adminData, logout } = useAuth();
@@ -62,6 +65,8 @@ export const AdminDashboard: React.FC = () => {
       ? 'clients'
       : path === '/admin/missoes'
       ? 'missions'
+      : path === '/admin/financeiro'
+      ? 'finance'
       : 'dashboard';
 
   const [currentTab, setCurrentTab] = useState<AdminTab>(initialTab);
@@ -88,6 +93,8 @@ export const AdminDashboard: React.FC = () => {
       setCurrentTab('clients');
     } else if (path === '/admin/missoes') {
       setCurrentTab('missions');
+    } else if (path === '/admin/financeiro') {
+      setCurrentTab('finance');
     } else if (path === '/admin' || path === '/admin/dashboard') {
       setCurrentTab('dashboard');
     }
@@ -113,6 +120,8 @@ export const AdminDashboard: React.FC = () => {
       navigate('/admin/clientes');
     } else if (tabId === 'missions') {
       navigate('/admin/missoes');
+    } else if (tabId === 'finance') {
+      navigate('/admin/financeiro');
     } else if (tabId === 'dashboard') {
       navigate('/admin');
     }
@@ -184,6 +193,7 @@ export const AdminDashboard: React.FC = () => {
     { id: 'clients' as AdminTab, label: 'Clientes', icon: UserCheck, status: 'active' },
     { id: 'scripts' as AdminTab, label: 'Roteiros', icon: BookOpen, status: 'active' },
     { id: 'missions' as AdminTab, label: 'Missões', icon: Target, status: 'active' },
+    { id: 'finance' as AdminTab, label: 'Financeiro', icon: Wallet, status: 'active' },
     { id: 'settings' as AdminTab, label: 'Configurações', icon: Settings, status: 'active' },
   ];
 
@@ -360,7 +370,7 @@ export const AdminDashboard: React.FC = () => {
         
         {/* TOPBAR */}
         <header className="h-16 bg-[#0B1120]/80 backdrop-blur-md border-b border-white/10 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-20">
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             {/* Mobile Hamburger */}
             <button
               onClick={() => setMobileMenuOpen(true)}
@@ -369,8 +379,8 @@ export const AdminDashboard: React.FC = () => {
               <Menu className="w-5 h-5" />
             </button>
             
-            <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-bold text-white tracking-tight">
+            <div className="flex min-w-0 items-center gap-2">
+              <h1 className="hidden min-[420px]:block truncate text-base sm:text-lg font-bold text-white tracking-tight">
                 Painel Administrativo
               </h1>
               <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
@@ -381,7 +391,8 @@ export const AdminDashboard: React.FC = () => {
           </div>
 
           {/* User Status & Logout */}
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+            <FinanceRevenueBadge />
             <NotificationsBell onOpenMissions={() => handleTabChange('missions')} />
             <div className="flex items-center gap-2.5 pl-3 border-l border-white/10 text-right">
               <div className="hidden md:block">
@@ -660,9 +671,10 @@ export const AdminDashboard: React.FC = () => {
           {currentTab === 'clients' && <AdminClientsPage />}
           {currentTab === 'scripts' && <AdminScriptsPage />}
           {currentTab === 'missions' && <AdminMissionsPage />}
+          {currentTab === 'finance' && <AdminFinancePage />}
 
           {/* TAB: SUBMÓDULOS EM BREVE */}
-            {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && currentTab !== 'categories' && currentTab !== 'content' && currentTab !== 'orders' && currentTab !== 'scripts' && currentTab !== 'clients' && currentTab !== 'missions' && (
+            {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && currentTab !== 'categories' && currentTab !== 'content' && currentTab !== 'orders' && currentTab !== 'scripts' && currentTab !== 'clients' && currentTab !== 'missions' && currentTab !== 'finance' && (
             <div className="max-w-2xl mx-auto py-12 text-center animate-in fade-in duration-200">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 mb-4 text-blue-400">
                 <Clock className="w-8 h-8" />
