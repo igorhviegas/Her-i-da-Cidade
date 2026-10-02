@@ -5,21 +5,21 @@ import {
   expensesForMonth, expenseAmountForMonth, patrimonySummary, financeMetrics, orderValue,
 } from './financeCalculations.js';
 
-const order = (id, status, eventDate, totalPaid, extra = {}) => ({ id, status, eventDate, totalPaid, servicePrice: totalPaid, rushFee: 0, ...extra });
+const order = (id, status, completedAt, totalPaid, extra = {}) => ({ id, status, completedAt, totalPaid, servicePrice: totalPaid, rushFee: 0, ...extra });
 const orders = [
   order('a', 'completed', new Date(2026, 9, 3, 10), 100),
   order('a', 'completed', new Date(2026, 9, 3, 10), 100), // duplicado
   order('b', 'completed', new Date(2026, 9, 3, 20), 50, { paidAt: null }), // concluído e não pago
   order('c', 'delivery', new Date(2026, 9, 4), 999), // não concluído
-  order('d', 'completed', new Date(2026, 8, 30, 23, 30), 70), // evento em setembro (conclusão em outubro não importa)
-  order('e', 'completed', null, 40), // sem data do evento
+  order('d', 'completed', new Date(2026, 8, 30, 23, 30), 70), // concluído em setembro
+  order('e', 'completed', null, 40), // sem nenhuma data
   order('f', 'completed', new Date(2026, 9, 5), 0, { scriptId: 's1' }), // interno de conteúdo
 ];
 
-test('faturamento: só concluídos, sem duplicidade, agrupado pela data do evento', () => {
-  const { entries, withoutEventDate } = buildRevenueEntries(orders);
+test('faturamento: só concluídos, sem duplicidade, agrupado pela data de conclusão', () => {
+  const { entries, undated } = buildRevenueEntries(orders);
   assert.equal(entries.length, 3);
-  assert.equal(withoutEventDate, 1);
+  assert.equal(undated, 1);
   assert.deepEqual(monthTotals(entries, '2026-10'), { total: 150, count: 2 });
   assert.deepEqual(monthTotals(entries, '2026-09'), { total: 70, count: 1 });
   const days = dailyRevenue(entries, '2026-10');
@@ -30,7 +30,7 @@ test('faturamento: só concluídos, sem duplicidade, agrupado pela data do event
 });
 
 test('mudanças no pedido refletem no recálculo', () => {
-  const changed = orders.map((o) => (o.id === 'c' ? { ...o, status: 'completed', totalPaid: 10 } : o.id === 'b' ? { ...o, eventDate: new Date(2026, 10, 1) } : o));
+  const changed = orders.map((o) => (o.id === 'c' ? { ...o, status: 'completed', totalPaid: 10 } : o.id === 'b' ? { ...o, completedAt: new Date(2026, 10, 1) } : o));
   const { entries } = buildRevenueEntries(changed);
   assert.deepEqual(monthTotals(entries, '2026-10'), { total: 110, count: 2 });
   assert.deepEqual(monthTotals(entries, '2026-11'), { total: 50, count: 1 });
@@ -95,4 +95,16 @@ test('cálculo diário e mensal usam a mesma regra (soma dos dias = total do mê
 
 test('total do pedido editado (pagamento parcial) é o que entra hoje: totalPaid prevalece sobre servicePrice + rushFee', () => {
   assert.equal(orderValue({ totalPaid: 60, servicePrice: 100, rushFee: 20 }), 60);
+});
+
+test('data do faturamento: completedAt (automática) tem prioridade; sem ela cai em eventDate e depois paidAt', () => {
+  const june = new Date(2026, 5, 10);
+  const { entries, undated } = buildRevenueEntries([
+    { id: 'x', status: 'completed', totalPaid: 10, completedAt: new Date(2026, 9, 2), eventDate: june, paidAt: june },
+    { id: 'y', status: 'completed', totalPaid: 20, eventDate: new Date(2026, 8, 5), paidAt: june },
+    { id: 'z', status: 'completed', totalPaid: 30, paidAt: new Date(2026, 7, 1) },
+    { id: 'w', status: 'completed', totalPaid: 40 },
+  ]);
+  assert.deepEqual(entries.map((e) => [e.orderId, e.monthKey]), [['x', '2026-10'], ['y', '2026-09'], ['z', '2026-08']]);
+  assert.equal(undated, 1);
 });
