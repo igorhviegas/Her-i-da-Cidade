@@ -5,6 +5,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { handleThumbnailUpload } from "./api/upload-thumbnail";
 import { handleManyChatWebhook } from "./api/manychat";
 import { handleMissionsCron } from "./api/missions-cron";
+import { handleAlexa } from "./api/alexa";
 
 const PORT = 3000;
 
@@ -149,7 +150,8 @@ async function refreshReviewsInBackground() {
 
 async function startServer() {
   const app = express();
-  app.use(express.json());
+  // rawBody: a assinatura da Alexa é verificada sobre os bytes exatos da requisição.
+  app.use(express.json({ verify: (req: any, _res, buf) => { req.rawBody = buf; } }));
 
   // Health endpoint
   app.get("/api/health", (_req, res) => {
@@ -177,6 +179,11 @@ async function startServer() {
   // Missions daily sync (Vercel Cron in production; manual call with CRON_SECRET locally)
   app.all("/api/missions-cron", (req, res) => {
     handleMissionsCron(req, res);
+  });
+
+  // Alexa Skill: cria missões a partir de lembretes por voz
+  app.all("/api/alexa", (req, res) => {
+    handleAlexa(req, res);
   });
 
   // Vite middleware for development

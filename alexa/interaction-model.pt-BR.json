@@ -1,0 +1,31 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "herói da cidade",
+      "intents": [
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] },
+        {
+          "name": "CriarMissaoIntent",
+          "slots": [
+            { "name": "tarefa", "type": "AMAZON.SearchQuery" }
+          ],
+          "samples": [
+            "me lembrar de {tarefa}",
+            "lembrar de {tarefa}",
+            "adicionar tarefa {tarefa}",
+            "adicionar uma tarefa {tarefa}",
+            "adicione uma tarefa {tarefa}",
+            "criar missão {tarefa}",
+            "criar uma missão {tarefa}",
+            "crie uma missão {tarefa}",
+            "anotar {tarefa}"
+          ]
+        }
+      ],
+      "types": []
+    }
+  }
+}
