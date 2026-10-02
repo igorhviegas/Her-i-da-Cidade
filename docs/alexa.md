@@ -20,7 +20,7 @@ Alexa → POST /api/alexa (Vercel Function, mesmo projeto) → Firestore (Admin 
 - `api/alexa.ts`: HTTP + verificação da assinatura da Amazon (`Signature-256`, certificado `s3.amazonaws.com/echo.api/`, SAN `echo-api.amazon.com`, validade, timestamp ±150 s).
 - `functions/missions-alexa.js`: autorização, interpretação e gravação. Reaproveita `missions-core.js` (datas de Brasília) e o formato de documento do ManyChat (`source: 'alexa'`).
 - A Alexa nunca recebe credenciais do Firebase; as regras do Firestore não foram alteradas (Admin SDK).
-- Data: o slot `AMAZON.DATE` já chega resolvido pela Alexa (YYYY-MM-DD). Se a Alexa deixar "amanhã", "hoje", "depois de amanhã" ou um dia da semana no texto, o backend os reconhece no início/fim da frase (dia da semana = próxima ocorrência futura). Prazo = fim do dia em Brasília (como no ManyChat); com horário falado, o horário exato.
+- Data: o texto livre (`AMAZON.SearchQuery`) não pode dividir frase com outro slot, então a data vem dentro da tarefa. O backend reconhece (se vier um slot `data`, ele tem prioridade) "amanhã", "hoje", "depois de amanhã" ou um dia da semana no texto, o backend os reconhece no início/fim da frase (dia da semana = próxima ocorrência futura). Prazo = fim do dia em Brasília (como no ManyChat); com horário falado, o horário exato.
 - Sem data → missão sem prazo. Dificuldade não é falada: usa 3 (padrão do formulário do CRM). Não existe campo "responsável" em missões (o CRM é de um único administrador).
 - Dúvida (sem tarefa, data/hora vaga, hora sem dia) → a Alexa pergunta; nada é gravado até estar claro.
 - Idempotência: o ID do documento deriva do `requestId`; reenvio da Amazon não duplica.
