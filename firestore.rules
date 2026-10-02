@@ -175,6 +175,27 @@ service cloud.firestore {
 
 
     // =========================================================
+    // MISSÕES (missões, tarefas recorrentes, metas, avisos)
+    // =========================================================
+
+    match /missions/{id} { allow read, write: if isAdmin(); }
+    match /recurringTasks/{id} { allow read, write: if isAdmin(); }
+    match /taskOccurrences/{id} { allow read, write: if isAdmin(); }
+    match /goals/{id} { allow read, write: if isAdmin(); }
+    match /goalCycles/{id} { allow read, write: if isAdmin(); }
+    match /notifications/{id} {
+      allow read, create, update: if isAdmin();
+      allow delete: if false;
+    }
+    // Histórico para a futura gamificação: cada evento é criado uma única vez (o ID é o tipo + a referência) e
+    // nunca mais alterado nem apagado. Excluir o pedido, roteiro ou missão de origem não toca neste registro.
+    match /activityLog/{id} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+
+    // =========================================================
     // ADMINS
     // =========================================================
 

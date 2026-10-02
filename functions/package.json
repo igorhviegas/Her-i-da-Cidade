@@ -4,7 +4,7 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "check": "node --check index.js && node --check manychat-handler.js && node --check order-sequence.js && node --check technical-purchase-id.js",
+    "check": "node --check index.js && node --check manychat-handler.js && node --check order-sequence.js && node --check technical-purchase-id.js && node --check missions-core.js && node --check missions-manychat.js && node --check missions-sync.js && node --check activity-log.js",
     "test": "node --test"
   },
   "engines": {

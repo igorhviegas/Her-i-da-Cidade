@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { handleThumbnailUpload } from "./api/upload-thumbnail";
 import { handleManyChatWebhook } from "./api/manychat";
+import { handleMissionsCron } from "./api/missions-cron";
 
 const PORT = 3000;
 
@@ -171,6 +172,11 @@ async function startServer() {
   // ManyChat Webhook endpoint
   app.all("/api/manychat", (req, res) => {
     handleManyChatWebhook(req, res);
+  });
+
+  // Missions daily sync (Vercel Cron in production; manual call with CRON_SECRET locally)
+  app.all("/api/missions-cron", (req, res) => {
+    handleMissionsCron(req, res);
   });
 
   // Vite middleware for development

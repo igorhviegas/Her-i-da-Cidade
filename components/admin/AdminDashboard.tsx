@@ -10,6 +10,8 @@ import { AdminContentPage } from './AdminContentPage';
 import { AdminOrdersPage } from './AdminOrdersPage';
 import { AdminScriptsPage } from './AdminScriptsPage';
 import { AdminClientsPage } from './AdminClientsPage';
+import { AdminMissionsPage } from './AdminMissionsPage';
+import { NotificationsBell } from './NotificationsBell';
 import { 
   Shield, 
   LayoutDashboard, 
@@ -30,10 +32,11 @@ import {
   RefreshCw,
   AlertCircle,
   ClipboardList,
-  BookOpen
+  BookOpen,
+  Target
 } from 'lucide-react';
 
-type AdminTab = 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients';
+type AdminTab = 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions';
 
 export const AdminDashboard: React.FC = () => {
   const { user, adminData, logout } = useAuth();
@@ -57,6 +60,8 @@ export const AdminDashboard: React.FC = () => {
       ? 'scripts'
       : path === '/admin/clientes'
       ? 'clients'
+      : path === '/admin/missoes'
+      ? 'missions'
       : 'dashboard';
 
   const [currentTab, setCurrentTab] = useState<AdminTab>(initialTab);
@@ -81,6 +86,8 @@ export const AdminDashboard: React.FC = () => {
       setCurrentTab('scripts');
     } else if (path === '/admin/clientes') {
       setCurrentTab('clients');
+    } else if (path === '/admin/missoes') {
+      setCurrentTab('missions');
     } else if (path === '/admin' || path === '/admin/dashboard') {
       setCurrentTab('dashboard');
     }
@@ -104,6 +111,8 @@ export const AdminDashboard: React.FC = () => {
       navigate('/admin/roteiros');
     } else if (tabId === 'clients') {
       navigate('/admin/clientes');
+    } else if (tabId === 'missions') {
+      navigate('/admin/missoes');
     } else if (tabId === 'dashboard') {
       navigate('/admin');
     }
@@ -174,6 +183,7 @@ export const AdminDashboard: React.FC = () => {
     { id: 'orders' as AdminTab, label: 'Pedidos', icon: ClipboardList, status: 'active' },
     { id: 'clients' as AdminTab, label: 'Clientes', icon: UserCheck, status: 'active' },
     { id: 'scripts' as AdminTab, label: 'Roteiros', icon: BookOpen, status: 'active' },
+    { id: 'missions' as AdminTab, label: 'Missões', icon: Target, status: 'active' },
     { id: 'settings' as AdminTab, label: 'Configurações', icon: Settings, status: 'active' },
   ];
 
@@ -372,6 +382,7 @@ export const AdminDashboard: React.FC = () => {
 
           {/* User Status & Logout */}
           <div className="flex items-center gap-3 sm:gap-4">
+            <NotificationsBell onOpenMissions={() => handleTabChange('missions')} />
             <div className="flex items-center gap-2.5 pl-3 border-l border-white/10 text-right">
               <div className="hidden md:block">
                 <p className="text-xs font-semibold text-white leading-none">
@@ -648,9 +659,10 @@ export const AdminDashboard: React.FC = () => {
           {currentTab === 'orders' && <AdminOrdersPage />}
           {currentTab === 'clients' && <AdminClientsPage />}
           {currentTab === 'scripts' && <AdminScriptsPage />}
+          {currentTab === 'missions' && <AdminMissionsPage />}
 
           {/* TAB: SUBMÓDULOS EM BREVE */}
-            {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && currentTab !== 'categories' && currentTab !== 'content' && currentTab !== 'orders' && currentTab !== 'scripts' && currentTab !== 'clients' && (
+            {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && currentTab !== 'categories' && currentTab !== 'content' && currentTab !== 'orders' && currentTab !== 'scripts' && currentTab !== 'clients' && currentTab !== 'missions' && (
             <div className="max-w-2xl mx-auto py-12 text-center animate-in fade-in duration-200">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 mb-4 text-blue-400">
                 <Clock className="w-8 h-8" />

@@ -175,3 +175,21 @@ O CRM não pode ser conferido a partir do código. Em cada serviço abaixo, abra
 | Vídeo Temático (`5`) | sim | sim | Imediato | **Entregar** |
 
 O título precisa continuar igual ao nome da tabela (sem diferença de acento ou caixa). Serviços que hoje estão como "Concluído" por causa da regra antiga **precisam ser alterados para Entregar**: o CRM agora respeita o que está salvo.
+
+## Criar missão pelo WhatsApp (External Request)
+
+Mesmo endpoint, mesmo `Authorization: Bearer <segredo>`; o evento é `mission.create`. A palavra-chave que inicia o fluxo fica só no ManyChat (o CRM não a conhece). O fluxo coleta título, descrição, prazo (ou "sem prazo") e dificuldade, e então chama:
+
+```json
+{ "eventType": "mission.create",
+  "mission": { "title": "Comprar fantasia", "description": "Tamanho M", "dueDate": "2026-10-10", "difficulty": "3" } }
+```
+
+| Campo | Regra |
+|---|---|
+| `mission.title` | obrigatório, até 120 caracteres |
+| `mission.description` | opcional, até 1000 caracteres |
+| `mission.dueDate` | opcional: `YYYY-MM-DD` (vale até 23:59 de Brasília) ou ISO 8601 com fuso. **Sem prazo: omita a chave ou envie vazio** |
+| `mission.difficulty` | obrigatório, inteiro de 1 a 5 (texto `"3"` é aceito) |
+
+Qualquer outro campo gera `400` e nada é criado. Sucesso: `{ "ok": true, "missionId": "<id>" }`. Não há deduplicação (como nos pedidos): em caso de timeout, confira o CRM antes de reenviar. O fluxo de pagamento (`payment.paid`) não foi alterado.

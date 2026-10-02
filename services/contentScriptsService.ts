@@ -1,5 +1,6 @@
 import { collection, deleteField, doc, documentId, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { activityRefs, prepareActivityLog } from './activityLog';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../types';
 
 export const CONTENT_SCRIPTS_COLLECTION = 'contentScripts';
@@ -101,13 +102,25 @@ export async function createContentScript(input: ContentScriptInput): Promise<Co
   await validateParent(undefined, clean.parentScriptId);
   const reference = doc(collection(db, CONTENT_SCRIPTS_COLLECTION));
   const { publishedAt, parentScriptId, ...fields } = clean;
-  await setDoc(reference, {
+  const payload = {
     ...fields,
     ...(publishedAt ? { publishedAt } : {}),
     ...(parentScriptId ? { parentScriptId } : {}),
+    ...(fields.productionStatus === 'ready' ? { readyAt: serverTimestamp() } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  };
+  if (fields.productionStatus === 'ready') {
+    const firestore = db;
+    await runTransaction(firestore, async (transaction) => {
+      const refs = activityRefs(firestore, 'script_ready', reference.id);
+      const record = await prepareActivityLog(transaction, refs, { type: 'script_ready', refId: reference.id, occurredAt: new Date(), difficultyKey: 'script_created' });
+      transaction.set(reference, payload);
+      if (record) transaction.set(refs.logRef, record);
+    });
+  } else {
+    await setDoc(reference, payload);
+  }
   return { ...clean, ...(parentScriptId ? { parentScriptId } : {}), id: reference.id };
 }
 
@@ -117,11 +130,24 @@ export async function updateContentScript(id: string, input: ContentScriptInput)
   const clean = validate(input);
   await validateParent(id, clean.parentScriptId);
   const { publishedAt, parentScriptId, ...fields } = clean;
-  await updateDoc(doc(db, CONTENT_SCRIPTS_COLLECTION, id), {
-    ...fields,
-    publishedAt: publishedAt || deleteField(),
-    parentScriptId: parentScriptId || deleteField(),
-    updatedAt: serverTimestamp(),
+  const firestore = db;
+  const scriptRef = doc(firestore, CONTENT_SCRIPTS_COLLECTION, id);
+  await runTransaction(firestore, async (transaction) => {
+    const current = await transaction.get(scriptRef);
+    if (!current.exists()) throw new Error('Roteiro não encontrado.');
+    // Evento "Pronto para gravar": gravado uma única vez, nunca limpado; alimenta as metas automáticas sem contar duas vezes
+    // e vira registro permanente em activityLog (dificuldade da atividade "Criação de roteiro" congelada neste instante).
+    const becomesReady = fields.productionStatus === 'ready' && !current.data().readyAt;
+    const refs = becomesReady ? activityRefs(firestore, 'script_ready', id) : null;
+    const record = refs ? await prepareActivityLog(transaction, refs, { type: 'script_ready', refId: id, occurredAt: new Date(), difficultyKey: 'script_created' }) : null;
+    transaction.update(scriptRef, {
+      ...fields,
+      publishedAt: publishedAt || deleteField(),
+      parentScriptId: parentScriptId || deleteField(),
+      ...(becomesReady ? { readyAt: serverTimestamp() } : {}),
+      updatedAt: serverTimestamp(),
+    });
+    if (refs && record) transaction.set(refs.logRef, record);
   });
 }
 

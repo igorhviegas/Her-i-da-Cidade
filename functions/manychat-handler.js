@@ -1,5 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { ACTIVITY_LOG_COLLECTION, GAMIFICATION_CONFIG_PATH, activityLogId, prepareActivityLog } from './activity-log.js';
+import { MISSION_EVENT, createMissionFromManyChat, validateMissionPayload } from './missions-manychat.js';
 
 const CLIENTS = 'clients';
 const ORDERS = 'orders';
@@ -196,6 +198,12 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
   if (!secretsMatch(req.get('authorization'), secret)) return jsonError(res, 401, 'unauthorized', 'Credencial ausente ou inválida.');
 
   const input = req.body;
+  // Mesmo endpoint e segredo; evento distinto, sem tocar na validação de pedidos abaixo.
+  if (input?.eventType === MISSION_EVENT) {
+    const { errors, mission } = validateMissionPayload(input);
+    if (errors.length) return jsonError(res, 400, 'validation_error', 'Revise os campos da requisição.', { details: errors });
+    return createMissionFromManyChat(res, mission, { database, logger: customLogger || console });
+  }
   const { errors: validationErrors, profile } = validateManyChatPayload(input);
   if (validationErrors.length) return jsonError(res, 400, 'validation_error', 'Revise os campos da requisição.', { details: validationErrors });
 
@@ -281,7 +289,15 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
         orderData.customerDueDate = Timestamp.fromDate(deadlines.customerDueDate);
         orderData.internalDueDate = Timestamp.fromDate(deadlines.internalDueDate);
       }
-      if (evaluation.status === 'completed') orderData.completedAt = paidAt;
+      let activity = null;
+      const logRef = database.collection(ACTIVITY_LOG_COLLECTION).doc(activityLogId('order_completed', orderRef.id));
+      if (evaluation.status === 'completed') {
+        orderData.completedAt = paidAt;
+        // Pedido que já nasce concluído: registro permanente na mesma transação, com a dificuldade vigente.
+        activity = await prepareActivityLog(transaction, { logRef, configRef: database.collection(GAMIFICATION_CONFIG_PATH[0]).doc(GAMIFICATION_CONFIG_PATH[1]) }, {
+          type: 'order_completed', refId: orderRef.id, occurredAt: paidAt.toDate(), difficultyKey: `service_${profile.serviceId}`, meta: { serviceId: profile.serviceId },
+        });
+      }
 
       if (shouldCreateClient) {
         transaction.set(clientRef, {
@@ -294,6 +310,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
       }
       if (shouldCreateIndex) transaction.set(whatsappIndexRef, { clientId: clientRef.id, whatsappNormalized: normalizedWhatsApp, recordType: 'whatsapp-index' });
       transaction.set(orderRef, orderData);
+      if (activity) transaction.set(logRef, activity);
       return { orderId: orderRef.id };
     });
 
