@@ -10,6 +10,9 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import { PublicSiteConfig } from "../types";
+import { isValidWhatsAppUrl } from "./serviceWhatsApp.js";
+
+export { isValidWhatsAppUrl };
 
 export const SITE_CONFIG_COLLECTION = "siteConfig";
 export const PUBLIC_CONFIG_DOC = "public";
@@ -27,26 +30,6 @@ export const TEMPORARY_FALLBACK_WHATSAPP_URL = "https://wa.me/5531999044206";
 export const DEFAULT_PUBLIC_SITE_CONFIG: PublicSiteConfig = {
   whatsappUrl: TEMPORARY_FALLBACK_WHATSAPP_URL,
 };
-
-/**
- * Normaliza e valida URL do WhatsApp para garantir formato padrão.
- */
-export function isValidWhatsAppUrl(url: string): boolean {
-  if (!url || typeof url !== "string") return false;
-  const trimmed = url.trim();
-  try {
-    const parsed = new URL(trimmed);
-    const validHosts = [
-      "wa.me",
-      "api.whatsapp.com",
-      "web.whatsapp.com",
-      "chat.whatsapp.com"
-    ];
-    return validHosts.some((h) => parsed.hostname === h || parsed.hostname.endsWith(`.${h}`));
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Constrói uma URL do WhatsApp preservando mensagem pré-preenchida.
@@ -105,6 +88,16 @@ export async function getPublicSiteConfig(): Promise<PublicSiteConfig> {
     console.error("[siteConfigService] Erro ao buscar configuração pública do Firestore:", error);
     return DEFAULT_PUBLIC_SITE_CONFIG;
   }
+}
+
+/**
+ * Número padrão configurado em /admin (siteConfig/public), SEM o fallback temporário.
+ * Retorna undefined se ausente; quem gera links trata como erro.
+ */
+export async function getConfiguredWhatsAppUrl(): Promise<string | undefined> {
+  if (!db) return undefined;
+  const value = (await getDoc(doc(db, SITE_CONFIG_COLLECTION, PUBLIC_CONFIG_DOC))).data()?.whatsappUrl;
+  return typeof value === "string" ? value.trim() : undefined;
 }
 
 /**

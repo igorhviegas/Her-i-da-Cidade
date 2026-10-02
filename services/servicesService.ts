@@ -11,11 +11,14 @@ import {
   Unsubscribe,
   serverTimestamp,
   deleteField,
-  runTransaction
+  runTransaction,
+  writeBatch
 } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import { Service, FirestoreService, OrderStatus, ProductionType } from "../types";
 import { SERVICES as FALLBACK_SERVICES } from "../constants";
+import { getConfiguredWhatsAppUrl } from "./siteConfigService";
+import { isValidWhatsAppUrl, planCreateWhatsApp, planUpdateWhatsApp, planAutoLinkSync } from "./serviceWhatsApp.js";
 
 export const SERVICES_COLLECTION = "services";
 export const INTERNAL_CONTENT_SERVICE_ID = 'internal-content-production';
@@ -83,7 +86,8 @@ export interface CreateServiceInput {
   description: string;
   imageUrl: string;
   category: string;
-  whatsappUrl: string;
+  /** Opcional: se omitido, é gerado a partir do número padrão configurado em /admin. */
+  whatsappUrl?: string;
   active?: boolean;
   order?: number;
   badgeText?: string;
@@ -115,25 +119,7 @@ export interface UpdateServiceInput {
  * Validação de link de WhatsApp individual do serviço.
  * Aceita wa.me, api.whatsapp.com e rejeita esquemas inseguros ou vazios.
  */
-export function isValidServiceWhatsAppUrl(url: string): boolean {
-  if (!url || typeof url !== "string") return false;
-  const trimmed = url.trim();
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-      return false;
-    }
-    const validHosts = [
-      "wa.me",
-      "api.whatsapp.com",
-      "web.whatsapp.com",
-      "chat.whatsapp.com"
-    ];
-    return validHosts.some((h) => parsed.hostname === h || parsed.hostname.endsWith(`.${h}`));
-  } catch {
-    return false;
-  }
-}
+export const isValidServiceWhatsAppUrl = isValidWhatsAppUrl;
 
 /**
  * Interface que representa o estado de carregamento e dados dos serviços.
@@ -489,17 +475,18 @@ export async function createService(input: CreateServiceInput): Promise<Service>
   const description = input.description?.trim();
   const category = input.category?.trim();
   const imageUrl = input.imageUrl?.trim();
-  const whatsappUrl = input.whatsappUrl?.trim();
 
   if (!title) throw new Error("O nome do serviço é obrigatório.");
   if (!price) throw new Error("O preço do serviço é obrigatório.");
   if (!description) throw new Error("A descrição do serviço é obrigatória.");
   if (!category) throw new Error("A categoria do serviço é obrigatória.");
   if (!imageUrl) throw new Error("A URL da imagem é obrigatória.");
-  if (!whatsappUrl) throw new Error("O link do WhatsApp do serviço é obrigatório.");
-  if (!isValidServiceWhatsAppUrl(whatsappUrl)) {
-    throw new Error("O link do WhatsApp informado é inválido. Utilize um formato válido (ex: https://wa.me/5531999044206).");
-  }
+  const manualUrl = input.whatsappUrl?.trim();
+  const { whatsappUrl, whatsappUrlSource } = planCreateWhatsApp({
+    manualUrl,
+    title,
+    baseUrl: manualUrl ? undefined : await getConfiguredWhatsAppUrl(),
+  });
 
   let order = typeof input.order === "number" ? input.order : undefined;
   if (order === undefined || isNaN(order)) {
@@ -525,6 +512,7 @@ export async function createService(input: CreateServiceInput): Promise<Service>
     image: imageUrl, // compatibilidade com blueprint legado
     category,
     whatsappUrl,
+    whatsappUrlSource,
     active: input.active !== false,
     order,
     ...(input.badgeText?.trim() ? { badgeText: input.badgeText.trim() } : {}),
@@ -613,10 +601,21 @@ export async function updateService(id: string, updates: UpdateServiceInput): Pr
   if (updates.whatsappUrl !== undefined) {
     const trimmed = updates.whatsappUrl.trim();
     if (!trimmed) throw new Error("O link do WhatsApp não pode ser vazio.");
-    if (!isValidServiceWhatsAppUrl(trimmed)) {
-      throw new Error("O link do WhatsApp informado é inválido. Utilize um formato válido (ex: https://wa.me/5531999044206).");
+  }
+
+  // Link manual (validado) ou, se o título mudou, regeneração do link automático.
+  if (updates.whatsappUrl !== undefined || updates.title !== undefined) {
+    if (updates.whatsappUrl !== undefined && !updates.whatsappUrl.trim()) {
+      throw new Error("O link do WhatsApp não pode ser vazio.");
     }
-    payload.whatsappUrl = trimmed;
+    const manualUrl = updates.whatsappUrl?.trim();
+    const current = manualUrl ? undefined : (await getDoc(doc(db, SERVICES_COLLECTION, id))).data();
+    Object.assign(payload, await planUpdateWhatsApp({
+      manualUrl,
+      title: payload.title,
+      current,
+      getBaseUrl: getConfiguredWhatsAppUrl,
+    }));
   }
 
   if (updates.active !== undefined) {
@@ -730,6 +729,28 @@ export async function updateServiceOrder(id: string, newOrder: number): Promise<
     throw new Error("A ordem deve ser um número válido.");
   }
   await updateService(id, { order: orderNum });
+}
+
+/**
+ * Após mudar o número padrão: regenera SÓ os serviços com whatsappUrlSource === 'auto'.
+ * Links manuais, documentos antigos (sem o campo) e internos nunca são tocados.
+ * Com dryRun, apenas lista o que mudaria.
+ */
+export async function syncAutoServiceWhatsAppUrls(options: { dryRun?: boolean } = {}): Promise<{ changed: number; ids: string[] }> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  const baseUrl = await getConfiguredWhatsAppUrl();
+  const snap = await getDocs(collection(db, SERVICES_COLLECTION));
+  const changes = planAutoLinkSync(snap.docs.map((d) => ({ id: d.id, data: d.data() })), baseUrl);
+  if (!options.dryRun) {
+    for (let i = 0; i < changes.length; i += 400) {
+      const batch = writeBatch(db);
+      for (const { id, whatsappUrl } of changes.slice(i, i + 400)) {
+        batch.update(doc(db, SERVICES_COLLECTION, id), { whatsappUrl, updatedAt: serverTimestamp() });
+      }
+      await batch.commit();
+    }
+  }
+  return { changed: changes.length, ids: changes.map((c) => c.id) };
 }
 
 /**
