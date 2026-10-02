@@ -24,6 +24,8 @@ A documentação pública consultada para [External Request](https://help.manych
 
 Procedimento contra reenvio acidental: se houver timeout/erro, não repetir a confirmação imediatamente. Primeiro conferir o CRM e os logs para saber se o pedido foi gravado; se não for possível confirmar, pausar e solicitar revisão administrativa antes de nova tentativa. Uma resposta perdida pode ocorrer depois do commit e cada nova chamada cria outro pedido. Isso é revisão operacional, não idempotência técnica. A função tem limite local de 8 segundos, abaixo dos 10 segundos documentados pelo ManyChat, para reduzir o risco de a execução continuar muito depois do timeout do cliente. Isso não elimina a ambiguidade se o commit tiver ocorrido antes de a resposta se perder.
 
+> Contratos de todos os serviços (Aniversário, Temático, Personalizado, Convite e Chamada ao Vivo): ver [`docs/manychat-integration.md`](../docs/manychat-integration.md). O contrato abaixo continua valendo para requisições sem o campo `service`.
+
 ## Endpoint ManyChat: Vídeo Especial de Aniversário
 
 `receiveManyChatOrder` aceita apenas o evento `payment.paid` e o serviço `services/1` (Vídeo Especial de Aniversário). A equipe só deve chamar a função após confirmar manualmente o pagamento recebido. Contrato:

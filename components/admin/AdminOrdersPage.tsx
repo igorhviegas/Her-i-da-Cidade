@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CalendarDays, CheckCircle2, Copy, Loader2, MessageCircle, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Copy, Loader2, MessageCircle, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { useRouter } from '../../lib/router';
 import { getClientById, normalizeWhatsApp } from '../../services/clientsService';
 import { deleteOrder, listOrders, updateOrder } from '../../services/ordersService';
@@ -7,6 +7,7 @@ import { getContentScriptsByIds } from '../../services/contentScriptsService';
 import { getServiceById } from '../../services/servicesService';
 import { formatOrderReference, extractBirthdayPerson } from '../../services/orderReference.js';
 import { buildDeliveryWhatsAppUrl } from '../../services/digitalDelivery.js';
+import { getServiceColor, type ServiceColor } from '../../services/serviceColors.js';
 import type { Client, ContentScript, Order, OrderStatus, Service } from '../../types';
 import { CreateOrderModal } from './CreateOrderModal';
 import { EditOrderModal } from './EditOrderModal';
@@ -19,6 +20,15 @@ const COLUMNS = [
   { status: 'scheduled', label: 'AGENDADO', accent: 'border-blue-400' },
   { status: 'completed', label: 'CONCLUÍDO', accent: 'border-slate-400' },
 ] as const;
+
+// Classes estáticas (o Tailwind precisa enxergá-las por completo): fundo do card e título do serviço.
+const SERVICE_COLOR_CLASSES: Record<ServiceColor, { card: string; title: string }> = {
+  red: { card: 'bg-gradient-to-b from-red-500/10 to-red-500/10', title: 'text-red-300' },
+  yellow: { card: 'bg-gradient-to-b from-yellow-400/10 to-yellow-400/10', title: 'text-yellow-300' },
+  blue: { card: 'bg-gradient-to-b from-blue-500/10 to-blue-500/10', title: 'text-blue-300' },
+  purple: { card: 'bg-gradient-to-b from-purple-500/10 to-purple-500/10', title: 'text-purple-300' },
+  green: { card: 'bg-gradient-to-b from-green-500/10 to-green-500/10', title: 'text-green-300' },
+};
 
 function toDate(value: unknown): Date | null {
   if (!value) return null;
@@ -71,6 +81,7 @@ export const AdminOrdersPage: React.FC = () => {
   const [completedOrders, setCompletedOrders] = useState<OrderView[]>([]);
   const [totalOrderCount, setTotalOrderCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
@@ -86,8 +97,8 @@ export const AdminOrdersPage: React.FC = () => {
   const [dragOverStatus, setDragOverStatus] = useState<OrderStatus | null>(null);
   const allOrderRecords = useMemo(() => [...orders, ...completedOrders].map(({ order }) => order), [orders, completedOrders]);
 
-  const loadOrders = useCallback(async () => {
-    setLoading(true);
+  const loadOrders = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const allOrders = await listOrders();
@@ -119,6 +130,14 @@ export const AdminOrdersPage: React.FC = () => {
   }, []);
 
   useEffect(() => { void loadOrders(); }, [loadOrders]);
+
+  // Atualização manual (útil no app da tela inicial do iPhone, sem pull-to-refresh).
+  // Silenciosa: mantém o Kanban na tela enquanto os dados são relidos do Firestore.
+  const handleRefresh = async () => {
+    if (refreshing || loading) return;
+    setRefreshing(true);
+    try { await loadOrders({ silent: true }); } finally { setRefreshing(false); }
+  };
 
   useEffect(() => {
     if (loading) return;
@@ -204,6 +223,14 @@ export const AdminOrdersPage: React.FC = () => {
     }
   };
 
+  const handleCompleteOrder = async (view: OrderView) => {
+    if (updatingOrderId || deletingOrderId) return;
+    const childName = extractBirthdayPerson(view.order);
+    const label = [view.client?.name, childName].filter(Boolean).join(' · ') || 'este pedido';
+    if (!window.confirm(`Concluir o pedido de ${label}? Ele sairá do Kanban e irá para os pedidos concluídos. Nenhuma mensagem será enviada.`)) return;
+    await handleStatusChange(view.order.id, 'completed');
+  };
+
   const filteredOrders = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('pt-BR');
     return orders.filter(({ client, service, script }) => !term ||
@@ -270,6 +297,17 @@ export const AdminOrdersPage: React.FC = () => {
           </label>
           <button
             type="button"
+            onClick={() => void handleRefresh()}
+            disabled={refreshing || loading}
+            aria-label="Atualizar pedidos"
+            title="Atualizar pedidos"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/10 bg-[#0D1527] px-3.5 py-2.5 text-sm font-semibold text-white/70 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-60 sm:min-h-0"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <span className="sm:hidden">{refreshing ? 'Atualizando…' : 'Atualizar'}</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setCreateOpen(true)}
             className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-500/30 bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/15 transition-colors hover:bg-blue-500"
           >
@@ -327,6 +365,11 @@ export const AdminOrdersPage: React.FC = () => {
                       const state = deadlineState(order.internalDueDate);
                       const internalDate = formatDate(order.internalDueDate);
                       const eventDate = formatDate(order.eventDate);
+                      const childName = extractBirthdayPerson(order);
+                      const deliveryUrl = buildDeliveryWhatsAppUrl(client?.whatsapp, order, service);
+                      const serviceColor = getServiceColor(service);
+                      const colorClasses = serviceColor ? SERVICE_COLOR_CLASSES[serviceColor] : null;
+                      const completing = updatingOrderId === order.id;
                       return (
                         <article
                           key={order.id}
@@ -348,11 +391,12 @@ export const AdminOrdersPage: React.FC = () => {
                               setOrderActionError('');
                             }
                           }}
-                          className={`cursor-pointer rounded-xl border bg-[#0D1527] p-3.5 shadow-lg outline-none transition-colors hover:border-blue-400/50 focus-visible:ring-2 focus-visible:ring-blue-400 ${order.scriptId ? 'ring-1 ring-inset ring-blue-400/10' : ''} ${state === 'overdue' ? 'border-red-500/45' : state === 'soon' ? 'border-amber-400/35' : 'border-white/10'}`}
+                          className={`cursor-pointer rounded-xl border bg-[#0D1527] ${colorClasses?.card ?? ''} p-3.5 shadow-lg outline-none transition-colors hover:border-blue-400/50 focus-visible:ring-2 focus-visible:ring-blue-400 ${order.scriptId ? 'ring-1 ring-inset ring-blue-400/10' : ''} ${state === 'overdue' ? 'border-red-500/45' : state === 'soon' ? 'border-amber-400/35' : 'border-white/10'}`}
                         >
                           <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-white/35">Pedido {formatOrderReference(order, allOrderRecords)}</p>
                           <h4 className="truncate text-sm font-bold text-white">{client?.name || 'Cliente não encontrado'}</h4>
-                          <p className="mt-0.5 truncate text-xs text-white/55">{service?.title || 'Serviço não encontrado'}</p>
+                          <p className={`mt-0.5 truncate text-xs ${colorClasses ? `font-semibold ${colorClasses.title}` : 'text-white/55'}`}>{service?.title || 'Serviço não encontrado'}</p>
+                          {childName && <p className="mt-0.5 truncate text-xs text-white/70">Criança: <span className="font-semibold text-white/90">{childName}</span></p>}
                           {order.scriptId && <p className="mt-1 truncate text-[11px] text-blue-200/75"><span className="mr-1 rounded bg-blue-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">Roteiro</span>{script?.title || 'Roteiro não encontrado'}</p>}
                           {(eventDate || internalDate) && (
                             <div className="mt-3 space-y-1 border-t border-white/5 pt-2.5 text-[11px]">
@@ -363,9 +407,8 @@ export const AdminOrdersPage: React.FC = () => {
                             </div>
                           )}
                           <p className="mt-3 text-sm font-extrabold text-emerald-300">{formatMoney(order.totalPaid)}</p>
-                          {order.status === 'delivery' && (() => {
-                            const deliveryUrl = buildDeliveryWhatsAppUrl(client?.whatsapp, order);
-                            return deliveryUrl ? (
+                          <div className="mt-2.5 flex flex-wrap gap-2">
+                            {(deliveryUrl ? (
                               <a
                                 href={deliveryUrl}
                                 target="_blank"
@@ -373,12 +416,23 @@ export const AdminOrdersPage: React.FC = () => {
                                 draggable={false}
                                 onClick={(event) => event.stopPropagation()}
                                 onKeyDown={(event) => event.stopPropagation()}
-                                className="mt-2.5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/15 px-3 text-xs font-bold text-emerald-100 hover:bg-emerald-500/25"
+                                className="inline-flex min-h-11 flex-[2_1_130px] items-center justify-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/15 px-3 text-xs font-bold text-emerald-100 hover:bg-emerald-500/25"
                               >
-                                <MessageCircle className="h-4 w-4" /> Enviar pelo WhatsApp
+                                <MessageCircle className="h-4 w-4 shrink-0" /> Enviar pelo WhatsApp
                               </a>
-                            ) : <p className="mt-2 text-[11px] text-white/35">WhatsApp indisponível</p>;
-                          })()}
+                            ) : order.status === 'delivery' ? <p className="w-full text-[11px] text-white/35">WhatsApp indisponível</p> : null)}
+                            <button
+                              type="button"
+                              draggable={false}
+                              disabled={Boolean(updatingOrderId || deletingOrderId)}
+                              onClick={(event) => { event.stopPropagation(); void handleCompleteOrder({ order, client, service, script }); }}
+                              onKeyDown={(event) => event.stopPropagation()}
+                              className="inline-flex min-h-11 flex-[1_1_90px] items-center justify-center gap-1.5 rounded-lg border border-emerald-400/40 bg-emerald-600 px-3 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-60"
+                            >
+                              {completing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                              {completing ? 'Concluindo…' : 'Concluir'}
+                            </button>
+                          </div>
                         </article>
                       );
                     })}

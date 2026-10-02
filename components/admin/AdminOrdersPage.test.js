@@ -11,10 +11,9 @@ test('colunas do Kanban: Entregar, Gravar, Editar, Agendado, Concluído', () => 
   assert.deepEqual(order, ['delivery', 'recording', 'editing', 'scheduled', 'completed']);
 });
 
-test('botão de WhatsApp na etapa Entregar não move nem abre o card', () => {
-  assert.match(source, /order\.status === 'delivery'/);
+test('botão de WhatsApp nos cards não move nem abre o card', () => {
   assert.match(source, /Enviar pelo WhatsApp/);
-  assert.match(source, /buildDeliveryWhatsAppUrl\(client\?\.whatsapp, order\)/);
+  assert.match(source, /buildDeliveryWhatsAppUrl\(client\?\.whatsapp, order, service\)/);
   assert.match(source, /draggable=\{false\}/);
   assert.match(source, /onClick=\{\(event\) => event\.stopPropagation\(\)\}/);
   assert.match(source, /WhatsApp indisponível<\/p>/);
@@ -25,4 +24,20 @@ test('concluídos iniciam recolhidos; Ver mais/Ver menos alternam; busca e detal
   assert.match(completed, /completedOpen \? 'Ver menos' : 'Ver mais'/);
   assert.match(completed, /!completedOpen \? null : filteredCompletedOrders/);
   assert.match(completed, /setSelectedOrder\(\{ order, client, service, script \}\)/);
+});
+
+test('Concluir em todos os cards: confirma, reutiliza handleStatusChange e não abre WhatsApp', () => {
+  assert.match(source, /Concluir/);
+  assert.match(source, /window\.confirm\(`Concluir o pedido/);
+  assert.match(source, /handleStatusChange\(view\.order\.id, 'completed'\)/);
+});
+
+test('cards exibem o nome da criança e há botão de atualizar', () => {
+  assert.match(source, /Criança: /);
+  assert.match(source, /aria-label="Atualizar pedidos"/);
+});
+
+test('cards ganham cor por serviço', () => {
+  assert.match(source, /getServiceColor\(service\)/);
+  assert.match(source, /SERVICE_COLOR_CLASSES/);
 });

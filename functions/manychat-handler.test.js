@@ -48,8 +48,8 @@ function fakeDatabase({ serviceExists = true, servicePrice = 'Apenas R$ 30', fai
     category: 'Pronta entrega',
     generateOrder: true,
     productionType: 'immediate',
-    initialStatus: 'completed',
-    autoComplete: true,
+    initialStatus: 'delivery',
+    autoComplete: false,
   };
   let generatedId = 0;
   const database = {

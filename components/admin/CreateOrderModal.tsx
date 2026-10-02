@@ -3,7 +3,7 @@ import { AlertCircle, CheckCircle2, Loader2, Plus, X } from 'lucide-react';
 import { createClient, getClientByWhatsApp, normalizeWhatsApp } from '../../services/clientsService';
 import { createOrder } from '../../services/ordersService';
 import { calculateOrderDeadlines } from '../../services/orderDates';
-import { initialStatusFor } from '../../services/digitalDelivery.js';
+import { resolveInitialStatus } from '../../services/orderInitialStatus.js';
 import { getServices } from '../../services/servicesService';
 import type { Order, OrderStatus, ProductionType, Service } from '../../types';
 
@@ -102,9 +102,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
     selectedService && selectedService.generateOrder === true && selectedService.productionType &&
     (selectedService.initialStatus || selectedService.autoComplete),
   );
-  const initialStatus: OrderStatus | null = selectedService
-    ? initialStatusFor(selectedService, selectedService.autoComplete || selectedService.initialStatus === 'completed' ? 'completed' : selectedService.initialStatus || null)
-    : null;
+  const initialStatus: OrderStatus | null = selectedService ? resolveInitialStatus(selectedService) : null;
   const total = totalPaid.trim() ? inputAmount(totalPaid) ?? 0 : (inputAmount(servicePrice) ?? 0) + (inputAmount(rushFee) ?? 0);
   const deadlinePreview = useMemo(() => {
     if (!paidDate || !deliveryDays) return null;
@@ -188,7 +186,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
       const order = await createOrder({
         clientId: client.id,
         serviceId: selectedService.id,
-        status: completed ? 'completed' : initialStatus,
+        status: initialStatus,
         paidAt,
         ...(eventDate ? { eventDate: dateFromInput(eventDate) } : {}),
         ...(days !== undefined ? { deliveryDays: days } : {}),

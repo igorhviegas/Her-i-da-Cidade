@@ -6,7 +6,6 @@ export interface OrderReferenceInput {
 export interface BirthdayPersonInput {
   content?: string;
   childName?: string;
-  [key: string]: unknown;
 }
 
 /** Formats a label for display; it must never be used as a document key. */
