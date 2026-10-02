@@ -1,5 +1,5 @@
 import {
-  collection, deleteField, doc, getDoc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp, setDoc, where, type Transaction,
+  collection, deleteField, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, where, type Transaction,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Order, OrderStatus, ProductionType, OrderSource } from "../types";
@@ -253,6 +253,46 @@ export async function listOrders(): Promise<Order[]> {
   if (!db) throw new Error("Firebase Firestore não inicializado.");
   const result = await getDocs(query(collection(db, ORDERS_COLLECTION), orderBy("createdAt", "desc")));
   return result.docs.map((item) => mapOrder(item.id, item.data()));
+}
+
+/** Etapas do Kanban em andamento: todas as colunas, exceto Concluído (mesma divisão de AdminOrdersPage). */
+export const ACTIVE_ORDER_STATUSES: OrderStatus[] = ["scheduled", "recording", "editing", "delivery"];
+
+type ActiveListener = { onData: (orders: Order[]) => void; onError: (error: Error) => void };
+const activeListeners = new Set<ActiveListener>();
+let stopActive: (() => void) | null = null;
+let lastActive: Order[] | null = null;
+
+/**
+ * Pedidos em andamento em tempo real. Um único listener Firestore é compartilhado entre o contador do menu e o widget
+ * da página Principal; mudança de status, criação, exclusão ou conclusão chegam sem nova leitura completa.
+ */
+export function subscribeActiveOrders(onData: (orders: Order[]) => void, onError: (error: Error) => void): () => void {
+  if (!db) { onError(new Error("Firebase Firestore não inicializado.")); return () => {}; }
+  const listener = { onData, onError };
+  activeListeners.add(listener);
+  if (lastActive) onData(lastActive);
+  if (!stopActive) {
+    stopActive = onSnapshot(
+      query(collection(db, ORDERS_COLLECTION), where("status", "in", ACTIVE_ORDER_STATUSES)),
+      (snapshot) => {
+        lastActive = snapshot.docs.map((item) => mapOrder(item.id, item.data()));
+        activeListeners.forEach((l) => l.onData(lastActive!));
+      },
+      (error) => {
+        // O Firestore encerra a escuta após um erro: limpa o estado para que a próxima assinatura crie uma nova (nada de contagem velha).
+        stopActive = null;
+        lastActive = null;
+        const failed = [...activeListeners];
+        activeListeners.clear();
+        failed.forEach((l) => l.onError(error));
+      },
+    );
+  }
+  return () => {
+    activeListeners.delete(listener);
+    if (activeListeners.size === 0) { stopActive?.(); stopActive = null; lastActive = null; }
+  };
 }
 
 export async function updateOrder(id: string, updates: UpdateOrderInput): Promise<void> {

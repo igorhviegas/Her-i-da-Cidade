@@ -17,7 +17,7 @@ export const AdminLogin: React.FC = () => {
   // Se já estiver logado e autorizado, redireciona direto para o dashboard
   useEffect(() => {
     if (status === 'authenticated_admin') {
-      navigate('/admin/dashboard');
+      navigate('/admin');
     }
   }, [status, navigate]);
 
@@ -40,7 +40,7 @@ export const AdminLogin: React.FC = () => {
     try {
       await login(email.trim(), password);
       // Redirecionamento é tratado pelo observer ou manualmente
-      navigate('/admin/dashboard');
+      navigate('/admin');
     } catch (error: any) {
       console.error('[AdminLogin] Erro ao autenticar:', error);
       const code = error?.code || 'auth/unknown';
