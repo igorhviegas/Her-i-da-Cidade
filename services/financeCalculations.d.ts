@@ -1,4 +1,4 @@
-export interface RevenueEntry { orderId: string; order: any; eventDate: Date; value: number; monthKey: string; dayKey: string; }
+export interface RevenueEntry { orderId: string; order: any; revenueDate: Date; value: number; monthKey: string; dayKey: string; }
 export interface DayRevenue { day: number; total: number; count: number; entries: RevenueEntry[]; }
 export interface FixedExpense {
   id: string; name: string; category: string; description?: string; startMonth: string; active: boolean;
@@ -15,7 +15,7 @@ export function dayKeyOf(date: Date): string;
 export function daysInMonth(monthKey: string): number;
 export function shiftMonth(monthKey: string, delta: number): string;
 export function orderValue(order: { totalPaid?: number; servicePrice?: number; rushFee?: number }): number;
-export function buildRevenueEntries(orders: any[]): { entries: RevenueEntry[]; withoutEventDate: number };
+export function buildRevenueEntries(orders: any[]): { entries: RevenueEntry[]; undated: number };
 export function monthTotals(entries: RevenueEntry[], monthKey: string): { total: number; count: number };
 export function revenueSeries(entries: RevenueEntry[], endMonthKey: string, n?: number): { monthKey: string; total: number; count: number }[];
 export function dailyRevenue(entries: RevenueEntry[], monthKey: string): DayRevenue[];

@@ -1,6 +1,6 @@
 // Cálculos financeiros puros (sem Firebase/React): faturamento, despesas fixas e patrimônio.
 // Faturamento = valor registrado nos pedidos concluídos (totalPaid, com fallback servicePrice + rushFee),
-// agrupado pela data do evento (eventDate) no fuso local. Não representa dinheiro recebido.
+// agrupado pela data de conclusão (completedAt, gravada automaticamente ao concluir) no fuso local. Não representa dinheiro recebido.
 
 export function toDate(value) {
   if (!value) return null;
@@ -29,25 +29,30 @@ export function orderValue(order) {
 }
 
 /**
- * Entradas de faturamento: pedidos concluídos com data do evento, sem duplicidade por id.
+ * Data do faturamento: completedAt (automática na conclusão). Pedidos concluídos antes dessa regra, sem completedAt, caem em eventDate e depois paidAt.
+ */
+export const revenueDateOf = (order) => toDate(order.completedAt) || toDate(order.eventDate) || toDate(order.paidAt);
+
+/**
+ * Entradas de faturamento: pedidos concluídos com data de faturamento, sem duplicidade por id.
  * Pedidos internos de Conteúdo (scriptId, valor 0) não são serviços vendidos e ficam de fora.
- * `withoutEventDate` conta concluídos que não puderam ser datados.
+ * `undated` conta concluídos que não puderam ser datados.
  */
 export function buildRevenueEntries(orders) {
   const seen = new Set();
   const entries = [];
-  let withoutEventDate = 0;
+  let undated = 0;
   for (const order of orders) {
     if (!order || order.status !== 'completed' || order.scriptId || seen.has(order.id)) continue;
     seen.add(order.id);
-    const eventDate = toDate(order.eventDate);
-    if (!eventDate) { withoutEventDate += 1; continue; }
+    const revenueDate = revenueDateOf(order);
+    if (!revenueDate) { undated += 1; continue; }
     entries.push({
-      orderId: order.id, order, eventDate, value: orderValue(order),
-      monthKey: monthKeyOf(eventDate), dayKey: dayKeyOf(eventDate),
+      orderId: order.id, order, revenueDate, value: orderValue(order),
+      monthKey: monthKeyOf(revenueDate), dayKey: dayKeyOf(revenueDate),
     });
   }
-  return { entries, withoutEventDate };
+  return { entries, undated };
 }
 
 export function monthTotals(entries, monthKey) {
@@ -69,7 +74,7 @@ export function dailyRevenue(entries, monthKey) {
   const days = Array.from({ length: daysInMonth(monthKey) }, (_, i) => ({ day: i + 1, total: 0, count: 0, entries: [] }));
   for (const e of entries) {
     if (e.monthKey !== monthKey) continue;
-    const slot = days[e.eventDate.getDate() - 1];
+    const slot = days[e.revenueDate.getDate() - 1];
     slot.total += e.value; slot.count += 1; slot.entries.push(e);
   }
   return days;

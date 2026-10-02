@@ -64,7 +64,7 @@ export const AdminFinancePage: React.FC = () => {
     (e) => setError(e.message || 'Não foi possível carregar os pedidos.'),
   ), []);
 
-  const { entries, withoutEventDate } = useMemo(() => buildRevenueEntries(orders ?? []), [orders]);
+  const { entries, undated } = useMemo(() => buildRevenueEntries(orders ?? []), [orders]);
 
   // Nomes de clientes/serviços: busca apenas ids ainda não conhecidos.
   useEffect(() => {
@@ -84,7 +84,7 @@ export const AdminFinancePage: React.FC = () => {
 
   const years = useMemo(() => {
     const current = new Date().getFullYear();
-    const first = Math.min(current, ...entries.map((e) => e.eventDate.getFullYear()), Number(monthKey.slice(0, 4)));
+    const first = Math.min(current, ...entries.map((e) => e.revenueDate.getFullYear()), Number(monthKey.slice(0, 4)));
     return Array.from({ length: current + 1 - first + 1 }, (_, i) => first + i);
   }, [entries, monthKey]);
 
@@ -107,7 +107,7 @@ export const AdminFinancePage: React.FC = () => {
     return view.monthEntries
       .map((e) => ({ e, client: clients.get(e.order.clientId), service: services.get(e.order.serviceId), child: extractBirthdayPerson(e.order) as string | null }))
       .filter(({ e, client, service, child }) => !term || [client?.name, service?.title, child, e.orderId].some((v) => (v || '').toLocaleLowerCase('pt-BR').includes(term)))
-      .sort((a, b) => (newestFirst ? -1 : 1) * (a.e.eventDate.getTime() - b.e.eventDate.getTime()));
+      .sort((a, b) => (newestFirst ? -1 : 1) * (a.e.revenueDate.getTime() - b.e.revenueDate.getTime()));
   }, [data, view, clients, services, search, newestFirst]);
 
   const statementTotal = statementRows.reduce((sum, row) => sum + row.e.value, 0);
@@ -152,9 +152,9 @@ export const AdminFinancePage: React.FC = () => {
 
       {data && view && (
         <>
-          {withoutEventDate > 0 && (
+          {undated > 0 && (
             <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
-              {withoutEventDate} pedido(s) concluído(s) sem data do evento ficam fora do faturamento mensal. Informe a data no pedido para incluí-los.
+              {undated} pedido(s) concluído(s) sem nenhuma data registrada ficam fora do faturamento mensal.
             </p>
           )}
 
@@ -215,7 +215,7 @@ export const AdminFinancePage: React.FC = () => {
                   {statementRows.map(({ e, client, service, child }) => (
                     <div key={e.orderId} className="flex items-center justify-between gap-3 p-4">
                       <div className="min-w-0">
-                        <p className="text-[11px] font-semibold text-white/45">{formatDate(e.eventDate)} · <span className="text-emerald-300/80">Concluído</span></p>
+                        <p className="text-[11px] font-semibold text-white/45">{formatDate(e.revenueDate)} · <span className="text-emerald-300/80">Concluído</span></p>
                         <p className="truncate text-sm font-bold text-white">{child ? `${child} · ` : ''}{client?.name || `Pedido ${e.orderId.slice(0, 6)}`}</p>
                         <p className="truncate text-xs text-white/55">{service?.title || 'Serviço não encontrado'}</p>
                       </div>
