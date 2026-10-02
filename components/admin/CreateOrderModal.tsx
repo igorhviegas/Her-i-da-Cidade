@@ -5,6 +5,7 @@ import { createOrder } from '../../services/ordersService';
 import { calculateOrderDeadlines } from '../../services/orderDates';
 import { resolveInitialStatus } from '../../services/orderInitialStatus.js';
 import { getServices } from '../../services/servicesService';
+import { ImportPdfPanel, type ImportedValues } from './ImportPdfPanel';
 import type { Order, OrderStatus, ProductionType, Service } from '../../types';
 
 interface CreateOrderModalProps {
@@ -85,6 +86,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
   const [servicePrice, setServicePrice] = useState(initialValues ? String(initialValues.servicePrice) : '');
   const [rushFee, setRushFee] = useState(initialValues ? String(initialValues.rushFee) : '0');
   const [totalPaid, setTotalPaid] = useState(initialValues ? String(initialValues.totalPaid) : '');
+  const [importFingerprint, setImportFingerprint] = useState('');
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -196,6 +198,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
         totalPaid: initialValues && totalPaid.trim() ? inputAmount(totalPaid)! : serviceAmount + rushAmount,
         productionType: selectedService.productionType,
         source: 'manual',
+        ...(importFingerprint ? { importFingerprint } : {}),
         ...(completed ? { completedAt: new Date() } : {}),
       });
       await onCreated(order);
@@ -225,6 +228,21 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
         <form onSubmit={handleSubmit} className="min-h-0 overflow-y-auto">
           <div className="space-y-5 p-5 sm:p-6">
             {formError && <div role="alert" className="flex gap-2 rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-200"><AlertCircle className="h-4 w-4 shrink-0" />{formError}</div>}
+
+            {!initialValues && (
+              <ImportPdfPanel
+                disabled={submitting}
+                applied={Boolean(importFingerprint)}
+                onClear={() => setImportFingerprint('')}
+                onApply={(values: ImportedValues, fingerprint) => {
+                  if (values.name) setName(values.name);
+                  if (values.whatsapp) { setWhatsapp(values.whatsapp); setLookupState('idle'); setLookupMessage(''); }
+                  if (values.eventDate) setEventDate(values.eventDate);
+                  if (values.content) setContent(values.content);
+                  setImportFingerprint(fingerprint);
+                }}
+              />
+            )}
 
             <section className="space-y-3">
               <h3 className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-blue-300">Cliente</h3>

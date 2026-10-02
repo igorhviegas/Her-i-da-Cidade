@@ -146,3 +146,29 @@ test('users without admin authorization cannot create or edit orders', async () 
   await assertFails(getDoc(doc(anonymousDb, 'orders/historical-order')));
   await assertFails(updateDoc(doc(anonymousDb, 'orders/historical-order'), { status: 'completed' }));
 });
+
+test('finance collections (fixedExpenses, assets) are admin-only and cannot be deleted', async () => {
+  const adminDb = env.authenticatedContext('admin-user').firestore();
+  const regularDb = env.authenticatedContext('other-user').firestore();
+  const anonymousDb = env.unauthenticatedContext().firestore();
+  for (const path of ['fixedExpenses/exp-1', 'assets/asset-1']) {
+    await assertSucceeds(setDoc(doc(adminDb, path), { name: 'fictício' }));
+    await assertSucceeds(getDoc(doc(adminDb, path)));
+    await assertSucceeds(updateDoc(doc(adminDb, path), { name: 'editado' }));
+    await assertFails(deleteDoc(doc(adminDb, path)));
+    await assertFails(getDoc(doc(regularDb, path)));
+    await assertFails(getDoc(doc(anonymousDb, path)));
+    await assertFails(setDoc(doc(regularDb, path), { name: 'x' }));
+  }
+});
+
+test('orderImports: admin cria uma vez por PDF; ninguém altera, apaga ou lê sem ser admin', async () => {
+  const adminDb = env.authenticatedContext('admin-user').firestore();
+  const path = 'orderImports/' + 'a'.repeat(64);
+  await assertSucceeds(setDoc(doc(adminDb, path), { orderId: 'o1', createdAt: serverTimestamp() }));
+  await assertSucceeds(getDoc(doc(adminDb, path)));
+  await assertFails(setDoc(doc(adminDb, path), { orderId: 'o2', createdAt: serverTimestamp() })); // sobrescrever = update
+  await assertFails(deleteDoc(doc(adminDb, path)));
+  await assertFails(getDoc(doc(env.authenticatedContext('other-user').firestore(), path)));
+  await assertFails(setDoc(doc(env.unauthenticatedContext().firestore(), 'orderImports/' + 'b'.repeat(64)), { orderId: 'o3' }));
+});

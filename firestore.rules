@@ -69,6 +69,43 @@ service cloud.firestore {
           || (data.technicalPurchaseId is string && data.technicalPurchaseId == orderId));
     }
 
+    // Conclusão excepcional com estoque insuficiente: somente administradores (role admin/superadmin e active == true no
+    // documento /admins/{uid}). Usuários com outro papel (ex.: editor) continuam só com a conclusão normal.
+    function canOverrideStock() {
+      return isAdmin()
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('role', '') in ['admin', 'superadmin']
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('active', false) == true;
+    }
+
+    function consumptionPath(orderId) {
+      return /databases/$(database)/documents/stockConsumptions/$(orderId);
+    }
+
+    function stockMovementPath(movementId) {
+      return /databases/$(database)/documents/stockMovements/$(movementId);
+    }
+
+    // Todo saldo de material precisa de uma movimentação criada na MESMA transação, apontada por lastMovementId,
+    // do mesmo material e com balanceAfter igual ao novo saldo. Saldo nunca é editado sem histórico.
+    function balanceTraced(materialId, data) {
+      return data.lastMovementId is string
+        && !exists(stockMovementPath(data.lastMovementId))
+        && existsAfter(stockMovementPath(data.lastMovementId))
+        && getAfter(stockMovementPath(data.lastMovementId)).data.materialId == materialId
+        && getAfter(stockMovementPath(data.lastMovementId)).data.balanceAfter == data.balance;
+    }
+
+    function validMovement(data) {
+      return data.keys().hasAll(['materialId', 'type', 'quantity', 'delta', 'balanceAfter', 'date', 'createdAt'])
+        && data.materialId is string
+        && data.quantity is int && data.quantity > 0
+        && data.delta is int
+        && data.balanceAfter is int && data.balanceAfter >= 0
+        && ((data.type in ['purchase', 'adjustment_in', 'reversal'] && data.delta == data.quantity)
+          || (data.type in ['consumption', 'adjustment_out'] && data.delta == -data.quantity))
+        && (!data.keys().hasAny(['orderId']) || data.orderId is string);
+    }
+
     function validCounter(data) {
       return data.keys().hasAll(['lastIssued', 'lastOrderId', 'updatedAt'])
         && data.keys().hasOnly(['lastIssued', 'lastOrderId', 'updatedAt'])
@@ -153,6 +190,77 @@ service cloud.firestore {
         && request.resource.data.get('orderNumber', null) == resource.data.get('orderNumber', null)
         && request.resource.data.get('orderNumberDisplay', null) == resource.data.get('orderNumberDisplay', null);
       allow delete: if isAdmin();
+    }
+
+    // Módulo Financeiro: dados internos, somente administradores. Sem exclusão,
+    // para preservar o histórico (despesas são desativadas; bens, vendidos/descartados).
+    match /fixedExpenses/{expenseId} {
+      allow read, create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    match /assets/{assetId} {
+      allow read, create, update: if isAdmin();
+      allow delete: if false;
+    }
+
+    // Estoque de consumíveis (não é patrimônio). Movimentações são imutáveis (correções = nova movimentação);
+    // o saldo do material só muda junto com uma movimentação; nada é excluído.
+    match /stockMaterials/{materialId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.balance is int
+        && request.resource.data.balance >= 0
+        && (request.resource.data.balance == 0 || balanceTraced(materialId, request.resource.data));
+      allow update: if isAdmin()
+        && request.resource.data.balance is int
+        && request.resource.data.balance >= 0
+        && (request.resource.data.balance == resource.data.balance || balanceTraced(materialId, request.resource.data));
+      allow delete: if false;
+    }
+
+    match /stockMovements/{movementId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && validMovement(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // Consumo por pedido (id = id do pedido): estado consumed/reversed e linhas baixadas.
+    // Uma conclusão excepcional (exceptional == true) exige canOverrideStock(); só a reabertura (mesmo ciclo) é livre.
+    match /stockConsumptions/{orderId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && (request.resource.data.get('exceptional', false) == false || canOverrideStock());
+      allow update: if isAdmin()
+        && (request.resource.data.get('cycle', 0) == resource.data.get('cycle', 0)
+          || request.resource.data.get('exceptional', false) == false
+          || canOverrideStock());
+      allow delete: if false;
+    }
+
+    // Pendências de estoque (quantidade que faltou numa conclusão excepcional). NÃO são movimentações: não alteram saldo.
+    // Só nascem junto de um consumo excepcional do mesmo ciclo; depois só podem ser anuladas (open -> voided).
+    match /stockPendings/{pendingId} {
+      allow read: if isAdmin();
+      allow create: if canOverrideStock()
+        && request.resource.data.status == 'open'
+        && request.resource.data.missing is int && request.resource.data.missing > 0
+        && request.resource.data.fulfilled is int && request.resource.data.fulfilled >= 0
+        && request.resource.data.required == request.resource.data.fulfilled + request.resource.data.missing
+        && existsAfter(consumptionPath(request.resource.data.orderId))
+        && getAfter(consumptionPath(request.resource.data.orderId)).data.exceptional == true
+        && getAfter(consumptionPath(request.resource.data.orderId)).data.cycle == request.resource.data.cycle;
+      allow update: if isAdmin()
+        && resource.data.status == 'open'
+        && request.resource.data.status == 'voided'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'voidedAt', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // PDFs importados: um documento por formulário (id = hash do texto), criado junto do pedido; nunca alterado nem apagado.
+    match /orderImports/{importId} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
     }
 
     // Shared sequence: each increment must be +1 and point to the numbered

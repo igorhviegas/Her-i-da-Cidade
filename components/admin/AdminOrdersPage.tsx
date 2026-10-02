@@ -11,6 +11,10 @@ import { getServiceColor, type ServiceColor } from '../../services/serviceColors
 import type { Client, ContentScript, Order, OrderStatus, Service } from '../../types';
 import { CreateOrderModal } from './CreateOrderModal';
 import { EditOrderModal } from './EditOrderModal';
+import { StockConsumptionModal } from './StockConsumptionModal';
+import { useAuth } from '../../context/AuthContext';
+import { isPresentialService } from '../../services/stockCalculations.js';
+import type { ConsumptionLine } from '../../services/stockService';
 import { TeleprompterModal } from './TeleprompterModal';
 import { getTeleprompterText } from '../../services/teleprompter.js';
 
@@ -95,6 +99,10 @@ export const AdminOrdersPage: React.FC = () => {
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [orderActionError, setOrderActionError] = useState('');
   const [teleprompterView, setTeleprompterView] = useState<OrderView | null>(null);
+  const [consumptionView, setConsumptionView] = useState<OrderView | null>(null);
+  const { adminData } = useAuth();
+  // Conclusão excepcional com estoque insuficiente: só admin/superadmin (as regras do Firestore validam o mesmo critério).
+  const canOverrideStock = adminData?.role === 'admin' || adminData?.role === 'superadmin';
   const [completedOpen, setCompletedOpen] = useState(false);
   const [draggingOrderId, setDraggingOrderId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<OrderStatus | null>(null);
@@ -208,6 +216,8 @@ export const AdminOrdersPage: React.FC = () => {
     if (updatingOrderId) return false;
     const orderView = [...orders, ...completedOrders].find(({ order }) => order.id === orderId);
     if (!orderView || orderView.order.status === status) return false;
+    // Evento presencial: a conclusão passa pela conferência de materiais (a baixa de estoque é feita junto, em updateOrder).
+    if (status === 'completed' && isPresentialService(orderView.service)) { setOrderActionError(''); setConsumptionView(orderView); return false; }
     setUpdatingOrderId(orderId);
     setOrderActionError('');
     try {
@@ -228,6 +238,16 @@ export const AdminOrdersPage: React.FC = () => {
     }
   };
 
+  const confirmConsumption = async (lines: ConsumptionLine[], { allowShortage }: { allowShortage: boolean }) => {
+    if (!consumptionView) return;
+    const orderId = consumptionView.order.id;
+    await updateOrder(orderId, { status: 'completed', materialConsumption: lines, allowStockShortage: allowShortage });
+    setConsumptionView(null);
+    setSelectedOrder((current) => (current?.order.id === orderId ? null : current));
+    setSuccess(allowShortage ? 'Evento concluído com pendências de estoque (veja Financeiro → Estoque).' : 'Evento concluído e materiais baixados do estoque.');
+    await loadOrders();
+  };
+
   const handleSendToEditing = async () => {
     if (!teleprompterView) return;
     if (await handleStatusChange(teleprompterView.order.id, 'editing')) setTeleprompterView(null);
@@ -237,6 +257,7 @@ export const AdminOrdersPage: React.FC = () => {
     if (updatingOrderId || deletingOrderId) return;
     const childName = extractBirthdayPerson(view.order);
     const label = [view.client?.name, childName].filter(Boolean).join(' · ') || 'este pedido';
+    if (isPresentialService(view.service)) { setConsumptionView(view); return; }
     if (!window.confirm(`Concluir o pedido de ${label}? Ele sairá do Kanban e irá para os pedidos concluídos. Nenhuma mensagem será enviada.`)) return;
     await handleStatusChange(view.order.id, 'completed');
   };
@@ -601,6 +622,14 @@ export const AdminOrdersPage: React.FC = () => {
           </div>
         );
       })()}
+      {consumptionView && (
+        <StockConsumptionModal
+          title={[consumptionView.client?.name, extractBirthdayPerson(consumptionView.order), consumptionView.service?.title].filter(Boolean).join(' · ')}
+          canOverride={canOverrideStock}
+          onConfirm={confirmConsumption}
+          onClose={() => setConsumptionView(null)}
+        />
+      )}
       {teleprompterView && (
         <TeleprompterModal
           title={[teleprompterView.client?.name, teleprompterView.service?.title].filter(Boolean).join(' · ')}
