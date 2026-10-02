@@ -7,6 +7,7 @@ import { calculateOrderDeadlines } from "./orderDates";
 import { CONTENT_SCRIPTS_COLLECTION } from "./contentScriptsService";
 import { CLIENTS_COLLECTION } from "./clientsService";
 import { SERVICES_COLLECTION } from "./servicesService";
+import { activityRefs, prepareActivityLog } from "./activityLog";
 
 export const ORDERS_COLLECTION = "orders";
 
@@ -38,12 +39,14 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     ? calculateOrderDeadlines(input.paidAt, input.deliveryDays)
     : {};
   const { completedAt, ...fields } = input;
-  await setDoc(reference, {
+  const payload = {
     ...fields,
     ...(deadlines.customerDueDate ? deadlines : {}),
     createdAt: serverTimestamp(),
     ...(completedAt ? { completedAt } : {}),
-  });
+  };
+  if (input.status === 'completed') await setCompletedOrder(reference, payload, completedAt || new Date());
+  else await setDoc(reference, payload);
   return { ...input, ...deadlines, id: reference.id, createdAt: undefined };
 }
 
@@ -189,6 +192,19 @@ export async function deleteOrder(id: string): Promise<void> {
   });
 }
 
+/** Pedido que já nasce concluído: grava o pedido e o registro de atividade na mesma transação. */
+async function setCompletedOrder(reference: ReturnType<typeof doc>, payload: Record<string, unknown>, occurredAt: Date): Promise<void> {
+  const firestore = db!;
+  await runTransaction(firestore, async (transaction) => {
+    const refs = activityRefs(firestore, 'order_completed', reference.id);
+    const record = await prepareActivityLog(transaction, refs, {
+      type: 'order_completed', refId: reference.id, occurredAt, difficultyKey: `service_${payload.serviceId}`, meta: { serviceId: payload.serviceId },
+    });
+    transaction.set(reference, payload);
+    if (record) transaction.set(refs.logRef, record);
+  });
+}
+
 export async function listOrders(): Promise<Order[]> {
   if (!db) throw new Error("Firebase Firestore não inicializado.");
   const result = await getDocs(query(collection(db, ORDERS_COLLECTION), orderBy("createdAt", "desc")));
@@ -239,7 +255,19 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
       linkedScript = scriptSnapshot.data();
     }
 
+    // Primeira conclusão do pedido vira registro permanente (ID por pedido): reabrir e concluir de novo, editar ou excluir o
+    // pedido não altera nem apaga o histórico, e a dificuldade fica congelada com a configuração vigente neste instante.
+    const serviceId = updates.serviceId ?? currentData.serviceId;
+    const activityRefsForOrder = updates.status === 'completed' && currentData.status !== 'completed' ? activityRefs(firestore, 'order_completed', id) : null;
+    const activityRecord = activityRefsForOrder
+      ? await prepareActivityLog(transaction, activityRefsForOrder, {
+        type: 'order_completed', refId: id, occurredAt: updates.completedAt instanceof Date ? updates.completedAt : new Date(),
+        difficultyKey: `service_${serviceId}`, meta: { serviceId, ...(currentData.scriptId ? { scriptId: currentData.scriptId } : {}) },
+      })
+      : null;
+
     transaction.update(orderRef, payload);
+    if (activityRefsForOrder && activityRecord) transaction.set(activityRefsForOrder.logRef, activityRecord);
     if (linkedScriptRef && linkedScript) {
       transaction.update(linkedScriptRef, {
         productionStatus: 'produced',

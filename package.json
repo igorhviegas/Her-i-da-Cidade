@@ -8,7 +8,8 @@
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
-    "test": "node --test functions/manychat-services.test.js functions/manychat-handler.test.js services/serviceColors.test.js tests/api-manychat.test.js services/orderReference.test.js services/ordersService.test.js services/digitalDelivery.test.js components/admin/AdminOrdersPage.test.js services/orderInitialStatus.test.js services/teleprompter.test.js",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-heroi-da-cidade \"node --test tests/firestore-rules.test.js tests/firestore-rules-missions.test.js\"",
+    "test": "node --test functions/manychat-services.test.js functions/manychat-handler.test.js services/serviceColors.test.js functions/missions-core.test.js functions/missions-manychat.test.js functions/missions-sync.test.js functions/activity-log.test.js tests/api-manychat.test.js tests/api-missions-cron.test.js services/orderReference.test.js services/ordersService.test.js services/digitalDelivery.test.js components/admin/AdminOrdersPage.test.js services/orderInitialStatus.test.js services/teleprompter.test.js",
     "firebase:setup": "node scripts/setup-firebase.mjs",
     "firebase:seed": "node scripts/seed-services.mjs",
     "firebase:seed-home": "node scripts/seed-home-content.mjs"
@@ -26,6 +27,7 @@
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.2.0",
     "@types/node": "^22.14.0",

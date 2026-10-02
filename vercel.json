@@ -1,4 +1,10 @@
 {
+  "crons": [
+    {
+      "path": "/api/missions-cron",
+      "schedule": "0 3 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/((?!api/.*).*)",

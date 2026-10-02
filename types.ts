@@ -79,6 +79,8 @@ export interface ContentScript {
   createdAt?: any;
   updatedAt?: any;
   publishedAt?: any;
+  /** Primeira vez que o roteiro ficou Pronto para gravar; definido uma só vez. */
+  readyAt?: any;
   notes: string;
   /** Pedido de produção associado a este roteiro, quando enviado. */
   orderId?: string;
