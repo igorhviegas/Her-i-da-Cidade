@@ -5,7 +5,7 @@ const MAX_FONT = 64;
 const MIN_FONT = 22;
 const MIN_MANUAL_FONT = 14; // o ajuste manual pode ir além do mínimo automático, para textos muito extensos
 const FONT_STEP = 2;
-const COMFORT_FONT = 36;
+const ONE_COLUMN_MIN_FONT = 30; // no automático, uma coluna só é trocada por duas se exigir fonte menor que isto
 const TWO_COLUMNS_MIN_WIDTH = 640; // abaixo disso (celular) duas colunas ficam estreitas demais
 
 type Layout = { size: number; columns: 1 | 2; scroll: boolean };
@@ -21,28 +21,38 @@ interface Props {
 }
 
 /**
- * Escolhe a maior fonte em que o texto cabe sem rolar (1 coluna, senão 2). Com `manualSize`, só esse tamanho é tentado.
- * Se não couber, mantém o máximo de colunas com rolagem vertical (nada é cortado).
+ * Uma coluna sempre que o texto couber sem rolar; duas só quando uma exigiria rolagem (ou, no automático, fonte menor que
+ * ONE_COLUMN_MIN_FONT). Com `manualSize`, só esse tamanho é tentado. Se não couber, mantém o máximo de colunas com rolagem
+ * vertical (nada é cortado).
  */
 function fitLayout(box: HTMLElement, manualSize: number | null): Layout {
+  const layout = chooseLayout(box, manualSize);
+  // O React não reaplica estilos iguais ao render anterior: deixa o DOM já no estado final.
+  box.style.fontSize = `${layout.size}px`;
+  box.style.columnCount = String(layout.columns);
+  box.style.flex = layout.scroll ? '0 0 auto' : '1 1 0';
+  return layout;
+}
+
+function chooseLayout(box: HTMLElement, manualSize: number | null): Layout {
   // Sem espaço, as colunas transbordam para a direita (scrollWidth) ou o conteúdo estoura a altura.
-  const fits = () => box.scrollHeight <= box.clientHeight + 1 && box.scrollWidth <= box.clientWidth + 1;
+  const fits = (size: number, columns: 1 | 2) => {
+    box.style.fontSize = `${size}px`;
+    box.style.columnCount = String(columns);
+    return box.scrollHeight <= box.clientHeight + 1 && box.scrollWidth <= box.clientWidth + 1;
+  };
   const maxColumns = box.clientWidth >= TWO_COLUMNS_MIN_WIDTH ? 2 : 1;
   const sizes = manualSize ? [manualSize] : Array.from({ length: (MAX_FONT - MIN_FONT) / FONT_STEP + 1 }, (_, i) => MAX_FONT - i * FONT_STEP);
-  for (const size of sizes) {
-    // Linhas de ~100 caracteres cansam a leitura: abaixo de COMFORT_FONT prefere-se 2 colunas.
-    for (const columns of (size >= COMFORT_FONT ? [1, 2] : [2, 1]).filter((c) => c <= maxColumns) as (1 | 2)[]) {
-      box.style.fontSize = `${size}px`;
-      box.style.columnCount = String(columns);
-      if (fits()) return { size, columns, scroll: false };
-    }
+  const oneColumn = sizes.find((size) => fits(size, 1));
+  if (oneColumn && (manualSize || oneColumn >= ONE_COLUMN_MIN_FONT || maxColumns === 1)) return { size: oneColumn, columns: 1, scroll: false };
+  if (maxColumns === 2) {
+    const twoColumns = sizes.find((size) => fits(size, 2));
+    // Duas colunas só valem se permitirem fonte maior que a de uma coluna.
+    if (twoColumns && (!oneColumn || twoColumns > oneColumn)) return { size: twoColumns, columns: 2, scroll: false };
   }
-  // O React não reaplica estilos iguais ao render anterior: deixa o DOM já no estado final.
-  const size = manualSize ?? MIN_FONT;
-  box.style.fontSize = `${size}px`;
-  box.style.columnCount = String(maxColumns);
-  box.style.flex = '0 0 auto';
-  return { size, columns: maxColumns, scroll: true };
+  // Uma coluna coube só em fonte pequena e duas não ajudam: fica com ela.
+  if (oneColumn) return { size: oneColumn, columns: 1, scroll: false };
+  return { size: manualSize ?? MIN_FONT, columns: maxColumns, scroll: true };
 }
 
 export const TeleprompterModal: React.FC<Props> = ({ title, text, canSendToEditing, sending, error, onBack, onSendToEditing }) => {
