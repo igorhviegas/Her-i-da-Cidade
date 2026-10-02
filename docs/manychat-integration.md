@@ -30,7 +30,7 @@ Qualquer campo fora da lista do serviço é rejeitado com `400`.
 | Serviço | `service` | Preço | `childName` | Outros campos |
 |---|---|---|---|---|
 | Vídeo Especial de Aniversário | `birthday-video` | R$ 30, lido do catálogo | **obrigatório** | — |
-| Vídeo Temático | `themed-video` | R$ 20, lido do catálogo | **obrigatório** | — |
+| Vídeo Temático | `themed-video` | R$ 20, lido do catálogo | **obrigatório** | `theme` **obrigatório** |
 | Vídeo Personalizado | `custom-video` | pela modalidade (tabela abaixo) | opcional | `modality` **obrigatório**; `details` e `eventDate` opcionais |
 | Vídeo Convite | `invite-video` | pela modalidade (tabela abaixo) | opcional | `modality` **obrigatório**; `details` e `eventDate` opcionais |
 | Vídeo Chamada ao Vivo | `live-call` | **R$ 75,00 fixo** | opcional | `details` opcional. **Sem data de agendamento** |
@@ -54,6 +54,7 @@ Serviços sem modalidade (Aniversário, Temático e Chamada ao Vivo) usam o "Pra
 ### Tipos dos campos específicos
 
 - `childName`: string, até 100 caracteres.
+- `theme`: string, até 100 caracteres (tema escolhido pelo cliente). Só Vídeo Temático; vai no conteúdo do pedido como `Tema: <theme>`.
 - `details`: string, até 1000 caracteres (observações do pedido).
 - `modality`: `"7_days"`, `"4_days"` ou `"2_days"`.
 - `eventDate`: `YYYY-MM-DD` (gravada às 12:00 de Brasília) ou data/hora ISO 8601 com fuso (`2026-11-21T16:30:00-03:00`). Só Personalizado e Convite.
@@ -65,12 +66,13 @@ Serviços sem modalidade (Aniversário, Temático e Chamada ao Vivo) usam o "Pra
 | `amountPaid` | Todos os serviços. O preço vem do catálogo, da tabela de modalidades ou do valor fixo. Enviá-lo gera `400`. |
 | `eventDate` | `live-call`. A Chamada ao Vivo não exige agendamento; enviá-lo gera `400`. |
 | `modality` | `birthday-video`, `themed-video`, `live-call`. |
+| `theme` | Todos, exceto `themed-video`. |
 
 ### Como o pedido aparece no CRM
 
 - Cliente: criado ou reaproveitado pelo WhatsApp.
 - Data do pagamento (`paidAt`): o momento em que o CRM recebe a requisição (para a Chamada ao Vivo, é a única data registrada).
-- `Aniversariante: <childName>` e `Detalhes: <details>` vão no conteúdo do pedido; sem nenhum dos dois, o conteúdo fica "Pedido recebido via ManyChat.".
+- `Aniversariante: <childName>`, `Tema: <theme>` e `Detalhes: <details>` vão no conteúdo do pedido; sem nenhum dos dois, o conteúdo fica "Pedido recebido via ManyChat.".
 - **Status inicial, tipo de produção e prazo padrão vêm da configuração do serviço** (Admin → Serviços → "Configuração de Pedido"), igual ao cadastro manual. Nada é forçado no código: um serviço imediato configurado como "Entregar" nasce em Entregar; configurado como "Concluído", nasce concluído. "Concluir automaticamente" só é usado como alternativa se nenhum status inicial estiver configurado.
 - Se o serviço estiver inativo, sem "Gerar pedido no CRM", sem tipo de produção ou sem status inicial, a resposta é `422` e nada é criado.
 - Origem do pedido: `manychat`.
@@ -88,7 +90,7 @@ Vídeo Temático:
 ```json
 { "eventType": "payment.paid", "service": "themed-video",
   "customer": { "name": "Maria Silva", "whatsapp": "+55 31 99999-0000" },
-  "childName": "Helena" }
+  "childName": "Helena", "theme": "Frozen" }
 ```
 
 Vídeo Personalizado (7 dias, R$ 60,00):
@@ -126,10 +128,11 @@ No ManyChat, o corpo do External Request é montado com campos personalizados (*
 
 1. **`service`**: texto fixo por fluxo (um External Request por serviço, ou um campo preenchido pelo fluxo). Use exatamente os identificadores da tabela.
 2. **`modality`** (Personalizado e Convite): crie o campo personalizado de texto `modalidade` e preencha-o no fluxo com exatamente `7_days`, `4_days` ou `2_days` conforme a opção contratada. **Não monte `modality` a partir de texto digitado pelo cliente.**
-3. `childName` e `details` vêm de campos personalizados. Para campos opcionais ainda vazios, **não inclua a chave** no JSON (evite enviar o texto de uma variável vazia).
-4. Remova do corpo `amountPaid` e, na Chamada ao Vivo, `eventDate`.
-5. Envolva todos os valores em aspas: o CRM só aceita texto.
-6. Header `Authorization: Bearer <segredo>` e `Content-Type: application/json`.
+3. `theme` (Vídeo Temático): campo personalizado de texto preenchido pelo cliente; é obrigatório.
+4. `childName` e `details` vêm de campos personalizados. Para campos opcionais ainda vazios, **não inclua a chave** no JSON (evite enviar o texto de uma variável vazia).
+5. Remova do corpo `amountPaid` e, na Chamada ao Vivo, `eventDate`.
+6. Envolva todos os valores em aspas: o CRM só aceita texto.
+7. Header `Authorization: Bearer <segredo>` e `Content-Type: application/json`.
 
 ## Requisições repetidas
 
