@@ -144,7 +144,9 @@ test('autorização: skill ou usuário diferentes e usuário não cadastrado nun
 
 test('Launch, Help, Stop e SessionEnded não gravam nada', async () => {
   const db = fakeDb();
-  assert.equal((await run(envelope({}, { type: 'LaunchRequest' }), db)).out.response.shouldEndSession, false);
+  const launch = (await run(envelope({}, { type: 'LaunchRequest' }), db)).out.response;
+  assert.equal(launch.shouldEndSession, false);
+  assert.equal(launch.outputSpeech.text, 'Qual missão você quer criar?');
   assert.equal((await run(envelope({}, { intent: 'AMAZON.HelpIntent' }), db)).out.response.shouldEndSession, false);
   assert.equal((await run(envelope({}, { intent: 'AMAZON.StopIntent' }), db)).out.response.shouldEndSession, true);
   assert.deepEqual((await run(envelope({}, { type: 'SessionEndedRequest' }), db)).out.response, {});
