@@ -5,6 +5,7 @@ import {
   isValidWhatsAppUrl, 
   TEMPORARY_FALLBACK_WHATSAPP_URL 
 } from '../../services/siteConfigService';
+import { syncAutoServiceWhatsAppUrls } from '../../services/servicesService';
 import { 
   Settings, 
   MessageCircle, 
@@ -78,9 +79,17 @@ export const AdminSettings: React.FC = () => {
       });
 
       setSavedWhatsappUrl(trimmed);
+      // Acompanha o novo número nos serviços com link automático (manuais/antigos não são tocados).
+      let syncNote = '';
+      try {
+        const { changed } = await syncAutoServiceWhatsAppUrls();
+        if (changed > 0) syncNote = ` ${changed} serviço(s) com link automático foram atualizados.`;
+      } catch (syncErr: any) {
+        syncNote = ` Atenção: o número foi salvo, mas os links dos serviços não foram atualizados: ${syncErr?.message || 'erro desconhecido'}`;
+      }
       setFeedback({
-        type: 'success',
-        message: 'Link do WhatsApp salvo com sucesso no Firestore! Todos os botões do site já estão atualizados.',
+        type: syncNote.startsWith(' Atenção') ? 'error' : 'success',
+        message: 'Link do WhatsApp salvo com sucesso no Firestore! Todos os botões do site já estão atualizados.' + syncNote,
       });
     } catch (err: any) {
       console.error('[AdminSettings] Erro ao salvar:', err);

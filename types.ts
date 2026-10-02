@@ -7,6 +7,7 @@ export interface Service {
   imageUrl: string;
   category: string;
   whatsappUrl: string;
+  whatsappUrlSource?: 'auto' | 'manual';
   badgeText?: string;
   active?: boolean;
   order?: number;
@@ -103,6 +104,7 @@ export interface FirestoreService {
   imageUrl: string;
   category: string;
   whatsappUrl: string;
+  whatsappUrlSource?: 'auto' | 'manual'; // ausente em documentos antigos
   badgeText?: string;
   active: boolean;
   order: number;
