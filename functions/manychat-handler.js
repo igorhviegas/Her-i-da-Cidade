@@ -67,7 +67,7 @@ const tiers = (price7, price4, price2) => ({
  */
 export const SERVICE_PROFILES = {
   'birthday-video': { serviceId: '1', title: 'Vídeo Especial de Aniversário', pricing: 'catalog', fields: { childName: 'required' } },
-  'themed-video': { serviceId: '5', title: 'Vídeo Temático', pricing: 'catalog', fields: { childName: 'required' } },
+  'themed-video': { serviceId: '5', title: 'Vídeo Temático', pricing: 'catalog', fields: { childName: 'required', theme: 'required' } },
   'custom-video': { serviceId: '3', title: 'Vídeo Personalizado', pricing: 'tiers', tiers: tiers(60, 75, 85), fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
   'invite-video': { serviceId: '4', title: 'Vídeo Convite', pricing: 'tiers', tiers: tiers(65, 80, 95), fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
   'live-call': { serviceId: '2', title: 'Vídeo Chamada ao Vivo', pricing: 'fixed', price: 75, fields: { childName: 'optional', details: 'optional' } },
@@ -114,7 +114,7 @@ export function validateManyChatPayload(body) {
     const normalized = normalizeWhatsApp(body.customer.whatsapp);
     if (!normalized || !/^55\d{10,11}$/.test(normalized)) errors.push('customer.whatsapp deve ser um número brasileiro válido com DDD.');
   }
-  const textRules = { childName: 100, details: 1000 };
+  const textRules = { childName: 100, theme: 100, details: 1000 };
   for (const [field, limit] of Object.entries(textRules)) {
     const rule = profile.fields[field];
     if (!rule) continue;
@@ -176,6 +176,7 @@ function evaluateService(profile, service, modality) {
 function buildOrderContent(input) {
   const lines = [];
   if (typeof input.childName === 'string' && input.childName.trim()) lines.push(`Aniversariante: ${input.childName.trim()}`);
+  if (typeof input.theme === 'string' && input.theme.trim()) lines.push(`Tema: ${input.theme.trim()}`);
   if (typeof input.details === 'string' && input.details.trim()) lines.push(`Detalhes: ${input.details.trim()}`);
   return lines.join('\n') || 'Pedido recebido via ManyChat.';
 }

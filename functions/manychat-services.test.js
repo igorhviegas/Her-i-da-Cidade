@@ -110,7 +110,7 @@ test('modalidade inválida, ausente ou preço enviado pelo ManyChat: 400 sem cri
     base('custom-video', { modality: '7_days', amountPaid: 60 }),
     base('invite-video', { modality: '7_days', amountPaid: '65,00' }),
     base('live-call', { modality: '7_days' }),
-    base('themed-video', { childName: 'Ana', modality: '7_days' }),
+    base('themed-video', { childName: 'Ana', theme: 'Super-heróis', modality: '7_days' }),
   ];
   for (const body of cases) {
     const { res, database } = await post(body);
@@ -132,6 +132,20 @@ test('campos opcionais do Personalizado e do Convite continuam funcionando', asy
 });
 
 // ---------- Chamada ao Vivo ----------
+
+test('Temático: tema é obrigatório (até 100 caracteres), vai no conteúdo e não é aceito em outros serviços', async () => {
+  for (const extra of [{ childName: 'Ana' }, { childName: 'Ana', theme: '' }, { childName: 'Ana', theme: '   ' }, { childName: 'Ana', theme: 'x'.repeat(101) }, { childName: 'Ana', theme: 5 }]) {
+    const { res, database } = await post(base('themed-video', extra));
+    assert.equal(res.statusCode, 400, JSON.stringify(extra));
+    assert.match(res.body.details.join(' '), /theme/);
+    assert.equal(database.docs('orders').length, 0);
+  }
+  const { res, order } = await post(base('themed-video', { childName: 'Ana', theme: '  Homem-Aranha  ' }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(order.content, 'Aniversariante: Ana\nTema: Homem-Aranha');
+  assert.equal((await post(base('birthday-video', { childName: 'Ana', theme: 'X' }))).res.statusCode, 400);
+  assert.equal((await post(base('live-call', { theme: 'X' }))).res.statusCode, 400);
+});
 
 test('Chamada ao Vivo: R$ 75 fixo, sem data de agendamento, registra a data do pagamento', async () => {
   const { res, order } = await post(base('live-call'));
@@ -161,7 +175,7 @@ test('Chamada ao Vivo não aceita mais eventDate nem amountPaid', async () => {
 // ---------- Status inicial / configuração do serviço ----------
 
 test('serviços imediatos iniciam em Entregar quando configurados assim; a configuração manda', async () => {
-  for (const [slug, id, extra] of [['themed-video', '5', { childName: 'Helena' }], ['birthday-video', '1', { childName: 'Lucas' }]]) {
+  for (const [slug, id, extra] of [['themed-video', '5', { childName: 'Helena', theme: 'Super-heróis' }], ['birthday-video', '1', { childName: 'Lucas' }]]) {
     const { res, order } = await post(base(slug, extra));
     assert.equal(res.statusCode, 200);
     assert.equal(order.status, 'delivery');
@@ -172,17 +186,17 @@ test('serviços imediatos iniciam em Entregar quando configurados assim; a confi
     assert.equal(done.order.status, 'completed');
     assert.ok(done.order.completedAt);
   }
-  const catalogPrice = await post(base('themed-video', { childName: 'Helena' }));
+  const catalogPrice = await post(base('themed-video', { childName: 'Helena', theme: 'Super-heróis' }));
   assert.equal(catalogPrice.order.servicePrice, 20);
-  assert.equal(catalogPrice.order.content, 'Aniversariante: Helena');
+  assert.equal(catalogPrice.order.content, 'Aniversariante: Helena\nTema: Super-heróis');
 });
 
 test('conclusão automática não força o status inicial; só é alternativa quando não há status configurado', async () => {
-  const configured = await post(base('themed-video', { childName: 'Ana' }), fakeDatabase({ '5': { initialStatus: 'delivery', autoComplete: true } }));
+  const configured = await post(base('themed-video', { childName: 'Ana', theme: 'Super-heróis' }), fakeDatabase({ '5': { initialStatus: 'delivery', autoComplete: true } }));
   assert.equal(configured.order.status, 'delivery');
-  const fallback = await post(base('themed-video', { childName: 'Ana' }), fakeDatabase({ '5': { initialStatus: undefined, autoComplete: true } }));
+  const fallback = await post(base('themed-video', { childName: 'Ana', theme: 'Super-heróis' }), fakeDatabase({ '5': { initialStatus: undefined, autoComplete: true } }));
   assert.equal(fallback.order.status, 'completed');
-  const none = await post(base('themed-video', { childName: 'Ana' }), fakeDatabase({ '5': { initialStatus: undefined, autoComplete: false } }));
+  const none = await post(base('themed-video', { childName: 'Ana', theme: 'Super-heróis' }), fakeDatabase({ '5': { initialStatus: undefined, autoComplete: false } }));
   assert.equal(none.res.statusCode, 422);
 });
 
@@ -211,7 +225,7 @@ test('serviço ausente ou mal configurado no CRM retorna 422 sem criar registros
     ['4', { initialStatus: undefined, autoComplete: false }, 'invite-video', { modality: '7_days' }],
     ['4', { title: 'Outro serviço' }, 'invite-video', { modality: '7_days' }],
     ['2', { active: false }, 'live-call', {}],
-    ['5', { price: 'Sob consulta' }, 'themed-video', { childName: 'Ana' }],
+    ['5', { price: 'Sob consulta' }, 'themed-video', { childName: 'Ana', theme: 'Super-heróis' }],
   ]) {
     const database = fakeDatabase({ [id]: patch });
     const { res } = await post(base(slug, extra), database);
@@ -252,12 +266,12 @@ test('payloads inválidos retornam 400 e não gravam nada', async () => {
   const cases = [
     base('invite-video', { modality: '7_days', eventDate: '2026-02-31' }),
     base('invite-video', { modality: '7_days', serviceId: '1' }),
-    base('themed-video', { childName: 'Ana', amountPaid: 1 }),
+    base('themed-video', { childName: 'Ana', theme: 'Super-heróis', amountPaid: 1 }),
     base('themed-video'),
     base('unknown-service'),
     base(['custom-video']),
     base('custom-video', { modality: '7_days', customer: { name: 'X', whatsapp: '123' } }),
-    { ...base('themed-video', { childName: 'Ana' }), eventType: 'payment.pending' },
+    { ...base('themed-video', { childName: 'Ana', theme: 'Super-heróis' }), eventType: 'payment.pending' },
   ];
   for (const body of cases) {
     const { res, database } = await post(body);
@@ -269,7 +283,7 @@ test('payloads inválidos retornam 400 e não gravam nada', async () => {
 // ---------- Sem deduplicação (decisão de negócio) ----------
 
 test('paymentId não faz parte do contrato; repetições criam pedidos separados (duplicatas são removidas manualmente)', async () => {
-  const { res: rejected } = await post(base('themed-video', { childName: 'Ana', paymentId: 'abc-123-xyz' }));
+  const { res: rejected } = await post(base('themed-video', { childName: 'Ana', theme: 'Super-heróis', paymentId: 'abc-123-xyz' }));
   assert.equal(rejected.statusCode, 400);
   assert.match(rejected.body.details.join(' '), /paymentId/);
 
