@@ -2,6 +2,25 @@
 
 Documentação da Meta e da Vercel consultada em **03/10/2026**. Este guia não foi executado contra a conta real: nenhuma chamada à Meta, nenhuma sincronização, nenhum deploy, nenhuma regra publicada e nenhuma variável alterada. Onde a documentação não deu certeza, está marcado.
 
+## 0. Status atualizado (03/10/2026) — o que já foi feito e o que sobrou para você
+
+**Já feito por mim (verificado):**
+- Commit `70ed310` e push da branch `claude/stoic-kare-00f48a`; **Pull Request #25** aberto: https://github.com/igorhviegas/Her-i-da-Cidade/pull/25 (**não mergeado**; mergear em `main` dispara o deploy de produção).
+- **Deploy de preview na Vercel concluído com sucesso**: isso confirma que o `vercel.json` (os dois crons e `maxDuration: 60`) é aceito pelo plano atual.
+- **Regras do Firestore comparadas com as publicadas (somente leitura, via Firebase CLI):** as regras publicadas hoje no banco `(default)` do projeto `heroi-da-cidade` (versão de 02/10/2026) são **idênticas** às de `main`; a branch só **acrescenta** o bloco do Instagram (16 linhas). Publicar é, portanto, uma mudança aditiva e segura. (Existe também uma segunda versão de regras, de 17/09/2026, ligada a um banco nomeado `ai-studio-…`; ela não é afetada.)
+- **Teste das regras no emulador local** (novo: `tests/firestore-rules-instagram.test.js`, já incluído em `npm run test:rules`): 3 testes passam — admin lê `instagramMeta`/`instagramPosts`; ninguém escreve pelo cliente; `instagramPrivate` (token e reserva) não é acessível nem pelo admin. Isso substitui a necessidade do "Rules Playground" (Etapa 22), que passa a ser só uma conferência opcional.
+- `npm test`: 191 passam, 0 falham.
+
+**Bloqueado para mim (negado pelo sistema de permissões): publicar as regras em produção.** Fica para você, em 1 comando (Etapa 21 abaixo).
+
+**O que continua dependendo só de você** (nesta ordem):
+1. **Etapa 21** — publicar as regras (1 comando, ou colar no console).
+2. **Etapas 1–12** (conta, app Meta, permissões, token) — exigem seu login no Instagram/Meta.
+3. **Etapa E (Testes 1–10)** — exigem o token. **Pare se os Testes 3 ou 4 falharem** e me envie o erro.
+4. **Etapa 14–15** — conferir/cadastrar variáveis na Vercel (não tenho acesso ao painel nem à CLI da Vercel).
+5. **Etapa 16** — mergear o PR #25 (ou me pedir) para ir à produção, **depois** das regras e do token.
+6. **Etapas 24–29** — primeira sincronização e conferência.
+
 **Legenda de confiança** (usada em todo o guia)
 - **[DOC]** Confirmado pela documentação oficial consultada.
 - **[CONTA]** Depende de configuração da conta ou do aplicativo.
@@ -346,7 +365,8 @@ Todas as chamadas abaixo usam `curl.exe` (com `.exe`, para não cair no alias do
 
 **Etapa 16 — Quando é preciso fazer um novo deploy**
 - **Regra:** variáveis de ambiente só são lidas por **deployments novos**; deploys antigos continuam com o valor anterior. Depois da Etapa 15 (e depois de qualquer troca de token), é necessário um **novo deploy de produção**.
-- **Importante:** o deploy também é o que **publica o código do módulo** (hoje só existe nesta cópia de trabalho). Faça o commit, o push e o deploy **somente com sua autorização** — me peça ("faça o commit e o push dessa branch") quando chegar a hora. O fluxo mais seguro é: Etapa 17 (regras) → deploy → primeira sincronização.
+- **Importante:** o deploy também é o que **publica o código do módulo**. **Commit e push já foram feitos** e o **PR #25** está aberto (https://github.com/igorhviegas/Her-i-da-Cidade/pull/25), com o preview da Vercel aprovado. **Mergear o PR em `main` dispara o deploy de produção.** Ordem segura: (1) Etapa 21 (regras) → (2) cadastrar `INSTAGRAM_ACCESS_TOKEN` (Etapa 15) → (3) mergear o PR (ou me pedir) → (4) primeira sincronização. Se mergear antes de cadastrar o token, nada quebra: a página abre e a sincronização responde "Integração não configurada".
+- **Preview vs. produção:** o preview da Vercel não serve para sincronizar (outro domínio, talvez fora dos "Authorized domains" do Firebase, e variáveis do ambiente Preview).
 - **Preview:** ambientes de preview têm outro endereço, que talvez não esteja em **Authentication → Settings → Authorized domains** do Firebase; o login do admin falharia lá. Faça a primeira sincronização **em produção**.
 
 **Etapa 17 — Conferir plano, duração e cron**
@@ -372,6 +392,7 @@ Todas as chamadas abaixo usam `curl.exe` (com `.exe`, para não cair no alias do
 - **Conclusão:** UID do admin conferido.
 
 **Etapa 20 — Comparar as regras publicadas com as do repositório (sem publicar nada)**
+- **✅ JÁ FEITA por mim em 03/10/2026:** publicadas = `main`; a branch só acrescenta o bloco do Instagram. **Pule para a Etapa 21.** (O procedimento abaixo fica como referência caso alguém altere as regras pelo console depois.)
 - **Onde:** Firestore Database → aba **Rules** (Regras).
 - **Passo a passo:**
   1. Copie todo o texto das regras publicadas e salve num arquivo **local fora do repositório** (ex.: `C:\Temp\regras-publicadas.txt`).
@@ -383,9 +404,16 @@ Todas as chamadas abaixo usam `curl.exe` (com `.exe`, para não cair no alias do
 - **Resultado esperado:** diferença restrita ao bloco do Instagram.
 - **Conclusão:** você sabe se publicar é seguro.
 
-**Etapa 21 — Publicar as regras (somente com a sua autorização)**
-- **Quando:** depois da Etapa 20, antes da primeira sincronização (sem as regras, o painel não consegue ler os dados e mostra "Não foi possível carregar").
-- **Como (futuro, por mim ou por você):** `firebase deploy --only firestore:rules --project heroi-da-cidade`. Observação: `firebase.json` referencia `firestore.indexes.json`, que **não existe** no repositório; use sempre `--only firestore:rules` (um `deploy` de todo o Firestore falharia). Alternativa: colar o conteúdo em **Rules → Publish** no console.
+**Etapa 21 — Publicar as regras (VOCÊ executa; eu fui impedido de publicar em produção)**
+- **Quando:** agora (é aditivo e seguro, conforme a Etapa 20), e antes de mergear o PR (sem as regras, o painel não consegue ler os dados e mostra "Não foi possível carregar").
+- **Como:** abra um terminal na pasta do projeto, na branch `claude/stoic-kare-00f48a` (ou depois do merge, em `main`), e rode:
+  ```powershell
+  firebase deploy --only firestore:rules --project heroi-da-cidade
+  ```
+  O Firebase CLI já está logado como `igorhviegas@gmail.com` neste computador. Detalhe: use sempre `--only firestore:rules`.
+- **Verificação (opcional, 1 comando):** o terminal deve terminar com `Deploy complete!`; no console (Firestore → Rules) a data de publicação passa a ser a de hoje e o texto contém `match /instagramPrivate/{docId}`.
+- **Se preferir o console:** copie o conteúdo de `firestore.rules` (desta branch) para Firestore → Rules → **Publish**.
+- **Observação (detalhe técnico):** os comandos abaixo continuam válidos: Observação: `firebase.json` referencia `firestore.indexes.json`, que **não existe** no repositório; use sempre `--only firestore:rules` (um `deploy` de todo o Firestore falharia). Alternativa: colar o conteúdo em **Rules → Publish** no console.
 - **Resultado esperado:** "Rules published" e a data de publicação atualizada.
 - **Conclusão:** regras publicadas.
 
@@ -538,7 +566,7 @@ O servidor local (`npm run dev`) **não** lê arquivos `.env` e, se você config
 
 | Item | Estado atual | Evidência | Ação necessária | Responsável |
 |---|---|---|---|---|
-| Código do módulo em produção | **Não implantado** | Alterações só nesta cópia de trabalho (não commitadas) | Commit, push e deploy | Claude, **com sua autorização** |
+| Código do módulo em produção | **Commitado e enviado; PR #25 aberto; preview da Vercel aprovado; produção aguarda o merge** | Commit `70ed310`; check "Vercel" do PR = pass | Mergear o PR (depois de regras e token) | Você (ou Claude, se pedir) |
 | Conta profissional | **A verificar** (sem acesso) | — | Etapas 1–3 | Você |
 | Aplicativo da Meta | **A verificar** (sem acesso) | Documentação exige tipo **Business** | Etapas 4–8 | Você |
 | Permissões | **A verificar** | Escopos exigidos pelo código identificados; lista da documentação inconsistente quanto a `manage_insights` | Etapas 9–10 | Você |
@@ -547,21 +575,20 @@ O servidor local (`npm run dev`) **não** lê arquivos `.env` e, se você config
 | `views` e formato da resposta | **A verificar** | Feed/Reels documentados; formato da resposta não obtido; álbum sem insights | Testes 6–8 | Você e Claude |
 | Versão `v23.0` | **Não confirmado** | Documentação mostra `v25.0` | Teste 10 (e `INSTAGRAM_API_VERSION` se preciso) | Você |
 | Variáveis da Vercel | **A verificar** | Código exige: token, `CRON_SECRET`, Admin SDK, ID do projeto, chave web | Etapas 13–15 | Você (ou Claude, com autorização) |
-| Regras do Firestore | **Não publicadas / não comparadas** | Local = `main` + 16 linhas; publicadas desconhecidas; `firestore.indexes.json` ausente | Etapas 20–22 | Você; Claude publica **com autorização** |
-| Plano / duração (`maxDuration: 60`) | **Provavelmente ok** | Hobby: máx. 300 s com fluid compute [DOC]; cron 1x/dia permitido | Confirmar plano e aceitação do deploy | Você |
+| Regras do Firestore | **Comparadas (idênticas a `main`); NÃO publicadas** | Lidas via Firebase CLI em 03/10: publicadas = `main`; branch = `main` + bloco do Instagram; emulador: 3 testes passam; `firestore.indexes.json` ausente (use `--only firestore:rules`) | Etapa 21 (1 comando) | **Você** (publicação em produção foi negada a mim) |
+| Plano / duração (`maxDuration: 60`) e crons | **Aceitos** | Deploy de preview da Vercel concluído com o `vercel.json` atual | Conferir em Settings → Cron Jobs após o merge | Você |
 | Primeira sincronização | **Pendente** | — | Etapas 23–27 | Você |
 | Validação dos dados | **Pendente** | — | Etapa 28 | Você e Claude |
 | Cron automático | **Configurado, não validado** | `0 9 * * *`; Hobby exige 1x/dia (ok); precisão ±59 min | Etapa 29 | Você |
 
-**Bloqueios que impedem avançar:** (1) deploy do módulo; (2) Testes 3 e 4; (3) regras publicadas.
+**Bloqueios que impedem avançar:** (1) Testes 3 e 4; (2) regras publicadas (Etapa 21); (3) token na Vercel; (4) merge do PR.
 **Podem esperar:** tokenExpiresAt (preenche no dia seguinte), validação do cron, comparação fina de visualizações.
 
 ---
 
 ## 13. Pendências (dependem de você, acesso ou autorização)
 
-- Autorizar commit, push e deploy do módulo.
-- Autorizar a publicação das regras (após a comparação da Etapa 20).
+- Publicar as regras (Etapa 21) e mergear o PR #25 (ou me pedir o merge).
 - Criar/confirmar o app Meta, a conta, as permissões e o token.
 - Cadastrar `INSTAGRAM_ACCESS_TOKEN` e conferir as demais variáveis.
 - Executar os Testes 1–10 e me enviar **apenas** os resultados dos que falharem (sem tokens).
