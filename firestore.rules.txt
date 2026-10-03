@@ -322,6 +322,22 @@ service cloud.firestore {
     }
 
 
+    // Instagram Analytics: espelho dos dados da Meta, gravado só pelo servidor (Admin SDK); administradores apenas leem.
+    // instagramPrivate guarda o token renovado e não é acessível por nenhum cliente.
+    match /instagramMeta/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /instagramPosts/{postId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /instagramPrivate/{docId} {
+      allow read, write: if false;
+    }
+
     // =========================================================
     // SITE CONFIG (Configurações do Site)
     // =========================================================

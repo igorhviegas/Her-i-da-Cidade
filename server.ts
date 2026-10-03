@@ -6,6 +6,7 @@ import { handleThumbnailUpload } from "./api/upload-thumbnail";
 import { handleManyChatWebhook } from "./api/manychat";
 import { handleMissionsCron } from "./api/missions-cron";
 import { handleAlexa } from "./api/alexa";
+import { handleInstagramSync } from "./api/instagram-sync";
 
 const PORT = 3000;
 
@@ -182,6 +183,10 @@ async function startServer() {
   });
 
   // Alexa Skill: cria missões a partir de lembretes por voz
+  app.all("/api/instagram-sync", (req, res) => {
+    handleInstagramSync(req, res);
+  });
+
   app.all("/api/alexa", (req, res) => {
     handleAlexa(req, res);
   });

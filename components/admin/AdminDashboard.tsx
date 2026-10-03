@@ -15,6 +15,7 @@ import { NotificationsBell } from './NotificationsBell';
 import { AdminFinancePage } from './AdminFinancePage';
 import { FinanceRevenueBadge } from './FinanceRevenueBadge';
 import { AdminHomePage } from './AdminHomePage';
+import { AdminInstagramPage } from './AdminInstagramPage';
 import { AdminNav, useNavOrder, type NavItem } from './AdminNav';
 import { subscribeActiveOrders } from '../../services/ordersService';
 import { 
@@ -40,10 +41,11 @@ import {
   BookOpen,
   Target,
   Wallet,
+  Camera,
   House
 } from 'lucide-react';
 
-type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance';
+type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram';
 
 // Módulos reorganizáveis (ordem padrão). "Principal" é fixo no topo e fica fora desta lista.
 const NAV_ITEMS: NavItem<AdminTab>[] = [
@@ -57,6 +59,7 @@ const NAV_ITEMS: NavItem<AdminTab>[] = [
   { id: 'scripts', label: 'Roteiros', icon: BookOpen },
   { id: 'missions', label: 'Missões', icon: Target },
   { id: 'finance', label: 'Financeiro', icon: Wallet },
+  { id: 'instagram', label: 'Instagram', icon: Camera },
   { id: 'settings', label: 'Configurações', icon: Settings },
 ];
 const NAV_ORDER = NAV_ITEMS.map((item) => item.id);
@@ -85,6 +88,8 @@ export const AdminDashboard: React.FC = () => {
       ? 'clients'
       : path === '/admin/missoes'
       ? 'missions'
+      : path === '/admin/instagram'
+      ? 'instagram'
       : path === '/admin/financeiro'
       ? 'finance'
       : path === '/admin/dashboard'
@@ -115,6 +120,8 @@ export const AdminDashboard: React.FC = () => {
       setCurrentTab('clients');
     } else if (path === '/admin/missoes') {
       setCurrentTab('missions');
+    } else if (path === '/admin/instagram') {
+      setCurrentTab('instagram');
     } else if (path === '/admin/financeiro') {
       setCurrentTab('finance');
     } else if (path === '/admin/dashboard') {
@@ -144,6 +151,8 @@ export const AdminDashboard: React.FC = () => {
       navigate('/admin/clientes');
     } else if (tabId === 'missions') {
       navigate('/admin/missoes');
+    } else if (tabId === 'instagram') {
+      navigate('/admin/instagram');
     } else if (tabId === 'finance') {
       navigate('/admin/financeiro');
     } else if (tabId === 'dashboard') {
@@ -648,9 +657,10 @@ export const AdminDashboard: React.FC = () => {
           {currentTab === 'scripts' && <AdminScriptsPage />}
           {currentTab === 'missions' && <AdminMissionsPage />}
           {currentTab === 'finance' && <AdminFinancePage />}
+          {currentTab === 'instagram' && <AdminInstagramPage />}
 
           {/* TAB: SUBMÓDULOS EM BREVE */}
-            {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && currentTab !== 'categories' && currentTab !== 'content' && currentTab !== 'orders' && currentTab !== 'scripts' && currentTab !== 'clients' && currentTab !== 'missions' && currentTab !== 'finance' && (
+            {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && currentTab !== 'categories' && currentTab !== 'content' && currentTab !== 'orders' && currentTab !== 'scripts' && currentTab !== 'clients' && currentTab !== 'missions' && currentTab !== 'finance' && currentTab !== 'instagram' && (
             <div className="max-w-2xl mx-auto py-12 text-center animate-in fade-in duration-200">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 mb-4 text-blue-400">
                 <Clock className="w-8 h-8" />
