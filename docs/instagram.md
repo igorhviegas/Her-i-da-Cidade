@@ -18,6 +18,12 @@ Espelha no Firestore o perfil e as últimas 100 publicações da conta profissio
 5. Definir `INSTAGRAM_ACCESS_TOKEN` (e confirmar `CRON_SECRET`) na Vercel e republicar. Para trocar de token, basta atualizar a variável (ela prevalece sobre o token renovado salvo).
 6. Publicar `firestore.rules` (nova regra das coleções `instagram*`). Sem isso o painel não consegue ler.
 
+## Balanço diário (seguidores, curtidas e visualizações)
+- Calculado no servidor, no mesmo batch da sincronização (falha não altera nada). Referências em `instagramPrivate/daily`; o saldo exibido em `instagramMeta/profile.daily` (painel e widget da Principal só leem).
+- O dia é o de Brasília (America/Sao_Paulo). A **primeira sincronização bem-sucedida de cada dia** vira a referência ("hoje" = desde ela; o painel mostra "desde HH:mm" se for depois das 02:00). Seguidores: atual − referência (líquido). Curtidas/visualizações: soma por publicação de (atual − referência), só onde as duas pontas existem; publicação nascida depois da referência entra com referência 0; publicação que sai do conjunto não gera saldo; visualizações desatualizadas ficam de fora ("parcial").
+- Cron: `0 3 * * *` (00:00–00:59 em Brasília no plano Hobby) cria a referência perto da meia-noite; `0 9 * * *` segue como atualização da manhã. Se o cron falhar, a 1ª sincronização do dia (manual ou da manhã) cria a referência; o cálculo não depende do cron.
+- Sem sincronização no dia, o painel mostra "Aguardando a 1ª sincronização de hoje" (nunca o saldo de ontem).
+
 ## Métricas e limitações
 - Disponíveis: seguidores, nº de publicações, curtidas, comentários, visualizações (`views` por mídia), tipo, data, legenda, miniatura.
 - Curtidas/comentários/visualizações exibidos são **soma das publicações carregadas** (até 100), não o total histórico. Métrica ausente aparece como "Indisponível" e fica fora de somas e rankings (ex.: curtidas ocultas pelo autor; `views` pode falhar em mídias antigas).

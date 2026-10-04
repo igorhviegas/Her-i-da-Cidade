@@ -659,35 +659,6 @@ export const AdminDashboard: React.FC = () => {
           {currentTab === 'finance' && <AdminFinancePage />}
           {currentTab === 'instagram' && <AdminInstagramPage />}
 
-          {/* TAB: SUBMÓDULOS EM BREVE */}
-            {currentTab !== 'dashboard' && currentTab !== 'services' && currentTab !== 'settings' && currentTab !== 'videos' && currentTab !== 'categories' && currentTab !== 'content' && currentTab !== 'orders' && currentTab !== 'scripts' && currentTab !== 'clients' && currentTab !== 'missions' && currentTab !== 'finance' && currentTab !== 'instagram' && (
-            <div className="max-w-2xl mx-auto py-12 text-center animate-in fade-in duration-200">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10 mb-4 text-blue-400">
-                <Clock className="w-8 h-8" />
-              </div>
-              <div className="mb-2">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                  Módulo em Preparação
-                </span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-3">
-                {navItems.find(i => i.id === currentTab)?.label}
-              </h2>
-              <p className="text-sm text-white/60 leading-relaxed max-w-lg mx-auto mb-8 font-light">
-                A estrutura de navegação e as rotas administrativas já estão preparadas. 
-                A lógica operacional deste módulo será implementada nas etapas seguintes.
-              </p>
-              
-              <button
-                onClick={() => handleTabChange('dashboard')}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-blue-600/30 transition-all"
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                <span>Voltar ao Dashboard Principal</span>
-              </button>
-            </div>
-          )}
-
         </main>
       </div>
 

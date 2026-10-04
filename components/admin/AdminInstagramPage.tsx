@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ExternalLink, Image as ImageIcon, Loader2, RefreshCw } from 'lucide-react';
 import { subscribeInstagramPosts, subscribeInstagramProfile, syncInstagramNow, type InstagramProfile } from '../../services/instagramService';
 import { currentPosts, formatDateTime as fmtDateTime, sortPosts, topPost, totalFor, type InstagramPost, type MetricKey } from '../../services/instagramMetrics.js';
+import { describeDelta } from '../../services/instagramDaily.js';
+import { dateKey } from '../../functions/missions-core.js';
 import { cardClass, ghostBtn, primaryBtn } from './financeFormat';
 
 type SortKey = MetricKey | 'recent';
@@ -15,10 +17,19 @@ const PAGE_SIZE = 12;
 const num = new Intl.NumberFormat('pt-BR');
 const fmt = (value: number | null | undefined) => (value == null ? 'Indisponível' : num.format(value));
 
-const Kpi: React.FC<{ label: string; value: string; hint?: string }> = ({ label, value, hint }) => (
+const DELTA_TONE = { up: 'text-emerald-300', down: 'text-red-300', zero: 'text-white/50', pending: 'text-white/40', unavailable: 'text-white/40' } as const;
+
+/** Saldo do dia (texto vindo de describeDelta; sem regra de negócio aqui). */
+export const DeltaText: React.FC<{ daily: InstagramProfile['daily']; metric: 'followers' | 'likes' | 'views'; today: string; className?: string }> = ({ daily, metric, today, className = '' }) => {
+  const delta = describeDelta(daily, metric, today);
+  return <p className={`text-xs font-semibold ${DELTA_TONE[delta.kind]} ${className}`}>{delta.text}{delta.since && <span className="font-normal text-white/40"> · desde {delta.since}</span>}</p>;
+};
+
+const Kpi: React.FC<{ label: string; value: string; hint?: string; delta?: React.ReactNode }> = ({ label, value, hint, delta }) => (
   <div className={cardClass}>
     <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">{label}</p>
     <p className="mt-1 text-xl font-extrabold tabular-nums text-white sm:text-2xl">{value}</p>
+    {delta && <div className="mt-1">{delta}</div>}
     {hint && <p className="mt-1 text-xs text-white/50">{hint}</p>}
   </div>
 );
@@ -84,6 +95,7 @@ export const AdminInstagramPage: React.FC = () => {
 
   const scope = (key: MetricKey) => `Soma de ${totals[key].counted} de ${current.length} publicações da última sincronização (não é o total histórico).`;
   const loading = profile === undefined || posts === undefined;
+  const today = dateKey(new Date()); // dia em Brasília, recalculado a cada render
 
   return (
     <div className="space-y-6">
@@ -124,11 +136,11 @@ export const AdminInstagramPage: React.FC = () => {
       {profile && posts && (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <Kpi label="Seguidores" value={fmt(profile.followers)} />
+            <Kpi label="Seguidores" value={fmt(profile.followers)} delta={<DeltaText daily={profile.daily} metric="followers" today={today} />} />
             <Kpi label="Publicações" value={fmt(profile.mediaCount)} hint={`${current.length} na última sincronização`} />
-            <Kpi label="Curtidas" value={fmt(totals.likes.counted ? totals.likes.total : null)} hint={scope('likes')} />
+            <Kpi label="Curtidas" value={fmt(totals.likes.counted ? totals.likes.total : null)} delta={<DeltaText daily={profile.daily} metric="likes" today={today} />} hint={scope('likes')} />
             <Kpi label="Comentários" value={fmt(totals.comments.counted ? totals.comments.total : null)} hint={scope('comments')} />
-            <Kpi label="Visualizações" value={fmt(totals.views.counted ? totals.views.total : null)} hint={scope('views')} />
+            <Kpi label="Visualizações" value={fmt(totals.views.counted ? totals.views.total : null)} delta={<DeltaText daily={profile.daily} metric="views" today={today} />} hint={scope('views')} />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
