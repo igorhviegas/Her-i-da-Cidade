@@ -216,6 +216,12 @@ export const AdminOrdersPage: React.FC = () => {
 
   /** Evento sem custo informado não pode ser concluído: avisa e abre "Editar pedido" no pedido. */
   const requireEventCost = (view: OrderView): boolean => {
+    if (view.order.eventDraft) {
+      window.alert('Complete os dados do evento em "Editar pedido" antes de concluir.');
+      setSelectedOrder(view);
+      setEditOrderOpen(true);
+      return false;
+    }
     if (!view.order.eventForm || typeof view.order.eventForm.cost === 'number') return true;
     window.alert('Informe o custo do evento em "Editar pedido" antes de concluir. Ele é obrigatório para lançar a despesa no Financeiro.');
     setSelectedOrder(view);
@@ -471,9 +477,19 @@ export const AdminOrdersPage: React.FC = () => {
                               </p>}
                             </div>
                           )}
-                          <p className="mt-3 text-sm font-extrabold text-emerald-300">{formatMoney(order.totalPaid)}</p>
+                          {order.eventDraft ? <p className="mt-3 text-xs font-bold text-amber-300">⚠ Dados do evento pendentes</p> : <p className="mt-3 text-sm font-extrabold text-emerald-300">{formatMoney(order.totalPaid)}</p>}
                           <div className="mt-2.5 flex flex-wrap gap-2">
-                            {order.eventForm ? (
+                            {order.eventDraft ? (
+                              <button
+                                type="button"
+                                draggable={false}
+                                onClick={(event) => { event.stopPropagation(); setSelectedOrder({ order, client, service, script }); setOrderActionError(''); setEditOrderOpen(true); }}
+                                onKeyDown={(event) => event.stopPropagation()}
+                                className="inline-flex min-h-11 flex-[2_1_130px] items-center justify-center gap-2 rounded-lg border border-blue-400/40 bg-blue-500/15 px-3 text-xs font-bold text-blue-100 hover:bg-blue-500/25"
+                              >
+                                <Pencil className="h-4 w-4 shrink-0" /> Completar cadastro
+                              </button>
+                            ) : order.eventForm ? (
                               <button
                                 type="button"
                                 draggable={false}
@@ -659,6 +675,11 @@ export const AdminOrdersPage: React.FC = () => {
                     </div>
                   ))}
                 </dl>
+                {order.eventDraft && (
+                  <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100">
+                    Pedido recebido pelo ManyChat com cliente e WhatsApp. Faltam os dados do evento: use "Editar pedido" para completar. Nada foi lançado no Financeiro ainda.
+                  </p>
+                )}
                 {!event && (
                   <div className="border-b border-white/[0.07] pb-3">
                     <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/40">Conteúdo</h3>

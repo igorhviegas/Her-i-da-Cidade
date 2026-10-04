@@ -70,6 +70,8 @@ export interface Order {
   childName?: string;
   /** Dados do formulário manual de evento. Ausente em pedidos antigos / ManyChat. */
   eventForm?: EventForm;
+  /** Pedido presencial criado pelo ManyChat só com cliente e WhatsApp: os dados do evento ainda não foram preenchidos. Sai ao salvar o formulário de evento. */
+  eventDraft?: boolean;
   /** Presente em pedidos de evento com livro de lançamentos (collection financeEntries). Valores já lançados (congelados). */
   eventLedger?: { entry: number; final?: number; cost?: number };
   /** Vínculo com o Google Agenda, gravado pelo servidor (/api/google-calendar). */

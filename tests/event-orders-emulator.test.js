@@ -108,5 +108,50 @@ assert.deepEqual(await ledger(created.id), {});
 assert.equal((await getDocs(collection(db, 'financeEntries'))).size, 4);
 step('excluir o pedido remove seus lançamentos; os demais ficam');
 
+// 9. pedido presencial vindo do ManyChat (rascunho): nada é lançado até o cadastro do evento ser salvo
+const draftData = () => ({ clientId: 'c1', serviceId: 's1', status: 'scheduled', content: 'Pedido recebido via ManyChat.', servicePrice: 0, rushFee: 0, totalPaid: 0, productionType: 'scheduled', source: 'manychat', eventDraft: true, createdAt: new Date() });
+const makeDraft = async () => {
+  const ref = doc(collection(db, 'orders'));
+  await env.withSecurityRulesDisabled(async (ctx) => { await setDoc(doc(ctx.firestore(), 'orders', ref.id), draftData()); });
+  return ref.id;
+};
+const before = (await getDocs(collection(db, 'financeEntries'))).size;
+const draftId = await makeDraft();
+assert.equal((await getDocs(collection(db, 'financeEntries'))).size, before);
+await assert.rejects(orders.updateOrder(draftId, { status: 'completed' }), /Complete os dados do evento/);
+assert.equal((await orderDoc(draftId)).status, 'scheduled');
+assert.deepEqual(await ledger(draftId), {});
+step('rascunho do ManyChat: sem lançamentos e conclusão bloqueada');
+
+const filled = { ...input().eventForm };
+await orders.updateOrder(draftId, { eventForm: filled, childName: 'Pedro', eventDate: new Date(2026, 9, 10, 12), content: 'x', servicePrice: 1000, rushFee: 0, totalPaid: 1000 });
+let draft = await orderDoc(draftId);
+assert.equal(draft.eventDraft, undefined);
+assert.deepEqual(draft.eventLedger, { entry: 500 });
+l = await ledger(draftId);
+assert.deepEqual(Object.keys(l), ['entry']);
+assert.equal(l.entry.amount, 500);
+step('cadastro do evento salvo: vira evento comum e lança só a entrada (R$ 500)');
+const entryStamp = l.entry.createdAt.toMillis();
+
+await orders.updateOrder(draftId, { eventForm: { ...filled, totalValue: 3000, entryValue: 1500 } }); // edição posterior
+l = await ledger(draftId);
+assert.deepEqual([Object.keys(l).length, l.entry.amount, l.entry.createdAt.toMillis()], [1, 500, entryStamp]);
+assert.deepEqual((await orderDoc(draftId)).eventLedger, { entry: 500 });
+step('salvar de novo não lança outra entrada nem altera a existente');
+
+await orders.updateOrder(draftId, { eventForm: { ...filled, totalValue: 1000, entryValue: 500 } });
+await orders.updateOrder(draftId, { status: 'completed' });
+l = await ledger(draftId);
+assert.deepEqual(Object.keys(l).sort(), ['cost', 'entry', 'final']);
+assert.deepEqual([l.final.amount, l.cost.amount], [500, 150]);
+step('conclusão após o cadastro: 2ª parcela e despesa, uma vez cada');
+
+const noCost = await makeDraft();
+await orders.updateOrder(noCost, { eventForm: { ...filled, cost: null }, childName: 'Ana', eventDate: new Date(2026, 9, 11, 12), content: 'x', servicePrice: 1000, rushFee: 0, totalPaid: 1000 });
+await assert.rejects(orders.updateOrder(noCost, { status: 'completed' }), /informe o custo/);
+assert.deepEqual(Object.keys(await ledger(noCost)), ['entry']);
+step('rascunho completado sem custo: conclusão exige o custo e nada é lançado');
+
 await vite.close(); await env.cleanup();
 console.log('E2E OK');

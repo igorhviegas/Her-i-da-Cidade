@@ -345,6 +345,22 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
       stock = await prepareOrderReversal(transaction, firestore, { orderId: id, actor: currentActor() });
     }
 
+    // Pedido presencial do ManyChat (eventDraft): sem os dados do evento não há o que faturar, então não pode ser concluído.
+    if (updates.status === 'completed' && currentData.status !== 'completed' && currentData.eventDraft === true) {
+      throw new Error('Complete os dados do evento em "Editar pedido" antes de concluir.');
+    }
+    // Primeira vez que o cadastro do evento é salvo num rascunho: vira evento comum e a entrada é lançada (data = este momento).
+    // ID determinístico + checagem na transação: salvar de novo nunca lança outra entrada.
+    let draftEntry: { id: string; record: Record<string, unknown> } | null = null;
+    if (currentData.eventDraft === true && updates.eventForm) {
+      const entryRef = doc(firestore, LEDGER_COLLECTION, ledgerId(id, 'entry'));
+      const existingEntry = await transaction.get(entryRef);
+      const record = planEntry(id, { ...currentData, ...updates }, serverTimestamp());
+      if (!existingEntry.exists()) draftEntry = { id: entryRef.id, record: { ...record, createdAt: serverTimestamp() } };
+      payload.eventDraft = deleteField();
+      payload.eventLedger = { entry: record.amount };
+    }
+
     // Evento com livro de lançamentos: a PRIMEIRA conclusão lança a 2ª parcela e a "Despesa evento" (IDs determinísticos, create-only).
     // Se o lançamento já existe (reabertura, repetição, falha de rede com nova tentativa), nada é criado nem alterado.
     // Dados financeiros incompletos bloqueiam a conclusão (EventFinanceError) sem lançar nada.
@@ -375,6 +391,7 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     transaction.update(orderRef, payload);
     stock?.apply();
     ledgerWrites.forEach(({ id: entryId, record }) => transaction.set(doc(firestore, LEDGER_COLLECTION, entryId), record));
+    if (draftEntry) transaction.set(doc(firestore, LEDGER_COLLECTION, draftEntry.id), draftEntry.record);
     if (activityRefsForOrder && activityRecord) transaction.set(activityRefsForOrder.logRef, activityRecord);
     if (linkedScriptRef && linkedScript) {
       transaction.update(linkedScriptRef, {

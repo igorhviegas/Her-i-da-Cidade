@@ -63,7 +63,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
   const [rushFee, setRushFee] = useState(String(order.rushFee ?? 0));
   const [totalPaid, setTotalPaid] = useState(String(order.totalPaid ?? ''));
   // Pedido criado pelo formulário manual de evento: edita os campos do evento (os lançamentos já feitos no Financeiro não mudam).
-  const isEventOrder = Boolean(order.eventForm);
+  const isDraft = order.eventDraft === true; // criado pelo ManyChat: só cliente e WhatsApp até este cadastro
+  const isEventOrder = Boolean(order.eventForm) || isDraft;
   const [eventState, setEventState] = useState(() => eventFormFromOrder(order));
   const booked = order.eventLedger;
   const money = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -178,6 +179,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
         rushFee: rushAmount,
         totalPaid: paidTotal,
         ...eventUpdates,
+        ...(isDraft && eventValues ? { eventDraft: undefined, eventLedger: { entry: eventValues.entryValue } } : {}),
       };
       if (paidAtChanged || deliveryDaysChanged) {
         const deadlinePaidAt = paidAtChanged ? paidAt : toDate(order.paidAt);
@@ -215,6 +217,11 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
               <p className="text-[11px] text-white/40">O WhatsApp será normalizado e atualizado no cadastro do cliente.</p>
             </section>
 
+            {isDraft && (
+              <p className="rounded-xl border border-blue-500/25 bg-blue-500/10 p-3 text-[11px] text-blue-100">
+                Pedido recebido pelo ManyChat: complete os dados do evento. Ao salvar, a entrada é lançada no Financeiro (a 2ª parcela e a despesa são lançadas na conclusão).
+              </p>
+            )}
             {isEventOrder && booked && (
               <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-[11px] text-amber-200">
                 Lançamentos já efetivados no Financeiro: entrada {money(booked.entry)}{booked.final !== undefined ? ` · 2ª parcela ${money(booked.final)}` : ''}{booked.cost !== undefined ? ` · despesa evento ${money(booked.cost)}` : ''}.
