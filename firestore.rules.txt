@@ -77,6 +77,22 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('active', false) == true;
     }
 
+    // Livro de lançamentos dos eventos (financeEntries): ID determinístico evt-{pedido}-{entry|final|cost}, criado uma única vez.
+    function validLedgerEntry(entryId, data) {
+      return data.keys().hasAll(['orderId', 'kind', 'type', 'amount', 'date', 'createdAt'])
+        && data.orderId is string
+        && data.orderId.size() > 0
+        && data.kind in ['entry', 'final', 'cost']
+        && entryId == 'evt-' + data.orderId + '-' + data.kind
+        && data.type == (data.kind == 'cost' ? 'expense' : 'revenue')
+        && data.amount is number
+        && data.amount >= 0
+        && data.date is timestamp
+        && data.createdAt is timestamp
+        && data.createdAt == request.time
+        && existsAfter(orderDocumentPath(data.orderId));
+    }
+
     function consumptionPath(orderId) {
       return /databases/$(database)/documents/stockConsumptions/$(orderId);
     }
@@ -257,7 +273,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // PDFs importados: um documento por formulário (id = hash do texto), criado junto do pedido; nunca alterado nem apagado.
+    // Lançamentos financeiros de eventos: imutáveis. Só podem ser removidos junto da exclusão do pedido de origem
+    // (o pedido deixa de existir na mesma transação); caso contrário, nunca são alterados nem apagados.
+    match /financeEntries/{entryId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && validLedgerEntry(entryId, request.resource.data);
+      allow update: if false;
+      allow delete: if isAdmin() && !existsAfter(orderDocumentPath(resource.data.orderId));
+    }
+
+    // PDFs importados (importação removida; coleção mantida para os documentos já gravados): um documento por formulário (id = hash do texto), criado junto do pedido; nunca alterado nem apagado.
     match /orderImports/{importId} {
       allow read, create: if isAdmin();
       allow update, delete: if false;

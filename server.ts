@@ -7,6 +7,7 @@ import { handleManyChatWebhook } from "./api/manychat";
 import { handleMissionsCron } from "./api/missions-cron";
 import { handleAlexa } from "./api/alexa";
 import { handleInstagramSync } from "./api/instagram-sync";
+import { handleGoogleCalendar } from "./api/google-calendar";
 
 const PORT = 3000;
 
@@ -185,6 +186,11 @@ async function startServer() {
   // Alexa Skill: cria missões a partir de lembretes por voz
   app.all("/api/instagram-sync", (req, res) => {
     handleInstagramSync(req, res);
+  });
+
+  // Google Agenda: envio manual de pedidos de evento (administrador autenticado)
+  app.all("/api/google-calendar", (req, res) => {
+    handleGoogleCalendar(req, res);
   });
 
   app.all("/api/alexa", (req, res) => {

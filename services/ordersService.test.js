@@ -24,6 +24,7 @@ test('script production keeps its atomic order-script transaction without sequen
 
 const financeSource = await readFile(new URL('./financeService.ts', import.meta.url), 'utf8');
 test('financeiro usa um único listener compartilhado de pedidos concluídos (tempo real)', () => {
-  assert.match(financeSource, /onSnapshot\(\s*query\(collection\(requireDb\(\), "orders"\), where\("status", "==", "completed"\)\)/);
+  assert.match(financeSource, /onSnapshot\(\s*query\(collection\(firestore, "orders"\), where\("status", "==", "completed"\)\)/);
+  assert.match(financeSource, /collection\(firestore, LEDGER_COLLECTION\)/); // livro de lançamentos de eventos no mesmo listener compartilhado
   assert.match(financeSource, /listeners\.size === 0/);
 });

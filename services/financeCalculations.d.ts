@@ -15,7 +15,8 @@ export function dayKeyOf(date: Date): string;
 export function daysInMonth(monthKey: string): number;
 export function shiftMonth(monthKey: string, delta: number): string;
 export function orderValue(order: { totalPaid?: number; servicePrice?: number; rushFee?: number }): number;
-export function buildRevenueEntries(orders: any[]): { entries: RevenueEntry[]; undated: number };
+export function buildRevenueEntries(orders: any[]): { entries: RevenueEntry[]; undated: number; costs: RevenueEntry[] };
+export function eventCostForMonth(costs: RevenueEntry[], monthKey: string): { items: RevenueEntry[]; total: number };
 export function monthTotals(entries: RevenueEntry[], monthKey: string): { total: number; count: number };
 export function revenueSeries(entries: RevenueEntry[], endMonthKey: string, n?: number): { monthKey: string; total: number; count: number }[];
 export function dailyRevenue(entries: RevenueEntry[], monthKey: string): DayRevenue[];
@@ -33,5 +34,5 @@ export function financeMetrics(entries: RevenueEntry[], expenses: FixedExpense[]
   recordMonth: { monthKey: string; total: number } | null; cumulative: number; evolutionPct: number | null;
   goalStreak: number; operatingMarginPct: number | null; servicesCount: number;
 };
-export interface StatementRow { id: string; kind: 'in' | 'out'; source: 'order' | 'editing' | 'expense'; date: Date; amount: number; entry?: RevenueEntry; expense?: FixedExpense }
-export function buildStatement(entries: RevenueEntry[], expenses: FixedExpense[], monthKey: string): { rows: StatementRow[]; totalIn: number; totalOut: number; balance: number };
+export interface StatementRow { id: string; kind: 'in' | 'out'; source: 'order' | 'editing' | 'eventCost' | 'expense'; date: Date; amount: number; entry?: RevenueEntry; expense?: FixedExpense }
+export function buildStatement(entries: RevenueEntry[], expenses: FixedExpense[], monthKey: string, costs?: RevenueEntry[]): { rows: StatementRow[]; totalIn: number; totalOut: number; balance: number };
