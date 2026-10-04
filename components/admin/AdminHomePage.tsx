@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, ArrowRight, CalendarDays, Camera, CheckCircle2, Circle, ClipboardList, Loader2, RefreshCw, Target, Wallet, XCircle } from 'lucide-react';
+import { AlertCircle, ArrowRight, CalendarDays, Camera, ChevronDown, ChevronUp, RotateCcw, CheckCircle2, Circle, ClipboardList, Loader2, RefreshCw, Target, Wallet, XCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from '../../lib/router';
 import { subscribeCompletedOrders } from '../../services/financeService';
@@ -18,6 +18,7 @@ import { DeltaText } from './AdminInstagramPage';
 import { useCalendarEvents } from '../../services/calendarService';
 import { eventsOnDay } from '../../services/calendarEvents.js';
 import { DayAgenda } from './CalendarAgenda';
+import { resolveNavOrder, shiftNavItem } from '../../services/adminNav.js';
 
 type Load<T> = { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: T };
 
@@ -279,26 +280,74 @@ const AppointmentsWidget: React.FC<{ now: Date; onOpen: (query?: string) => void
 
 // ------------------------------------------------------------------------ página
 
+const WIDGET_IDS = ['appointments', 'finance', 'tasks', 'instagram', 'deliveries'] as const;
+type WidgetId = (typeof WIDGET_IDS)[number];
+
+/** Ordem dos widgets por administrador (uid), salva neste navegador; ids desconhecidos são ignorados e widgets novos entram no fim. */
+function useWidgetOrder(uid: string | undefined) {
+  const key = `hdc.admin.homeWidgets.${uid ?? 'anon'}`;
+  const read = (): unknown => { try { return JSON.parse(localStorage.getItem(key) ?? 'null'); } catch { return null; } };
+  const [saved, setSaved] = useState<unknown>(read);
+  useEffect(() => { setSaved(read()); }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const order = useMemo(() => resolveNavOrder(WIDGET_IDS, saved) as WidgetId[], [saved]);
+  const persist = (next: WidgetId[] | null) => {
+    setSaved(next);
+    try { if (next) localStorage.setItem(key, JSON.stringify(next)); else localStorage.removeItem(key); } catch { /* vale só nesta sessão */ }
+  };
+  return { order, customized: saved != null, setOrder: persist };
+}
+
 export const AdminHomePage: React.FC<{ onNavigate: (tab: 'finance' | 'missions' | 'orders' | 'instagram' | 'calendar') => void }> = ({ onNavigate }) => {
   const { user } = useAuth();
   const { navigate } = useRouter();
   const now = useNow();
+  const { order, customized, setOrder } = useWidgetOrder(user?.uid);
+  const [editing, setEditing] = useState(false);
   const name = user?.displayName || user?.email?.split('@')[0] || 'Administrador';
   const dateLabel = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Sao_Paulo' }).format(now);
 
+  const widgets: Record<WidgetId, { label: string; node: React.ReactNode }> = {
+    appointments: { label: 'Compromissos', node: <AppointmentsWidget now={now} onOpen={(query) => (query ? navigate(`/admin/calendario?${query}`) : onNavigate('calendar'))} /> },
+    finance: { label: 'Faturamento', node: <FinanceWidget now={now} onOpen={() => onNavigate('finance')} /> },
+    tasks: { label: 'Tarefas', node: <TasksWidget now={now} onOpen={() => onNavigate('missions')} /> },
+    instagram: { label: 'Instagram', node: <InstagramWidget now={now} onOpen={() => onNavigate('instagram')} /> },
+    deliveries: { label: 'Entregas', node: <DeliveriesWidget now={now} onOpen={() => onNavigate('orders')} onOpenOrder={(id) => navigate(`/admin/pedidos?orderId=${encodeURIComponent(id)}`)} /> },
+  };
+  const arrow = 'flex h-7 w-7 items-center justify-center rounded-lg text-white/80 hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent';
+
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-400">Principal</p>
-        <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-white">Olá, {name}!</h2>
-        <p className="mt-1 text-sm capitalize text-white/50">{dateLabel}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-400">Principal</p>
+          <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-white">Olá, {name}!</h2>
+          <p className="mt-1 text-sm capitalize text-white/50">{dateLabel}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {editing && customized && (
+            <button type="button" onClick={() => setOrder(null)} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium text-white/50 hover:bg-white/5 hover:text-white/80"><RotateCcw className="h-3 w-3" aria-hidden />Restaurar padrão</button>
+          )}
+          <button type="button" onClick={() => setEditing((v) => !v)} aria-pressed={editing}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${editing ? 'bg-blue-600 text-white' : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'}`}>
+            {editing ? 'Concluir' : 'Reorganizar'}
+          </button>
+        </div>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <AppointmentsWidget now={now} onOpen={(query) => (query ? navigate(`/admin/calendario?${query}`) : onNavigate('calendar'))} />
-        <FinanceWidget now={now} onOpen={() => onNavigate('finance')} />
-        <TasksWidget now={now} onOpen={() => onNavigate('missions')} />
-        <InstagramWidget now={now} onOpen={() => onNavigate('instagram')} />
-        <DeliveriesWidget now={now} onOpen={() => onNavigate('orders')} onOpenOrder={(id) => navigate(`/admin/pedidos?orderId=${encodeURIComponent(id)}`)} />
+        {order.map((id, index) => (
+          <div key={id} className={`relative ${editing ? 'rounded-2xl ring-2 ring-blue-500/50' : ''}`}>
+            {widgets[id].node}
+            {editing && (
+              <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between rounded-t-2xl bg-blue-600/90 px-3 py-1" role="group" aria-label={`Mover ${widgets[id].label}`}>
+                <span className="text-[11px] font-bold text-white">{widgets[id].label}</span>
+                <span className="flex gap-1">
+                  <button type="button" className={arrow} disabled={index === 0} aria-label={`Mover ${widgets[id].label} para antes`} onClick={() => setOrder(shiftNavItem(order, id, -1) as WidgetId[])}><ChevronUp className="h-4 w-4" aria-hidden /></button>
+                  <button type="button" className={arrow} disabled={index === order.length - 1} aria-label={`Mover ${widgets[id].label} para depois`} onClick={() => setOrder(shiftNavItem(order, id, 1) as WidgetId[])}><ChevronDown className="h-4 w-4" aria-hidden /></button>
+                </span>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
