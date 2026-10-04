@@ -18,6 +18,8 @@ export interface Service {
   initialStatus?: OrderStatus;
   autoComplete?: boolean;
   defaultDeliveryDays?: number;
+  /** Mensagem de WhatsApp do botão de envio do Kanban; ausente/vazia = padrão do tipo de serviço. */
+  deliveryMessage?: string;
   internalOnly?: boolean;
 }
 
@@ -117,6 +119,7 @@ export interface FirestoreService {
   initialStatus?: OrderStatus;
   autoComplete?: boolean;
   defaultDeliveryDays?: number;
+  deliveryMessage?: string;
   internalOnly?: boolean;
 }
 
