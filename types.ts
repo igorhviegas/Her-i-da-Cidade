@@ -85,7 +85,8 @@ export interface EventForm {
   extraWeb: 0 | 1 | 2;
   totalValue: number;
   entryValue: number;
-  cost: number;
+  /** null = ainda não informado; obrigatório só para concluir o pedido. */
+  cost: number | null;
   observations: string;
   /** "#formulário": tipo/identificação do evento; compõe o título no Google Agenda. */
   formType: string;

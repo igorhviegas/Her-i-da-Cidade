@@ -8,7 +8,8 @@ export interface EventFormValues {
   extraWeb: 0 | 1 | 2;
   totalValue: number;
   entryValue: number;
-  cost: number;
+  /** null = ainda não informado (obrigatório só para concluir). */
+  cost: number | null;
   observations: string;
   formType: string;
 }

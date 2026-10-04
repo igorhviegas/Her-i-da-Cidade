@@ -44,8 +44,9 @@ export function validateEventForm(form) {
   const entryValue = money(form.entryValue);
   if (entryValue === null) return { error: 'Informe um valor de entrada válido.' };
   if (entryValue > totalValue) return { error: 'O valor de entrada não pode ser maior que o valor total.' };
-  const cost = money(form.cost);
-  if (cost === null) return { error: 'Informe o custo do evento (use 0 se não houver).' };
+  // Custo é opcional ao criar/editar; é exigido só na conclusão (services/eventFinance.js).
+  const cost = String(form.cost ?? '').trim() === '' ? null : money(form.cost);
+  if (cost === undefined || (cost === null && String(form.cost ?? '').trim() !== '')) return { error: 'Informe um custo válido.' };
   if (!text(form.formType)) return { error: 'Informe o #formulário (tipo do evento).' };
   return {
     value: {

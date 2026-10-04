@@ -9,6 +9,8 @@ import { createHash, createSign } from 'node:crypto';
 
 export const TIME_ZONE = 'America/Sao_Paulo';
 export const EVENT_DURATION_MINUTES = 60;
+/** Cor "Tangerina" da paleta de eventos do Google Agenda. */
+export const TANGERINE_COLOR_ID = '6';
 const SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const API = 'https://www.googleapis.com/calendar/v3/calendars';
@@ -87,30 +89,19 @@ export function whatsappLink(order, client) {
   return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(whatsappMessage(order, client))}` : null;
 }
 
+/** Descrição enxuta (com emojis para leitura rápida): contato, autorização de imagem, teia extra, observações e o link de WhatsApp. */
 export function eventDescription(order, client) {
   const f = order.eventForm;
-  const dateKey = eventDateKey(order.eventDate);
   const link = whatsappLink(order, client);
   return [
-    '=== DADOS DO EVENTO ===',
-    `Formulário: ${f.formType}`,
-    `Cliente: ${client.name}`,
-    `WhatsApp: ${client.whatsapp}`,
-    `Nome da criança: ${order.childName}`,
-    `Data do evento: ${dateKey ? brDate(dateKey) : '—'}`,
-    `Horário de início: ${f.eventTime}`,
-    `Local: ${f.location}`,
-    `Autorização de uso de imagem: ${f.imageAuthorization ? 'Sim' : 'Não'}`,
-    `Teia extra: ${f.extraWeb ? f.extraWeb : 'Não'}`,
-    `Observações: ${f.observations || '—'}`,
+    `👤 Cliente: ${client.name}`,
+    `📱 WhatsApp: ${client.whatsapp}`,
+    `📸 Autorização do uso de imagem: ${f.imageAuthorization ? 'Sim' : 'Não'}`,
+    `🕸️ Teia extra: ${f.extraWeb ? f.extraWeb : 'Não'}`,
+    `📝 Observações: ${f.observations || '—'}`,
     '',
-    '=== DADOS COMERCIAIS ===',
-    `Valor total: ${brl(f.totalValue)}`,
-    `Valor de entrada: ${brl(f.entryValue)}`,
-    `Custo: ${brl(f.cost)}`,
-    '',
-    '=== MENSAGEM DE CONTATO (WHATSAPP) ===',
-    link ? `Abrir conversa com a mensagem pronta: ${link}` : 'Link indisponível: o WhatsApp do cliente não é um número válido.',
+    '💬 Abrir conversa com a mensagem pronta:',
+    link || '⚠️ Link indisponível: o WhatsApp do cliente não é um número válido.',
   ].join('\n');
 }
 
@@ -124,6 +115,7 @@ export function buildCalendarEvent(order, client) {
   const { start, end } = eventTimes(dateKey, f.eventTime);
   return {
     status: 'confirmed',
+    colorId: TANGERINE_COLOR_ID,
     summary: eventTitle(order, client),
     location: f.location,
     description: eventDescription(order, client),

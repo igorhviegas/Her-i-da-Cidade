@@ -41,7 +41,7 @@ export function planEntry(orderId, order, date) {
 export function planCompletion(orderId, order, { bookedEntry, final: hasFinal = false, cost: hasCost = false }, date) {
   const { totalValue, cost } = order?.eventForm ?? {};
   if (!Number.isFinite(totalValue) || totalValue < 0 || !Number.isFinite(cost) || cost < 0) {
-    throw new EventFinanceError('incomplete', 'Dados financeiros do evento incompletos (valor total ou custo). Edite o pedido e informe os valores antes de concluir.');
+    throw new EventFinanceError('incomplete', 'Dados financeiros do evento incompletos: informe o custo em "Editar pedido" antes de concluir.');
   }
   const entry = Number.isFinite(bookedEntry) ? bookedEntry : order.eventForm.entryValue;
   const records = [];

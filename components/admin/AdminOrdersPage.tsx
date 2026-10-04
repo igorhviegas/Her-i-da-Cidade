@@ -214,10 +214,20 @@ export const AdminOrdersPage: React.FC = () => {
     setSuccess('Pedido atualizado com sucesso.');
   };
 
+  /** Evento sem custo informado não pode ser concluído: avisa e abre "Editar pedido" no pedido. */
+  const requireEventCost = (view: OrderView): boolean => {
+    if (!view.order.eventForm || typeof view.order.eventForm.cost === 'number') return true;
+    window.alert('Informe o custo do evento em "Editar pedido" antes de concluir. Ele é obrigatório para lançar a despesa no Financeiro.');
+    setSelectedOrder(view);
+    setEditOrderOpen(true);
+    return false;
+  };
+
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {
     if (updatingOrderId) return false;
     const orderView = [...orders, ...completedOrders].find(({ order }) => order.id === orderId);
     if (!orderView || orderView.order.status === status) return false;
+    if (status === 'completed' && !requireEventCost(orderView)) return false;
     // Evento presencial: a conclusão passa pela conferência de materiais (a baixa de estoque é feita junto, em updateOrder).
     if (status === 'completed' && isPresentialService(orderView.service)) { setOrderActionError(''); setConsumptionView(orderView); return false; }
     setUpdatingOrderId(orderId);
@@ -279,6 +289,7 @@ export const AdminOrdersPage: React.FC = () => {
     if (updatingOrderId || deletingOrderId) return;
     const childName = extractBirthdayPerson(view.order);
     const label = [view.client?.name, childName].filter(Boolean).join(' · ') || 'este pedido';
+    if (!requireEventCost(view)) return;
     if (isPresentialService(view.service)) { setConsumptionView(view); return; }
     if (!window.confirm(`Concluir o pedido de ${label}? Ele sairá do Kanban e irá para os pedidos concluídos. Nenhuma mensagem será enviada.`)) return;
     await handleStatusChange(view.order.id, 'completed');
@@ -462,7 +473,19 @@ export const AdminOrdersPage: React.FC = () => {
                           )}
                           <p className="mt-3 text-sm font-extrabold text-emerald-300">{formatMoney(order.totalPaid)}</p>
                           <div className="mt-2.5 flex flex-wrap gap-2">
-                            {(deliveryUrl ? (
+                            {order.eventForm ? (
+                              <button
+                                type="button"
+                                draggable={false}
+                                disabled={calendarState?.kind === 'sending' || Boolean(updatingOrderId || deletingOrderId)}
+                                onClick={(event) => { event.stopPropagation(); void handleSendToCalendar(order.id); }}
+                                onKeyDown={(event) => event.stopPropagation()}
+                                className="inline-flex min-h-11 flex-[2_1_130px] items-center justify-center gap-2 rounded-lg border border-orange-500/30 bg-orange-500/15 px-3 text-xs font-bold text-orange-100 hover:bg-orange-500/25 disabled:opacity-60"
+                              >
+                                {calendarState?.orderId === order.id && calendarState.kind === 'sending' ? <Loader2 className="h-4 w-4 shrink-0 animate-spin" /> : <CalendarPlus className="h-4 w-4 shrink-0" />}
+                                {calendarState?.orderId === order.id && calendarState.kind === 'sending' ? 'Enviando…' : 'Enviar para Google Agenda'}
+                              </button>
+                            ) : (deliveryUrl ? (
                               <a
                                 href={deliveryUrl}
                                 target="_blank"
@@ -475,6 +498,9 @@ export const AdminOrdersPage: React.FC = () => {
                                 <MessageCircle className="h-4 w-4 shrink-0" /> Enviar pelo WhatsApp
                               </a>
                             ) : order.status === 'delivery' ? <p className="w-full text-[11px] text-white/35">WhatsApp indisponível</p> : null)}
+                            {order.eventForm && calendarState?.orderId === order.id && calendarState.kind !== 'sending' && (
+                              <p role={calendarState.kind === 'error' ? 'alert' : 'status'} className={`w-full text-[11px] ${calendarState.kind === 'ok' ? 'text-emerald-300' : 'text-red-300'}`}>{calendarState.message}</p>
+                            )}
                             {getTeleprompterText({ order, service, script }) !== null && (
                               <button
                                 type="button"
@@ -578,7 +604,7 @@ export const AdminOrdersPage: React.FC = () => {
           ['Teia extra', event.extraWeb ? String(event.extraWeb) : 'Não'],
           ['Valor total', formatMoney(event.totalValue)],
           ['Valor de entrada', formatMoney(event.entryValue)],
-          ['Custo', formatMoney(event.cost)],
+          ['Custo', typeof event.cost === 'number' ? formatMoney(event.cost) : '—'],
           ['Observações', event.observations || '—'],
         ] : [
           ['Referência do pedido', formatOrderReference(order, allOrderRecords)],
