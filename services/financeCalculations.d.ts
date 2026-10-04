@@ -33,3 +33,5 @@ export function financeMetrics(entries: RevenueEntry[], expenses: FixedExpense[]
   recordMonth: { monthKey: string; total: number } | null; cumulative: number; evolutionPct: number | null;
   goalStreak: number; operatingMarginPct: number | null; servicesCount: number;
 };
+export interface StatementRow { id: string; kind: 'in' | 'out'; source: 'order' | 'editing' | 'expense'; date: Date; amount: number; entry?: RevenueEntry; expense?: FixedExpense }
+export function buildStatement(entries: RevenueEntry[], expenses: FixedExpense[], monthKey: string): { rows: StatementRow[]; totalIn: number; totalOut: number; balance: number };

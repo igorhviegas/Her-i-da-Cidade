@@ -166,3 +166,14 @@ test('despesa única: deactivatedFrom no mês seguinte conta só no mês de iní
   assert.equal(expensesForMonth([once], '2026-12').total, 80);
   assert.equal(expensesForMonth([once], '2027-01').total, 0);
 });
+
+test('extrato: entradas, custo de edição individual e despesas no dia 1, com saídas negativas', async () => {
+  const { buildStatement } = await import('./financeCalculations.js');
+  const done = complete(video('a'));
+  const { entries } = buildRevenueEntries([done]);
+  const fixed = [{ id: 'x', name: 'Ferramenta', category: 'c', startMonth: '2026-01', active: true, amountHistory: { '2026-01': 100 } }];
+  const s = buildStatement(entries, fixed, '2026-10');
+  assert.deepEqual(s.rows.map((r) => [r.source, r.kind, r.amount]), [['order', 'in', 85], ['editing', 'out', -25], ['expense', 'out', -100]]);
+  assert.equal(s.rows[2].date.getDate(), 1);
+  assert.deepEqual([s.totalIn, s.totalOut, s.balance], [85, 125, -40]);
+});
