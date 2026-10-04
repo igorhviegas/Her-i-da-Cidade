@@ -91,6 +91,25 @@ export function variationPct(current, previous) {
   return previous > 0 ? ((current - previous) / previous) * 100 : null;
 }
 
+// ---- Custo de edição (Vídeo Personalizado) ----
+// Custo variável fixo por vídeo concluído, independente do prazo (2/4/7 dias). Gravado como snapshot `editingCost` no pedido
+// na PRIMEIRA conclusão (nunca reescrito) e somado ao mês da conclusão: sem coleção nova, sem duplicidade, sem efeito retroativo
+// (pedidos concluídos antes não têm o campo). Reabrir tira o pedido (e o custo) do mês; concluir de novo o devolve, sem 2º custo.
+export const EDITING_COST = 25;
+const CUSTOM_VIDEO_SERVICE_ID = '3'; // id fixo do seed/ManyChat (ver services/teleprompter.js)
+
+/** Campo a gravar no pedido ao concluí-lo pela primeira vez; {} se não for Vídeo Personalizado ou já tiver custo. */
+export function editingCostFields(serviceId, existingOrder) {
+  if (serviceId !== CUSTOM_VIDEO_SERVICE_ID || typeof existingOrder?.editingCost === 'number') return {};
+  return { editingCost: EDITING_COST };
+}
+
+/** Custo de edição do mês: pedidos concluídos com `editingCost`, pela mesma data do faturamento. */
+export function editingCostForMonth(entries, monthKey) {
+  const items = entries.filter((e) => e.monthKey === monthKey && typeof e.order.editingCost === 'number');
+  return { items, total: items.reduce((sum, e) => sum + e.order.editingCost, 0) };
+}
+
 // ---- Despesas fixas ----
 // Documento: { startMonth, active, deactivatedFrom?, amountHistory: {'YYYY-MM': valor}, adjustments?: {'YYYY-MM': valor} }
 // amountHistory = valor padrão vigente a partir de cada mês (mudança nunca altera meses anteriores);

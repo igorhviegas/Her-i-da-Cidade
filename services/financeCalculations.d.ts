@@ -21,6 +21,9 @@ export function revenueSeries(entries: RevenueEntry[], endMonthKey: string, n?: 
 export function dailyRevenue(entries: RevenueEntry[], monthKey: string): DayRevenue[];
 export function topDay(days: DayRevenue[]): DayRevenue | null;
 export function variationPct(current: number, previous: number): number | null;
+export const EDITING_COST: number;
+export function editingCostFields(serviceId: string | undefined, existingOrder?: { editingCost?: number } | null): { editingCost?: number };
+export function editingCostForMonth(entries: RevenueEntry[], monthKey: string): { items: RevenueEntry[]; total: number };
 export function isExpenseInMonth(expense: Partial<FixedExpense>, monthKey: string): boolean;
 export function expenseAmountForMonth(expense: Partial<FixedExpense>, monthKey: string): number;
 export function expensesForMonth(expenses: FixedExpense[], monthKey: string): { items: { expense: FixedExpense; amount: number; adjusted: boolean }[]; total: number };

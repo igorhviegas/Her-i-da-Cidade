@@ -6,23 +6,24 @@ import {
 } from '../../services/financeService';
 import { cardClass, ghostBtn, inputClass, labelClass, formatMoney, MONTH_NAMES, monthLabel, primaryBtn } from './financeFormat';
 
-const CATEGORIES = ['Funcionários', 'Automações', 'Ferramentas e sistemas', 'Assinaturas', 'Outros custos operacionais'];
+const CATEGORIES = ['Despesas fixas', 'Funcionários', 'Automações', 'Ferramentas e sistemas', 'Assinaturas', 'Outros custos operacionais'];
 type Mode = 'new' | { id: string; kind: 'info' | 'default' | 'adjust' | 'deactivate' };
 
 const parseAmount = (v: string) => (v.trim() === '' ? NaN : Number(v.replace(',', '.')));
 
-export const FinanceExpenses: React.FC<{ expenses: FixedExpense[]; monthKey: string; onChanged: () => Promise<void> | void }> = ({ expenses, monthKey, onChanged }) => {
+export const FinanceExpenses: React.FC<{ expenses: FixedExpense[]; videoCost: { items: unknown[]; total: number }; monthKey: string; onChanged: () => Promise<void> | void }> = ({ expenses, videoCost, monthKey, onChanged }) => {
   const [mode, setMode] = useState<Mode | null>(null);
-  const [form, setForm] = useState({ name: '', category: CATEGORIES[0], amount: '', description: '', startMonth: monthKey });
+  const [form, setForm] = useState({ name: '', category: CATEGORIES[0], amount: '', description: '', startMonth: monthKey, oneTime: false });
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
-  const { items, total } = expensesForMonth(expenses, monthKey);
+  const { items, total: fixedTotal } = expensesForMonth(expenses, monthKey);
+  const total = fixedTotal + videoCost.total;
   const inactive = expenses.filter((e) => e.active === false);
 
   const open = (next: Mode, expense?: FixedExpense) => {
     setFeedback(null); setMode(next);
     setForm({
-      name: expense?.name ?? '', category: expense?.category ?? CATEGORIES[0], description: expense?.description ?? '', startMonth: monthKey,
+      name: expense?.name ?? '', category: expense?.category ?? CATEGORIES[0], description: expense?.description ?? '', startMonth: monthKey, oneTime: false,
       amount: expense ? String(expense.adjustments?.[monthKey] ?? currentDefaultAmount(expense)) : '',
     });
   };
@@ -55,7 +56,7 @@ export const FinanceExpenses: React.FC<{ expenses: FixedExpense[]; monthKey: str
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Total de despesas fixas · {monthLabel(monthKey)}</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Total de despesas ·{monthLabel(monthKey)}</p>
           <p className="text-2xl font-extrabold text-white">{formatMoney(total)}</p>
         </div>
         <button type="button" className={primaryBtn} onClick={() => open('new')}><Plus className="h-4 w-4" />Nova despesa</button>
@@ -66,7 +67,7 @@ export const FinanceExpenses: React.FC<{ expenses: FixedExpense[]; monthKey: str
       {mode && (
         <form onSubmit={submit} className={`${cardClass} space-y-3`}>
           <h3 className="text-sm font-bold text-white">
-            {mode === 'new' ? 'Nova despesa fixa' : kind === 'info' ? `Editar ${editing?.name}` : kind === 'default' ? `Novo valor padrão de ${editing?.name}` : kind === 'adjust' ? `Ajustar ${editing?.name} em ${monthLabel(monthKey)}` : `Desativar ${editing?.name}`}
+            {mode === 'new' ? 'Nova despesa' : kind === 'info' ? `Editar ${editing?.name}` : kind === 'default' ? `Novo valor padrão de ${editing?.name}` : kind === 'adjust' ? `Ajustar ${editing?.name} em ${monthLabel(monthKey)}` : `Desativar ${editing?.name}`}
           </h3>
           {kind === 'default' && <p className="text-xs text-white/55">Vale a partir de {monthLabel(monthKey)}; meses anteriores mantêm o valor antigo.</p>}
           {kind === 'adjust' && <p className="text-xs text-white/55">Vale somente para {monthLabel(monthKey)}; os demais meses não mudam.</p>}
@@ -81,10 +82,11 @@ export const FinanceExpenses: React.FC<{ expenses: FixedExpense[]; monthKey: str
           )}
           {needsAmount && (
             <div className="grid gap-3 sm:grid-cols-3">
-              <label className={labelClass}>{mode === 'new' ? 'Valor mensal *' : 'Valor *'}<input required type="number" inputMode="decimal" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className={inputClass} placeholder="0,00" /></label>
+              <label className={labelClass}>{mode === 'new' && !form.oneTime ? 'Valor mensal *' : 'Valor *'}<input required type="number" inputMode="decimal" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className={inputClass} placeholder="0,00" /></label>
               {mode === 'new' && (
                 <>
-                  <label className={labelClass}>Mês de início *
+                  <label className="flex items-center gap-2 text-xs font-medium text-white/70 sm:col-span-3"><input type="checkbox" checked={form.oneTime} onChange={(e) => setForm({ ...form, oneTime: e.target.checked })} />Despesa única (conta apenas no mês escolhido, sem repetir)</label>
+                  <label className={labelClass}>{form.oneTime ? 'Mês *' : 'Mês de início *'}
                     <select value={form.startMonth.slice(5)} onChange={(e) => setForm({ ...form, startMonth: `${form.startMonth.slice(0, 4)}-${e.target.value}` })} className={inputClass}>
                       {MONTH_NAMES.map((name, i) => <option key={name} value={String(i + 1).padStart(2, '0')}>{name}</option>)}
                     </select>
@@ -101,10 +103,19 @@ export const FinanceExpenses: React.FC<{ expenses: FixedExpense[]; monthKey: str
         </form>
       )}
 
-      {items.length === 0 ? (
-        <div className={`${cardClass} text-center`}><Receipt className="mx-auto h-8 w-8 text-white/20" /><p className="mt-3 text-sm text-white/45">Nenhuma despesa fixa em {monthLabel(monthKey)}.</p></div>
+      {items.length === 0 && videoCost.items.length === 0 ? (
+        <div className={`${cardClass} text-center`}><Receipt className="mx-auto h-8 w-8 text-white/20" /><p className="mt-3 text-sm text-white/45">Nenhuma despesa em {monthLabel(monthKey)}.</p></div>
       ) : (
         <div className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-[#0D1527]">
+          {videoCost.items.length > 0 && (
+            <div className="flex items-start justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-white">Custo de edição — Vídeo personalizado</p>
+                <p className="text-xs text-white/50">Edição de vídeos · automático: {videoCost.items.length} vídeo{videoCost.items.length === 1 ? '' : 's'} concluído{videoCost.items.length === 1 ? '' : 's'} no mês</p>
+              </div>
+              <p className="shrink-0 text-sm font-extrabold text-white">{formatMoney(videoCost.total)}</p>
+            </div>
+          )}
           {items.map(({ expense, amount, adjusted }) => (
             <div key={expense.id} className="p-4">
               <div className="flex items-start justify-between gap-3">

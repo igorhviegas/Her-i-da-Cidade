@@ -6,7 +6,7 @@ import { getServiceById } from '../../services/servicesService';
 import { extractBirthdayPerson } from '../../services/orderReference.js';
 import { listAssets, listFixedExpenses, subscribeCompletedOrders } from '../../services/financeService';
 import {
-  buildRevenueEntries, dailyRevenue, expensesForMonth, monthKeyOf, monthTotals, patrimonySummary, revenueSeries, shiftMonth, topDay, variationPct,
+  buildRevenueEntries, dailyRevenue, editingCostForMonth, expensesForMonth, monthKeyOf, monthTotals, patrimonySummary, revenueSeries, shiftMonth, topDay, variationPct,
   type Asset, type FixedExpense,
 } from '../../services/financeCalculations.js';
 import type { Client, Order, Service } from '../../types';
@@ -18,7 +18,7 @@ import { cardClass, formatDate, formatMoney, ghostBtn, inputClass, labelClass, M
 
 type FinanceTab = 'summary' | 'statement' | 'expenses' | 'assets' | 'stock';
 const TABS: { id: FinanceTab; label: string }[] = [
-  { id: 'summary', label: 'Resumo' }, { id: 'statement', label: 'Extrato' }, { id: 'expenses', label: 'Despesas fixas' }, { id: 'assets', label: 'Patrimônio' }, { id: 'stock', label: 'Estoque' },
+  { id: 'summary', label: 'Resumo' }, { id: 'statement', label: 'Extrato' }, { id: 'expenses', label: 'Despesas' }, { id: 'assets', label: 'Patrimônio' }, { id: 'stock', label: 'Estoque' },
 ];
 
 interface Loaded { expenses: FixedExpense[]; assets: Asset[] }
@@ -92,11 +92,13 @@ export const AdminFinancePage: React.FC = () => {
     if (!data || !orders) return null;
     const current = monthTotals(entries, monthKey);
     const previous = monthTotals(entries, shiftMonth(monthKey, -1));
-    const expenseTotal = expensesForMonth(data.expenses, monthKey).total;
+    const fixedTotal = expensesForMonth(data.expenses, monthKey).total;
+    const editing = editingCostForMonth(entries, monthKey);
+    const expenseTotal = fixedTotal + editing.total;
     const days = dailyRevenue(entries, monthKey);
     const monthEntries = entries.filter((e) => e.monthKey === monthKey);
     return {
-      current, previous, expenseTotal, days, monthEntries, top: topDay(days), variation: variationPct(current.total, previous.total),
+      current, previous, fixedTotal, editing, expenseTotal, days, monthEntries, top: topDay(days), variation: variationPct(current.total, previous.total),
       series: revenueSeries(entries, monthKey, 12), patrimony: patrimonySummary(data.assets),
     };
   }, [data, orders, entries, monthKey]);
@@ -166,8 +168,9 @@ export const AdminFinancePage: React.FC = () => {
                 <Kpi label="Variação" value={view.variation === null ? '—' : `${view.variation > 0 ? '+' : ''}${view.variation.toFixed(1).replace('.', ',')}%`}
                   tone={view.variation === null ? 'text-white/60' : view.variation >= 0 ? 'text-emerald-300' : 'text-red-300'}
                   hint={view.variation === null ? 'Sem base de comparação' : view.variation >= 0 ? <span className="inline-flex items-center gap-1"><ArrowUpRight className="h-3 w-3" />vs. mês anterior</span> : <span className="inline-flex items-center gap-1"><ArrowDownRight className="h-3 w-3" />vs. mês anterior</span>} />
-                <Kpi label="Despesas fixas" value={formatMoney(view.expenseTotal)} />
-                <Kpi label="Resultado operacional estimado" value={formatMoney(view.current.total - view.expenseTotal)} tone={view.current.total - view.expenseTotal >= 0 ? 'text-white' : 'text-red-300'} hint="Faturamento − despesas fixas" />
+                <Kpi label="Despesas do mês" value={formatMoney(view.expenseTotal)} tone="text-red-300"
+                  hint={`Fixas ${formatMoney(view.fixedTotal)} · Edição de vídeos ${formatMoney(view.editing.total)}`} />
+                <Kpi label="Resultado operacional estimado" value={formatMoney(view.current.total - view.expenseTotal)} tone={view.current.total - view.expenseTotal >= 0 ? 'text-white' : 'text-red-300'} hint="Faturamento − despesas" />
                 <Kpi label="Patrimônio ativo" value={formatMoney(view.patrimony.currentTotal)} hint={`${view.patrimony.activeCount} iten${view.patrimony.activeCount === 1 ? '' : 's'}`} />
               </div>
 
@@ -230,7 +233,7 @@ export const AdminFinancePage: React.FC = () => {
             </div>
           )}
 
-          {tab === 'expenses' && <FinanceExpenses expenses={data.expenses} monthKey={monthKey} onChanged={reloadCollections} />}
+          {tab === 'expenses' && <FinanceExpenses expenses={data.expenses} videoCost={view.editing} monthKey={monthKey} onChanged={reloadCollections} />}
           {tab === 'assets' && <FinanceAssets assets={data.assets} onChanged={reloadCollections} />}
           {tab === 'stock' && <FinanceStock />}
         </>

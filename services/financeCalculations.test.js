@@ -108,3 +108,61 @@ test('data do faturamento: completedAt (automática) tem prioridade; sem ela cai
   assert.deepEqual(entries.map((e) => [e.orderId, e.monthKey]), [['x', '2026-10'], ['y', '2026-09'], ['z', '2026-08']]);
   assert.equal(undated, 1);
 });
+
+// ---- Custo de edição (Vídeo Personalizado) ----
+import { EDITING_COST, editingCostFields, editingCostForMonth } from './financeCalculations.js';
+
+// Espelha a regra de updateOrder: o campo só é gravado na transição para "concluído".
+const complete = (current, serviceId = '3') => ({ ...current, status: 'completed', ...(current.status !== 'completed' ? editingCostFields(serviceId, current) : {}) });
+const monthCost = (list, month = '2026-10') => editingCostForMonth(buildRevenueEntries(list).entries, month).total;
+const video = (id, extra = {}) => ({ id, serviceId: '3', status: 'delivery', totalPaid: 85, completedAt: new Date(2026, 9, 10), ...extra });
+
+test('custo de edição: concluir gera R$ 25 e é igual para prazos de 2, 4 e 7 dias', () => {
+  assert.equal(EDITING_COST, 25);
+  for (const deliveryDays of [2, 4, 7]) {
+    const done = complete(video(`v${deliveryDays}`, { deliveryDays }));
+    assert.equal(done.editingCost, 25);
+    assert.equal(monthCost([done]), 25);
+  }
+});
+
+test('custo de edição: concluir de novo ou editar pedido concluído não gera custo extra', () => {
+  const done = complete(video('a'));
+  assert.deepEqual(editingCostFields('3', done), {});
+  const again = complete(done);
+  const edited = { ...again, content: 'novo texto', totalPaid: 90 };
+  assert.equal(edited.editingCost, 25);
+  assert.equal(monthCost([edited]), 25);
+});
+
+test('custo de edição: não concluído e outros serviços não geram custo', () => {
+  assert.equal(monthCost([video('a')]), 0);
+  assert.equal(monthCost([complete(video('b', { serviceId: '1' }), '1')]), 0);
+  assert.equal(monthCost([video('c', { status: 'completed' })]), 0); // concluído antes da regra: sem retroativo
+});
+
+test('custo de edição: reabrir tira o custo do mês e concluir de novo devolve um único custo', () => {
+  const done = complete(video('a'));
+  const reopened = { ...done, status: 'editing', completedAt: undefined };
+  assert.equal(monthCost([reopened]), 0);
+  const recompleted = complete(reopened);
+  assert.equal(recompleted.editingCost, 25);
+  assert.equal(monthCost([{ ...recompleted, completedAt: new Date(2026, 10, 2) }], '2026-11'), 25);
+  assert.equal(monthCost([{ ...recompleted, completedAt: new Date(2026, 10, 2) }], '2026-10'), 0);
+});
+
+test('custo de edição: entra no resultado sem alterar faturamento nem despesas fixas', () => {
+  const done = complete(video('a'));
+  const { entries } = buildRevenueEntries([done]);
+  const fixed = [{ id: 'x', name: 'n', category: 'c', startMonth: '2026-01', active: true, amountHistory: { '2026-01': 100 } }];
+  assert.equal(monthTotals(entries, '2026-10').total, 85);
+  assert.equal(expensesForMonth(fixed, '2026-10').total, 100);
+  assert.equal(expensesForMonth(fixed, '2026-10').total + editingCostForMonth(entries, '2026-10').total, 125);
+});
+
+test('despesa única: deactivatedFrom no mês seguinte conta só no mês de início', () => {
+  const once = { id: 'u', name: 'n', category: 'c', startMonth: '2026-12', active: true, deactivatedFrom: '2027-01', amountHistory: { '2026-12': 80 } };
+  assert.equal(expensesForMonth([once], '2026-11').total, 0);
+  assert.equal(expensesForMonth([once], '2026-12').total, 80);
+  assert.equal(expensesForMonth([once], '2027-01').total, 0);
+});
