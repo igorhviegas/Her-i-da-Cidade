@@ -174,3 +174,21 @@ export function financeMetrics(entries, expenses, monthKey, monthlyGoal = null) 
     servicesCount: monthTotals(entries, monthKey).count,
   };
 }
+
+// ---- Extrato do mês ----
+// Entradas: pedidos concluídos (data de conclusão). Saídas: custo de edição de cada vídeo (data de conclusão) e despesas do mês
+// (data = dia 1 do mês, para entrar no balanço do mês). `amount` já vem com sinal: saídas são negativas.
+export function buildStatement(entries, expenses, monthKey) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const firstDay = new Date(y, m - 1, 1);
+  const rows = [
+    ...entries.filter((e) => e.monthKey === monthKey)
+      .map((e) => ({ id: `in-${e.orderId}`, kind: 'in', source: 'order', date: e.revenueDate, amount: e.value, entry: e })),
+    ...editingCostForMonth(entries, monthKey).items
+      .map((e) => ({ id: `edit-${e.orderId}`, kind: 'out', source: 'editing', date: e.revenueDate, amount: -e.order.editingCost, entry: e })),
+    ...expensesForMonth(expenses, monthKey).items
+      .map(({ expense, amount }) => ({ id: `exp-${expense.id}`, kind: 'out', source: 'expense', date: firstDay, amount: -amount, expense })),
+  ];
+  const sum = (kind) => rows.filter((r) => r.kind === kind).reduce((s, r) => s + r.amount, 0);
+  return { rows, totalIn: sum('in'), totalOut: -sum('out'), balance: sum('in') + sum('out') };
+}

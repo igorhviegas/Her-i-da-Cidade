@@ -6,7 +6,7 @@ import { getServiceById } from '../../services/servicesService';
 import { extractBirthdayPerson } from '../../services/orderReference.js';
 import { listAssets, listFixedExpenses, subscribeCompletedOrders } from '../../services/financeService';
 import {
-  buildRevenueEntries, dailyRevenue, editingCostForMonth, expensesForMonth, monthKeyOf, monthTotals, patrimonySummary, revenueSeries, shiftMonth, topDay, variationPct,
+  buildRevenueEntries, buildStatement, dailyRevenue, editingCostForMonth, expensesForMonth, monthKeyOf, monthTotals, patrimonySummary, revenueSeries, shiftMonth, topDay, variationPct,
   type Asset, type FixedExpense,
 } from '../../services/financeCalculations.js';
 import type { Client, Order, Service } from '../../types';
@@ -45,6 +45,7 @@ export const AdminFinancePage: React.FC = () => {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [newestFirst, setNewestFirst] = useState(true);
+  const [kindFilter, setKindFilter] = useState<'all' | 'in' | 'out'>('all');
 
   // Despesas e patrimônio: leitura sob demanda (poucos documentos).
   const loadCollections = useCallback(async () => {
@@ -103,16 +104,17 @@ export const AdminFinancePage: React.FC = () => {
     };
   }, [data, orders, entries, monthKey]);
 
+  const statement = useMemo(() => (data ? buildStatement(entries, data.expenses, monthKey) : null), [data, entries, monthKey]);
   const statementRows = useMemo(() => {
-    if (!data || !view) return [];
+    if (!statement) return [];
     const term = search.trim().toLocaleLowerCase('pt-BR');
-    return view.monthEntries
-      .map((e) => ({ e, client: clients.get(e.order.clientId), service: services.get(e.order.serviceId), child: extractBirthdayPerson(e.order) as string | null }))
-      .filter(({ e, client, service, child }) => !term || [client?.name, service?.title, child, e.orderId].some((v) => (v || '').toLocaleLowerCase('pt-BR').includes(term)))
-      .sort((a, b) => (newestFirst ? -1 : 1) * (a.e.revenueDate.getTime() - b.e.revenueDate.getTime()));
-  }, [data, view, clients, services, search, newestFirst]);
+    return statement.rows
+      .filter((r) => kindFilter === 'all' || r.kind === kindFilter)
+      .map((r) => ({ r, client: r.entry ? clients.get(r.entry.order.clientId) : undefined, service: r.entry ? services.get(r.entry.order.serviceId) : undefined, child: r.entry ? extractBirthdayPerson(r.entry.order) as string | null : null }))
+      .filter(({ r, client, service, child }) => !term || [client?.name, service?.title, child, r.entry?.orderId, r.expense?.name, r.expense?.category].some((v) => (v || '').toLocaleLowerCase('pt-BR').includes(term)))
+      .sort((x, y) => (newestFirst ? -1 : 1) * (x.r.date.getTime() - y.r.date.getTime()));
+  }, [statement, clients, services, search, newestFirst, kindFilter]);
 
-  const statementTotal = statementRows.reduce((sum, row) => sum + row.e.value, 0);
   const selectedEntries = selectedDay ? view?.days[selectedDay - 1]?.entries ?? [] : [];
 
   return (
@@ -199,35 +201,48 @@ export const AdminFinancePage: React.FC = () => {
             </div>
           )}
 
-          {tab === 'statement' && (
+          {tab === 'statement' && statement && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-end gap-3">
                 <label className={`${labelClass} min-w-[200px] flex-1`}>Pesquisar
-                  <span className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 mt-0.5 h-4 w-4 -translate-y-1/2 text-white/35" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cliente, criança ou serviço" className={`${inputClass} pl-9`} /></span>
+                  <span className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 mt-0.5 h-4 w-4 -translate-y-1/2 text-white/35" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cliente, criança, serviço ou despesa" className={`${inputClass} pl-9`} /></span>
                 </label>
-                <button type="button" className={`${ghostBtn} h-[42px]`} onClick={() => setNewestFirst((v) => !v)}>Data do evento: {newestFirst ? 'mais recentes' : 'mais antigos'}</button>
+                <button type="button" className={`${ghostBtn} h-[42px]`} onClick={() => setNewestFirst((v) => !v)}>Data: {newestFirst ? 'mais recentes' : 'mais antigas'}</button>
               </div>
-              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-white/70">
-                <span><strong className="text-white">{statementRows.length}</strong> serviço{statementRows.length === 1 ? '' : 's'} concluído{statementRows.length === 1 ? '' : 's'}</span>
-                <span>Total do período: <strong className="text-emerald-300">{formatMoney(statementTotal)}</strong></span>
+              <div className="flex gap-1 rounded-xl border border-white/10 bg-white/5 p-1" role="tablist">
+                {([['all', 'Todos'], ['in', 'Entradas'], ['out', 'Saídas']] as const).map(([id, label]) => (
+                  <button key={id} role="tab" aria-selected={kindFilter === id} type="button" onClick={() => setKindFilter(id)}
+                    className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${kindFilter === id ? (id === 'in' ? 'bg-emerald-600 text-white' : id === 'out' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white') : 'text-white/60 hover:text-white'}`}>{label}</button>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <Kpi label="Entradas" value={formatMoney(statement.totalIn)} tone="text-emerald-300" />
+                <Kpi label="Saídas" value={formatMoney(statement.totalOut)} tone="text-red-300" />
+                <Kpi label="Saldo do mês" value={formatMoney(statement.balance)} tone={statement.balance >= 0 ? 'text-white' : 'text-red-300'} />
               </div>
               {statementRows.length === 0 ? (
-                <div className={`${cardClass} text-center text-sm text-white/45`}>{search ? 'Nenhum serviço encontrado para a pesquisa.' : `Nenhum serviço concluído em ${monthLabel(monthKey)}.`}</div>
+                <div className={`${cardClass} text-center text-sm text-white/45`}>{search ? 'Nenhum lançamento encontrado para a pesquisa.' : `Nenhum lançamento em ${monthLabel(monthKey)}.`}</div>
               ) : (
                 <div className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-[#0D1527]">
-                  {statementRows.map(({ e, client, service, child }) => (
-                    <div key={e.orderId} className="flex items-center justify-between gap-3 p-4">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-semibold text-white/45">{formatDate(e.revenueDate)} · <span className="text-emerald-300/80">Concluído</span></p>
-                        <p className="truncate text-sm font-bold text-white">{child ? `${child} · ` : ''}{client?.name || `Pedido ${e.orderId.slice(0, 6)}`}</p>
-                        <p className="truncate text-xs text-white/55">{service?.title || 'Serviço não encontrado'}</p>
+                  {statementRows.map(({ r, client, service, child }) => {
+                    const out = r.kind === 'out';
+                    const who = child ? `${child} · ` : '';
+                    const title = r.source === 'expense' ? r.expense!.name : `${who}${client?.name || `Pedido ${r.entry!.orderId.slice(0, 6)}`}`;
+                    const subtitle = r.source === 'expense' ? `Despesa · ${r.expense!.category}` : r.source === 'editing' ? 'Custo de edição — Vídeo personalizado' : (service?.title || 'Serviço não encontrado');
+                    return (
+                      <div key={r.id} className={`flex items-center justify-between gap-3 p-4 ${out ? 'bg-red-500/10' : ''}`}>
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold text-white/45">{formatDate(r.date)} · {out ? <span className="text-red-300/90">Saída</span> : <span className="text-emerald-300/80">Entrada</span>}</p>
+                          <p className="truncate text-sm font-bold text-white">{title}</p>
+                          <p className="truncate text-xs text-white/55">{subtitle}</p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                          <p className={`text-sm font-extrabold ${out ? 'text-red-300' : 'text-emerald-300'}`}>{out ? '− ' : '+ '}{formatMoney(Math.abs(r.amount))}</p>
+                          {r.entry && <button type="button" className="text-[11px] font-semibold text-blue-400 hover:text-blue-300" onClick={() => navigate('/admin/pedidos')}>Ver pedidos</button>}
+                        </div>
                       </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        <p className="text-sm font-extrabold text-white">{formatMoney(e.value)}</p>
-                        <button type="button" className="text-[11px] font-semibold text-blue-400 hover:text-blue-300" onClick={() => navigate('/admin/pedidos')}>Ver pedidos</button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
