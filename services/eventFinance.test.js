@@ -43,6 +43,7 @@ test('valores editados depois da criação: a 2ª parcela fecha o total sobre a 
 test('dados financeiros incompletos bloqueiam a conclusão sem lançar nada', () => {
   assert.throws(() => planCompletion('o1', order({ totalValue: undefined }), {}, 'D'), /incompletos/);
   assert.throws(() => planCompletion('o1', order({ cost: NaN }), {}, 'D'), EventFinanceError);
+  assert.throws(() => planCompletion('o1', order({ cost: null }), {}, 'D'), /informe o custo/); // custo em branco bloqueia só a conclusão
   assert.throws(() => planCompletion('o1', { clientId: 'c', serviceId: 's' }, {}, 'D'), EventFinanceError);
 });
 

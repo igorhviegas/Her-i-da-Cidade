@@ -31,18 +31,25 @@ test('a data não desloca por fuso: meio-dia local de qualquer fuso cai no mesmo
   assert.equal(eventDateKey(null), null);
 });
 
-test('descrição traz todos os dados do pedido, com seções e link de WhatsApp', () => {
+test('descrição enxuta: só contato, autorização de imagem, teia extra, observações e link de WhatsApp (com emojis)', () => {
   const text = eventDescription(order(), client);
-  for (const expected of [
-    'DADOS DO EVENTO', 'DADOS COMERCIAIS', 'MENSAGEM DE CONTATO', 'Formulário: Aniversário', 'Cliente: Maria Silva', 'WhatsApp: (31) 99904-4206',
-    'Nome da criança: Pedro', 'Data do evento: 10/10/2026', 'Horário de início: 14:30', 'Local: Rua das Flores, 10 - BH',
-    'Autorização de uso de imagem: Sim', 'Teia extra: 2', 'Observações: Bolo às 16h', 'https://wa.me/5531999044206?text=',
-  ]) assert.ok(text.includes(expected), `faltou: ${expected}`);
-  assert.match(text, /Valor total: R\$\s1\.000,00/);
-  assert.match(text, /Valor de entrada: R\$\s500,00/);
-  assert.match(text, /Custo: R\$\s150,00/);
-  const none = { ...order(), eventForm: { ...order().eventForm, extraWeb: 0, imageAuthorization: false } };
-  assert.ok(eventDescription(none, client).includes('Teia extra: Não') && eventDescription(none, client).includes('imagem: Não'));
+  const lines = text.split('\n');
+  assert.deepEqual(lines.slice(0, 5), [
+    '👤 Cliente: Maria Silva', '📱 WhatsApp: (31) 99904-4206', '📸 Autorização do uso de imagem: Sim', '🕸️ Teia extra: 2', '📝 Observações: Bolo às 16h',
+  ]);
+  assert.equal(lines[5], '');
+  assert.equal(lines[6], '💬 Abrir conversa com a mensagem pronta:');
+  assert.equal(lines[7], whatsappLink(order(), client));
+  assert.equal(lines.length, 8);
+  for (const omitted of ['Valor', 'Custo', 'Local', 'Horário', 'Data do evento', 'Nome da criança', 'Formulário']) assert.ok(!text.includes(omitted), `não deveria conter: ${omitted}`);
+  const none = { ...order(), eventForm: { ...order().eventForm, extraWeb: 0, imageAuthorization: false, observations: '' } };
+  const plain = eventDescription(none, client);
+  assert.ok(plain.includes('🕸️ Teia extra: Não') && plain.includes('imagem: Não') && plain.includes('📝 Observações: —'));
+  assert.ok(eventDescription(order(), { name: 'X', whatsapp: '123' }).includes('Link indisponível'));
+});
+
+test('evento criado na cor Tangerina (colorId 6)', () => {
+  assert.equal(buildCalendarEvent(order(), client).colorId, '6');
 });
 
 test('mensagem de WhatsApp: texto exato, campos substituídos, URL codificada preservando emoji, acento e quebra de linha', () => {

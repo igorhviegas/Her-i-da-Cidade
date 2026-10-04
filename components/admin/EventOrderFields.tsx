@@ -23,7 +23,7 @@ export function eventFormFromOrder(order: Pick<Order, 'eventForm' | 'childName' 
   return {
     childName: order.childName ?? '', eventDate: dateInput(order.eventDate), eventTime: f.eventTime, location: f.location,
     imageAuthorization: f.imageAuthorization ? 'yes' : 'no', extraWeb: String(f.extraWeb), totalValue: String(f.totalValue),
-    entryValue: String(f.entryValue), cost: String(f.cost), observations: f.observations, formType: f.formType,
+    entryValue: String(f.entryValue), cost: f.cost === null || f.cost === undefined ? '' : String(f.cost), observations: f.observations, formType: f.formType,
     entryTouched: roundMoney(f.entryValue) !== defaultEntry(f.totalValue),
   };
 }
@@ -74,10 +74,10 @@ export const EventOrderFields: React.FC<{ value: EventFormState; onChange: (next
         <div className="grid gap-3 sm:grid-cols-3">
           <label className={labelClass}>Valor total *<input required type="number" min="0" step="0.01" value={value.totalValue} onChange={(e) => setTotal(e.target.value)} disabled={disabled} className={inputClass} placeholder="0,00" /></label>
           <label className={labelClass}>Valor de entrada *<input required type="number" min="0" step="0.01" value={value.entryValue} onChange={(e) => set({ entryValue: e.target.value, entryTouched: true })} disabled={disabled} className={inputClass} placeholder="50% do total" /></label>
-          <label className={labelClass}>Custo *<input required type="number" min="0" step="0.01" value={value.cost} onChange={(e) => set({ cost: e.target.value })} disabled={disabled} className={inputClass} placeholder="0,00" /></label>
+          <label className={labelClass}>Custo<input type="number" min="0" step="0.01" value={value.cost} onChange={(e) => set({ cost: e.target.value })} disabled={disabled} className={inputClass} placeholder="Informar até concluir" /></label>
         </div>
         <p className="text-[11px] text-white/45">
-          A entrada acompanha 50% do total até ser editada.{' '}
+          O custo pode ficar em branco, mas é obrigatório para concluir o pedido. A entrada acompanha 50% do total até ser editada.{' '}
           {value.entryTouched && <button type="button" onClick={recalc} disabled={disabled} className="font-semibold text-blue-300 underline hover:text-blue-200">Recalcular 50%</button>}
         </p>
       </section>

@@ -42,8 +42,11 @@ test('campos obrigatórios e valores inválidos são recusados com mensagem', ()
   assert.match(bad({ totalValue: '-5' }), /total/i);
   assert.match(bad({ entryValue: 'abc' }), /entrada/i);
   assert.match(bad({ entryValue: '1200' }), /maior que o valor total/i);
-  assert.match(bad({ cost: '' }), /custo/i);
+  assert.match(bad({ cost: 'abc' }), /custo/i);
+  assert.match(bad({ cost: '-1' }), /custo/i);
   assert.match(bad({ formType: ' ' }), /#formulário/i);
+  assert.equal(validateEventForm({ ...valid, cost: '' }).value.cost, null); // custo é opcional até a conclusão
+  assert.equal(validateEventForm({ ...valid, cost: '0' }).value.cost, 0);
   assert.equal(validateEventForm({ ...valid, cost: '0', entryValue: '0', observations: 'x' }).error, undefined); // zero é válido
 });
 
