@@ -2,6 +2,8 @@ import React, { FormEvent, useEffect, useState } from 'react';
 import { AlertCircle, Loader2, Save, X } from 'lucide-react';
 import { createClient, getClientByWhatsApp, normalizeWhatsApp, updateClient } from '../../services/clientsService';
 import { updateOrder } from '../../services/ordersService';
+import { eventContentSummary, validateEventForm } from '../../services/eventForm.js';
+import { EventOrderFields, eventFormFromOrder } from './EventOrderFields';
 import { calculateOrderDeadlines } from '../../services/orderDates';
 import { getServices } from '../../services/servicesService';
 import type { Client, Order, Service } from '../../types';
@@ -60,6 +62,11 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
   const [servicePrice, setServicePrice] = useState(String(order.servicePrice ?? ''));
   const [rushFee, setRushFee] = useState(String(order.rushFee ?? 0));
   const [totalPaid, setTotalPaid] = useState(String(order.totalPaid ?? ''));
+  // Pedido criado pelo formulário manual de evento: edita os campos do evento (os lançamentos já feitos no Financeiro não mudam).
+  const isEventOrder = Boolean(order.eventForm);
+  const [eventState, setEventState] = useState(() => eventFormFromOrder(order));
+  const booked = order.eventLedger;
+  const money = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,7 +91,9 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
     setError('');
     const cleanName = name.trim();
     if (!cleanName) return setError('Informe o nome do cliente.');
-    if (!paidDate) return setError('Informe a data do pagamento.');
+    const eventValidation = isEventOrder ? validateEventForm(eventState) : null;
+    if (eventValidation?.error) return setError(eventValidation.error);
+    if (!isEventOrder && !paidDate) return setError('Informe a data do pagamento.');
     if (!serviceId) return setError('Selecione um serviço.');
     const selectedService = services.find((item) => item.id === serviceId) || (service?.id === serviceId ? service : null);
     if (!selectedService) return setError('Serviço não encontrado. Atualize a página e tente novamente.');
@@ -125,10 +134,12 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
         updatedClient = await createClient({ name: cleanName, whatsapp: whatsapp.trim() });
       }
 
-      const paidAt = dateFromInput(paidDate);
-      const eventAt = eventDate ? dateFromInput(eventDate) : null;
-      const paidAtChanged = dateInput(order.paidAt) !== paidDate;
-      const eventDateChanged = dateInput(order.eventDate) !== eventDate;
+      const eventValues = eventValidation?.value;
+      const paidAt = paidDate ? dateFromInput(paidDate) : undefined;
+      const eventDay = eventValues ? eventValues.eventDate : eventDate;
+      const eventAt = eventDay ? dateFromInput(eventDay) : null;
+      const paidAtChanged = !isEventOrder && dateInput(order.paidAt) !== paidDate;
+      const eventDateChanged = dateInput(order.eventDate) !== eventDay;
       const deliveryDaysChanged = (order.deliveryDays === undefined ? '' : String(order.deliveryDays)) !== deliveryDays.trim();
       const orderUpdates: Parameters<typeof updateOrder>[1] = {
         clientId: updatedClient.id,
@@ -141,6 +152,18 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
       if (paidAtChanged) orderUpdates.paidAt = paidAt;
       if (eventDateChanged) orderUpdates.eventDate = eventAt;
       if (deliveryDaysChanged) orderUpdates.deliveryDays = days;
+      const eventUpdates: Partial<Order> = eventValues ? {
+        childName: eventValues.childName,
+        content: eventContentSummary(eventValues),
+        servicePrice: eventValues.totalValue,
+        rushFee: 0,
+        totalPaid: eventValues.totalValue,
+        eventForm: {
+          eventTime: eventValues.eventTime, location: eventValues.location, imageAuthorization: eventValues.imageAuthorization, extraWeb: eventValues.extraWeb,
+          totalValue: eventValues.totalValue, entryValue: eventValues.entryValue, cost: eventValues.cost, observations: eventValues.observations, formType: eventValues.formType,
+        },
+      } : {};
+      Object.assign(orderUpdates, eventUpdates);
       await updateOrder(order.id, orderUpdates);
 
       const updatedOrder: Order = {
@@ -154,6 +177,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
         servicePrice: serviceAmount,
         rushFee: rushAmount,
         totalPaid: paidTotal,
+        ...eventUpdates,
       };
       if (paidAtChanged || deliveryDaysChanged) {
         const deadlinePaidAt = paidAtChanged ? paidAt : toDate(order.paidAt);
@@ -191,6 +215,14 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
               <p className="text-[11px] text-white/40">O WhatsApp será normalizado e atualizado no cadastro do cliente.</p>
             </section>
 
+            {isEventOrder && booked && (
+              <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-[11px] text-amber-200">
+                Lançamentos já efetivados no Financeiro: entrada {money(booked.entry)}{booked.final !== undefined ? ` · 2ª parcela ${money(booked.final)}` : ''}{booked.cost !== undefined ? ` · despesa evento ${money(booked.cost)}` : ''}.
+                Alterar valor total, entrada ou custo aqui NÃO modifica esses lançamentos; a 2ª parcela e a despesa ainda não lançadas usam os valores vigentes na primeira conclusão.
+              </p>
+            )}
+            {isEventOrder ? <EventOrderFields value={eventState} onChange={setEventState} disabled={saving} /> : (
+              <>
             <section className="space-y-3 border-t border-white/10 pt-4">
               <h3 className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-blue-300">Pedido</h3>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -218,6 +250,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
                 <label className={labelClass}>Total pago *<input required type="number" min="0" step="0.01" value={totalPaid} onChange={(event) => setTotalPaid(event.target.value)} disabled={saving} className={inputClass} /></label>
               </div>
             </section>
+              </>
+            )}
           </div>
           <footer className="flex flex-col-reverse gap-2 border-t border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:justify-end sm:px-6">
             <button type="button" onClick={onClose} disabled={saving} className="rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/65 hover:bg-white/5 disabled:opacity-40">Cancelar</button>

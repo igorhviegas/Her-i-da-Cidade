@@ -172,3 +172,52 @@ test('orderImports: admin cria uma vez por PDF; ninguém altera, apaga ou lê se
   await assertFails(getDoc(doc(env.authenticatedContext('other-user').firestore(), path)));
   await assertFails(setDoc(doc(env.unauthenticatedContext().firestore(), 'orderImports/' + 'b'.repeat(64)), { orderId: 'o3' }));
 });
+
+// ---- Livro de lançamentos dos eventos (financeEntries) ----
+const ledgerData = (orderId, kind, over = {}) => ({
+  orderId, kind, type: kind === 'cost' ? 'expense' : 'revenue', amount: 500, date: serverTimestamp(), createdAt: serverTimestamp(), ...over,
+});
+const ledgerPath = (orderId, kind) => `financeEntries/evt-${orderId}-${kind}`;
+
+test('financeEntries: lançamento nasce junto do pedido, uma única vez, com ID determinístico', async () => {
+  const adminDb = env.authenticatedContext('admin-user').firestore();
+  await assertSucceeds(runTransaction(adminDb, async (tx) => {
+    tx.set(doc(adminDb, 'orders/ev1'), orderData());
+    tx.set(doc(adminDb, ledgerPath('ev1', 'entry')), ledgerData('ev1', 'entry'));
+  }));
+  await assertSucceeds(getDoc(doc(adminDb, ledgerPath('ev1', 'entry'))));
+  // mesma chave de novo = sobrescrita (update): negada, então reabrir/concluir de novo/repetir nunca duplica nem altera
+  await assertFails(setDoc(doc(adminDb, ledgerPath('ev1', 'entry')), ledgerData('ev1', 'entry', { amount: 999 })));
+  await assertFails(updateDoc(doc(adminDb, ledgerPath('ev1', 'entry')), { amount: 1 }));
+  // 2ª parcela e despesa na conclusão (pedido já existe)
+  await assertSucceeds(setDoc(doc(adminDb, ledgerPath('ev1', 'final')), ledgerData('ev1', 'final')));
+  await assertSucceeds(setDoc(doc(adminDb, ledgerPath('ev1', 'cost')), ledgerData('ev1', 'cost', { amount: 150 })));
+});
+
+test('financeEntries: ID fora do padrão, tipo incoerente, valor negativo, sem pedido ou sem ser admin são recusados', async () => {
+  const adminDb = env.authenticatedContext('admin-user').firestore();
+  await env.withSecurityRulesDisabled(async (context) => { await setDoc(doc(context.firestore(), 'orders/ev2'), { status: 'recording' }); });
+  await assertFails(setDoc(doc(adminDb, 'financeEntries/qualquer-id'), ledgerData('ev2', 'entry')));
+  await assertFails(setDoc(doc(adminDb, ledgerPath('ev2', 'entry')), ledgerData('ev2', 'entry', { type: 'expense' })));
+  await assertFails(setDoc(doc(adminDb, ledgerPath('ev2', 'entry')), ledgerData('ev2', 'entry', { amount: -1 })));
+  await assertFails(setDoc(doc(adminDb, ledgerPath('ev2', 'entry')), ledgerData('ev2', 'entry', { createdAt: new Date(0) })));
+  await assertFails(setDoc(doc(adminDb, ledgerPath('sem-pedido', 'entry')), ledgerData('sem-pedido', 'entry')));
+  const other = env.authenticatedContext('other-user').firestore();
+  await assertFails(setDoc(doc(other, ledgerPath('ev2', 'entry')), ledgerData('ev2', 'entry')));
+  await assertSucceeds(setDoc(doc(adminDb, ledgerPath('ev2', 'entry')), ledgerData('ev2', 'entry')));
+  await assertFails(getDoc(doc(other, ledgerPath('ev2', 'entry'))));
+  await assertFails(getDoc(doc(env.unauthenticatedContext().firestore(), ledgerPath('ev2', 'entry'))));
+});
+
+test('financeEntries: só pode ser apagado na mesma transação que exclui o pedido de origem', async () => {
+  const adminDb = env.authenticatedContext('admin-user').firestore();
+  await env.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'orders/ev3'), { status: 'completed' });
+    await setDoc(doc(context.firestore(), ledgerPath('ev3', 'entry')), { orderId: 'ev3', kind: 'entry', type: 'revenue', amount: 500 });
+  });
+  await assertFails(deleteDoc(doc(adminDb, ledgerPath('ev3', 'entry')))); // pedido continua existindo
+  await assertSucceeds(runTransaction(adminDb, async (tx) => {
+    tx.delete(doc(adminDb, 'orders/ev3'));
+    tx.delete(doc(adminDb, ledgerPath('ev3', 'entry')));
+  }));
+});

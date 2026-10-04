@@ -11,13 +11,13 @@ type Mode = 'new' | { id: string; kind: 'info' | 'default' | 'adjust' | 'deactiv
 
 const parseAmount = (v: string) => (v.trim() === '' ? NaN : Number(v.replace(',', '.')));
 
-export const FinanceExpenses: React.FC<{ expenses: FixedExpense[]; videoCost: { items: unknown[]; total: number }; monthKey: string; onChanged: () => Promise<void> | void }> = ({ expenses, videoCost, monthKey, onChanged }) => {
+export const FinanceExpenses: React.FC<{ expenses: FixedExpense[]; videoCost: { items: unknown[]; total: number }; eventCost: { items: unknown[]; total: number }; monthKey: string; onChanged: () => Promise<void> | void }> = ({ expenses, videoCost, eventCost, monthKey, onChanged }) => {
   const [mode, setMode] = useState<Mode | null>(null);
   const [form, setForm] = useState({ name: '', category: CATEGORIES[0], amount: '', description: '', startMonth: monthKey, oneTime: false });
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const { items, total: fixedTotal } = expensesForMonth(expenses, monthKey);
-  const total = fixedTotal + videoCost.total;
+  const total = fixedTotal + videoCost.total + eventCost.total;
   const inactive = expenses.filter((e) => e.active === false);
 
   const open = (next: Mode, expense?: FixedExpense) => {
@@ -103,7 +103,7 @@ export const FinanceExpenses: React.FC<{ expenses: FixedExpense[]; videoCost: { 
         </form>
       )}
 
-      {items.length === 0 && videoCost.items.length === 0 ? (
+      {items.length === 0 && videoCost.items.length === 0 && eventCost.items.length === 0 ? (
         <div className={`${cardClass} text-center`}><Receipt className="mx-auto h-8 w-8 text-white/20" /><p className="mt-3 text-sm text-white/45">Nenhuma despesa em {monthLabel(monthKey)}.</p></div>
       ) : (
         <div className="divide-y divide-white/5 overflow-hidden rounded-2xl border border-white/10 bg-[#0D1527]">
@@ -114,6 +114,15 @@ export const FinanceExpenses: React.FC<{ expenses: FixedExpense[]; videoCost: { 
                 <p className="text-xs text-white/50">Edição de vídeos · automático: {videoCost.items.length} vídeo{videoCost.items.length === 1 ? '' : 's'} concluído{videoCost.items.length === 1 ? '' : 's'} no mês</p>
               </div>
               <p className="shrink-0 text-sm font-extrabold text-white">{formatMoney(videoCost.total)}</p>
+            </div>
+          )}
+          {eventCost.items.length > 0 && (
+            <div className="flex items-start justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-white">Despesa evento</p>
+                <p className="text-xs text-white/50">Custo de eventos · automático: {eventCost.items.length} evento{eventCost.items.length === 1 ? '' : 's'} concluído{eventCost.items.length === 1 ? '' : 's'} no mês</p>
+              </div>
+              <p className="shrink-0 text-sm font-extrabold text-white">{formatMoney(eventCost.total)}</p>
             </div>
           )}
           {items.map(({ expense, amount, adjusted }) => (

@@ -41,18 +41,25 @@ export const revenueDateOf = (order) => toDate(order.completedAt) || toDate(orde
 export function buildRevenueEntries(orders) {
   const seen = new Set();
   const entries = [];
+  const costs = [];
   let undated = 0;
   for (const order of orders) {
     if (!order || order.status !== 'completed' || order.scriptId || seen.has(order.id)) continue;
+    // Pedido de evento com livro de lançamentos (eventLedger): as parcelas vêm do livro (itens `ledger`), não do pedido em si.
+    if (order.eventLedger && !order.ledger) continue;
     seen.add(order.id);
     const revenueDate = revenueDateOf(order);
     if (!revenueDate) { undated += 1; continue; }
+    if (order.ledgerKind === 'cost') {
+      costs.push({ orderId: order.id, order, revenueDate, value: order.eventCost, monthKey: monthKeyOf(revenueDate), dayKey: dayKeyOf(revenueDate) });
+      continue;
+    }
     entries.push({
       orderId: order.id, order, revenueDate, value: orderValue(order),
       monthKey: monthKeyOf(revenueDate), dayKey: dayKeyOf(revenueDate),
     });
   }
-  return { entries, undated };
+  return { entries, undated, costs };
 }
 
 export function monthTotals(entries, monthKey) {
@@ -108,6 +115,12 @@ export function editingCostFields(serviceId, existingOrder) {
 export function editingCostForMonth(entries, monthKey) {
   const items = entries.filter((e) => e.monthKey === monthKey && typeof e.order.editingCost === 'number');
   return { items, total: items.reduce((sum, e) => sum + e.order.editingCost, 0) };
+}
+
+/** "Despesa evento" do mês: despesas do livro de lançamentos (data = conclusão do pedido), vindas de buildRevenueEntries().costs. */
+export function eventCostForMonth(costs, monthKey) {
+  const items = (costs ?? []).filter((e) => e.monthKey === monthKey);
+  return { items, total: items.reduce((sum, e) => sum + e.value, 0) };
 }
 
 // ---- Despesas fixas ----
@@ -178,7 +191,7 @@ export function financeMetrics(entries, expenses, monthKey, monthlyGoal = null) 
 // ---- Extrato do mês ----
 // Entradas: pedidos concluídos (data de conclusão). Saídas: custo de edição de cada vídeo (data de conclusão) e despesas do mês
 // (data = dia 1 do mês, para entrar no balanço do mês). `amount` já vem com sinal: saídas são negativas.
-export function buildStatement(entries, expenses, monthKey) {
+export function buildStatement(entries, expenses, monthKey, costs = []) {
   const [y, m] = monthKey.split('-').map(Number);
   const firstDay = new Date(y, m - 1, 1);
   const rows = [
@@ -186,6 +199,8 @@ export function buildStatement(entries, expenses, monthKey) {
       .map((e) => ({ id: `in-${e.orderId}`, kind: 'in', source: 'order', date: e.revenueDate, amount: e.value, entry: e })),
     ...editingCostForMonth(entries, monthKey).items
       .map((e) => ({ id: `edit-${e.orderId}`, kind: 'out', source: 'editing', date: e.revenueDate, amount: -e.order.editingCost, entry: e })),
+    ...eventCostForMonth(costs, monthKey).items
+      .map((e) => ({ id: e.orderId, kind: 'out', source: 'eventCost', date: e.revenueDate, amount: -e.value, entry: e })),
     ...expensesForMonth(expenses, monthKey).items
       .map(({ expense, amount }) => ({ id: `exp-${expense.id}`, kind: 'out', source: 'expense', date: firstDay, amount: -amount, expense })),
   ];

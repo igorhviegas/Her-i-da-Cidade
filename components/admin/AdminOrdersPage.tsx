@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CalendarDays, CheckCircle2, Copy, Loader2, MessageCircle, Pencil, Plus, RefreshCw, Search, Trash2, Tv, X } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Copy, Loader2, MessageCircle, Pencil, Plus, RefreshCw, Search, Trash2, Tv, X, CalendarPlus } from 'lucide-react';
 import { useRouter } from '../../lib/router';
 import { getClientById, normalizeWhatsApp } from '../../services/clientsService';
 import { deleteOrder, listOrders, updateOrder } from '../../services/ordersService';
+import { sendOrderToGoogleCalendar } from '../../services/googleCalendarService';
 import { getContentScriptsByIds } from '../../services/contentScriptsService';
 import { getServiceById } from '../../services/servicesService';
 import { formatOrderReference, extractBirthdayPerson } from '../../services/orderReference.js';
@@ -98,6 +99,7 @@ export const AdminOrdersPage: React.FC = () => {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [orderActionError, setOrderActionError] = useState('');
+  const [calendarState, setCalendarState] = useState<{ orderId: string; kind: 'sending' | 'ok' | 'error'; message: string; link?: string | null } | null>(null);
   const [teleprompterView, setTeleprompterView] = useState<OrderView | null>(null);
   const [consumptionView, setConsumptionView] = useState<OrderView | null>(null);
   const { adminData } = useAuth();
@@ -248,6 +250,26 @@ export const AdminOrdersPage: React.FC = () => {
     await loadOrders();
   };
 
+  /** Envio manual ao Google Agenda: só mostra sucesso depois da confirmação do servidor/Google. */
+  const handleSendToCalendar = async (orderId: string) => {
+    if (calendarState?.kind === 'sending') return;
+    setCalendarState({ orderId, kind: 'sending', message: '' });
+    try {
+      const result = await sendOrderToGoogleCalendar(orderId);
+      setCalendarState({
+        orderId, kind: 'ok', link: result.htmlLink,
+        message: `${result.created ? 'Evento criado' : 'Evento atualizado'} no Google Agenda.${result.persisted ? '' : ' O vínculo não pôde ser salvo no pedido; um novo envio atualizará este mesmo evento.'}`,
+      });
+      if (result.persisted) {
+        setSelectedOrder((current) => (current?.order.id === orderId
+          ? { ...current, order: { ...current.order, googleCalendar: { eventId: current.order.googleCalendar?.eventId ?? '', calendarId: current.order.googleCalendar?.calendarId ?? '', htmlLink: result.htmlLink ?? undefined, syncedAt: new Date() } } }
+          : current));
+      }
+    } catch (error) {
+      setCalendarState({ orderId, kind: 'error', message: error instanceof Error ? error.message : 'Não foi possível enviar ao Google Agenda.' });
+    }
+  };
+
   const handleSendToEditing = async () => {
     if (!teleprompterView) return;
     if (await handleStatusChange(teleprompterView.order.id, 'editing')) setTeleprompterView(null);
@@ -295,6 +317,7 @@ export const AdminOrdersPage: React.FC = () => {
       servicePrice: order.servicePrice,
       rushFee: order.rushFee,
       totalPaid: order.totalPaid,
+      ...(order.eventForm ? { eventForm: order.eventForm, childName: order.childName } : {}),
     };
   }, [duplicateSource]);
 
@@ -539,7 +562,25 @@ export const AdminOrdersPage: React.FC = () => {
             whatsappUrl = null;
           }
         }
-        const detailRows: Array<[string, string]> = [
+        const event = order.eventForm;
+        const detailRows: Array<[string, string]> = event ? [
+          ['Referência do pedido', formatOrderReference(order, allOrderRecords)],
+          ['ID do documento', order.id],
+          ['Cliente', client?.name || 'Cliente não encontrado'],
+          ['WhatsApp', client?.whatsapp || '—'],
+          ['Nome da criança', order.childName || '—'],
+          ['#formulário', event.formType],
+          ['Serviço', service?.title || 'Serviço não encontrado'],
+          ['Data do evento', displayDate(order.eventDate)],
+          ['Horário de início', event.eventTime],
+          ['Local', event.location],
+          ['Autorização de uso de imagem', event.imageAuthorization ? 'Sim' : 'Não'],
+          ['Teia extra', event.extraWeb ? String(event.extraWeb) : 'Não'],
+          ['Valor total', formatMoney(event.totalValue)],
+          ['Valor de entrada', formatMoney(event.entryValue)],
+          ['Custo', formatMoney(event.cost)],
+          ['Observações', event.observations || '—'],
+        ] : [
           ['Referência do pedido', formatOrderReference(order, allOrderRecords)],
           ['ID do documento', order.id],
           ['Cliente', client?.name || 'Cliente não encontrado'],
@@ -554,6 +595,8 @@ export const AdminOrdersPage: React.FC = () => {
           ['Taxa de urgência', formatMoney(order.rushFee)],
           ['Total pago', formatMoney(order.totalPaid)],
         ];
+        const calendar = calendarState?.orderId === order.id ? calendarState : null;
+        const syncedAt = toDate(order.googleCalendar?.syncedAt);
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-3 backdrop-blur-sm sm:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !updatingOrderId) setSelectedOrder(null); }}>
             <section role="dialog" aria-modal="true" aria-labelledby="order-details-title" className="my-auto max-h-[94vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/15 bg-[#0D1527] shadow-2xl">
@@ -590,10 +633,30 @@ export const AdminOrdersPage: React.FC = () => {
                     </div>
                   ))}
                 </dl>
-                <div className="border-b border-white/[0.07] pb-3">
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/40">Conteúdo</h3>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85">{order.content || '—'}</p>
-                </div>
+                {!event && (
+                  <div className="border-b border-white/[0.07] pb-3">
+                    <h3 className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/40">Conteúdo</h3>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85">{order.content || '—'}</p>
+                  </div>
+                )}
+                {event && (
+                  <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3.5">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button type="button" onClick={() => void handleSendToCalendar(order.id)} disabled={calendar?.kind === 'sending' || Boolean(updatingOrderId || deletingOrderId)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-2.5 text-sm font-semibold text-sky-200 hover:bg-sky-500/20 disabled:opacity-50">
+                        {calendar?.kind === 'sending' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarPlus className="h-4 w-4" />}
+                        {calendar?.kind === 'sending' ? 'Enviando…' : 'Enviar para Google Agenda'}
+                      </button>
+                      <span className="text-[11px] text-white/45">
+                        {syncedAt ? `Último envio: ${syncedAt.toLocaleString('pt-BR')}. Reenviar atualiza o mesmo evento.` : 'Ainda não enviado. Salve as alterações do pedido antes de enviar.'}
+                      </span>
+                    </div>
+                    {calendar && calendar.kind !== 'sending' && (
+                      <p role={calendar.kind === 'error' ? 'alert' : 'status'} className={`rounded-lg border p-2.5 text-xs ${calendar.kind === 'ok' ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200' : 'border-red-500/25 bg-red-500/10 text-red-200'}`}>
+                        {calendar.message}{calendar.kind === 'ok' && calendar.link && <> <a href={calendar.link} target="_blank" rel="noopener noreferrer" className="font-semibold underline">Abrir no Google Agenda</a></>}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:items-center">
                   {getTeleprompterText(selectedOrder) !== null && (

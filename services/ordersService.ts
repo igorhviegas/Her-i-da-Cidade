@@ -1,5 +1,5 @@
 import {
-  collection, deleteField, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, where, type Transaction,
+  collection, deleteField, doc, getDoc, getDocs, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, where,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Order, OrderStatus, ProductionType, OrderSource } from "../types";
@@ -12,10 +12,9 @@ import { StockError, isPresentialService, type ConsumptionLine } from "./stockCa
 import { prepareOrderConsumption, prepareOrderReversal } from "./stockTransactions.js";
 import { currentActor } from "./stockService";
 import { editingCostFields } from "./financeCalculations.js";
+import { LEDGER_COLLECTION, LEDGER_KINDS, ledgerId, planCompletion, planEntry } from "./eventFinance.js";
 
 export const ORDERS_COLLECTION = "orders";
-/** Um documento por PDF importado (id = hash do texto): a criação é atômica com o pedido e impede importação duplicada, inclusive concorrente. */
-export const ORDER_IMPORTS_COLLECTION = "orderImports";
 
 export type CreateOrderInput = Omit<Order, "id" | "orderNumber" | "orderNumberDisplay" | "technicalPurchaseId" | "createdAt" | "completedAt" | "customerDueDate" | "internalDueDate"> & {
   paidAt?: Date | null;
@@ -44,6 +43,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
   if (input.deliveryDays !== undefined && (!Number.isInteger(input.deliveryDays) || input.deliveryDays < 0)) {
     throw new Error("O prazo deve ser informado em dias corridos.");
   }
+  if (input.eventForm && input.status === 'completed') throw new Error('Pedidos de evento não podem ser criados já concluídos: o faturamento é lançado na conclusão pelo Kanban.');
   if (input.status === 'completed') {
     const serviceSnapshot = await getDoc(doc(db, SERVICES_COLLECTION, input.serviceId));
     if (serviceSnapshot.exists() && isPresentialService(serviceSnapshot.data())) {
@@ -62,11 +62,10 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     ...(completedAt ? { completedAt } : {}),
     ...(input.status === 'completed' ? editingCostFields(input.serviceId) : {}),
   };
-  const claim = input.importFingerprint ? importClaimRef(input.importFingerprint) : null;
-  if (input.status === 'completed') await setCompletedOrder(reference, payload, completedAt || new Date(), claim);
-  else if (claim) await setOrderClaimingImport(reference, payload, claim);
+  if (input.eventForm) await setEventOrder(reference, { ...payload, eventLedger: { entry: input.eventForm.entryValue } });
+  else if (input.status === 'completed') await setCompletedOrder(reference, payload, completedAt || new Date());
   else await setDoc(reference, payload);
-  return { ...input, ...deadlines, id: reference.id, createdAt: undefined };
+  return { ...input, ...(input.eventForm ? { eventLedger: { entry: input.eventForm.entryValue } } : {}), ...deadlines, id: reference.id, createdAt: undefined };
 }
 
 /** Cria uma única produção interna para um roteiro pronto e vincula os dois documentos atomicamente. */
@@ -190,6 +189,10 @@ export async function deleteOrder(id: string): Promise<void> {
     if (!orderSnapshot.exists()) throw new Error('Pedido não encontrado para exclusão.');
 
     const order = orderSnapshot.data();
+    // Pedido de evento: seus lançamentos no livro saem junto (exclusão explícita do pedido; as regras só permitem apagar se o pedido deixar de existir).
+    const ledgerSnapshots = order.eventLedger
+      ? await Promise.all(LEDGER_KINDS.map((kind) => transaction.get(doc(firestore, LEDGER_COLLECTION, ledgerId(id, kind)))))
+      : [];
     let linkedScriptRef: ReturnType<typeof doc> | null = null;
     let linkedScript: Record<string, any> | null = null;
     if (typeof order.scriptId === 'string' && order.scriptId) {
@@ -200,6 +203,7 @@ export async function deleteOrder(id: string): Promise<void> {
     }
 
     transaction.delete(orderRef);
+    ledgerSnapshots.forEach((snapshot) => { if (snapshot.exists()) transaction.delete(snapshot.ref); });
     if (linkedScriptRef && linkedScript?.orderId === id) {
       const scriptUpdates: Record<string, unknown> = {
         orderId: deleteField(),
@@ -212,10 +216,9 @@ export async function deleteOrder(id: string): Promise<void> {
 }
 
 /** Pedido que já nasce concluído: grava o pedido e o registro de atividade na mesma transação. */
-async function setCompletedOrder(reference: ReturnType<typeof doc>, payload: Record<string, unknown>, occurredAt: Date, claim: ReturnType<typeof doc> | null = null): Promise<void> {
+async function setCompletedOrder(reference: ReturnType<typeof doc>, payload: Record<string, unknown>, occurredAt: Date): Promise<void> {
   const firestore = db!;
   await runTransaction(firestore, async (transaction) => {
-    if (claim) await claimImport(transaction, claim, reference.id);
     const refs = activityRefs(firestore, 'order_completed', reference.id);
     const record = await prepareActivityLog(transaction, refs, {
       type: 'order_completed', refId: reference.id, occurredAt, difficultyKey: `service_${payload.serviceId}`, meta: { serviceId: payload.serviceId },
@@ -225,30 +228,14 @@ async function setCompletedOrder(reference: ReturnType<typeof doc>, payload: Rec
   });
 }
 
-function importClaimRef(fingerprint: string) {
-  if (!/^sha256:[0-9a-f]{64}$/.test(fingerprint)) throw new Error("Impressão digital da importação inválida.");
-  return doc(db!, ORDER_IMPORTS_COLLECTION, fingerprint.slice(7));
-}
-
-/** Reserva o PDF para este pedido (dentro da transação do pedido); falha se outro pedido já o usou. */
-async function claimImport(transaction: Transaction, claim: ReturnType<typeof doc>, orderId: string): Promise<void> {
-  const existing = await transaction.get(claim);
-  if (existing.exists()) throw new Error(`Este formulário já foi importado no pedido ${String(existing.data().orderId).slice(0, 8)}. Importação duplicada bloqueada.`);
-  transaction.set(claim, { orderId, createdAt: serverTimestamp() });
-}
-
-async function setOrderClaimingImport(reference: ReturnType<typeof doc>, payload: Record<string, unknown>, claim: ReturnType<typeof doc>): Promise<void> {
-  await runTransaction(db!, async (transaction) => {
-    await claimImport(transaction, claim, reference.id);
+/** Pedido de evento: o pedido e o lançamento da entrada (1ª parcela, data = criação) nascem na mesma transação. */
+async function setEventOrder(reference: ReturnType<typeof doc>, payload: Record<string, unknown>): Promise<void> {
+  const firestore = db!;
+  const entry = planEntry(reference.id, payload as any, serverTimestamp());
+  await runTransaction(firestore, async (transaction) => {
     transaction.set(reference, payload);
+    transaction.set(doc(firestore, LEDGER_COLLECTION, ledgerId(reference.id, 'entry')), { ...entry, createdAt: serverTimestamp() });
   });
-}
-
-/** Pedido já criado a partir do mesmo PDF (mesma impressão digital do texto), para evitar importação duplicada. */
-export async function findOrderByImportFingerprint(fingerprint: string): Promise<Order | null> {
-  if (!db) throw new Error("Firebase Firestore não inicializado.");
-  const result = await getDocs(query(collection(db, ORDERS_COLLECTION), where("importFingerprint", "==", fingerprint), limit(1)));
-  return result.empty ? null : mapOrder(result.docs[0].id, result.docs[0].data());
 }
 
 export async function listOrders(): Promise<Order[]> {
@@ -358,6 +345,20 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
       stock = await prepareOrderReversal(transaction, firestore, { orderId: id, actor: currentActor() });
     }
 
+    // Evento com livro de lançamentos: a PRIMEIRA conclusão lança a 2ª parcela e a "Despesa evento" (IDs determinísticos, create-only).
+    // Se o lançamento já existe (reabertura, repetição, falha de rede com nova tentativa), nada é criado nem alterado.
+    // Dados financeiros incompletos bloqueiam a conclusão (EventFinanceError) sem lançar nada.
+    const ledgerWrites: Array<{ id: string; record: Record<string, unknown> }> = [];
+    if (updates.status === 'completed' && currentData.status !== 'completed' && currentData.eventLedger && currentData.eventForm) {
+      const [entrySnap, finalSnap, costSnap] = await Promise.all((['entry', 'final', 'cost'] as const).map((kind) => transaction.get(doc(firestore, LEDGER_COLLECTION, ledgerId(id, kind)))));
+      const eventOrder = { ...currentData, eventForm: { ...currentData.eventForm, ...updates.eventForm } };
+      const date = updates.completedAt instanceof Date ? updates.completedAt : serverTimestamp();
+      for (const record of planCompletion(id, eventOrder, { bookedEntry: entrySnap.exists() ? entrySnap.data().amount : undefined, final: finalSnap.exists(), cost: costSnap.exists() }, date)) {
+        ledgerWrites.push({ id: ledgerId(id, record.kind), record: { ...record, createdAt: serverTimestamp() } });
+        payload[`eventLedger.${record.kind}`] = record.amount;
+      }
+    }
+
     // Primeira conclusão do pedido vira registro permanente (ID por pedido): reabrir e concluir de novo, editar ou excluir o
     // pedido não altera nem apaga o histórico, e a dificuldade fica congelada com a configuração vigente neste instante.
     const serviceId = updates.serviceId ?? currentData.serviceId;
@@ -373,6 +374,7 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
 
     transaction.update(orderRef, payload);
     stock?.apply();
+    ledgerWrites.forEach(({ id: entryId, record }) => transaction.set(doc(firestore, LEDGER_COLLECTION, entryId), record));
     if (activityRefsForOrder && activityRecord) transaction.set(activityRefsForOrder.logRef, activityRecord);
     if (linkedScriptRef && linkedScript) {
       transaction.update(linkedScriptRef, {

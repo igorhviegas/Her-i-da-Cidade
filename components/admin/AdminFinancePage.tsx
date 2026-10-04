@@ -4,9 +4,10 @@ import { useRouter } from '../../lib/router';
 import { getClientById } from '../../services/clientsService';
 import { getServiceById } from '../../services/servicesService';
 import { extractBirthdayPerson } from '../../services/orderReference.js';
+import { LEDGER_LABELS, type LedgerKind } from '../../services/eventFinance.js';
 import { listAssets, listFixedExpenses, subscribeCompletedOrders } from '../../services/financeService';
 import {
-  buildRevenueEntries, buildStatement, dailyRevenue, editingCostForMonth, expensesForMonth, monthKeyOf, monthTotals, patrimonySummary, revenueSeries, shiftMonth, topDay, variationPct,
+  buildRevenueEntries, buildStatement, dailyRevenue, editingCostForMonth, eventCostForMonth, expensesForMonth, monthKeyOf, monthTotals, patrimonySummary, revenueSeries, shiftMonth, topDay, variationPct,
   type Asset, type FixedExpense,
 } from '../../services/financeCalculations.js';
 import type { Client, Order, Service } from '../../types';
@@ -65,16 +66,17 @@ export const AdminFinancePage: React.FC = () => {
     (e) => setError(e.message || 'Não foi possível carregar os pedidos.'),
   ), []);
 
-  const { entries, undated } = useMemo(() => buildRevenueEntries(orders ?? []), [orders]);
+  const { entries, undated, costs } = useMemo(() => buildRevenueEntries(orders ?? []), [orders]);
 
   // Nomes de clientes/serviços: busca apenas ids ainda não conhecidos.
   useEffect(() => {
     const missing = (ids: (string | undefined)[], known: Lookup<unknown>) => [...new Set(ids.filter((id): id is string => !!id && !known.has(id)))];
-    const newClients = missing(entries.map((e) => e.order.clientId), clients);
-    const newServices = missing(entries.map((e) => e.order.serviceId), services);
+    const withCosts = [...entries, ...costs];
+    const newClients = missing(withCosts.map((e) => e.order.clientId), clients);
+    const newServices = missing(withCosts.map((e) => e.order.serviceId), services);
     if (newClients.length) void Promise.all(newClients.map((id) => getClientById(id).catch(() => null))).then((r) => setClients((prev) => new Map([...prev, ...newClients.map((id, i) => [id, r[i]] as const)])));
     if (newServices.length) void Promise.all(newServices.map((id) => getServiceById(id).catch(() => null))).then((r) => setServices((prev) => new Map([...prev, ...newServices.map((id, i) => [id, r[i]] as const)])));
-  }, [entries, clients, services]);
+  }, [entries, costs, clients, services]);
 
   useEffect(() => { setSelectedDay(null); }, [monthKey]);
 
@@ -95,16 +97,17 @@ export const AdminFinancePage: React.FC = () => {
     const previous = monthTotals(entries, shiftMonth(monthKey, -1));
     const fixedTotal = expensesForMonth(data.expenses, monthKey).total;
     const editing = editingCostForMonth(entries, monthKey);
-    const expenseTotal = fixedTotal + editing.total;
+    const eventCost = eventCostForMonth(costs, monthKey);
+    const expenseTotal = fixedTotal + editing.total + eventCost.total;
     const days = dailyRevenue(entries, monthKey);
     const monthEntries = entries.filter((e) => e.monthKey === monthKey);
     return {
-      current, previous, fixedTotal, editing, expenseTotal, days, monthEntries, top: topDay(days), variation: variationPct(current.total, previous.total),
+      current, previous, fixedTotal, editing, eventCost, expenseTotal, days, monthEntries, top: topDay(days), variation: variationPct(current.total, previous.total),
       series: revenueSeries(entries, monthKey, 12), patrimony: patrimonySummary(data.assets),
     };
-  }, [data, orders, entries, monthKey]);
+  }, [data, orders, entries, costs, monthKey]);
 
-  const statement = useMemo(() => (data ? buildStatement(entries, data.expenses, monthKey) : null), [data, entries, monthKey]);
+  const statement = useMemo(() => (data ? buildStatement(entries, data.expenses, monthKey, costs) : null), [data, entries, costs, monthKey]);
   const statementRows = useMemo(() => {
     if (!statement) return [];
     const term = search.trim().toLocaleLowerCase('pt-BR');
@@ -171,7 +174,7 @@ export const AdminFinancePage: React.FC = () => {
                   tone={view.variation === null ? 'text-white/60' : view.variation >= 0 ? 'text-emerald-300' : 'text-red-300'}
                   hint={view.variation === null ? 'Sem base de comparação' : view.variation >= 0 ? <span className="inline-flex items-center gap-1"><ArrowUpRight className="h-3 w-3" />vs. mês anterior</span> : <span className="inline-flex items-center gap-1"><ArrowDownRight className="h-3 w-3" />vs. mês anterior</span>} />
                 <Kpi label="Despesas do mês" value={formatMoney(view.expenseTotal)} tone="text-red-300"
-                  hint={`Fixas ${formatMoney(view.fixedTotal)} · Edição de vídeos ${formatMoney(view.editing.total)}`} />
+                  hint={`Fixas ${formatMoney(view.fixedTotal)} · Edição de vídeos ${formatMoney(view.editing.total)} · Eventos ${formatMoney(view.eventCost.total)}`} />
                 <Kpi label="Resultado operacional estimado" value={formatMoney(view.current.total - view.expenseTotal)} tone={view.current.total - view.expenseTotal >= 0 ? 'text-white' : 'text-red-300'} hint="Faturamento − despesas" />
                 <Kpi label="Patrimônio ativo" value={formatMoney(view.patrimony.currentTotal)} hint={`${view.patrimony.activeCount} iten${view.patrimony.activeCount === 1 ? '' : 's'}`} />
               </div>
@@ -228,7 +231,7 @@ export const AdminFinancePage: React.FC = () => {
                     const out = r.kind === 'out';
                     const who = child ? `${child} · ` : '';
                     const title = r.source === 'expense' ? r.expense!.name : `${who}${client?.name || `Pedido ${r.entry!.orderId.slice(0, 6)}`}`;
-                    const subtitle = r.source === 'expense' ? `Despesa · ${r.expense!.category}` : r.source === 'editing' ? 'Custo de edição — Vídeo personalizado' : (service?.title || 'Serviço não encontrado');
+                    const subtitle = r.source === 'expense' ? `Despesa · ${r.expense!.category}` : r.source === 'editing' ? 'Custo de edição — Vídeo personalizado' : r.source === 'eventCost' ? LEDGER_LABELS.cost : `${service?.title || 'Serviço não encontrado'}${r.entry?.order.ledgerKind ? ` · ${LEDGER_LABELS[r.entry.order.ledgerKind as LedgerKind]}` : ''}`;
                     return (
                       <div key={r.id} className={`flex items-center justify-between gap-3 p-4 ${out ? 'bg-red-500/10' : ''}`}>
                         <div className="min-w-0">
@@ -248,7 +251,7 @@ export const AdminFinancePage: React.FC = () => {
             </div>
           )}
 
-          {tab === 'expenses' && <FinanceExpenses expenses={data.expenses} videoCost={view.editing} monthKey={monthKey} onChanged={reloadCollections} />}
+          {tab === 'expenses' && <FinanceExpenses expenses={data.expenses} videoCost={view.editing} eventCost={view.eventCost} monthKey={monthKey} onChanged={reloadCollections} />}
           {tab === 'assets' && <FinanceAssets assets={data.assets} onChanged={reloadCollections} />}
           {tab === 'stock' && <FinanceStock />}
         </>
