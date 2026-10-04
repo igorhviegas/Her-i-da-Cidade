@@ -64,6 +64,8 @@ export interface Order {
   scriptId?: string;
   /** Impressão digital do PDF importado (sha256 do texto normalizado); evita importar o mesmo formulário duas vezes. */
   importFingerprint?: string;
+  /** Custo de edição (R$) gravado na primeira conclusão de Vídeo Personalizado; entra nas despesas do Financeiro. */
+  editingCost?: number;
 }
 
 export interface FirestoreOrder extends Order {}

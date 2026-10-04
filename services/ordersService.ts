@@ -11,6 +11,7 @@ import { activityRefs, prepareActivityLog } from "./activityLog";
 import { StockError, isPresentialService, type ConsumptionLine } from "./stockCalculations.js";
 import { prepareOrderConsumption, prepareOrderReversal } from "./stockTransactions.js";
 import { currentActor } from "./stockService";
+import { editingCostFields } from "./financeCalculations.js";
 
 export const ORDERS_COLLECTION = "orders";
 /** Um documento por PDF importado (id = hash do texto): a criação é atômica com o pedido e impede importação duplicada, inclusive concorrente. */
@@ -59,6 +60,7 @@ export async function createOrder(input: CreateOrderInput): Promise<Order> {
     ...(deadlines.customerDueDate ? deadlines : {}),
     createdAt: serverTimestamp(),
     ...(completedAt ? { completedAt } : {}),
+    ...(input.status === 'completed' ? editingCostFields(input.serviceId) : {}),
   };
   const claim = input.importFingerprint ? importClaimRef(input.importFingerprint) : null;
   if (input.status === 'completed') await setCompletedOrder(reference, payload, completedAt || new Date(), claim);
@@ -366,6 +368,8 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
         difficultyKey: `service_${serviceId}`, meta: { serviceId, ...(currentData.scriptId ? { scriptId: currentData.scriptId } : {}) },
       })
       : null;
+
+    if (updates.status === 'completed' && currentData.status !== 'completed') Object.assign(payload, editingCostFields(serviceId, currentData));
 
     transaction.update(orderRef, payload);
     stock?.apply();

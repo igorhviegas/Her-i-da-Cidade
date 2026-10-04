@@ -3,7 +3,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Order } from "../types";
-import type { Asset, FixedExpense } from "./financeCalculations";
+import { shiftMonth, type Asset, type FixedExpense } from "./financeCalculations.js";
 
 export const FIXED_EXPENSES_COLLECTION = "fixedExpenses";
 export const ASSETS_COLLECTION = "assets";
@@ -65,14 +65,17 @@ export async function listFixedExpenses(): Promise<FixedExpense[]> {
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
-export async function createFixedExpense(input: { name: string; category: string; amount: number; description?: string; startMonth: string }) {
+export async function createFixedExpense(input: { name: string; category: string; amount: number; description?: string; startMonth: string; oneTime?: boolean }) {
   const name = input.name.trim();
   if (!name || !input.category.trim()) throw new Error("Nome e categoria são obrigatórios.");
   assertAmount(input.amount, "O valor mensal");
   assertMonth(input.startMonth);
   await addDoc(collection(requireDb(), FIXED_EXPENSES_COLLECTION), {
     name, category: input.category.trim(), description: input.description?.trim() || "",
-    startMonth: input.startMonth, active: true, amountHistory: { [input.startMonth]: input.amount },
+    startMonth: input.startMonth, active: true,
+    // Despesa única: encerra no mês seguinte ao de início (mesmo mecanismo de "desativar"), então só conta em startMonth.
+    ...(input.oneTime ? { deactivatedFrom: shiftMonth(input.startMonth, 1) } : {}),
+    amountHistory: { [input.startMonth]: input.amount },
     createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
   });
 }
