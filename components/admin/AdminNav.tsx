@@ -1,8 +1,9 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, GripVertical, RotateCcw, type LucideIcon } from 'lucide-react';
 import { moveNavItem, resolveNavOrder, shiftNavItem } from '../../services/adminNav.js';
 
 export interface NavItem<Id extends string = string> { id: Id; label: string; icon: LucideIcon }
+export interface NavGroup<Id extends string = string> { key: string; label: string; icon: LucideIcon; ids: Id[] }
 
 const storageKey = (uid: string) => `hdc.admin.navOrder.${uid}`;
 const readSaved = (uid: string): unknown => { try { return JSON.parse(localStorage.getItem(storageKey(uid)) ?? 'null'); } catch { return null; } };
@@ -28,6 +29,7 @@ export function useNavOrder<Id extends string>(uid: string | undefined, defaultI
 interface Props<Id extends string> {
   pinned: NavItem<Id>;
   items: NavItem<Id>[];
+  groups: NavGroup<Id>[];
   order: Id[];
   onReorder: (next: Id[]) => void;
   onReset: () => void;
@@ -46,7 +48,7 @@ const smallBtn = 'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg t
  * Navegação lateral: "pinned" fica fixo no topo; os demais módulos podem ser arrastados (mouse), movidos com Alt + ↑/↓
  * ou, no modo "Reordenar" (alternativa por toque), com os botões ▲ ▼.
  */
-export function AdminNav<Id extends string>({ pinned, items, order, onReorder, onReset, customized, current, onSelect, ordersCount, ordersCountFailed, variant }: Props<Id>) {
+export function AdminNav<Id extends string>({ pinned, items, groups, order, onReorder, onReset, customized, current, onSelect, ordersCount, ordersCountFailed, variant }: Props<Id>) {
   const [dragging, setDragging] = useState<Id | null>(null);
   const [over, setOver] = useState<{ id: Id; position: 'before' | 'after' } | null>(null);
   const [announce, setAnnounce] = useState('');
@@ -54,9 +56,20 @@ export function AdminNav<Id extends string>({ pinned, items, order, onReorder, o
   const byId = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const sorted = order.map((id) => byId.get(id)).filter((item): item is NavItem<Id> => !!item);
 
+  const groupOf = (id: Id) => groups.find((group) => group.ids.includes(id));
+  // Só uma categoria aberta por vez; a da página atual abre sozinha ao navegar.
+  const [openKey, setOpenKey] = useState<string | null>(() => groupOf(current)?.key ?? null);
+  useEffect(() => { const key = groupOf(current)?.key; if (key) setOpenKey(key); }, [current]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reordena só dentro da categoria: troca com o vizinho do mesmo grupo e devolve os itens aos mesmos "slots" da ordem global.
   const move = (id: Id, delta: -1 | 1, focusId: string) => {
-    const next = shiftNavItem(order, id, delta) as Id[];
-    if (next === order) return;
+    const group = groupOf(id);
+    if (!group) return;
+    const inGroup = order.filter((x) => group.ids.includes(x));
+    const shifted = shiftNavItem(inGroup, id, delta) as Id[];
+    if (shifted === inGroup) return;
+    let i = 0;
+    const next = order.map((x) => (group.ids.includes(x) ? shifted[i++] : x));
     onReorder(next);
     setAnnounce(`${byId.get(id)?.label} movido para a posição ${next.indexOf(id) + 1} de ${next.length}.`);
     // o foco acompanha o item movido (o React reordena os nós e o navegador pode soltá-lo)
@@ -101,58 +114,82 @@ export function AdminNav<Id extends string>({ pinned, items, order, onReorder, o
     <>
       <div role="status" aria-live="polite" className="sr-only">{announce}</div>
       <div className="mb-1.5">{renderButton(pinned)}</div>
-      <ul className="space-y-1.5" onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setOver(null); }}>
-        {sorted.map((item, index) => {
-          const showBefore = over?.id === item.id && over.position === 'before' && dragging !== item.id;
-          const showAfter = over?.id === item.id && over.position === 'after' && dragging !== item.id;
-          const buttonId = `nav-${variant}-${item.id}`;
+      <ul className="space-y-1" onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setOver(null); }}>
+        {groups.map((group) => {
+          const GroupIcon = group.icon;
+          const open = openKey === group.key;
+          const groupItems = sorted.filter((item) => group.ids.includes(item.id));
+          const hasCurrent = group.ids.includes(current);
           return (
-            <li
-              key={item.id}
-              draggable={!editing}
-              onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item.id); setDragging(item.id); }}
-              onDragEnd={() => { setDragging(null); setOver(null); }}
-              onDragOver={(event) => {
-                if (!dragging) return;
-                event.preventDefault();
-                event.dataTransfer.dropEffect = 'move';
-                const rect = event.currentTarget.getBoundingClientRect();
-                const position = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
-                if (over?.id !== item.id || over.position !== position) setOver({ id: item.id, position });
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                if (dragging && over) onReorder(moveNavItem(order, dragging, over.id, over.position) as Id[]);
-                setDragging(null);
-                setOver(null);
-              }}
-              className={`group relative flex items-center gap-1 rounded-xl ${dragging === item.id ? 'opacity-40' : ''}`}
-            >
-              {showBefore && <span aria-hidden className="pointer-events-none absolute -top-1 left-2 right-2 h-0.5 rounded bg-blue-400" />}
-              <div className="min-w-0 flex-1">
-                {renderButton(item, {
-                  id: buttonId,
-                  onKeyDown: (event) => {
-                    if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
-                      event.preventDefault();
-                      move(item.id, event.key === 'ArrowUp' ? -1 : 1, buttonId);
-                    }
-                  },
-                  'aria-keyshortcuts': 'Alt+ArrowUp Alt+ArrowDown',
-                } as Partial<React.ButtonHTMLAttributes<HTMLButtonElement>>)}
+            <li key={group.key}>
+              <button
+                type="button"
+                onClick={() => setOpenKey(open ? null : group.key)}
+                aria-expanded={open}
+                aria-controls={`nav-${variant}-${group.key}`}
+                className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-colors hover:bg-white/5 ${hasCurrent ? 'text-blue-400' : 'text-white/50 hover:text-white'}`}
+              >
+                <span className="flex items-center gap-3"><GroupIcon className="w-4 h-4 shrink-0" />{group.label}</span>
+                <ChevronDown aria-hidden className={`w-4 h-4 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+              </button>
+              <div id={`nav-${variant}-${group.key}`} className={`grid transition-[grid-template-rows] duration-200 ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+                <ul className={`min-h-0 overflow-hidden space-y-1 ml-5 border-l border-white/10 pl-2 ${open ? 'mt-1' : 'invisible'}`}>
+                  {groupItems.map((item, index) => {
+                  const showBefore = over?.id === item.id && over.position === 'before' && dragging !== item.id;
+                  const showAfter = over?.id === item.id && over.position === 'after' && dragging !== item.id;
+                  const buttonId = `nav-${variant}-${item.id}`;
+                  return (
+                    <li
+                      key={item.id}
+                      draggable={!editing}
+                      onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item.id); setDragging(item.id); }}
+                      onDragEnd={() => { setDragging(null); setOver(null); }}
+                      onDragOver={(event) => {
+                        if (!dragging || groupOf(dragging) !== group) return;
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = 'move';
+                        const rect = event.currentTarget.getBoundingClientRect();
+                        const position = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+                        if (over?.id !== item.id || over.position !== position) setOver({ id: item.id, position });
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        if (dragging && over && groupOf(dragging) === group) onReorder(moveNavItem(order, dragging, over.id, over.position) as Id[]);
+                        setDragging(null);
+                        setOver(null);
+                      }}
+                      className={`group relative flex items-center gap-1 rounded-xl ${dragging === item.id ? 'opacity-40' : ''}`}
+                    >
+                      {showBefore && <span aria-hidden className="pointer-events-none absolute -top-1 left-2 right-2 h-0.5 rounded bg-blue-400" />}
+                      <div className="min-w-0 flex-1">
+                        {renderButton(item, {
+                          id: buttonId,
+                          onKeyDown: (event) => {
+                            if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+                              event.preventDefault();
+                              move(item.id, event.key === 'ArrowUp' ? -1 : 1, buttonId);
+                            }
+                          },
+                          'aria-keyshortcuts': 'Alt+ArrowUp Alt+ArrowDown',
+                        } as Partial<React.ButtonHTMLAttributes<HTMLButtonElement>>)}
+                      </div>
+                      {!editing && <GripVertical aria-hidden className="pointer-events-none absolute left-0.5 top-1/2 hidden h-3 w-3 -translate-y-1/2 text-white/30 group-hover:block" />}
+                      {editing && (
+                        <>
+                          <button type="button" id={`${buttonId}-up`} className={smallBtn} disabled={index === 0} aria-label={`Mover ${item.label} para cima`} onClick={() => move(item.id, -1, `${buttonId}-up`)}>
+                            <ChevronUp className="h-4 w-4" aria-hidden />
+                          </button>
+                          <button type="button" id={`${buttonId}-down`} className={smallBtn} disabled={index === groupItems.length - 1} aria-label={`Mover ${item.label} para baixo`} onClick={() => move(item.id, 1, `${buttonId}-down`)}>
+                            <ChevronDown className="h-4 w-4" aria-hidden />
+                          </button>
+                        </>
+                      )}
+                      {showAfter && <span aria-hidden className="pointer-events-none absolute -bottom-1 left-2 right-2 h-0.5 rounded bg-blue-400" />}
+                    </li>
+                  );
+                  })}
+                </ul>
               </div>
-              {!editing && <GripVertical aria-hidden className="pointer-events-none absolute left-0.5 top-1/2 hidden h-3 w-3 -translate-y-1/2 text-white/30 group-hover:block" />}
-              {editing && (
-                <>
-                  <button type="button" id={`${buttonId}-up`} className={smallBtn} disabled={index === 0} aria-label={`Mover ${item.label} para cima`} onClick={() => move(item.id, -1, `${buttonId}-up`)}>
-                    <ChevronUp className="h-4 w-4" aria-hidden />
-                  </button>
-                  <button type="button" id={`${buttonId}-down`} className={smallBtn} disabled={index === sorted.length - 1} aria-label={`Mover ${item.label} para baixo`} onClick={() => move(item.id, 1, `${buttonId}-down`)}>
-                    <ChevronDown className="h-4 w-4" aria-hidden />
-                  </button>
-                </>
-              )}
-              {showAfter && <span aria-hidden className="pointer-events-none absolute -bottom-1 left-2 right-2 h-0.5 rounded bg-blue-400" />}
             </li>
           );
         })}

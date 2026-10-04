@@ -16,7 +16,7 @@ import { AdminFinancePage } from './AdminFinancePage';
 import { FinanceRevenueBadge } from './FinanceRevenueBadge';
 import { AdminHomePage } from './AdminHomePage';
 import { AdminInstagramPage } from './AdminInstagramPage';
-import { AdminNav, useNavOrder, type NavItem } from './AdminNav';
+import { AdminNav, useNavOrder, type NavItem, type NavGroup } from './AdminNav';
 import { subscribeActiveOrders } from '../../services/ordersService';
 import { 
   Shield, 
@@ -42,25 +42,33 @@ import {
   Target,
   Wallet,
   Camera,
-  House
+  House,
+  Briefcase,
+  Tv,
+  SlidersHorizontal
 } from 'lucide-react';
 
 type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram';
 
 // Módulos reorganizáveis (ordem padrão). "Principal" é fixo no topo e fica fora desta lista.
 const NAV_ITEMS: NavItem<AdminTab>[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'services', label: 'Serviços', icon: Sparkles },
-  { id: 'videos', label: 'Vídeos', icon: Video },
-  { id: 'categories', label: 'Categorias', icon: Layers },
-  { id: 'content', label: 'Conteúdo', icon: FileText },
   { id: 'orders', label: 'Pedidos', icon: ClipboardList },
-  { id: 'clients', label: 'Clientes', icon: UserCheck },
-  { id: 'scripts', label: 'Roteiros', icon: BookOpen },
   { id: 'missions', label: 'Missões', icon: Target },
   { id: 'finance', label: 'Financeiro', icon: Wallet },
   { id: 'instagram', label: 'Instagram', icon: Camera },
+  { id: 'scripts', label: 'Roteiros', icon: BookOpen },
+  { id: 'clients', label: 'Clientes', icon: UserCheck },
+  { id: 'videos', label: 'Vídeos', icon: Video },
+  { id: 'categories', label: 'Categorias', icon: Layers },
+  { id: 'services', label: 'Serviços', icon: Sparkles },
+  { id: 'content', label: 'Conteúdo', icon: FileText },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'settings', label: 'Configurações', icon: Settings },
+];
+const NAV_GROUPS: NavGroup<AdminTab>[] = [
+  { key: 'crm', label: 'CRM', icon: Briefcase, ids: ['orders', 'missions', 'finance', 'instagram', 'scripts', 'clients'] },
+  { key: 'streaming', label: 'Streaming', icon: Tv, ids: ['videos', 'categories'] },
+  { key: 'ajustes', label: 'Ajustes', icon: SlidersHorizontal, ids: ['services', 'content', 'dashboard', 'settings'] },
 ];
 const NAV_ORDER = NAV_ITEMS.map((item) => item.id);
 
@@ -235,6 +243,7 @@ export const AdminDashboard: React.FC = () => {
     <AdminNav<AdminTab>
       pinned={pinnedItem}
       items={navItems}
+      groups={NAV_GROUPS}
       order={navOrder}
       onReorder={setNavOrder}
       onReset={resetNavOrder}
