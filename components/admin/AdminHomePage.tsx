@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, ArrowRight, Camera, CheckCircle2, Circle, ClipboardList, Loader2, RefreshCw, Target, Wallet, XCircle } from 'lucide-react';
+import { AlertCircle, ArrowRight, CalendarDays, Camera, CheckCircle2, Circle, ClipboardList, Loader2, RefreshCw, Target, Wallet, XCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from '../../lib/router';
 import { subscribeCompletedOrders } from '../../services/financeService';
@@ -15,6 +15,9 @@ import type { Client, Order, Service } from '../../types';
 import { formatMoney } from './financeFormat';
 import { subscribeInstagramProfile, type InstagramProfile } from '../../services/instagramService';
 import { DeltaText } from './AdminInstagramPage';
+import { useCalendarEvents } from '../../services/calendarService';
+import { eventsOnDay } from '../../services/calendarEvents.js';
+import { DayAgenda } from './CalendarAgenda';
 
 type Load<T> = { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: T };
 
@@ -259,9 +262,24 @@ const InstagramWidget: React.FC<{ now: Date; onOpen: () => void }> = ({ now, onO
   );
 };
 
+// ------------------------------------------------------------------ Compromissos
+
+/** Compromissos do dia do Google Agenda (mesma lógica do destaque do Calendário; cache de 2 min evita chamadas a cada visita). */
+const AppointmentsWidget: React.FC<{ now: Date; onOpen: (query?: string) => void }> = ({ now, onOpen }) => {
+  const today = dateKey(now);
+  const { state, reload } = useCalendarEvents(today, today);
+  const count = state.status === 'ready' ? eventsOnDay(state.events, today).length : null;
+  return (
+    <Widget title="Compromissos de hoje" subtitle={count === null ? 'Eventos do Google Agenda para hoje.' : `${count} ${count === 1 ? 'compromisso' : 'compromissos'} no Google Agenda hoje.`} icon={CalendarDays} tone="bg-orange-500/10 text-orange-300" onOpen={() => onOpen()} openLabel="Abrir Calendário">
+      <DayAgenda state={state} dayKey={today} emptyText="Nenhum compromisso para hoje" limit={5} onRetry={reload}
+        onOpen={(event) => onOpen(`date=${today}&event=${encodeURIComponent(event.id)}`)} />
+    </Widget>
+  );
+};
+
 // ------------------------------------------------------------------------ página
 
-export const AdminHomePage: React.FC<{ onNavigate: (tab: 'finance' | 'missions' | 'orders' | 'instagram') => void }> = ({ onNavigate }) => {
+export const AdminHomePage: React.FC<{ onNavigate: (tab: 'finance' | 'missions' | 'orders' | 'instagram' | 'calendar') => void }> = ({ onNavigate }) => {
   const { user } = useAuth();
   const { navigate } = useRouter();
   const now = useNow();
@@ -276,6 +294,7 @@ export const AdminHomePage: React.FC<{ onNavigate: (tab: 'finance' | 'missions' 
         <p className="mt-1 text-sm capitalize text-white/50">{dateLabel}</p>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <AppointmentsWidget now={now} onOpen={(query) => (query ? navigate(`/admin/calendario?${query}`) : onNavigate('calendar'))} />
         <FinanceWidget now={now} onOpen={() => onNavigate('finance')} />
         <TasksWidget now={now} onOpen={() => onNavigate('missions')} />
         <InstagramWidget now={now} onOpen={() => onNavigate('instagram')} />

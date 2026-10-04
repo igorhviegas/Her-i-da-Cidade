@@ -42,3 +42,14 @@ Pré-requisitos externos (não dá para fazer pelo código):
 
 Erros (credencial ausente, sem permissão, agenda não encontrada, limite, indisponibilidade) aparecem no botão com mensagem própria.
 Fuso: `America/Sao_Paulo`; duração fixa de 1 hora a partir do horário de início.
+
+## Módulo Calendário (`/admin/calendario`)
+
+Item fixo do menu, logo abaixo de Principal. Visualizações mês/semana/dia, destaque "Compromissos do dia" no topo (acompanha a data selecionada), busca e Novo evento/editar/excluir. Usa a **mesma** conta de serviço, `GOOGLE_CALENDAR_ID` e escopo do envio de pedidos (nenhuma credencial nova).
+
+- API: `POST /api/calendar-events` (`api/calendar-events.ts`, `functions/google-calendar.js`) com `action` = `list | create | update | delete`, só para administradores. Só responde ok depois da confirmação do Google; erros viram mensagens claras.
+- Eventos criados no módulo são independentes: nada é gravado no Firestore (sem pedido, missão ou lançamento). Edição usa `PATCH`, exclusão usa `DELETE` (410 = já excluído conta como concluído).
+- Eventos de pedidos são reconhecidos pelo ID (`hc` + sha1). **Não existe sincronização da agenda para o pedido** (o fluxo é só pedido → Google): editar/excluir o evento aqui não altera o pedido, e reenviar o pedido pelo Kanban recria/sobrescreve o evento. A tela avisa isso. Excluir um evento nunca apaga pedido, missão ou lançamento.
+- Busca: o parâmetro `q` do Google procura em título, descrição (onde estão cliente e criança nos eventos de pedido), local e participantes, sempre dentro de um período (padrão: 3 meses atrás a 10 meses à frente; máx. 400 dias por consulta).
+- Limites: 250 eventos por página, até 5 páginas por consulta (1250); acima disso a tela avisa que o resultado é parcial. Eventos de vários dias aparecem em todos os dias, mas só se editam no Google Agenda.
+- Cache: o navegador guarda cada período por 2 minutos (`services/calendarService.ts`), compartilhado entre o widget da Principal e o Calendário; editar, excluir ou enviar um pedido ao Google Agenda invalida o cache e recarrega. Não há polling.

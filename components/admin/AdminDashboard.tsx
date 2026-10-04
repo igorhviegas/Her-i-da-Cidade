@@ -15,6 +15,7 @@ import { NotificationsBell } from './NotificationsBell';
 import { AdminFinancePage } from './AdminFinancePage';
 import { FinanceRevenueBadge } from './FinanceRevenueBadge';
 import { AdminHomePage } from './AdminHomePage';
+import { AdminCalendarPage } from './AdminCalendarPage';
 import { AdminInstagramPage } from './AdminInstagramPage';
 import { AdminNav, useNavOrder, type NavItem, type NavGroup } from './AdminNav';
 import { subscribeActiveOrders } from '../../services/ordersService';
@@ -43,12 +44,13 @@ import {
   Wallet,
   Camera,
   House,
+  CalendarDays,
   Briefcase,
   Tv,
   SlidersHorizontal
 } from 'lucide-react';
 
-type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram';
+type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram' | 'calendar';
 
 // Módulos reorganizáveis (ordem padrão). "Principal" é fixo no topo e fica fora desta lista.
 const NAV_ITEMS: NavItem<AdminTab>[] = [
@@ -100,6 +102,8 @@ export const AdminDashboard: React.FC = () => {
       ? 'instagram'
       : path === '/admin/financeiro'
       ? 'finance'
+      : path === '/admin/calendario'
+      ? 'calendar'
       : path === '/admin/dashboard'
       ? 'dashboard'
       : 'home';
@@ -132,6 +136,8 @@ export const AdminDashboard: React.FC = () => {
       setCurrentTab('instagram');
     } else if (path === '/admin/financeiro') {
       setCurrentTab('finance');
+    } else if (path === '/admin/calendario') {
+      setCurrentTab('calendar');
     } else if (path === '/admin/dashboard') {
       setCurrentTab('dashboard');
     } else if (path === '/admin') {
@@ -163,6 +169,8 @@ export const AdminDashboard: React.FC = () => {
       navigate('/admin/instagram');
     } else if (tabId === 'finance') {
       navigate('/admin/financeiro');
+    } else if (tabId === 'calendar') {
+      navigate('/admin/calendario');
     } else if (tabId === 'dashboard') {
       navigate('/admin/dashboard');
     } else if (tabId === 'home') {
@@ -226,7 +234,7 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const pinnedItem: NavItem<AdminTab> = { id: 'home', label: 'Principal', icon: House };
+  const pinnedItems: NavItem<AdminTab>[] = [{ id: 'home', label: 'Principal', icon: House }, { id: 'calendar', label: 'Calendário', icon: CalendarDays }];
   const navItems: NavItem<AdminTab>[] = NAV_ITEMS;
   const { order: navOrder, setOrder: setNavOrder, reset: resetNavOrder, customized: navCustomized } = useNavOrder<AdminTab>(user?.uid, NAV_ORDER);
 
@@ -241,7 +249,7 @@ export const AdminDashboard: React.FC = () => {
 
   const renderNav = (variant: 'desktop' | 'mobile', afterSelect?: () => void) => (
     <AdminNav<AdminTab>
-      pinned={pinnedItem}
+      pinned={pinnedItems}
       items={navItems}
       groups={NAV_GROUPS}
       order={navOrder}
@@ -417,6 +425,7 @@ export const AdminDashboard: React.FC = () => {
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           
           {currentTab === 'home' && <AdminHomePage onNavigate={handleTabChange} />}
+          {currentTab === 'calendar' && <AdminCalendarPage />}
 
           {/* TAB: DASHBOARD */}
           {currentTab === 'dashboard' && (

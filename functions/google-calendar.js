@@ -6,6 +6,7 @@
 // reenviar o mesmo pedido atualiza o mesmo evento — mesmo se o vínculo não tiver sido gravado no pedido.
 
 import { createHash, createSign } from 'node:crypto';
+import { addDays, parseDateKey, startOfDay } from './missions-core.js';
 
 export const TIME_ZONE = 'America/Sao_Paulo';
 export const EVENT_DURATION_MINUTES = 60;
@@ -219,4 +220,130 @@ export async function syncOrderToCalendar({ orderId, order, client, env = proces
     if (response.ok) return confirmed(response, false);
   }
   throw new GoogleCalendarError(failureFor(response.status));
+}
+
+// ---------- módulo Calendário: listar / criar / editar / excluir eventos (qualquer evento da agenda) ----------
+// Reutiliza token, credenciais e mapeamento de erros acima. Eventos de pedidos têm ID 'hc'+sha1; os criados aqui são independentes
+// do CRM (nada é gravado no Firestore).
+
+const MAX_PAGES = 5; // 5 × 250 = 1250 eventos por consulta; acima disso o resultado vem marcado como truncado
+const MAX_RANGE_DAYS = 400;
+const EVENT_ID = /^[A-Za-z0-9_-]{1,1024}$/;
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+Object.assign(MESSAGES, {
+  invalid_event: 'Dados do evento inválidos. Confira título, data e horários.',
+  invalid_range: 'Período inválido para consulta.',
+  event_not_found: 'Evento não encontrado na agenda (talvez já tenha sido excluído).',
+});
+
+/** Evento do pedido (ID determinístico gerado por calendarEventId). */
+export const isCrmEventId = (id) => /^hc[0-9a-f]{40}$/.test(String(id));
+
+const clockIn = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const addDayKey = (key, amount) => { const d = new Date(`${key}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + amount); return d.toISOString().slice(0, 10); };
+
+/** Evento do Google → formato do módulo (datas como chaves no fuso de Brasília; fim de dia inteiro já inclusivo). */
+export function normalizeEvent(item) {
+  const allDay = !!item.start?.date;
+  const startDate = allDay ? null : new Date(item.start?.dateTime);
+  const endDate = allDay ? null : new Date(item.end?.dateTime ?? item.start?.dateTime);
+  const startKey = allDay ? item.start.date : eventDateKey(startDate);
+  let endKey = allDay ? addDayKey(item.end?.date ?? item.start.date, -1) : eventDateKey(endDate);
+  if (!startKey) return null;
+  if (!endKey || endKey < startKey) endKey = startKey;
+  return {
+    id: item.id,
+    title: item.summary || '(Sem título)',
+    description: item.description || '',
+    location: item.location || '',
+    allDay,
+    startKey,
+    startTime: allDay ? null : clockIn.format(startDate),
+    endKey,
+    endTime: allDay ? null : clockIn.format(endDate),
+    htmlLink: item.htmlLink || null,
+    crm: isCrmEventId(item.id),
+  };
+}
+
+/** Valida a entrada do formulário e monta o corpo da Calendar API. `patch` envia nulls para limpar campos e trocar dia inteiro ↔ horário. */
+export function buildStandaloneEvent(input, { patch = false } = {}) {
+  const title = typeof input?.title === 'string' ? input.title.trim() : '';
+  const date = input?.date;
+  const bad = () => new GoogleCalendarError('invalid_event');
+  if (!title || title.length > 250 || !parseDateKey(date ?? '')) throw bad();
+  const text = (value, max) => { const s = typeof value === 'string' ? value.trim() : ''; if (s.length > max) throw bad(); return s || (patch ? null : undefined); };
+  const body = { summary: title, location: text(input.location, 1024), description: text(input.description, 8000) };
+  if (input.allDay) {
+    body.start = { date, ...(patch ? { dateTime: null, timeZone: null } : {}) };
+    body.end = { date: addDayKey(date, 1), ...(patch ? { dateTime: null, timeZone: null } : {}) };
+  } else {
+    if (!TIME.test(input.startTime ?? '') || !TIME.test(input.endTime ?? '') || input.endTime <= input.startTime) throw bad();
+    body.start = { dateTime: `${date}T${input.startTime}:00`, timeZone: TIME_ZONE, ...(patch ? { date: null } : {}) };
+    body.end = { dateTime: `${date}T${input.endTime}:00`, timeZone: TIME_ZONE, ...(patch ? { date: null } : {}) };
+  }
+  return body;
+}
+
+async function calendarRequest(method, suffix, { query, body, env = process.env, fetchImpl = fetch, now } = {}) {
+  const calendarId = String(env.GOOGLE_CALENDAR_ID || '').trim();
+  if (!calendarId) throw new GoogleCalendarError('not_configured');
+  const token = await getAccessToken({ env, fetchImpl, now });
+  const url = `${API}/${encodeURIComponent(calendarId)}/events${suffix}${query ? `?${new URLSearchParams(query)}` : ''}`;
+  try {
+    return await fetchImpl(url, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+  } catch { throw new GoogleCalendarError('unavailable'); }
+}
+
+const failWith = (response) => new GoogleCalendarError(response.status === 404 ? 'event_not_found' : failureFor(response.status));
+const ensureId = (id) => { if (!EVENT_ID.test(String(id ?? ''))) throw new GoogleCalendarError('invalid_event'); return id; };
+
+/** Eventos entre duas datas (YYYY-MM-DD, inclusivas), ordenados; `q` filtra por título, descrição e local (busca do Google). */
+export async function listCalendarEvents({ from, to, q, ...ctx }) {
+  if (!parseDateKey(from ?? '') || !parseDateKey(to ?? '') || to < from || (Date.parse(to) - Date.parse(from)) / 86400000 > MAX_RANGE_DAYS) throw new GoogleCalendarError('invalid_range');
+  const query = {
+    singleEvents: 'true', orderBy: 'startTime', maxResults: '250', showDeleted: 'false',
+    timeMin: startOfDay(from).toISOString(), timeMax: startOfDay(addDays(to, 1)).toISOString(), timeZone: TIME_ZONE,
+    fields: 'nextPageToken,items(id,status,summary,description,location,start,end,htmlLink)',
+    ...(q?.trim() ? { q: q.trim().slice(0, 200) } : {}),
+  };
+  const events = [];
+  let pageToken;
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const response = await calendarRequest('GET', '', { ...ctx, query: pageToken ? { ...query, pageToken } : query });
+    if (!response.ok) throw response.status === 404 ? new GoogleCalendarError('calendar_not_found') : failWith(response);
+    const data = await response.json().catch(() => null);
+    if (!data) throw new GoogleCalendarError('api_error');
+    for (const item of data.items ?? []) { const event = item.status === 'cancelled' ? null : normalizeEvent(item); if (event) events.push(event); }
+    pageToken = data.nextPageToken;
+    if (!pageToken) return { events, truncated: false };
+  }
+  return { events, truncated: true };
+}
+
+async function confirmedEvent(response) {
+  if (!response.ok) throw failWith(response);
+  const data = await response.json().catch(() => null);
+  const event = data?.id ? normalizeEvent(data) : null;
+  if (!event) throw new GoogleCalendarError('api_error');
+  return event;
+}
+
+export const createCalendarEvent = async ({ input, ...ctx }) => confirmedEvent(await calendarRequest('POST', '', { ...ctx, body: buildStandaloneEvent(input) }));
+
+export async function updateCalendarEvent({ id, input, ...ctx }) {
+  const body = buildStandaloneEvent(input, { patch: true });
+  return confirmedEvent(await calendarRequest('PATCH', `/${encodeURIComponent(ensureId(id))}`, { ...ctx, body }));
+}
+
+/** Só resolve depois de o Google confirmar. 410 (já excluído) conta como concluído; 404 é erro. */
+export async function deleteCalendarEvent({ id, ...ctx }) {
+  const response = await calendarRequest('DELETE', `/${encodeURIComponent(ensureId(id))}`, ctx);
+  if (!response.ok && response.status !== 410) throw failWith(response);
+  return { id };
 }

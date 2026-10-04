@@ -8,6 +8,7 @@ import { handleMissionsCron } from "./api/missions-cron";
 import { handleAlexa } from "./api/alexa";
 import { handleInstagramSync } from "./api/instagram-sync";
 import { handleGoogleCalendar } from "./api/google-calendar";
+import { handleCalendarEvents } from "./api/calendar-events";
 
 const PORT = 3000;
 
@@ -191,6 +192,11 @@ async function startServer() {
   // Google Agenda: envio manual de pedidos de evento (administrador autenticado)
   app.all("/api/google-calendar", (req, res) => {
     handleGoogleCalendar(req, res);
+  });
+
+  // Calendário: listar/criar/editar/excluir eventos da agenda (administrador autenticado)
+  app.all("/api/calendar-events", (req, res) => {
+    handleCalendarEvents(req, res);
   });
 
   app.all("/api/alexa", (req, res) => {
