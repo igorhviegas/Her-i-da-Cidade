@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
-import { getAdminFirestore } from './manychat.ts';
+import { getAdminFirestore } from '../functions/firebase-admin.js';
 import { runMissionsSync } from '../functions/missions-sync.js';
 
 /**
