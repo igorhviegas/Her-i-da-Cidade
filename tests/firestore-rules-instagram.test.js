@@ -18,6 +18,7 @@ before(async () => {
     await setDoc(doc(db, 'instagramPosts/p1'), { likes: 1 });
     await setDoc(doc(db, 'instagramPrivate/token'), { accessToken: 'segredo' });
     await setDoc(doc(db, 'instagramPrivate/lock'), { until: 0 });
+    await setDoc(doc(db, 'instagramPrivate/daily'), { followers0: 1 });
   });
 });
 
@@ -41,7 +42,7 @@ test('instagramMeta e instagramPosts: só administrador lê; ninguém escreve pe
 });
 
 test('instagramPrivate (token e reserva): nenhum acesso pelo cliente, nem do administrador', async () => {
-  for (const path of ['instagramPrivate/token', 'instagramPrivate/lock']) {
+  for (const path of ['instagramPrivate/token', 'instagramPrivate/lock', 'instagramPrivate/daily']) {
     await assertFails(getDoc(doc(admin(), path)));
     await assertFails(setDoc(doc(admin(), path), { until: 0 }));
     await assertFails(updateDoc(doc(admin(), path), { until: 0 }));

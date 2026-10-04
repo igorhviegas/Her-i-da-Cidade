@@ -1,5 +1,6 @@
 // Sincronização com a Instagram API (Instagram Login, graph.instagram.com). Só roda no servidor: o token nunca vai ao navegador.
 import { randomUUID } from 'node:crypto';
+import { applyDaily } from '../services/instagramDaily.js';
 import { metricOrNull, normalizeMedia } from '../services/instagramMetrics.js';
 
 const PAGE_SIZE = 50;
@@ -12,6 +13,7 @@ export const LOCK_TTL_MS = 120 * 1000; // maior que o maxDuration (60 s) da fun�
 export const PROFILE_PATH = 'instagramMeta/profile';
 export const TOKEN_PATH = 'instagramPrivate/token'; // regras do Firestore: nenhum acesso pelo cliente
 export const LOCK_PATH = 'instagramPrivate/lock';
+export const DAILY_PATH = 'instagramPrivate/daily'; // referências do balanço diário (estado interno; o saldo exibido vai em profile.daily)
 export const POSTS_COLLECTION = 'instagramPosts';
 
 const MESSAGES = {
@@ -161,10 +163,15 @@ async function sync({ db, fetchImpl, env, now }) {
     const batch = db.batch();
     for (const post of posts) batch.set(db.doc(`${POSTS_COLLECTION}/${post.id}`), { ...post, syncedAt: iso });
     const warning = insightsWarning(insights);
+    // Balanço diário: calculado aqui, no mesmo batch das publicações e do perfil, então uma sincronização que falha não altera as referências.
+    const dailyRef = db.doc(DAILY_PATH);
+    const prevDaily = await dailyRef.get();
+    const daily = applyDaily({ prev: prevDaily.exists ? prevDaily.data() : null, nowMs: now, followers: me.followers_count, posts });
+    batch.set(dailyRef, daily.state);
     batch.set(profileRef, {
       username: me.username ?? null, followers: me.followers_count ?? null, mediaCount: me.media_count ?? null,
       loadedPosts: posts.length, syncedAt: iso, lastAttemptAt: iso, lastError: null,
-      insights, warning, tokenExpiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+      insights, warning, daily: daily.summary, tokenExpiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
     });
     await batch.commit();
     return { status: 'completed', posts: posts.length, warning: warning?.code ?? null };

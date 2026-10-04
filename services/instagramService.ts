@@ -1,11 +1,13 @@
 import { collection, doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import type { InstagramPost } from './instagramMetrics.js';
+import type { DailySummary } from './instagramDaily.js';
 
 export interface InstagramProfile {
   username: string | null; followers: number | null; mediaCount: number | null; loadedPosts?: number;
   syncedAt?: string; lastAttemptAt?: string; lastError?: { code: string; message: string } | null;
   warning?: { code: string; message: string } | null; tokenExpiresAt?: string | null;
+  daily?: DailySummary | null;
 }
 
 /** Perfil espelhado pelo servidor (null = ainda nunca sincronizado). */

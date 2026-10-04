@@ -56,7 +56,7 @@ const IMG = { id: '2', media_type: 'IMAGE', media_url: 'u2', timestamp: '2026-01
 const views = (value) => json({ data: [{ values: [{ value }] }] });
 
 /** insight(id) devolve a resposta do endpoint de insights; refresh devolve a resposta da renovação do token. */
-function fakeFetch({ media = [REEL, IMG], insight = () => views(123), refresh = () => json({ access_token: 'renovado', expires_in: 5184000 }), error, delay = 0 } = {}) {
+function fakeFetch({ media = [REEL, IMG], insight = () => views(123), refresh = () => json({ access_token: 'renovado', expires_in: 5184000 }), error, delay = 0, followers = 1500 } = {}) {
   const calls = [];
   const impl = async (url) => {
     calls.push(url);
@@ -64,7 +64,7 @@ function fakeFetch({ media = [REEL, IMG], insight = () => views(123), refresh = 
     if (error) return metaError(error.code, error.status);
     if (url.includes('refresh_access_token')) return refresh();
     if (url.includes('/me/media')) return json({ data: media });
-    if (url.includes('/me?')) return json({ username: 'heroi', followers_count: 1500, media_count: 40 });
+    if (url.includes('/me?')) return json({ username: 'heroi', followers_count: followers, media_count: 40 });
     return insight(url.match(/\/(\d+)\/insights/)[1]);
   };
   return { impl, calls };
@@ -235,4 +235,62 @@ test('admin-auth: valida ID token e o documento admins/{uid} (fetch simulado)', 
 test('api/instagram-sync.ts não importa outro arquivo de api/ (na Vercel isso derruba a função ao carregar)', async () => {
   const source = await readFile(new URL('../api/instagram-sync.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /from '\.\/[^']+'/);
+});
+
+// --- balanço diário (integração com a sincronização) ---
+const D1 = Date.parse('2026-03-10T03:30:00Z'); // 00:30 em Brasília
+const likesOf = (n) => ({ ...REEL, like_count: n });
+
+test('balanço diário: referência no 1º sync do dia, saldo nos seguintes, sem duplicar em sincronizações repetidas', async () => {
+  const db = fakeDb();
+  await run(db, fakeFetch({ followers: 1000, media: [likesOf(10)], insight: () => views(100) }).impl, { now: D1 });
+  assert.deepEqual([db.store.get('instagramMeta/profile').daily.followers, db.store.get('instagramMeta/profile').daily.likes], [0, 0]);
+  const again = () => run(db, fakeFetch({ followers: 1125, media: [likesOf(40)], insight: () => views(160) }).impl, { now: D1 + 6 * 3600_000 });
+  await again(); await again();
+  const daily = db.store.get('instagramMeta/profile').daily;
+  assert.deepEqual([daily.followers, daily.likes, daily.views, daily.day], [125, 30, 60, '2026-03-10']);
+  assert.equal(db.store.get('instagramPrivate/daily').followers0, 1000); // referência intacta
+  assert.equal(db.store.get('instagramPosts/1').likes, 40); // totais absolutos continuam sendo o valor atual
+});
+
+test('balanço diário: sincronização que falha não altera referências nem o saldo válido', async () => {
+  const db = fakeDb();
+  await run(db, fakeFetch({ followers: 1000, media: [likesOf(10)] }).impl, { now: D1 });
+  await run(db, fakeFetch({ followers: 1050, media: [likesOf(20)] }).impl, { now: D1 + 3600_000 });
+  const before = JSON.stringify([db.store.get('instagramMeta/profile').daily, db.store.get('instagramPrivate/daily')]);
+  await assert.rejects(run(db, fakeFetch({ error: { code: 190 } }).impl, { now: D1 + 7200_000 }), { code: 'token_invalid' });
+  await assert.rejects(run(db, fakeFetch({ insight: () => metaError(4) }).impl, { now: D1 + 7200_000 }), { code: 'rate_limited' });
+  assert.equal(JSON.stringify([db.store.get('instagramMeta/profile').daily, db.store.get('instagramPrivate/daily')]), before);
+  assert.equal(db.store.get('instagramMeta/profile').daily.followers, 50);
+});
+
+test('balanço diário: virada do dia em Brasília zera o saldo no 1º sync seguinte, mesmo sem cron à meia-noite', async () => {
+  const db = fakeDb();
+  await run(db, fakeFetch({ followers: 1000, media: [likesOf(10)] }).impl, { now: D1 });
+  await run(db, fakeFetch({ followers: 1100, media: [likesOf(30)] }).impl, { now: Date.parse('2026-03-11T02:55:00Z') }); // 23:55 de 10/03
+  assert.equal(db.store.get('instagramMeta/profile').daily.followers, 100);
+  await run(db, fakeFetch({ followers: 1110, media: [likesOf(35)] }).impl, { now: Date.parse('2026-03-11T12:00:00Z') }); // 09:00 de 11/03 (cron não rodou)
+  const daily = db.store.get('instagramMeta/profile').daily;
+  assert.deepEqual([daily.day, daily.followers, daily.likes], ['2026-03-11', 0, 0]);
+  await run(db, fakeFetch({ followers: 1112, media: [likesOf(36)] }).impl, { now: Date.parse('2026-03-11T15:00:00Z') });
+  assert.deepEqual([db.store.get('instagramMeta/profile').daily.followers, db.store.get('instagramMeta/profile').daily.likes], [2, 1]);
+});
+
+test('vercel.json: sincronização à meia-noite de Brasília (03:00 UTC) além da das 09:00 UTC; missões intactas', async () => {
+  const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const schedules = config.crons.filter((c) => c.path === '/api/instagram-sync').map((c) => c.schedule).sort();
+  assert.deepEqual(schedules, ['0 3 * * *', '0 9 * * *']);
+  assert.ok(config.crons.some((c) => c.path === '/api/missions-cron' && c.schedule === '0 3 * * *'));
+});
+
+test('Principal: widget do Instagram só lê o Firestore; o aviso "Em preparação" foi removido; demais widgets preservados', async () => {
+  const home = await readFile(new URL('../components/admin/AdminHomePage.tsx', import.meta.url), 'utf8');
+  const dashboard = await readFile(new URL('../components/admin/AdminDashboard.tsx', import.meta.url), 'utf8');
+  assert.match(home, /<InstagramWidget /);
+  assert.match(home, /subscribeInstagramProfile/);
+  assert.doesNotMatch(home, /graph\.instagram|fetch\(|api\/instagram-sync/); // nada de Meta nem de sync no widget
+  for (const widget of ['FinanceWidget', 'TasksWidget', 'DeliveriesWidget']) assert.match(home, new RegExp(`<${widget} `));
+  assert.doesNotMatch(dashboard, /Módulo em Prepara/);
+  assert.doesNotMatch(dashboard, /SUBMÓDULOS EM BREVE/);
+  assert.match(dashboard, /currentTab === 'home' && <AdminHomePage/);
 });

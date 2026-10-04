@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, ArrowRight, CheckCircle2, Circle, ClipboardList, Loader2, RefreshCw, Target, Wallet, XCircle } from 'lucide-react';
+import { AlertCircle, ArrowRight, Camera, CheckCircle2, Circle, ClipboardList, Loader2, RefreshCw, Target, Wallet, XCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from '../../lib/router';
 import { subscribeCompletedOrders } from '../../services/financeService';
@@ -13,6 +13,8 @@ import { dateKey } from '../../functions/missions-core.js';
 import { formatOrderReference } from '../../services/orderReference.js';
 import type { Client, Order, Service } from '../../types';
 import { formatMoney } from './financeFormat';
+import { subscribeInstagramProfile, type InstagramProfile } from '../../services/instagramService';
+import { DeltaText } from './AdminInstagramPage';
 
 type Load<T> = { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: T };
 
@@ -227,9 +229,39 @@ const DeliveriesWidget: React.FC<{ now: Date; onOpenOrder: (id: string) => void;
   );
 };
 
+// ------------------------------------------------------------------- Instagram
+
+/** Só visualiza o que a sincronização já calculou e gravou (instagramMeta/profile); nenhuma chamada à Meta e nenhuma regra de saldo aqui. */
+const InstagramWidget: React.FC<{ now: Date; onOpen: () => void }> = ({ now, onOpen }) => {
+  const [state, setState] = useState<Load<InstagramProfile | null>>({ status: 'loading' });
+  useEffect(() => subscribeInstagramProfile(
+    (profile) => setState({ status: 'ready', data: profile }),
+    () => setState({ status: 'error' }),
+  ), []);
+  const profile = state.status === 'ready' ? state.data : null;
+
+  return (
+    <Widget title="Instagram" subtitle="Seguidores do perfil e o saldo do dia (desde a 1ª sincronização de hoje)." icon={Camera} tone="bg-pink-500/10 text-pink-300" onOpen={onOpen} openLabel="Abrir Instagram">
+      {state.status === 'loading' && <Loading />}
+      {state.status === 'error' && <ErrorState />}
+      {state.status === 'ready' && !profile && <Empty>Nenhum dado ainda. Sincronize em Instagram.</Empty>}
+      {profile && (
+        <div className="py-2">
+          {profile.username && <p className="text-sm font-semibold text-white/80">@{profile.username}</p>}
+          <p className="mt-1 text-3xl font-extrabold tabular-nums tracking-tight text-white">
+            {profile.followers == null ? 'Indisponível' : new Intl.NumberFormat('pt-BR').format(profile.followers)}
+            {profile.followers != null && <span className="ml-2 text-sm font-semibold text-white/50">seguidores</span>}
+          </p>
+          <DeltaText daily={profile.daily} metric="followers" today={dateKey(now)} className="mt-1" />
+        </div>
+      )}
+    </Widget>
+  );
+};
+
 // ------------------------------------------------------------------------ página
 
-export const AdminHomePage: React.FC<{ onNavigate: (tab: 'finance' | 'missions' | 'orders') => void }> = ({ onNavigate }) => {
+export const AdminHomePage: React.FC<{ onNavigate: (tab: 'finance' | 'missions' | 'orders' | 'instagram') => void }> = ({ onNavigate }) => {
   const { user } = useAuth();
   const { navigate } = useRouter();
   const now = useNow();
@@ -246,6 +278,7 @@ export const AdminHomePage: React.FC<{ onNavigate: (tab: 'finance' | 'missions' 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <FinanceWidget now={now} onOpen={() => onNavigate('finance')} />
         <TasksWidget now={now} onOpen={() => onNavigate('missions')} />
+        <InstagramWidget now={now} onOpen={() => onNavigate('instagram')} />
         <DeliveriesWidget now={now} onOpen={() => onNavigate('orders')} onOpenOrder={(id) => navigate(`/admin/pedidos?orderId=${encodeURIComponent(id)}`)} />
       </div>
     </div>
