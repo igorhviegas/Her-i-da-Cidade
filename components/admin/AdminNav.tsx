@@ -27,7 +27,7 @@ export function useNavOrder<Id extends string>(uid: string | undefined, defaultI
 }
 
 interface Props<Id extends string> {
-  pinned: NavItem<Id>;
+  pinned: NavItem<Id>[];
   items: NavItem<Id>[];
   groups: NavGroup<Id>[];
   order: Id[];
@@ -113,7 +113,7 @@ export function AdminNav<Id extends string>({ pinned, items, groups, order, onRe
   return (
     <>
       <div role="status" aria-live="polite" className="sr-only">{announce}</div>
-      <div className="mb-1.5">{renderButton(pinned)}</div>
+      <ul className="mb-1.5 space-y-1">{pinned.map((item) => <li key={item.id}>{renderButton(item)}</li>)}</ul>
       <ul className="space-y-1" onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setOver(null); }}>
         {groups.map((group) => {
           const GroupIcon = group.icon;

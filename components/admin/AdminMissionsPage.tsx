@@ -3,14 +3,14 @@ import { AlertTriangle, CalendarCheck, CheckCircle2, ChevronDown, Flame, ListTod
 import { addDays, dateKey, taskStreak } from '../../functions/missions-core.js';
 import {
   completeMission, createMission, deleteMission, getActivityDifficulties, listMissions, listOccurrencesSince, listTasks, loadGoals,
-  runClientSync, setActivityDifficulty, updateMission,
+  runClientSync, setActivityDifficulty, toggleChecklistItem, updateMission,
   type GoalView, type Mission, type RecurringTask, type TaskOccurrence,
 } from '../../services/missionsService';
 import { getServices } from '../../services/servicesService';
 import { MissionTasksTab } from './MissionTasksTab';
 import { MissionGoalsTab } from './MissionGoalsTab';
 import {
-  DifficultySelect, DifficultyStars, ErrorNote, WarningNote, cardClass, formatDateTime, ghostButton, inputClass, labelClass, primaryButton, toInputValue,
+  ChecklistEditor, type ChecklistDraft, DifficultySelect, DifficultyStars, ErrorNote, WarningNote, cardClass, formatDateTime, ghostButton, inputClass, labelClass, primaryButton, toInputValue,
 } from './missionsUi';
 
 type Tab = 'missions' | 'tasks' | 'goals';
@@ -214,7 +214,24 @@ const MissionsTab: React.FC<{ missions: MissionsData['missions']; reload: () => 
                     <DifficultyStars value={m.difficulty} />
                     {m.dueAt ? <span className={overdue ? 'inline-flex items-center gap-1 font-semibold text-red-300' : 'text-white/60'}>{overdue && <AlertTriangle className="h-3 w-3" />}{overdue ? 'Atrasada · ' : 'Prazo · '}{formatDateTime(m.dueAt)}</span> : <span className="text-white/40">Sem prazo</span>}
                     {m.source === 'manychat' && <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-300">WhatsApp</span>}
+                    {m.source === 'event_checklist' && <span className="rounded-full bg-orange-500/15 px-2 py-0.5 font-semibold text-orange-300">Evento</span>}
+                    {m.orderState === 'deleted' && <span className="rounded-full bg-red-500/15 px-2 py-0.5 font-semibold text-red-300" title="O pedido deste evento foi excluído. A missão foi mantida com o progresso do checklist.">Pedido excluído</span>}
                   </div>
+                  {m.checklist && m.checklist.length > 0 && (
+                    <div className="mt-2">
+                      <p className="mb-1 text-[11px] font-semibold text-white/50">Checklist · {m.checklist.filter((i) => i.done).length}/{m.checklist.length}</p>
+                      <ul className="space-y-1">
+                        {m.checklist.map((item) => (
+                          <li key={item.id}>
+                            <label className="flex cursor-pointer items-center gap-2 text-sm">
+                              <input type="checkbox" checked={item.done} disabled={busyId === m.id} onChange={(e) => void run(m.id, () => toggleChecklistItem(m.id, item.id, e.target.checked))} className="h-4 w-4 shrink-0" />
+                              <span className={item.done ? 'text-white/40 line-through' : 'text-white/85'}>{item.text}</span>
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
                 <div className="flex shrink-0 gap-1">
                   <button type="button" title="Editar" onClick={() => setEditing(m)} className={ghostButton}><Pencil className="h-3.5 w-3.5" /></button>
@@ -251,6 +268,7 @@ const MissionForm: React.FC<{ mission: Mission | null; onClose: () => void; onSa
   const [description, setDescription] = useState(mission?.description ?? '');
   const [dueAt, setDueAt] = useState(toInputValue(mission?.dueAt));
   const [difficulty, setDifficulty] = useState(mission?.difficulty ?? 3);
+  const [checklist, setChecklist] = useState<ChecklistDraft[] | null>(mission?.checklist?.length ? mission.checklist : null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -258,7 +276,7 @@ const MissionForm: React.FC<{ mission: Mission | null; onClose: () => void; onSa
     event.preventDefault();
     setSaving(true); setError(null);
     try {
-      const input = { title, description, difficulty, dueAt: dueAt ? new Date(dueAt) : null };
+      const input = { title, description, difficulty, dueAt: dueAt ? new Date(dueAt) : null, checklist: checklist ?? [] };
       if (mission) await updateMission(mission.id, input); else await createMission(input);
       await onSaved();
     } catch (err) {
@@ -275,6 +293,7 @@ const MissionForm: React.FC<{ mission: Mission | null; onClose: () => void; onSa
         <label className={labelClass}>Prazo (opcional)<input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className={inputClass} /></label>
         <label className={labelClass}>Dificuldade<DifficultySelect value={difficulty} onChange={setDifficulty} /></label>
       </div>
+      <ChecklistEditor items={checklist} onChange={setChecklist} />
       <ErrorNote message={error} />
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className={ghostButton}>Cancelar</button>

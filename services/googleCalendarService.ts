@@ -1,4 +1,5 @@
 import { auth } from '../lib/firebase';
+import { invalidateCalendarCache } from './calendarService';
 
 export interface CalendarSendResult { created: boolean; htmlLink: string | null; persisted: boolean }
 
@@ -21,5 +22,6 @@ export async function sendOrderToGoogleCalendar(orderId: string): Promise<Calend
   }
   const body = await response.json().catch(() => null);
   if (!response.ok || !body?.ok) throw new Error(body?.error?.message ?? 'Não foi possível enviar ao Google Agenda. O evento NÃO foi enviado.');
+  invalidateCalendarCache(); // o widget da Principal e o Calendário recarregam a agenda
   return { created: Boolean(body.created), htmlLink: body.htmlLink ?? null, persisted: body.persisted !== false };
 }
