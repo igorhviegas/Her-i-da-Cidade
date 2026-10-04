@@ -7,6 +7,8 @@ Pedidos antigos e os criados pelo ManyChat não mudam: continuam sendo faturados
 Dados do formulário ficam em `orders/{id}.eventForm` (+ `childName`, `eventDate`); `content` recebe um resumo legível.
 Valor de entrada = 50% do total até ser editado à mão; depois disso é preservado (botão "Recalcular 50%").
 
+Pedidos presenciais criados pelo ManyChat (só cliente e WhatsApp) entram como rascunho (`eventDraft`); ver `docs/manychat-integration.md`. O formulário do evento completa o pedido, e a entrada é lançada nesse momento.
+
 ## Financeiro
 
 Pedidos de evento têm um livro imutável `financeEntries` (regras em `firestore.rules`), com ID determinístico:

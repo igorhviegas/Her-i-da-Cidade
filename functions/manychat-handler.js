@@ -6,6 +6,8 @@ import { MISSION_EVENT, createMissionFromManyChat, validateMissionPayload } from
 const CLIENTS = 'clients';
 const ORDERS = 'orders';
 const SERVICES = 'services';
+/** Reservas anti-duplicidade (só pedidos presenciais): uma por WhatsApp, gravadas na mesma transação do pedido. Acesso só pelo Admin SDK. */
+const DEDUPE = 'manychatRequests';
 
 function jsonError(res, status, code, message, extra = {}) {
   return res.status(status).json({ ok: false, error: { code, message }, ...extra });
@@ -63,6 +65,8 @@ const tiers = (price7, price4, price2) => ({
  * - pricing 'catalog': preço lido de services/{id} ("Apenas R$ …"); o payload não envia valor.
  * - pricing 'fixed': preço fixo definido aqui.
  * - pricing 'tiers': preço e prazo vêm da modalidade (`modality`); o payload não envia valor.
+ * - pricing 'pending': pedido incompleto (evento presencial). Sem valores: o CRM os preenche depois pelo formulário de evento;
+ *   nasce com eventDraft e nada é lançado no Financeiro. `dedupeMs` = janela em que o mesmo WhatsApp não gera outro pedido.
  * - fields: 'required' | 'optional' | ausente (campo não aceito para o serviço).
  * Status inicial, tipo de produção e prazo padrão vêm da configuração do serviço no CRM (Admin → Serviços);
  * a modalidade sobrepõe apenas o prazo.
@@ -73,6 +77,7 @@ export const SERVICE_PROFILES = {
   'custom-video': { serviceId: '3', title: 'Vídeo Personalizado', pricing: 'tiers', tiers: tiers(60, 75, 85), fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
   'invite-video': { serviceId: '4', title: 'Vídeo Convite', pricing: 'tiers', tiers: tiers(65, 80, 95), fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
   'live-call': { serviceId: '2', title: 'Vídeo Chamada ao Vivo', pricing: 'fixed', price: 75, fields: { childName: 'optional', details: 'optional' } },
+  'presential-event': { serviceId: '6', title: 'Serviços Presenciais', pricing: 'pending', dedupeMs: 10 * 60 * 1000, fields: {} },
 };
 
 const normalizeTitle = (value) => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
@@ -163,6 +168,11 @@ function evaluateService(profile, service, modality) {
   }
   let price;
   let days = service.defaultDeliveryDays;
+  if (profile.pricing === 'pending') {
+    // Evento presencial: não pode nascer concluído (a conclusão exige o cadastro do evento e a conferência de materiais no CRM).
+    if (status === 'completed') return { problem: 'service_configuration_changed' };
+    return { price: 0, status, productionType: service.productionType, deliveryDays: undefined };
+  }
   if (profile.pricing === 'catalog') {
     price = parseCatalogPrice(service.price);
     if (price === null) return { problem: 'service_price_unavailable' };
@@ -237,6 +247,19 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
       const evaluation = evaluateService(profile, serviceSnapshot.data(), input.modality);
       if (evaluation.problem) return { problem: evaluation.problem };
 
+      // Chamada repetida (reenvio do ManyChat, duplo clique): dentro da janela, devolve o pedido já criado em vez de criar outro.
+      let dedupeRef = null;
+      if (profile.dedupeMs) {
+        dedupeRef = database.collection(DEDUPE).doc(`${profile.serviceId}_${normalizedWhatsApp}`);
+        const previous = await transaction.get(dedupeRef);
+        const previousOrderId = previous.exists ? previous.get('orderId') : null;
+        const previousAt = previous.exists ? previous.get('createdAtMs') : null;
+        if (typeof previousOrderId === 'string' && Number.isFinite(previousAt) && Date.now() - previousAt < profile.dedupeMs) {
+          const previousOrder = await transaction.get(database.collection(ORDERS).doc(previousOrderId));
+          if (previousOrder.exists) return { orderId: previousOrderId, duplicate: true };
+        }
+      }
+
       let clientRef = null;
       let shouldCreateClient = false;
       let shouldCreateIndex = false;
@@ -272,7 +295,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
         clientId: clientRef.id,
         serviceId: profile.serviceId,
         status: evaluation.status,
-        paidAt,
+        ...(profile.pricing === 'pending' ? { eventDraft: true } : { paidAt }),
         content: buildOrderContent(input),
         servicePrice: evaluation.price,
         rushFee: 0,
@@ -310,6 +333,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
       }
       if (shouldCreateIndex) transaction.set(whatsappIndexRef, { clientId: clientRef.id, whatsappNormalized: normalizedWhatsApp, recordType: 'whatsapp-index' });
       transaction.set(orderRef, orderData);
+      if (dedupeRef) transaction.set(dedupeRef, { orderId: orderRef.id, createdAtMs: Date.now(), whatsappNormalized: normalizedWhatsApp });
       if (activity) transaction.set(logRef, activity);
       return { orderId: orderRef.id };
     });
@@ -322,6 +346,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
       ok: true,
       orderId: transactionResult.orderId,
       technicalPurchaseId: transactionResult.orderId,
+      ...(transactionResult.duplicate ? { duplicate: true } : {}),
     });
   } catch (error) {
     const log = customLogger || console;
