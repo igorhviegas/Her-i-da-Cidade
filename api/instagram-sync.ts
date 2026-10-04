@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
-import { getAdminFirestore } from './manychat.ts';
-import { authorizeAdminRequest } from './upload-thumbnail.ts';
+import { getAdminFirestore } from '../functions/firebase-admin.js';
+import { authorizeAdminRequest } from '../functions/admin-auth.js';
 import { InstagramSyncError, runInstagramSync } from '../functions/instagram-sync.js';
 
 type Auth = 'unauthenticated' | 'forbidden' | 'authorized';

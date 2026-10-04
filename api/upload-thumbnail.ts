@@ -68,7 +68,7 @@ async function isAdminInFirestore(idToken: string, uid: string): Promise<boolean
   return true;
 }
 
-export async function authorizeAdminRequest(req: Request): Promise<'unauthenticated' | 'forbidden' | 'authorized'> {
+async function authorizeAdminRequest(req: Request): Promise<'unauthenticated' | 'forbidden' | 'authorized'> {
   const authorization = req.headers.authorization;
   const match = authorization?.match(/^Bearer\s+([^\s]+)$/i);
   if (!match) return 'unauthenticated';

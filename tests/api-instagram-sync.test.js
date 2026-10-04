@@ -211,3 +211,28 @@ test('vercel.json agenda o cron do Instagram e mantém o de missões', async () 
   assert.ok(config.crons.some((c) => c.path === '/api/instagram-sync' && c.schedule === '0 9 * * *'));
   assert.ok(config.crons.some((c) => c.path === '/api/missions-cron'));
 });
+
+test('admin-auth: valida ID token e o documento admins/{uid} (fetch simulado)', async () => {
+  const { authorizeAdminRequest } = await import('../functions/admin-auth.js');
+  const env = { FIREBASE_PROJECT_ID: 'p', FIREBASE_API_KEY: 'k' };
+  const original = globalThis.fetch;
+  const answer = (lookup, adminDoc) => { globalThis.fetch = async (url) => (String(url).includes('accounts:lookup') ? lookup : adminDoc); };
+  const req = { headers: { authorization: 'Bearer tok' } };
+  try {
+    assert.equal(await authorizeAdminRequest({ headers: {} }, env), 'unauthenticated');
+    answer({ ok: false, status: 400 }, null);
+    assert.equal(await authorizeAdminRequest(req, env), 'unauthenticated');
+    answer({ ok: true, status: 200, json: async () => ({ users: [{ localId: 'u1' }] }) }, { ok: false, status: 404 });
+    assert.equal(await authorizeAdminRequest(req, env), 'forbidden');
+    answer({ ok: true, status: 200, json: async () => ({ users: [{ localId: 'u1' }] }) }, { ok: true, status: 200 });
+    assert.equal(await authorizeAdminRequest(req, env), 'authorized');
+    answer({ ok: false, status: 500 }, null);
+    await assert.rejects(authorizeAdminRequest(req, env));
+    await assert.rejects(authorizeAdminRequest(req, {})); // sem configuração: erro (vira 503), nunca "authorized"
+  } finally { globalThis.fetch = original; }
+});
+
+test('api/instagram-sync.ts não importa outro arquivo de api/ (na Vercel isso derruba a função ao carregar)', async () => {
+  const source = await readFile(new URL('../api/instagram-sync.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /from '\.\/[^']+'/);
+});
