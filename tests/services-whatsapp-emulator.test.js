@@ -150,3 +150,24 @@ test('sync com número inválido falha sem gravar nada', async () => {
   await setNumber('https://wa.me/');
   await assert.rejects(svc.syncAutoServiceWhatsAppUrls(), /não está configurado ou é inválido/);
 });
+
+test('mensagem do Kanban: salva, recarrega, independe entre serviços, remove ao limpar; docs antigos seguem sem o campo', async () => {
+  await setNumber('https://wa.me/5531999044206');
+  const msg = 'Olá! 🕷️\nLinha 2 — “aspas” & 100%';
+  const a = await svc.createService(input('Msg A', { deliveryMessage: msg }));
+  const b = await svc.createService(input('Msg B'));
+  assert.equal((await read(a.id)).deliveryMessage, msg);
+  assert.equal((await read(b.id)).deliveryMessage, undefined);
+  assert.equal(svc.mapDocToService(a.id, await read(a.id)).deliveryMessage, msg);
+  assert.equal(svc.mapDocToService(b.id, await read(b.id)).deliveryMessage, undefined);
+
+  await svc.updateService(b.id, { deliveryMessage: 'Só do B' });
+  await svc.updateService(a.id, { price: 'R$ 11' }); // não mexer na mensagem quando não informada
+  assert.equal((await read(a.id)).deliveryMessage, msg);
+  assert.equal((await read(b.id)).deliveryMessage, 'Só do B');
+
+  await svc.updateService(a.id, { deliveryMessage: '  \n ' });
+  assert.equal('deliveryMessage' in (await read(a.id)), false, 'vazio remove o campo');
+  assert.equal((await read(b.id)).deliveryMessage, 'Só do B');
+  assert.equal((await read(a.id)).whatsappUrl.startsWith('https://wa.me/5531999044206?text='), true, 'link do serviço intacto');
+});

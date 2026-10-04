@@ -35,6 +35,7 @@ import {
 import { Service } from '../../types';
 import type { OrderStatus, ProductionType } from '../../types';
 import { defaultInitialStatus } from '../../services/orderInitialStatus.js';
+import { buildDeliveryMessage } from '../../services/digitalDelivery.js';
 import { uploadServiceImageToVercelBlob } from '../../services/blobUploadService';
 
 interface ServiceFormData {
@@ -51,6 +52,7 @@ interface ServiceFormData {
   initialStatus: OrderStatus | '';
   autoComplete: boolean;
   defaultDeliveryDays: string;
+  deliveryMessage: string;
 }
 
 const DEFAULT_CATEGORIES = [
@@ -205,6 +207,7 @@ export const AdminServices: React.FC = () => {
       initialStatus: '',
       autoComplete: false,
       defaultDeliveryDays: '',
+      deliveryMessage: '',
     });
     setFormErrors({});
     setOrderConfigTouched(false);
@@ -233,6 +236,7 @@ export const AdminServices: React.FC = () => {
       initialStatus: service.initialStatus ?? '',
       autoComplete: service.autoComplete ?? false,
       defaultDeliveryDays: service.defaultDeliveryDays !== undefined ? String(service.defaultDeliveryDays) : '',
+      deliveryMessage: service.deliveryMessage ?? '',
     });
     setFormErrors({});
     setOrderConfigTouched(false);
@@ -308,6 +312,7 @@ export const AdminServices: React.FC = () => {
           order: formData.order,
           active: formData.active,
           badgeText: formData.badgeText,
+          deliveryMessage: formData.deliveryMessage,
           ...(orderConfigTouched ? {
             generateOrder: formData.generateOrder,
             productionType: formData.productionType || null,
@@ -329,6 +334,7 @@ export const AdminServices: React.FC = () => {
           order: formData.order,
           active: formData.active,
           badgeText: formData.badgeText,
+          deliveryMessage: formData.deliveryMessage,
           ...(orderConfigTouched ? {
             generateOrder: formData.generateOrder,
             ...(formData.productionType ? { productionType: formData.productionType } : {}),
@@ -1253,6 +1259,24 @@ export const AdminServices: React.FC = () => {
                   </label>
                 </div>
                 {orderConfigError && <p role="alert" className="text-xs text-red-300">{orderConfigError}</p>}
+              </section>
+
+              {/* Mensagem padrão do botão de WhatsApp do Kanban */}
+              <section className="space-y-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4 sm:p-5">
+                <div>
+                  <h4 className="text-sm font-bold text-white">Mensagem do WhatsApp (Kanban)</h4>
+                  <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-white/45">
+                    Texto pré-preenchido no botão de envio dos cards deste serviço. Deixe vazio para usar a mensagem padrão (exibida abaixo como sugestão). O número e o destino do link não mudam.
+                  </p>
+                </div>
+                <textarea
+                  rows={7}
+                  value={formData.deliveryMessage}
+                  onChange={(event) => setFormData({ ...formData, deliveryMessage: event.target.value })}
+                  placeholder={buildDeliveryMessage({}, { id: editingServiceId ?? undefined, title: formData.title })}
+                  aria-label="Mensagem do WhatsApp do Kanban"
+                  className="w-full resize-y rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm leading-relaxed text-white outline-none placeholder:text-white/30 focus:border-emerald-500/60"
+                />
               </section>
 
               {/* Botões do Modal */}

@@ -96,6 +96,7 @@ export interface CreateServiceInput {
   initialStatus?: OrderStatus;
   autoComplete?: boolean;
   defaultDeliveryDays?: number;
+  deliveryMessage?: string;
 }
 
 export interface UpdateServiceInput {
@@ -113,6 +114,8 @@ export interface UpdateServiceInput {
   initialStatus?: OrderStatus | null;
   autoComplete?: boolean;
   defaultDeliveryDays?: number | null;
+  /** Vazio/null remove a personalização (volta ao padrão do tipo de serviço). */
+  deliveryMessage?: string | null;
 }
 
 /**
@@ -157,6 +160,7 @@ export function mapDocToService(docId: string, data: any): Service {
     ...(data.initialStatus !== undefined ? { initialStatus: data.initialStatus } : {}),
     ...(data.autoComplete !== undefined ? { autoComplete: data.autoComplete } : {}),
     ...(data.defaultDeliveryDays !== undefined ? { defaultDeliveryDays: data.defaultDeliveryDays } : {}),
+    ...(typeof data.deliveryMessage === 'string' && data.deliveryMessage.trim() ? { deliveryMessage: data.deliveryMessage } : {}),
     ...(data.internalOnly === true ? { internalOnly: true } : {}),
   };
 }
@@ -521,6 +525,7 @@ export async function createService(input: CreateServiceInput): Promise<Service>
     ...(input.initialStatus !== undefined ? { initialStatus: input.initialStatus } : {}),
     ...(input.autoComplete !== undefined ? { autoComplete: input.autoComplete } : {}),
     ...(input.defaultDeliveryDays !== undefined ? { defaultDeliveryDays: input.defaultDeliveryDays } : {}),
+    ...(input.deliveryMessage?.trim() ? { deliveryMessage: input.deliveryMessage.trim() } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -569,6 +574,11 @@ export async function updateService(id: string, updates: UpdateServiceInput): Pr
     if (!trimmed) throw new Error("O nome do serviço não pode ser vazio.");
     payload.title = trimmed;
     payload.name = trimmed;
+  }
+
+  if (updates.deliveryMessage !== undefined) {
+    const message = updates.deliveryMessage?.trim();
+    payload.deliveryMessage = message ? message : deleteField();
   }
 
   for (const field of ["generateOrder", "productionType", "initialStatus", "autoComplete", "defaultDeliveryDays"] as const) {
