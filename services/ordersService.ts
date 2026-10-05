@@ -12,7 +12,7 @@ import { StockError, isPresentialService, type ConsumptionLine } from "./stockCa
 import { prepareOrderConsumption, prepareOrderReversal } from "./stockTransactions.js";
 import { currentActor } from "./stockService";
 import { editingCostFields } from "./financeCalculations.js";
-import { LEDGER_COLLECTION, LEDGER_KINDS, ledgerId, planCompletion, planEntry } from "./eventFinance.js";
+import { LEDGER_COLLECTION, ledgerId, ledgerIdsFor, planAdjustments, planCompletion, planEntry } from "./eventFinance.js";
 
 export const ORDERS_COLLECTION = "orders";
 
@@ -191,7 +191,7 @@ export async function deleteOrder(id: string): Promise<void> {
     const order = orderSnapshot.data();
     // Pedido de evento: seus lançamentos no livro saem junto (exclusão explícita do pedido; as regras só permitem apagar se o pedido deixar de existir).
     const ledgerSnapshots = order.eventLedger
-      ? await Promise.all(LEDGER_KINDS.map((kind) => transaction.get(doc(firestore, LEDGER_COLLECTION, ledgerId(id, kind)))))
+      ? await Promise.all(ledgerIdsFor(id, order.eventLedger).map((entryId) => transaction.get(doc(firestore, LEDGER_COLLECTION, entryId))))
       : [];
     let linkedScriptRef: ReturnType<typeof doc> | null = null;
     let linkedScript: Record<string, any> | null = null;
@@ -369,9 +369,28 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
       const [entrySnap, finalSnap, costSnap] = await Promise.all((['entry', 'final', 'cost'] as const).map((kind) => transaction.get(doc(firestore, LEDGER_COLLECTION, ledgerId(id, kind)))));
       const eventOrder = { ...currentData, eventForm: { ...currentData.eventForm, ...updates.eventForm } };
       const date = updates.completedAt instanceof Date ? updates.completedAt : serverTimestamp();
-      for (const record of planCompletion(id, eventOrder, { bookedEntry: entrySnap.exists() ? entrySnap.data().amount : undefined, final: finalSnap.exists(), cost: costSnap.exists() }, date)) {
+      for (const record of planCompletion(id, eventOrder, { bookedRevenue: entrySnap.exists() ? entrySnap.data().amount + (currentData.eventLedger?.adj ?? 0) : undefined, final: finalSnap.exists(), cost: costSnap.exists() }, date)) {
         ledgerWrites.push({ id: ledgerId(id, record.kind), record: { ...record, createdAt: serverTimestamp() } });
         payload[`eventLedger.${record.kind}`] = record.amount;
+      }
+    }
+
+    // Valores do evento alterados depois dos lançamentos: o livro não é reescrito; a diferença entra como AJUSTE (receita e/ou despesa),
+    // datado de agora, com ID {pedido}-adjrev|adjcost-{n} (n = contador no pedido, que esta transação atualiza: sem duplicar).
+    // Na própria conclusão não há ajuste: a 2ª parcela já usa os valores vigentes.
+    if (updates.eventForm && currentData.eventLedger && currentData.eventDraft !== true && !(updates.status === 'completed' && currentData.status !== 'completed')) {
+      const merged = { ...currentData.eventForm, ...updates.eventForm };
+      const adjustment = planAdjustments(id, currentData, merged, serverTimestamp());
+      for (const record of adjustment.records) {
+        const entryId = ledgerId(id, record.kind, record.seq);
+        // Ler o documento na transação registra a dependência: uma edição simultânea idêntica é repetida (já sem diferença) em vez de negada.
+        const existingAdjustment = await transaction.get(doc(firestore, LEDGER_COLLECTION, entryId));
+        if (!existingAdjustment.exists()) ledgerWrites.push({ id: entryId, record: { ...record, createdAt: serverTimestamp() } });
+      }
+      if (adjustment.records.length) {
+        payload['eventLedger.seq'] = adjustment.next?.seq;
+        if (adjustment.next?.adj !== undefined) payload['eventLedger.adj'] = adjustment.next.adj;
+        if (adjustment.next?.adjCost !== undefined) payload['eventLedger.adjCost'] = adjustment.next.adjCost;
       }
     }
 

@@ -56,11 +56,10 @@ test('mensagem de WhatsApp: texto exato, campos substituídos, URL codificada pr
   const message = whatsappMessage(order(), client);
   assert.equal(message, [
     'Hoje é um dia espetacular!!🤩', '',
-    'Olá Maria Silva, bom dia! Aqui é o Vitor, tudo bem?😊', '',
-    'Sou o Vitor, agente que acompanhará o Homem Aranha para o aniversário do Pedro 🕸️🕷️', '',
-    'Me confirme alguns dados, por gentileza:', '',
+    'Olá Maria Silva, bom dia! Aqui é o Vitor, tudo bem?', '',
+    'Sou o Agente que acompanhará o Homem Aranha para o aniversário do Pedro! 🕸️🕷️ Me confirme alguns dados, por gentileza:', '',
     'O horário de início da nossa participação será às 14:30 e o endereço é no: Rua das Flores, 10 - BH', '',
-    'Qualquer coisa que precisar, estou a disposição! Pode me mandar mensagem ou me ligar!🥰🙏', '',
+    'Qualquer coisa que precisar, estou a disposição! Pode me mandar mensagem ou me ligar! 🫡', '',
     'Te enviaremos mensagem assim que chegarmos!😉',
   ].join('\n'));
   const url = new URL(whatsappLink(order(), client));

@@ -20,7 +20,12 @@ Pedidos de evento têm um livro imutável `financeEntries` (regras em `firestore
 | `evt-{pedido}-cost` | **primeira** conclusão | custo, categoria "Despesa evento" | conclusão |
 
 - Cada ID existe no máximo uma vez (create-only nas regras + checagem na transação de `updateOrder`): repetir, reabrir/concluir de novo ou concorrência não duplicam.
-- Editar total/entrada/custo depois **não altera** o que já foi lançado (o modal de edição avisa). A 2ª parcela fecha o total sobre a entrada efetivamente lançada.
+- **Alterar valores depois dos lançamentos gera AJUSTES**, nunca reescreve o histórico. Ao salvar a edição, a diferença entra como nova linha com sinal, datada do momento da alteração (o Financeiro do mês da alteração reflete o novo valor), e o modal pede confirmação mostrando o que será lançado:
+  - `evt-{pedido}-adjrev-{n}` (receita) e `evt-{pedido}-adjcost-{n}` (Despesa evento); `n` é um contador no pedido (`eventLedger.seq`), então a mesma alteração nunca é lançada duas vezes.
+  - **Antes da conclusão** só a entrada conta: mudar a entrada ajusta a receita. **Depois da conclusão** a receita total passa a ser o valor total (entrada + 2ª parcela + ajustes) e a despesa, o custo atual.
+  - A 2ª parcela da conclusão fecha o total sobre a entrada efetiva (entrada + ajustes).
+  - No Extrato os ajustes aparecem como "Ajuste de receita" / "Ajuste de Despesa evento"; ajuste que reduz receita aparece como saída e o que reduz despesa, como entrada. Não contam como serviço a mais.
+  - Excluir o pedido remove todos os seus lançamentos, ajustes incluídos.
 - Conclusão sem valor total/custo válidos é recusada com erro explícito, sem lançar nada.
 - Excluir o pedido remove seus lançamentos (as regras só permitem apagar quando o pedido deixa de existir na mesma transação).
 - O Financeiro lê o livro no mesmo listener dos pedidos concluídos (`subscribeCompletedOrders`); "Despesa evento" entra em Despesas e no Extrato.

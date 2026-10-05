@@ -64,15 +64,13 @@ export function whatsappMessage(order, client) {
   return [
     'Hoje é um dia espetacular!!🤩',
     '',
-    `Olá ${client.name}, bom dia! Aqui é o Vitor, tudo bem?😊`,
+    `Olá ${client.name}, bom dia! Aqui é o Vitor, tudo bem?`,
     '',
-    `Sou o Vitor, agente que acompanhará o Homem Aranha para o aniversário do ${order.childName} 🕸️🕷️`,
-    '',
-    'Me confirme alguns dados, por gentileza:',
+    `Sou o Agente que acompanhará o Homem Aranha para o aniversário do ${order.childName}! 🕸️🕷️ Me confirme alguns dados, por gentileza:`,
     '',
     `O horário de início da nossa participação será às ${eventTime} e o endereço é no: ${location}`,
     '',
-    'Qualquer coisa que precisar, estou a disposição! Pode me mandar mensagem ou me ligar!🥰🙏',
+    'Qualquer coisa que precisar, estou a disposição! Pode me mandar mensagem ou me ligar! 🫡',
     '',
     'Te enviaremos mensagem assim que chegarmos!😉',
   ].join('\n');

@@ -60,18 +60,19 @@ assert.deepEqual((await orderDoc(created.id)).eventLedger, { entry: 500, final: 
 step('conclusão lança 2ª parcela (R$ 500) e Despesa evento (R$ 150) na data de conclusão');
 const snapshot = JSON.stringify(Object.fromEntries(Object.entries(l).map(([k, v]) => [k, [v.amount, v.date.toMillis(), v.createdAt.toMillis()]])));
 
-// 3. repetir conclusão, reabrir, editar valores e concluir de novo: nada novo, nada alterado
+// 3. repetir conclusão, reabrir, editar valores e concluir de novo: os 3 lançamentos originais ficam intactos; a edição gera só AJUSTES
 await orders.updateOrder(created.id, { status: 'completed' });
 await orders.updateOrder(created.id, { status: 'scheduled' });
 await orders.updateOrder(created.id, { eventForm: { ...input().eventForm, totalValue: 2000, entryValue: 1000, cost: 999 } });
 await new Promise((r) => setTimeout(r, 25));
 await orders.updateOrder(created.id, { status: 'completed' });
 l = await ledger(created.id);
-assert.equal(JSON.stringify(Object.fromEntries(Object.entries(l).map(([k, v]) => [k, [v.amount, v.date.toMillis(), v.createdAt.toMillis()]]))), snapshot);
-assert.equal((await getDocs(collection(db, 'financeEntries'))).size, 3);
-assert.deepEqual((await orderDoc(created.id)).eventLedger, { entry: 500, final: 500, cost: 150 });
-assert.equal((await orderDoc(created.id)).eventForm.totalValue, 2000); // o pedido muda; o livro não
-step('repetir, reabrir, editar valores e concluir de novo: 3 lançamentos intactos');
+assert.equal(JSON.stringify(Object.fromEntries(Object.entries(l).map(([k, v]) => [k, [v.amount, v.date.toMillis(), v.createdAt.toMillis()]]))), snapshot); // originais intactos
+assert.equal((await getDocs(collection(db, 'financeEntries'))).size, 5); // + 2 ajustes (receita +1000, despesa +849)
+assert.equal((await getDoc(doc(db, 'financeEntries', fin.ledgerId(created.id, 'adjrev', 1)))).data().amount, 1000);
+assert.equal((await getDoc(doc(db, 'financeEntries', fin.ledgerId(created.id, 'adjcost', 1)))).data().amount, 849);
+assert.equal((await orderDoc(created.id)).eventForm.totalValue, 2000);
+step('repetir, reabrir, editar valores e concluir de novo: originais intactos; a edição vira ajustes (sem duplicar)');
 
 // 4. conclusões concorrentes: ainda um único conjunto
 const racing = await orders.createOrder(input());
@@ -79,7 +80,7 @@ const results = await Promise.allSettled([orders.updateOrder(racing.id, { status
 assert.ok(results.every((r) => r.status === 'fulfilled'), JSON.stringify(results));
 l = await ledger(racing.id);
 assert.deepEqual(Object.keys(l).sort(), ['cost', 'entry', 'final']);
-assert.equal((await getDocs(collection(db, 'financeEntries'))).size, 6);
+assert.equal((await getDocs(collection(db, 'financeEntries'))).size, 8);
 step('duas conclusões simultâneas geram um único conjunto de lançamentos');
 
 // 5. dados financeiros incompletos: conclusão bloqueada, nada lançado, status inalterado
@@ -99,13 +100,13 @@ step('criação já concluída / sem entrada recusada');
 const { eventForm: _e, childName: _c, ...plain } = input();
 const legacy = await orders.createOrder(plain);
 await orders.updateOrder(legacy.id, { status: 'completed' });
-assert.equal((await getDocs(collection(db, 'financeEntries'))).size, 7);
+assert.equal((await getDocs(collection(db, 'financeEntries'))).size, 9);
 step('pedido comum não gera lançamentos no livro');
 
 // 8. excluir o pedido leva os lançamentos junto
 await orders.deleteOrder(created.id);
 assert.deepEqual(await ledger(created.id), {});
-assert.equal((await getDocs(collection(db, 'financeEntries'))).size, 4);
+assert.equal((await getDocs(collection(db, 'financeEntries'))).size, 4); // 9 − 5 lançamentos do pedido excluído (3 originais + 2 ajustes)
 step('excluir o pedido remove seus lançamentos; os demais ficam');
 
 // 9. pedido presencial vindo do ManyChat (rascunho): nada é lançado até o cadastro do evento ser salvo
@@ -137,8 +138,9 @@ const entryStamp = l.entry.createdAt.toMillis();
 await orders.updateOrder(draftId, { eventForm: { ...filled, totalValue: 3000, entryValue: 1500 } }); // edição posterior
 l = await ledger(draftId);
 assert.deepEqual([Object.keys(l).length, l.entry.amount, l.entry.createdAt.toMillis()], [1, 500, entryStamp]);
-assert.deepEqual((await orderDoc(draftId)).eventLedger, { entry: 500 });
-step('salvar de novo não lança outra entrada nem altera a existente');
+assert.deepEqual((await orderDoc(draftId)).eventLedger, { entry: 500, adj: 1000, seq: 1 }); // a edição de entrada vira ajuste, não nova entrada
+assert.equal((await getDoc(doc(db, 'financeEntries', fin.ledgerId(draftId, 'adjrev', 1)))).data().amount, 1000);
+step('salvar de novo não lança outra entrada nem altera a existente (a mudança de valor vira ajuste)');
 
 await orders.updateOrder(draftId, { eventForm: { ...filled, totalValue: 1000, entryValue: 500 } });
 await orders.updateOrder(draftId, { status: 'completed' });
@@ -152,6 +154,59 @@ await orders.updateOrder(noCost, { eventForm: { ...filled, cost: null }, childNa
 await assert.rejects(orders.updateOrder(noCost, { status: 'completed' }), /informe o custo/);
 assert.deepEqual(Object.keys(await ledger(noCost)), ['entry']);
 step('rascunho completado sem custo: conclusão exige o custo e nada é lançado');
+
+// 10. alterar valores com reflexo no Financeiro: ajustes (diferença com sinal), sem reescrever lançamentos
+const ids = (rec) => Object.keys(rec).sort();
+const allLedger = async (id) => {
+  const out = {};
+  for (const entryId of fin.ledgerIdsFor(id, (await orderDoc(id)).eventLedger)) { const s = await getDoc(doc(db, 'financeEntries', entryId)); if (s.exists()) out[entryId] = s.data(); }
+  return out;
+};
+const adjOrder = await orders.createOrder(input()); // entrada 500
+const A = adjOrder.id;
+await orders.updateOrder(A, { eventForm: { ...input().eventForm, entryValue: 700 } }); // antes de concluir: só a entrada conta
+let all = await allLedger(A);
+assert.deepEqual(ids(all), [`evt-${A}-adjrev-1`, `evt-${A}-entry`]);
+assert.equal(all[`evt-${A}-adjrev-1`].amount, 200);
+assert.equal(all[`evt-${A}-entry`].amount, 500); // original intacto
+assert.deepEqual((await orderDoc(A)).eventLedger, { entry: 500, adj: 200, seq: 1 });
+await orders.updateOrder(A, { eventForm: { ...input().eventForm, entryValue: 700 } }); // mesmo valor de novo: nada novo
+assert.equal(Object.keys(await allLedger(A)).length, 2);
+step('antes da conclusão: mudar a entrada lança o ajuste (+R$ 200) sem tocar na entrada original');
+
+await orders.updateOrder(A, { status: 'completed' });
+all = await allLedger(A);
+assert.equal(all[`evt-${A}-final`].amount, 300); // total 1000 − (500 + 200): receita total fecha em 1000
+step('conclusão considera a entrada ajustada: 2ª parcela R$ 300 (receita total R$ 1.000)');
+
+await orders.updateOrder(A, { eventForm: { ...input().eventForm, entryValue: 700, totalValue: 1200, cost: 100 } });
+all = await allLedger(A);
+assert.equal(all[`evt-${A}-adjrev-2`].amount, 200); // 1200 − (500 + 300 + 200)
+assert.equal(all[`evt-${A}-adjcost-2`].amount, -50); // 100 − 150
+assert.equal(all[`evt-${A}-final`].amount, 300); assert.equal(all[`evt-${A}-cost`].amount, 150); // originais intactos
+assert.deepEqual((await orderDoc(A)).eventLedger, { entry: 500, final: 300, cost: 150, adj: 400, adjCost: -50, seq: 2 });
+step('depois da conclusão: total e custo alterados geram ajustes (+R$ 200 receita, −R$ 50 despesa)');
+
+// reabrir/concluir e salvar de novo não repete ajustes
+await orders.updateOrder(A, { status: 'scheduled' });
+await orders.updateOrder(A, { eventForm: { ...input().eventForm, entryValue: 700, totalValue: 1200, cost: 100 } });
+await orders.updateOrder(A, { status: 'completed' });
+assert.equal(Object.keys(await allLedger(A)).length, 6); // entrada, 2ª parcela, custo, 2 ajustes de receita e 1 de despesa
+step('reabrir, salvar igual e concluir de novo: nenhum ajuste repetido');
+
+// edições simultâneas idênticas: um único ajuste
+const B = (await orders.createOrder(input())).id;
+const edit = { eventForm: { ...input().eventForm, entryValue: 800 } };
+const raced = await Promise.allSettled([orders.updateOrder(B, edit), orders.updateOrder(B, edit)]);
+assert.ok(raced.every((r) => r.status === 'fulfilled'), JSON.stringify(raced));
+assert.deepEqual(ids(await allLedger(B)), [`evt-${B}-adjrev-1`, `evt-${B}-entry`]);
+step('duas edições simultâneas iguais geram um único ajuste');
+
+// excluir o pedido leva o histórico junto, inclusive os ajustes
+await orders.deleteOrder(A);
+assert.deepEqual(await getDoc(doc(db, 'financeEntries', `evt-${A}-adjrev-2`)).then((s) => s.exists()), false);
+assert.deepEqual(await getDoc(doc(db, 'financeEntries', `evt-${A}-entry`)).then((s) => s.exists()), false);
+step('excluir o pedido remove entrada, parcelas, custo e ajustes');
 
 await vite.close(); await env.cleanup();
 console.log('E2E OK');
