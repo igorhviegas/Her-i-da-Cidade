@@ -61,3 +61,12 @@ test('roteiro padrão: ordem operacional, alerta de voltagem na instalação, id
   // progresso salvo depende de IDs estáveis entre cargas do módulo
   assert.equal(install.items[0].id, 'instalacao-1');
 });
+
+test('suporte: link do WhatsApp do Vitor com a mensagem urgente e FAQ padrão com IDs estáveis', async () => {
+  const { SUPPORT_WHATSAPP_URL, DEFAULT_AGENT_FAQ } = await import('./agentContent.js');
+  const url = new URL(SUPPORT_WHATSAPP_URL);
+  assert.equal(url.pathname, '/5531995152224');
+  assert.equal(url.searchParams.get('text'), 'Olá Vitor, preciso de um suporte urgente!');
+  assert.equal(DEFAULT_AGENT_FAQ[0].title, 'Caixa de som');
+  assert.equal(DEFAULT_AGENT_FAQ[0].items[0].id, 'caixa-de-som-1');
+});

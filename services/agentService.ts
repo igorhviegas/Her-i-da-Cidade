@@ -1,13 +1,14 @@
 import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { auth, db } from '../lib/firebase';
-import { DEFAULT_AGENT_STEPS, sortByOrder, type AgentStep, type AgentTrack } from './agentContent.js';
+import { DEFAULT_AGENT_FAQ, DEFAULT_AGENT_STEPS, sortByOrder, type AgentFaqCategory, type AgentStep, type AgentTrack } from './agentContent.js';
 
-export type { AgentStep, AgentTrack, AgentItem } from './agentContent.js';
+export type { AgentStep, AgentTrack, AgentItem, AgentFaqCategory, AgentFaqItem } from './agentContent.js';
 
 // Leitura pública (a área /agente-hdc não tem login); escrita só de administradores (firestore.rules).
 export const AGENT_STEPS_COLLECTION = 'agentSteps';
 export const AGENT_TRACKS_COLLECTION = 'agentTracks';
+export const AGENT_FAQ_COLLECTION = 'agentFaq';
 
 function requireDb() {
   if (!db) throw new Error('Firebase Firestore não inicializado.');
@@ -31,6 +32,7 @@ function useCollection<T extends { id: string; order: number }>(name: string): T
 /** Hook do admin: dados crus (inclui inativos), `null` enquanto carrega. */
 export const useAgentStepsAdmin = () => useCollection<AgentStep>(AGENT_STEPS_COLLECTION);
 export const useAgentTracksAdmin = () => useCollection<AgentTrack>(AGENT_TRACKS_COLLECTION);
+export const useAgentFaqAdmin = () => useCollection<AgentFaqCategory>(AGENT_FAQ_COLLECTION);
 
 /**
  * Conteúdo da área do agente. Sem etapas gravadas (ou Firestore indisponível) usa o roteiro padrão,
@@ -39,11 +41,14 @@ export const useAgentTracksAdmin = () => useCollection<AgentTrack>(AGENT_TRACKS_
 export function useAgentContent() {
   const rawSteps = useAgentStepsAdmin();
   const rawTracks = useAgentTracksAdmin();
+  const rawFaq = useAgentFaqAdmin();
+  const faq = rawFaq && rawFaq.length > 0 ? rawFaq : DEFAULT_AGENT_FAQ;
   const steps = rawSteps && rawSteps.length > 0 ? rawSteps : DEFAULT_AGENT_STEPS;
   return {
     steps: steps.filter((s) => s.active !== false),
     tracks: (rawTracks ?? []).filter((t) => t.active !== false && !!t.url),
     tracksLoading: rawTracks === null,
+    faq: faq.filter((c) => c.active !== false),
   };
 }
 
@@ -63,6 +68,19 @@ const stepPayload = (step: AgentStep) => ({
 export const saveAgentStep = (step: AgentStep) => setDoc(doc(requireDb(), AGENT_STEPS_COLLECTION, step.id), stepPayload(step));
 export const deleteAgentStep = (id: string) => deleteDoc(doc(requireDb(), AGENT_STEPS_COLLECTION, id));
 
+const faqPayload = (c: AgentFaqCategory) => ({
+  title: c.title.trim(), active: c.active !== false, order: c.order,
+  items: c.items.map((i) => ({ id: i.id, question: i.question, answer: i.answer })),
+  updatedAt: serverTimestamp(),
+});
+export const saveAgentFaq = (c: AgentFaqCategory) => setDoc(doc(requireDb(), AGENT_FAQ_COLLECTION, c.id), faqPayload(c));
+export const deleteAgentFaq = (id: string) => deleteDoc(doc(requireDb(), AGENT_FAQ_COLLECTION, id));
+export async function seedDefaultAgentFaq() {
+  const batch = writeBatch(requireDb());
+  DEFAULT_AGENT_FAQ.forEach((c) => batch.set(doc(requireDb(), AGENT_FAQ_COLLECTION, c.id), faqPayload(c)));
+  await batch.commit();
+}
+
 export async function seedDefaultAgentSteps() {
   const batch = writeBatch(requireDb());
   DEFAULT_AGENT_STEPS.forEach((step) => batch.set(doc(requireDb(), AGENT_STEPS_COLLECTION, step.id), stepPayload(step)));
@@ -75,7 +93,7 @@ export const saveAgentTrack = (track: AgentTrack) => setDoc(doc(requireDb(), AGE
 export const deleteAgentTrack = (id: string) => deleteDoc(doc(requireDb(), AGENT_TRACKS_COLLECTION, id));
 
 /** Grava a nova ordem (índice na lista = `order`) de uma só vez. */
-export async function reorderAgentDocs(name: typeof AGENT_STEPS_COLLECTION | typeof AGENT_TRACKS_COLLECTION, ids: string[]) {
+export async function reorderAgentDocs(name: typeof AGENT_STEPS_COLLECTION | typeof AGENT_TRACKS_COLLECTION | typeof AGENT_FAQ_COLLECTION, ids: string[]) {
   const batch = writeBatch(requireDb());
   ids.forEach((id, order) => batch.update(doc(requireDb(), name, id), { order }));
   await batch.commit();

@@ -19,12 +19,20 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [loop, setLoop] = useState(false);
+  // Onde cada música parou ao trocar para outra: voltar nela continua dali (some ao terminar a música).
+  const positions = useRef(new Map<string, number>());
 
   const playTrack = useCallback((track: AgentTrack) => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (currentIdRef.current !== track.id || audio.src !== track.url) {
+    const previousId = currentIdRef.current;
+    if (previousId && previousId !== track.id && audio.currentTime > 0) positions.current.set(previousId, audio.currentTime);
+    if (previousId !== track.id || audio.src !== track.url) {
       audio.src = track.url;
+      const resumeAt = positions.current.get(track.id);
+      // O iOS ignora currentTime antes dos metadados: só posiciona quando carregarem.
+      if (resumeAt) audio.addEventListener('loadedmetadata', () => { audio.currentTime = resumeAt; }, { once: true });
       setProgress(0);
     }
     currentIdRef.current = track.id;
@@ -58,6 +66,7 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
     const audio = audioRef.current;
     if (!audio) return;
     const onEnded = () => {
+      if (currentIdRef.current) positions.current.delete(currentIdRef.current);
       const list = tracksRef.current;
       // Avança sozinho; na última música da playlist para.
       if (list.findIndex((t) => t.id === currentIdRef.current) < list.length - 1) stepRef.current(1);
@@ -82,6 +91,9 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
     };
   }, []);
 
+  // Repetir a música atual (com loop ligado o 'ended' nem dispara); vale também ao trocar de música.
+  useEffect(() => { if (audioRef.current) audioRef.current.loop = loop; }, [loop]);
+
   // Controles da tela de bloqueio / fones (iOS e Android).
   const current = tracks.find((t) => t.id === currentId) ?? null;
   useEffect(() => {
@@ -94,5 +106,5 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
     session.setActionHandler('nexttrack', () => stepRef.current(1));
   }, [current]);
 
-  return { current, playing, progress, error, playTrack, toggle, next: () => step(1), prev: () => step(-1) };
+  return { current, playing, progress, error, loop, toggleLoop: () => setLoop((l) => !l), playTrack, toggle, next: () => step(1), prev: () => step(-1) };
 }

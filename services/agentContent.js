@@ -188,3 +188,17 @@ export const DEFAULT_AGENT_STEPS = [
   // IDs estáveis: o progresso salvo no aparelho é chaveado por etapa+item e precisa sobreviver a recarregamentos.
   items: step.items.map((item, i) => ({ ...item, id: `${step.id}-${i + 1}` })),
 }));
+
+/** WhatsApp do agente mais experiente (Vitor), para suporte urgente durante o evento. */
+export const SUPPORT_WHATSAPP_URL = `https://wa.me/5531995152224?text=${encodeURIComponent('Olá Vitor, preciso de um suporte urgente!')}`;
+
+/** FAQ padrão (categorias do menu Suporte). O conteúdo real é cadastrado pelo admin em Ajustes → Agente → Suporte. */
+export const DEFAULT_AGENT_FAQ = [
+  {
+    id: 'caixa-de-som', title: 'Caixa de som',
+    items: [{ question: 'Qual cuidado antes de ligar a caixa de som?', answer: 'Confira a voltagem da tomada antes de ligar a caixa de som.' }],
+  },
+].map((category, order) => ({
+  active: true, ...category, order,
+  items: category.items.map((item, i) => ({ ...item, id: `${category.id}-${i + 1}` })),
+}));
