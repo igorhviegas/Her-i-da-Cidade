@@ -18,14 +18,29 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [elapsed, setElapsed] = useState(0); // segundos desde o início da música atual
   const [error, setError] = useState<string | null>(null);
+  const [loop, setLoop] = useState(false);
+  // Onde cada música parou ao trocar para outra: voltar nela continua dali (some ao terminar a música).
+  const positions = useRef(new Map<string, number>());
+  // Ids com posição guardada (para mostrar o botão de recomeçar nas músicas que não estão no início).
+  const [startedIds, setStartedIds] = useState<string[]>([]);
 
   const playTrack = useCallback((track: AgentTrack) => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (currentIdRef.current !== track.id || audio.src !== track.url) {
+    const previousId = currentIdRef.current;
+    if (previousId && previousId !== track.id && audio.currentTime > 0) {
+      positions.current.set(previousId, audio.currentTime);
+      setStartedIds((ids) => (ids.includes(previousId) ? ids : [...ids, previousId]));
+    }
+    if (previousId !== track.id || audio.src !== track.url) {
       audio.src = track.url;
+      const resumeAt = positions.current.get(track.id);
+      // O iOS ignora currentTime antes dos metadados: só posiciona quando carregarem.
+      if (resumeAt) audio.addEventListener('loadedmetadata', () => { audio.currentTime = resumeAt; }, { once: true });
       setProgress(0);
+      setElapsed(0);
     }
     currentIdRef.current = track.id;
     setCurrentId(track.id);
@@ -43,6 +58,19 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
     else audio.pause();
   }, [playTrack]);
 
+  /** Recomeça a música do 00:00 e toca (a atual volta ao início; as outras perdem a posição guardada). */
+  const restart = useCallback((track: AgentTrack) => {
+    positions.current.delete(track.id);
+    setStartedIds((ids) => ids.filter((id) => id !== track.id));
+    const audio = audioRef.current;
+    if (audio && currentIdRef.current === track.id) {
+      audio.currentTime = 0;
+      setProgress(0);
+      setElapsed(0);
+      audio.play().catch(() => setError('Não foi possível tocar esta música. Toque em play para tentar de novo.'));
+    } else playTrack(track);
+  }, [playTrack]);
+
   const step = useCallback((delta: -1 | 1) => {
     const list = tracksRef.current;
     if (list.length === 0) return;
@@ -58,12 +86,14 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
     const audio = audioRef.current;
     if (!audio) return;
     const onEnded = () => {
+      const endedId = currentIdRef.current;
+      if (endedId) { positions.current.delete(endedId); setStartedIds((ids) => ids.filter((id) => id !== endedId)); }
       const list = tracksRef.current;
       // Avança sozinho; na última música da playlist para.
       if (list.findIndex((t) => t.id === currentIdRef.current) < list.length - 1) stepRef.current(1);
       else setPlaying(false);
     };
-    const onTime = () => setProgress(audio.duration > 0 ? audio.currentTime / audio.duration : 0);
+    const onTime = () => { setProgress(audio.duration > 0 ? audio.currentTime / audio.duration : 0); setElapsed(audio.currentTime); };
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onError = () => { setPlaying(false); setError('Não foi possível carregar esta música.'); };
@@ -82,6 +112,9 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
     };
   }, []);
 
+  // Repetir a música atual (com loop ligado o 'ended' nem dispara); vale também ao trocar de música.
+  useEffect(() => { if (audioRef.current) audioRef.current.loop = loop; }, [loop]);
+
   // Controles da tela de bloqueio / fones (iOS e Android).
   const current = tracks.find((t) => t.id === currentId) ?? null;
   useEffect(() => {
@@ -94,5 +127,5 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
     session.setActionHandler('nexttrack', () => stepRef.current(1));
   }, [current]);
 
-  return { current, playing, progress, error, playTrack, toggle, next: () => step(1), prev: () => step(-1) };
+  return { current, playing, progress, error, loop, elapsed, startedIds, restart, toggleLoop: () => setLoop((l) => !l), playTrack, toggle, next: () => step(1), prev: () => step(-1) };
 }

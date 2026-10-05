@@ -61,3 +61,27 @@ test('roteiro padrão: ordem operacional, alerta de voltagem na instalação, id
   // progresso salvo depende de IDs estáveis entre cargas do módulo
   assert.equal(install.items[0].id, 'instalacao-1');
 });
+
+test('suporte: link do WhatsApp do Vitor com a mensagem urgente e FAQ padrão com IDs estáveis', async () => {
+  const { SUPPORT_WHATSAPP_URL, DEFAULT_AGENT_FAQ } = await import('./agentContent.js');
+  const url = new URL(SUPPORT_WHATSAPP_URL);
+  assert.equal(url.pathname, '/5531995152224');
+  assert.equal(url.searchParams.get('text'), 'Olá Vitor, preciso de um suporte urgente!');
+  assert.equal(DEFAULT_AGENT_FAQ[0].title, 'Caixa de som');
+  assert.equal(DEFAULT_AGENT_FAQ[0].items[0].id, 'caixa-de-som-1');
+});
+
+test('busca: ignora acento/maiúscula, exige todas as palavras e olha pergunta e resposta de todo o FAQ', async () => {
+  const { matchesQuery, searchFaq } = await import('./agentContent.js');
+  assert.equal(matchesQuery('', 'qualquer'), true);
+  assert.equal(matchesQuery('VOLTAGEM tomada', 'Confira a voltagém da tomada'), true);
+  assert.equal(matchesQuery('voltagem caixa', 'Confira a tomada'), false);
+  assert.equal(matchesQuery('tomada confira', 'Confira a voltagem da tomada'), true); // ordem livre
+  const faq = [
+    { id: 'a', title: 'Caixa de som', items: [{ id: 'a1', question: 'A caixa não liga', answer: 'Troque a tomada.' }, { id: 'a2', question: 'Sem som', answer: 'Aumente o volume do microfone.' }] },
+    { id: 'b', title: 'Microfone', items: [{ id: 'b1', question: 'Chiado', answer: 'Afaste o MICROFONE da caixa.' }] },
+  ];
+  assert.deepEqual(searchFaq(faq, 'microfone').map((r) => r.item.id), ['a2', 'b1']); // acha na resposta, em duas categorias
+  assert.deepEqual(searchFaq(faq, 'nao liga').map((r) => r.item.id), ['a1']); // acha na pergunta, sem acento
+  assert.deepEqual(searchFaq(faq, 'xyz'), []);
+});

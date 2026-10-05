@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ChevronLeft, ChevronRight, ClipboardList, Info, Minus, Music, Pause, Play, Plus, SkipBack, SkipForward, Timer, TriangleAlert, ChevronDown,
+  ChevronLeft, ChevronRight, CircleHelp, ClipboardList, Info, MessageCircle, Minus, Music, Pause, Play, Plus, Repeat1, RotateCcw, Search, SkipBack, SkipForward, Timer, TriangleAlert, ChevronDown, X,
 } from 'lucide-react';
-import { useAgentContent, type AgentStep } from '../../services/agentService';
+import { useAgentContent, type AgentFaqCategory, type AgentFaqItem, type AgentStep } from '../../services/agentService';
 import {
-  TIMER_ALERTS, computeTimer, dueAlert, formatClock, markFired, resetFired, type AlertKey, type FiredAlerts,
+  SUPPORT_WHATSAPP_URL, TIMER_ALERTS, computeTimer, dueAlert, formatClock, markFired, matchesQuery, resetFired, searchFaq, type AlertKey, type FiredAlerts,
 } from '../../services/agentContent.js';
 import { useAgentPlayer } from './useAgentPlayer';
 
@@ -35,13 +35,19 @@ const btn = 'touch-manipulation select-none active:scale-[0.98] transition-trans
 const bigBtn = `${btn} flex w-full items-center gap-4 rounded-2xl border border-white/10 bg-[#0D1527] px-5 py-5 text-left`;
 
 export const AgentApp: React.FC = () => {
-  const { steps, tracks, tracksLoading } = useAgentContent();
+  const { steps, tracks, tracksLoading, faq } = useAgentContent();
   const player = useAgentPlayer(tracks);
   const [saved, update] = useSaved();
-  const [view, setView] = useState('home'); // home | steps | music | info | step:<id>
+  const [view, rawSetView] = useState('home'); // home | steps | music | support | support:info | support:<categoria> | step:<id>
+  // Histórico de telas: a seta de voltar retorna à tela de onde o agente veio (ex.: Início → Chegada → Início).
+  const [trail, setTrail] = useState<string[]>([]);
+  const setView = (next: string) => { setTrail((t) => [...t, view]); rawSetView(next); };
+  const goBack = () => { rawSetView(trail[trail.length - 1] ?? 'home'); setTrail((t) => t.slice(0, -1)); };
   const [now, setNow] = useState(() => Date.now());
   const [alertKey, setAlertKey] = useState<AlertKey | null>(null);
   const [timerOpen, setTimerOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  useEffect(() => setQuery(''), [view]); // cada tela começa sem filtro
 
   const event = saved.event;
   const timer = event ? computeTimer(event, now) : null;
@@ -88,7 +94,7 @@ export const AgentApp: React.FC = () => {
     return { ...s, event: { ...s.event, adjustMs, fired: resetFired(remaining, s.event.fired) } };
   });
   const resetAll = () => {
-    if (window.confirm('Limpar checklist, anotações e timer para um novo evento?')) { update(() => EMPTY); setView('home'); }
+    if (window.confirm('Limpar checklist, anotações e timer para um novo evento?')) { update(() => EMPTY); setTrail([]); rawSetView('home'); }
   };
 
   const stepDone = (step: AgentStep) => step.items.filter((i) => !i.heading && saved.checks[`${step.id}:${i.id}`]).length;
@@ -99,17 +105,17 @@ export const AgentApp: React.FC = () => {
   const activeStep = view.startsWith('step:') ? steps.find((s) => s.id === view.slice(5)) : undefined;
   const stepIndex = activeStep ? steps.indexOf(activeStep) : -1;
   const showMini = !!player.current && view !== 'music';
+  const faqCategory = view.startsWith('support:') && view !== 'support:info' ? faq.find((c) => c.id === view.slice(8)) : undefined;
 
-  const title = view === 'home' ? 'Agente HDC' : view === 'steps' ? 'Passo a passo' : view === 'music' ? 'Músicas' : view === 'info' ? 'Informações' : activeStep?.kicker || 'Etapa';
-  const back = view.startsWith('step:') ? 'steps' : 'home';
+  const title = view === 'home' ? 'Agente HDC' : view === 'steps' ? 'Passo a passo' : view === 'music' ? 'Músicas' : view === 'support' ? 'Suporte' : view === 'support:info' ? 'Informações importantes' : faqCategory?.title ?? activeStep?.kicker ?? 'Etapa';
 
   return (
-    <div className={`min-h-screen bg-[#070B14] text-white antialiased ${showMini ? 'pb-28' : 'pb-10'}`} style={{ WebkitTapHighlightColor: 'transparent' }}>
+    <div className={`min-h-screen bg-[#070B14] text-white antialiased ${showMini ? 'pb-44' : 'pb-28'}`} style={{ WebkitTapHighlightColor: 'transparent' }}>
       <div className="sticky top-0 z-40 shadow-lg shadow-black/40">
         {event && timer && <TimerBar timer={timer} open={timerOpen} onToggle={() => setTimerOpen((o) => !o)} onAdjust={adjust} />}
         <header className="flex items-center gap-2 border-b border-white/10 bg-[#0B1120] px-3 py-2">
           {view !== 'home' ? (
-            <button onClick={() => setView(back)} aria-label="Voltar" className={`${btn} flex h-12 w-12 items-center justify-center rounded-xl bg-white/5`}><ChevronLeft className="h-6 w-6" /></button>
+            <button onClick={goBack} aria-label="Voltar" className={`${btn} flex h-12 w-12 items-center justify-center rounded-xl bg-white/5`}><ChevronLeft className="h-6 w-6" /></button>
           ) : <span className="flex h-12 w-12 items-center justify-center text-blue-400"><Timer className="h-6 w-6" /></span>}
           <h1 className="truncate text-lg font-extrabold tracking-tight">{title}</h1>
         </header>
@@ -144,9 +150,9 @@ export const AgentApp: React.FC = () => {
               <span className="min-w-0 flex-1"><span className="block text-lg font-bold">Passo a passo</span><span className="block text-sm text-white/50">{done} de {total} itens concluídos</span></span>
               <ChevronRight className="h-5 w-5 text-white/40" />
             </button>
-            <button onClick={() => setView('info')} className={bigBtn}>
-              <Info className="h-7 w-7 shrink-0 text-amber-300" />
-              <span className="min-w-0 flex-1"><span className="block text-lg font-bold">Informações importantes</span><span className="block text-sm text-white/50">Duração, alertas e novo evento</span></span>
+            <button onClick={() => setView('support')} className={bigBtn}>
+              <CircleHelp className="h-7 w-7 shrink-0 text-amber-300" />
+              <span className="min-w-0 flex-1"><span className="block text-lg font-bold">Suporte</span><span className="block text-sm text-white/50">Dúvidas, informações e ajuda</span></span>
               <ChevronRight className="h-5 w-5 text-white/40" />
             </button>
           </>
@@ -175,13 +181,34 @@ export const AgentApp: React.FC = () => {
             onStart={startEvent}
             prev={steps[stepIndex - 1]}
             next={steps[stepIndex + 1]}
-            go={(id) => { setView(`step:${id}`); window.scrollTo(0, 0); }}
+            go={(id) => { rawSetView(`step:${id}`); window.scrollTo(0, 0); }}
           />
         )}
 
-        {view === 'music' && <MusicView player={player} tracks={tracks} loading={tracksLoading} />}
+        {view === 'music' && <MusicView player={player} tracks={tracks} loading={tracksLoading} query={query} onQuery={setQuery} />}
 
-        {view === 'info' && (
+        {view === 'support' && (
+          <>
+            <SearchBox value={query} onChange={setQuery} placeholder="Buscar em todas as perguntas e respostas" />
+            {query.trim() ? <FaqResults results={searchFaq(faq, query)} /> : <>
+            <button onClick={() => setView('support:info')} className={bigBtn}>
+              <Info className="h-7 w-7 shrink-0 text-amber-300" />
+              <span className="min-w-0 flex-1"><span className="block text-lg font-bold">Informações importantes</span><span className="block text-sm text-white/50">Duração, alertas e novo evento</span></span>
+              <ChevronRight className="h-5 w-5 text-white/40" />
+            </button>
+            {faq.map((category) => (
+              <button key={category.id} onClick={() => setView(`support:${category.id}`)} className={bigBtn}>
+                <CircleHelp className="h-7 w-7 shrink-0 text-blue-300" />
+                <span className="min-w-0 flex-1"><span className="block text-lg font-bold">{category.title}</span><span className="block text-sm text-white/50">{category.items.length} {category.items.length === 1 ? 'pergunta' : 'perguntas'}</span></span>
+                <ChevronRight className="h-5 w-5 text-white/40" />
+              </button>
+            ))}
+            <p className="px-1 pt-2 text-center text-sm text-white/40">Não achou? Toque no botão verde para falar com o Vitor.</p>
+            </>}
+          </>
+        )}
+
+        {view === 'support:info' && (
           <>
             <InfoCard title="Duração e chegada">O evento contratado dura <b>1 hora</b>. O agente chega ~<b>30 minutos antes</b> para preparar tudo.</InfoCard>
             <InfoCard title="Timer do evento">Toque em <b>Iniciar evento</b> quando a apresentação começar. Use <b>−5 / +5</b> no topo para ajustar se os pais pedirem para atrasar.</InfoCard>
@@ -190,6 +217,8 @@ export const AgentApp: React.FC = () => {
             <button onClick={resetAll} className={`${btn} w-full rounded-2xl border border-red-500/30 bg-red-500/10 px-5 py-4 text-sm font-bold text-red-300`}>Novo evento (limpar checklist e timer)</button>
           </>
         )}
+
+        {faqCategory && <FaqView category={faqCategory} />}
       </main>
 
       {showMini && player.current && (
@@ -204,6 +233,13 @@ export const AgentApp: React.FC = () => {
           </div>
         </div>
       )}
+
+      {view.startsWith('support') && <a
+        href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="Suporte urgente: WhatsApp do Vitor"
+        className={`${btn} fixed right-4 z-30 flex h-14 items-center gap-2 rounded-full bg-[#25D366] px-5 text-base font-black text-[#04210F] shadow-lg shadow-black/50 ${showMini ? 'bottom-24' : 'bottom-5'}`}
+      >
+        <MessageCircle className="h-6 w-6" />Vitor
+      </a>}
 
       {alertKey && <AlertOverlay alertKey={alertKey} onClose={() => setAlertKey(null)} />}
     </div>
@@ -297,6 +333,47 @@ const StepView: React.FC<{
   </>
 );
 
+const FaqItemCard: React.FC<{ item: AgentFaqItem; label?: string }> = ({ item, label }) => (
+  <details className="group rounded-2xl border border-white/10 bg-[#0D1527]">
+    <summary className="flex min-h-[3.5rem] cursor-pointer list-none items-center gap-3 px-4 py-3 text-[17px] font-bold leading-snug [&::-webkit-details-marker]:hidden">
+      <span className="flex-1">{label && <span className="mb-0.5 block text-[11px] font-bold uppercase tracking-widest text-blue-300">{label}</span>}{item.question}</span>
+      <ChevronDown className="h-5 w-5 shrink-0 text-white/40 transition-transform group-open:rotate-180" />
+    </summary>
+    <p className="whitespace-pre-line border-t border-white/10 px-4 py-4 text-[16px] leading-relaxed text-white/80">{item.answer}</p>
+  </details>
+);
+
+const FaqView: React.FC<{ category: AgentFaqCategory }> = ({ category }) => (
+  category.items.length === 0 ? (
+    <p className="rounded-2xl border border-white/10 bg-[#0D1527] px-5 py-6 text-center text-white/60">Nenhuma pergunta cadastrada ainda.</p>
+  ) : (
+    <div className="space-y-2">{category.items.map((item) => <FaqItemCard key={item.id} item={item} />)}</div>
+  )
+);
+
+const FaqResults: React.FC<{ results: { category: AgentFaqCategory; item: AgentFaqItem }[] }> = ({ results }) => (
+  results.length === 0 ? (
+    <p className="rounded-2xl border border-white/10 bg-[#0D1527] px-5 py-6 text-center text-white/60">Nada encontrado. Tente outra palavra ou fale com o Vitor pelo botão verde.</p>
+  ) : (
+    <div className="space-y-2">{results.map(({ category, item }) => <FaqItemCard key={item.id} item={item} label={category.title} />)}</div>
+  )
+);
+
+const SearchBox: React.FC<{ value: string; onChange: (v: string) => void; placeholder: string }> = ({ value, onChange, placeholder }) => (
+  <div className="relative">
+    <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/40" />
+    <input
+      type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={placeholder}
+      className="h-14 w-full rounded-2xl border border-white/10 bg-[#0D1527] pl-12 pr-12 text-base text-white placeholder:text-white/35 focus:border-blue-400 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+    />
+    {value && <button onClick={() => onChange('')} aria-label="Limpar busca" className={`${btn} absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-white/60`}><X className="h-5 w-5" /></button>}
+  </div>
+);
+
+const RestartButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+  <button onClick={onClick} aria-label="Recomeçar do início" title="Recomeçar do início" className={`${btn} flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-pink-400/50 bg-pink-500/15 text-pink-200`}><RotateCcw className="h-5 w-5" /></button>
+);
+
 const PlayerButtons: React.FC<{ player: Player; size: 'sm' | 'lg' }> = ({ player, size }) => {
   const side = size === 'lg' ? 'h-16 w-16' : 'h-12 w-12';
   const main = size === 'lg' ? 'h-24 w-24' : 'h-14 w-14';
@@ -312,7 +389,7 @@ const PlayerButtons: React.FC<{ player: Player; size: 'sm' | 'lg' }> = ({ player
   );
 };
 
-const MusicView: React.FC<{ player: Player; tracks: ReturnType<typeof useAgentContent>['tracks']; loading: boolean }> = ({ player, tracks, loading }) => (
+const MusicView: React.FC<{ player: Player; tracks: ReturnType<typeof useAgentContent>['tracks']; loading: boolean; query: string; onQuery: (v: string) => void }> = ({ player, tracks, loading, query, onQuery }) => (
   <>
     {tracks.length === 0 ? (
       <p className="rounded-2xl border border-white/10 bg-[#0D1527] px-5 py-6 text-center text-white/60">{loading ? 'Carregando playlist...' : 'Nenhuma música ativa na playlist.'}</p>
@@ -320,24 +397,32 @@ const MusicView: React.FC<{ player: Player; tracks: ReturnType<typeof useAgentCo
       <>
         <div className="space-y-4 rounded-3xl border border-white/10 bg-[#0D1527] px-4 py-5 text-center">
           <p className="text-[11px] font-bold uppercase tracking-widest text-pink-300">{player.current ? (player.playing ? 'Tocando agora' : 'Pausado') : 'Toque em play'}</p>
-          <p className="min-h-[2.5rem] text-xl font-extrabold leading-tight">{player.current?.title ?? tracks[0].title}</p>
+          <div className="flex min-h-[2.5rem] items-center justify-center gap-2">
+            <p className="text-xl font-extrabold leading-tight">{player.current?.title ?? tracks[0].title}</p>
+            {player.current && player.elapsed >= 1 && <RestartButton onClick={() => player.restart(player.current!)} />}
+          </div>
           <div className="flex justify-center"><PlayerButtons player={player} size="lg" /></div>
+          <button onClick={player.toggleLoop} aria-pressed={player.loop} className={`${btn} mx-auto flex items-center gap-2 rounded-full border px-5 py-3 text-sm font-bold ${player.loop ? 'border-pink-400 bg-pink-500/25 text-pink-100' : 'border-white/15 text-white/60'}`}><Repeat1 className="h-5 w-5" />{player.loop ? 'Repetindo esta música' : 'Repetir música'}</button>
           {player.error && <p className="text-sm font-semibold text-red-300">{player.error}</p>}
         </div>
+        <SearchBox value={query} onChange={onQuery} placeholder="Buscar música" />
+        {query.trim() && !tracks.some((t) => matchesQuery(query, t.title)) && <p className="rounded-2xl border border-white/10 bg-[#0D1527] px-5 py-6 text-center text-white/60">Nenhuma música encontrada.</p>}
         <ol className="space-y-2">
           {tracks.map((track, i) => {
+            if (!matchesQuery(query, track.title)) return null; // o número continua o da playlist
             const active = player.current?.id === track.id;
             return (
-              <li key={track.id}>
+              <li key={track.id} className="flex items-center gap-2">
                 <button
                   onClick={() => (active ? player.toggle() : player.playTrack(track))}
-                  className={`${btn} flex w-full items-center gap-4 rounded-2xl border px-4 py-4 text-left ${active ? 'border-pink-400 bg-pink-500/20' : 'border-white/10 bg-[#0D1527]'}`}
+                  className={`${btn} flex min-w-0 flex-1 items-center gap-4 rounded-2xl border px-4 py-4 text-left ${active ? 'border-pink-400 bg-pink-500/20' : 'border-white/10 bg-[#0D1527]'}`}
                 >
                   <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${active ? 'bg-pink-500' : 'bg-white/10 text-white/70'}`}>
                     {active && player.playing ? <Pause className="h-4 w-4" fill="currentColor" /> : active ? <Play className="h-4 w-4" fill="currentColor" /> : i + 1}
                   </span>
                   <span className={`min-w-0 flex-1 truncate text-[17px] ${active ? 'font-extrabold' : 'font-semibold'}`}>{track.title}</span>
                 </button>
+                {((active && player.elapsed >= 1) || player.startedIds.includes(track.id)) && <RestartButton onClick={() => player.restart(track)} />}
               </li>
             );
           })}
