@@ -14,6 +14,7 @@ const VIDEO_URL = 'https://www.heroidacidade.com/videos';
 const SOCIAL_IMAGE = 'https://www.heroidacidade.com/images/spider.PNG';
 const SITE_NAME = 'O Herói da Cidade';
 
+const AgentApp = lazy(() => import('./components/agente/AgentApp').then(({ AgentApp: component }) => ({ default: component })));
 const AdminApp = lazy(() => import('./components/admin/AdminApp').then(({ AdminApp: component }) => ({ default: component })));
 
 function setMeta(attribute: 'name' | 'property', key: string, content: string) {
@@ -40,13 +41,15 @@ const AppContent: React.FC = () => {
   const { path } = useRouter();
   const isAdmin = path.startsWith('/admin');
   const isVideos = path === '/videos' || path.startsWith('/videos/');
-  const homeContent = useHomeContent(!isAdmin && !isVideos);
+  const isAgent = path === '/agente-hdc' || path.startsWith('/agente-hdc/');
+  const homeContent = useHomeContent(!isAdmin && !isVideos && !isAgent);
 
   useEffect(() => {
     const structuredDataId = 'site-seo-structured-data';
     const existingStructuredData = document.getElementById(structuredDataId);
 
-    if (isAdmin) {
+    if (isAdmin || isAgent) {
+      if (isAgent) document.title = 'Agente HDC';
       setMeta('name', 'robots', 'noindex, nofollow');
       document.querySelector('link[rel="canonical"]')?.remove();
       document.querySelector('meta[name="description"]')?.remove();
@@ -115,12 +118,21 @@ const AppContent: React.FC = () => {
       document.head.appendChild(script);
     }
     script.textContent = JSON.stringify(structuredData);
-  }, [isAdmin, isVideos, homeContent.seoTitle, homeContent.seoDescription]);
+  }, [isAdmin, isAgent, isVideos, homeContent.seoTitle, homeContent.seoDescription]);
 
   if (isAdmin) {
     return (
       <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#070B14] text-sm text-white/60">Carregando painel...</div>}>
         <AdminApp />
+      </Suspense>
+    );
+  }
+
+  // Área interna dos agentes de evento (link privado, sem login por enquanto)
+  if (isAgent) {
+    return (
+      <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#070B14] text-sm text-white/60">Carregando...</div>}>
+        <AgentApp />
       </Suspense>
     );
   }

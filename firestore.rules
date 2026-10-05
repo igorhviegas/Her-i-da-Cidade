@@ -335,6 +335,16 @@ service cloud.firestore {
     }
 
 
+    // Área /agente-hdc (sem login): roteiro e playlist com leitura pública; só administradores editam.
+    match /agentSteps/{stepId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /agentTracks/{trackId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // =========================================================
     // ADMINS
     // =========================================================

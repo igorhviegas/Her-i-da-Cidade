@@ -17,6 +17,7 @@ import { FinanceRevenueBadge } from './FinanceRevenueBadge';
 import { AdminHomePage } from './AdminHomePage';
 import { AdminCalendarPage } from './AdminCalendarPage';
 import { AdminInstagramPage } from './AdminInstagramPage';
+import { AdminAgentPage } from './AdminAgentPage';
 import { AdminNav, useNavOrder, type NavItem, type NavGroup } from './AdminNav';
 import { subscribeActiveOrders } from '../../services/ordersService';
 import { 
@@ -47,10 +48,11 @@ import {
   CalendarDays,
   Briefcase,
   Tv,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Headset
 } from 'lucide-react';
 
-type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram' | 'calendar';
+type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram' | 'calendar' | 'agent';
 
 // Módulos reorganizáveis (ordem padrão). "Principal" é fixo no topo e fica fora desta lista.
 const NAV_ITEMS: NavItem<AdminTab>[] = [
@@ -66,11 +68,12 @@ const NAV_ITEMS: NavItem<AdminTab>[] = [
   { id: 'content', label: 'Conteúdo', icon: FileText },
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'settings', label: 'Configurações', icon: Settings },
+  { id: 'agent', label: 'Agente', icon: Headset },
 ];
 const NAV_GROUPS: NavGroup<AdminTab>[] = [
   { key: 'crm', label: 'CRM', icon: Briefcase, ids: ['orders', 'missions', 'finance', 'instagram', 'scripts', 'clients'] },
   { key: 'streaming', label: 'Streaming', icon: Tv, ids: ['videos', 'categories'] },
-  { key: 'ajustes', label: 'Ajustes', icon: SlidersHorizontal, ids: ['services', 'content', 'dashboard', 'settings'] },
+  { key: 'ajustes', label: 'Ajustes', icon: SlidersHorizontal, ids: ['services', 'content', 'dashboard', 'settings', 'agent'] },
 ];
 const NAV_ORDER = NAV_ITEMS.map((item) => item.id);
 
@@ -104,6 +107,8 @@ export const AdminDashboard: React.FC = () => {
       ? 'finance'
       : path === '/admin/calendario'
       ? 'calendar'
+      : path === '/admin/agente'
+      ? 'agent'
       : path === '/admin/dashboard'
       ? 'dashboard'
       : 'home';
@@ -148,6 +153,8 @@ export const AdminDashboard: React.FC = () => {
       setCurrentTab('finance');
     } else if (path === '/admin/calendario') {
       setCurrentTab('calendar');
+    } else if (path === '/admin/agente') {
+      setCurrentTab('agent');
     } else if (path === '/admin/dashboard') {
       setCurrentTab('dashboard');
     } else if (path === '/admin') {
@@ -181,6 +188,8 @@ export const AdminDashboard: React.FC = () => {
       navigate('/admin/financeiro');
     } else if (tabId === 'calendar') {
       navigate('/admin/calendario');
+    } else if (tabId === 'agent') {
+      navigate('/admin/agente');
     } else if (tabId === 'dashboard') {
       navigate('/admin/dashboard');
     } else if (tabId === 'home') {
@@ -686,6 +695,7 @@ export const AdminDashboard: React.FC = () => {
           {currentTab === 'missions' && <AdminMissionsPage />}
           {currentTab === 'finance' && <AdminFinancePage />}
           {currentTab === 'instagram' && <AdminInstagramPage />}
+          {currentTab === 'agent' && <AdminAgentPage />}
 
         </main>
       </div>
