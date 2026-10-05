@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ChevronLeft, ChevronRight, CircleHelp, ClipboardList, Info, MessageCircle, Minus, Music, Pause, Play, Plus, Repeat1, Search, SkipBack, SkipForward, Timer, TriangleAlert, ChevronDown, X,
+  ChevronLeft, ChevronRight, CircleHelp, ClipboardList, Info, MessageCircle, Minus, Music, Pause, Play, Plus, Repeat1, RotateCcw, Search, SkipBack, SkipForward, Timer, TriangleAlert, ChevronDown, X,
 } from 'lucide-react';
 import { useAgentContent, type AgentFaqCategory, type AgentFaqItem, type AgentStep } from '../../services/agentService';
 import {
@@ -38,7 +38,11 @@ export const AgentApp: React.FC = () => {
   const { steps, tracks, tracksLoading, faq } = useAgentContent();
   const player = useAgentPlayer(tracks);
   const [saved, update] = useSaved();
-  const [view, setView] = useState('home'); // home | steps | music | support | support:info | support:<categoria> | step:<id>
+  const [view, rawSetView] = useState('home'); // home | steps | music | support | support:info | support:<categoria> | step:<id>
+  // Histórico de telas: a seta de voltar retorna à tela de onde o agente veio (ex.: Início → Chegada → Início).
+  const [trail, setTrail] = useState<string[]>([]);
+  const setView = (next: string) => { setTrail((t) => [...t, view]); rawSetView(next); };
+  const goBack = () => { rawSetView(trail[trail.length - 1] ?? 'home'); setTrail((t) => t.slice(0, -1)); };
   const [now, setNow] = useState(() => Date.now());
   const [alertKey, setAlertKey] = useState<AlertKey | null>(null);
   const [timerOpen, setTimerOpen] = useState(false);
@@ -90,7 +94,7 @@ export const AgentApp: React.FC = () => {
     return { ...s, event: { ...s.event, adjustMs, fired: resetFired(remaining, s.event.fired) } };
   });
   const resetAll = () => {
-    if (window.confirm('Limpar checklist, anotações e timer para um novo evento?')) { update(() => EMPTY); setView('home'); }
+    if (window.confirm('Limpar checklist, anotações e timer para um novo evento?')) { update(() => EMPTY); setTrail([]); rawSetView('home'); }
   };
 
   const stepDone = (step: AgentStep) => step.items.filter((i) => !i.heading && saved.checks[`${step.id}:${i.id}`]).length;
@@ -104,7 +108,6 @@ export const AgentApp: React.FC = () => {
   const faqCategory = view.startsWith('support:') && view !== 'support:info' ? faq.find((c) => c.id === view.slice(8)) : undefined;
 
   const title = view === 'home' ? 'Agente HDC' : view === 'steps' ? 'Passo a passo' : view === 'music' ? 'Músicas' : view === 'support' ? 'Suporte' : view === 'support:info' ? 'Informações importantes' : faqCategory?.title ?? activeStep?.kicker ?? 'Etapa';
-  const back = view.startsWith('step:') ? 'steps' : view.startsWith('support:') ? 'support' : 'home';
 
   return (
     <div className={`min-h-screen bg-[#070B14] text-white antialiased ${showMini ? 'pb-44' : 'pb-28'}`} style={{ WebkitTapHighlightColor: 'transparent' }}>
@@ -112,7 +115,7 @@ export const AgentApp: React.FC = () => {
         {event && timer && <TimerBar timer={timer} open={timerOpen} onToggle={() => setTimerOpen((o) => !o)} onAdjust={adjust} />}
         <header className="flex items-center gap-2 border-b border-white/10 bg-[#0B1120] px-3 py-2">
           {view !== 'home' ? (
-            <button onClick={() => setView(back)} aria-label="Voltar" className={`${btn} flex h-12 w-12 items-center justify-center rounded-xl bg-white/5`}><ChevronLeft className="h-6 w-6" /></button>
+            <button onClick={goBack} aria-label="Voltar" className={`${btn} flex h-12 w-12 items-center justify-center rounded-xl bg-white/5`}><ChevronLeft className="h-6 w-6" /></button>
           ) : <span className="flex h-12 w-12 items-center justify-center text-blue-400"><Timer className="h-6 w-6" /></span>}
           <h1 className="truncate text-lg font-extrabold tracking-tight">{title}</h1>
         </header>
@@ -178,7 +181,7 @@ export const AgentApp: React.FC = () => {
             onStart={startEvent}
             prev={steps[stepIndex - 1]}
             next={steps[stepIndex + 1]}
-            go={(id) => { setView(`step:${id}`); window.scrollTo(0, 0); }}
+            go={(id) => { rawSetView(`step:${id}`); window.scrollTo(0, 0); }}
           />
         )}
 
@@ -367,6 +370,10 @@ const SearchBox: React.FC<{ value: string; onChange: (v: string) => void; placeh
   </div>
 );
 
+const RestartButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
+  <button onClick={onClick} aria-label="Recomeçar do início" title="Recomeçar do início" className={`${btn} flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-pink-400/50 bg-pink-500/15 text-pink-200`}><RotateCcw className="h-5 w-5" /></button>
+);
+
 const PlayerButtons: React.FC<{ player: Player; size: 'sm' | 'lg' }> = ({ player, size }) => {
   const side = size === 'lg' ? 'h-16 w-16' : 'h-12 w-12';
   const main = size === 'lg' ? 'h-24 w-24' : 'h-14 w-14';
@@ -390,7 +397,10 @@ const MusicView: React.FC<{ player: Player; tracks: ReturnType<typeof useAgentCo
       <>
         <div className="space-y-4 rounded-3xl border border-white/10 bg-[#0D1527] px-4 py-5 text-center">
           <p className="text-[11px] font-bold uppercase tracking-widest text-pink-300">{player.current ? (player.playing ? 'Tocando agora' : 'Pausado') : 'Toque em play'}</p>
-          <p className="min-h-[2.5rem] text-xl font-extrabold leading-tight">{player.current?.title ?? tracks[0].title}</p>
+          <div className="flex min-h-[2.5rem] items-center justify-center gap-2">
+            <p className="text-xl font-extrabold leading-tight">{player.current?.title ?? tracks[0].title}</p>
+            {player.current && player.elapsed >= 1 && <RestartButton onClick={() => player.restart(player.current!)} />}
+          </div>
           <div className="flex justify-center"><PlayerButtons player={player} size="lg" /></div>
           <button onClick={player.toggleLoop} aria-pressed={player.loop} className={`${btn} mx-auto flex items-center gap-2 rounded-full border px-5 py-3 text-sm font-bold ${player.loop ? 'border-pink-400 bg-pink-500/25 text-pink-100' : 'border-white/15 text-white/60'}`}><Repeat1 className="h-5 w-5" />{player.loop ? 'Repetindo esta música' : 'Repetir música'}</button>
           {player.error && <p className="text-sm font-semibold text-red-300">{player.error}</p>}
@@ -402,16 +412,17 @@ const MusicView: React.FC<{ player: Player; tracks: ReturnType<typeof useAgentCo
             if (!matchesQuery(query, track.title)) return null; // o número continua o da playlist
             const active = player.current?.id === track.id;
             return (
-              <li key={track.id}>
+              <li key={track.id} className="flex items-center gap-2">
                 <button
                   onClick={() => (active ? player.toggle() : player.playTrack(track))}
-                  className={`${btn} flex w-full items-center gap-4 rounded-2xl border px-4 py-4 text-left ${active ? 'border-pink-400 bg-pink-500/20' : 'border-white/10 bg-[#0D1527]'}`}
+                  className={`${btn} flex min-w-0 flex-1 items-center gap-4 rounded-2xl border px-4 py-4 text-left ${active ? 'border-pink-400 bg-pink-500/20' : 'border-white/10 bg-[#0D1527]'}`}
                 >
                   <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${active ? 'bg-pink-500' : 'bg-white/10 text-white/70'}`}>
                     {active && player.playing ? <Pause className="h-4 w-4" fill="currentColor" /> : active ? <Play className="h-4 w-4" fill="currentColor" /> : i + 1}
                   </span>
                   <span className={`min-w-0 flex-1 truncate text-[17px] ${active ? 'font-extrabold' : 'font-semibold'}`}>{track.title}</span>
                 </button>
+                {((active && player.elapsed >= 1) || player.startedIds.includes(track.id)) && <RestartButton onClick={() => player.restart(track)} />}
               </li>
             );
           })}
