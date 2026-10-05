@@ -42,6 +42,15 @@ const AppContent: React.FC = () => {
   const isVideos = path === '/videos' || path.startsWith('/videos/');
   const homeContent = useHomeContent(!isAdmin && !isVideos);
 
+  // Ícone do iOS ("Adicionar à Tela de Início") próprio da plataforma de streaming
+  useEffect(() => {
+    const link = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
+    if (!link || !isVideos) return;
+    const original = link.getAttribute('href') ?? '';
+    link.setAttribute('href', '/images/modules/streaming.png');
+    return () => link.setAttribute('href', original);
+  }, [isVideos]);
+
   useEffect(() => {
     const structuredDataId = 'site-seo-structured-data';
     const existingStructuredData = document.getElementById(structuredDataId);
