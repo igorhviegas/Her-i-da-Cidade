@@ -8,6 +8,18 @@
         { "name": "AMAZON.StopIntent", "samples": [] },
         { "name": "AMAZON.FallbackIntent", "samples": [] },
         {
+          "name": "SincronizarLembretesIntent",
+          "slots": [],
+          "samples": [
+            "sincronizar lembretes",
+            "sincronizar os lembretes",
+            "atualizar lembretes",
+            "atualizar meus lembretes",
+            "criar meus lembretes",
+            "agendar lembretes"
+          ]
+        },
+        {
           "name": "CriarMissaoIntent",
           "slots": [
             { "name": "tarefa", "type": "AMAZON.SearchQuery" }

@@ -51,3 +51,41 @@ Alexa Developer Console e skill em desenvolvimento: gratuitos. Vercel/Firebase: 
 ## Não verificado (exige a skill real)
 
 Os testes automatizados cobrem lógica, autorização, idempotência e verificação de assinatura com certificado de teste. **Não** foram testados com a Alexa real: aceitação do nome de invocação com acento, qualidade do reconhecimento do `AMAZON.SearchQuery`, comportamento do `Dialog.ElicitSlot`, a assinatura real da Amazon e a leitura do corpo bruto na Vercel (fallback por stream em `readRawBody`). Se o 401 aparecer com a skill real, confira esse último ponto primeiro.
+
+## Lembrete pela Alexa (missões e tarefas)
+
+Na criação/edição de uma **missão** (exige prazo com horário) ou **tarefa recorrente** há a opção **Lembrete pela Alexa**. No horário, a Alexa fala: *"Alerta de missão: <nome>."*
+
+### Limite da API (por isso é por voz)
+
+A Reminders API da Alexa **só cria lembretes dentro de uma conversa com a skill**, usando o token da própria requisição (mais a permissão de lembretes dada pelo usuário). Não existe como o CRM criar o lembrete sozinho ao salvar. Atualizar e apagar fora da conversa seria possível (Skill Messaging), mas exige credenciais da skill e um tratamento extra; não foi implementado.
+
+Por isso: o CRM só **marca** a missão/tarefa (`alexaReminder`). Depois de salvar, diga:
+
+> "Alexa, peça ao Herói da Cidade para **sincronizar lembretes**"
+
+A sincronização é idempotente e reconcilia tudo de uma vez:
+
+| Situação no CRM | O que a sincronização faz |
+|---|---|
+| Marcada e sem lembrete | cria |
+| Horário ou nome mudou | atualiza o mesmo lembrete (sem duplicar) |
+| Desmarcada, concluída, pausada, excluída ou com prazo já passado | remove |
+| Lembrete apagado pelo usuário no app da Alexa | recria |
+
+O vínculo (missão/tarefa ↔ `alertToken` da Alexa) fica na coleção `alexaReminders` (acesso só pelo backend; as regras do Firestore não mudam). Alterações feitas no CRM só chegam à Alexa na próxima sincronização.
+
+### Regras de data
+
+- Fuso `America/Sao_Paulo`. Missão = lembrete único no prazo; prazo no passado nunca é agendado.
+- Tarefa recorrente = lembrete recorrente (RRULE): diária, semanal (dias marcados) e mensal em **dia fixo de 1 a 28**. "N-ésimo dia da semana", dia 29-31 ou as duas modalidades juntas não têm equivalente na Alexa: a opção fica desabilitada.
+
+### Configuração manual
+
+1. Alexa Developer Console → *Build → Permissions* → ativar **Lembretes** (`alexa::alerts:reminders:skill:readwrite`).
+2. Colar o `alexa/interaction-model.pt-BR.json` atualizado (novo intent `SincronizarLembretesIntent`), *Save* e *Build*.
+3. Na primeira vez, a Alexa pede a permissão no app da Alexa (cartão); aceite e peça de novo.
+
+### Não verificado
+
+Nenhuma chamada real à Reminders API foi feita. Testes cobrem a lógica com uma API simulada. Ficam sem confirmação com a skill real: aceitação das regras de recorrência (RRULE) em pt-BR, o fluxo de permissão, limites de quantidade (`MAX_REMINDERS_EXCEEDED`) e o comportamento de `startDateTime` em tarefas recorrentes.

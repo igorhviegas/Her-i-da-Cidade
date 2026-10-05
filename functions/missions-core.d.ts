@@ -14,6 +14,7 @@ export function addDays(key: string, amount: number): string;
 export function weekdayOf(key: string): number;
 export function recursOn(task: TaskRecurrence, key: string): boolean;
 export function validateTask(input: any): string[];
+export function taskReminderSupported(task: any): boolean;
 export function planOccurrences(task: any, today: string): { date: string; status: 'pending' | 'missed' }[];
 export function occurrenceId(taskId: string, date: string): string;
 export function occurrenceDueAt(date: string, time: string): Date;

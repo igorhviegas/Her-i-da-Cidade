@@ -10,7 +10,7 @@ import { getServices } from '../../services/servicesService';
 import { MissionTasksTab } from './MissionTasksTab';
 import { MissionGoalsTab } from './MissionGoalsTab';
 import {
-  ChecklistEditor, type ChecklistDraft, DifficultySelect, DifficultyStars, ErrorNote, WarningNote, cardClass, formatDateTime, ghostButton, inputClass, labelClass, primaryButton, toInputValue,
+  AlexaReminderField, ChecklistEditor, type ChecklistDraft, DifficultySelect, DifficultyStars, ErrorNote, WarningNote, cardClass, formatDateTime, ghostButton, inputClass, labelClass, primaryButton, toInputValue,
 } from './missionsUi';
 
 type Tab = 'missions' | 'tasks' | 'goals';
@@ -268,6 +268,7 @@ const MissionForm: React.FC<{ mission: Mission | null; onClose: () => void; onSa
   const [description, setDescription] = useState(mission?.description ?? '');
   const [dueAt, setDueAt] = useState(toInputValue(mission?.dueAt));
   const [difficulty, setDifficulty] = useState(mission?.difficulty ?? 3);
+  const [alexaReminder, setAlexaReminder] = useState(mission?.alexaReminder === true);
   const [checklist, setChecklist] = useState<ChecklistDraft[] | null>(mission?.checklist?.length ? mission.checklist : null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -276,7 +277,7 @@ const MissionForm: React.FC<{ mission: Mission | null; onClose: () => void; onSa
     event.preventDefault();
     setSaving(true); setError(null);
     try {
-      const input = { title, description, difficulty, dueAt: dueAt ? new Date(dueAt) : null, checklist: checklist ?? [] };
+      const input = { title, description, difficulty, dueAt: dueAt ? new Date(dueAt) : null, checklist: checklist ?? [], alexaReminder };
       if (mission) await updateMission(mission.id, input); else await createMission(input);
       await onSaved();
     } catch (err) {
@@ -293,6 +294,7 @@ const MissionForm: React.FC<{ mission: Mission | null; onClose: () => void; onSa
         <label className={labelClass}>Prazo (opcional)<input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className={inputClass} /></label>
         <label className={labelClass}>Dificuldade<DifficultySelect value={difficulty} onChange={setDifficulty} /></label>
       </div>
+      <AlexaReminderField checked={alexaReminder} onChange={setAlexaReminder} disabled={!dueAt} disabledReason="Defina um prazo (data e horário) para usar o lembrete pela Alexa." />
       <ChecklistEditor items={checklist} onChange={setChecklist} />
       <ErrorNote message={error} />
       <div className="flex justify-end gap-2">

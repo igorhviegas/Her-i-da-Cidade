@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Check, CheckCircle2, Loader2, Pause, Pencil, Play, Plus, Trash2, XCircle } from 'lucide-react';
 import { completeOccurrence, createTask, deleteTask, setTaskStatus, updateTask, type RecurringTask, type TaskInput } from '../../services/missionsService';
 import type { MissionsData } from './AdminMissionsPage';
-import { DifficultySelect, DifficultyStars, ErrorNote, WEEKDAYS, cardClass, ghostButton, inputClass, labelClass, primaryButton } from './missionsUi';
+import { taskReminderSupported } from '../../functions/missions-core.js';
+import { AlexaReminderField, DifficultySelect, DifficultyStars, ErrorNote, WEEKDAYS, cardClass, ghostButton, inputClass, labelClass, primaryButton } from './missionsUi';
 
 const NTH_LABELS: [number, string][] = [[1, 'primeira'], [2, 'segunda'], [3, 'terceira'], [4, 'quarta'], [-1, 'última']];
 const FREQUENCY_LABELS = { daily: 'Diária', weekly: 'Semanal', monthly: 'Mensal' };
@@ -98,6 +99,7 @@ const TaskForm: React.FC<{ task: RecurringTask | null; onClose: () => void; onSa
   const [useNth, setUseNth] = useState(!!task?.monthNth);
   const [nthWeek, setNthWeek] = useState(task?.monthNth?.week ?? 1);
   const [nthWeekday, setNthWeekday] = useState(task?.monthNth?.weekday ?? 1);
+  const [alexaReminder, setAlexaReminder] = useState(task?.alexaReminder === true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,7 +108,7 @@ const TaskForm: React.FC<{ task: RecurringTask | null; onClose: () => void; onSa
     setSaving(true); setError(null);
     const input: TaskInput = {
       title, description, difficulty, time, frequency, weekdays,
-      monthDay: useDay ? monthDay : null, monthNth: useNth ? { week: nthWeek, weekday: nthWeekday } : null,
+      monthDay: useDay ? monthDay : null, monthNth: useNth ? { week: nthWeek, weekday: nthWeekday } : null, alexaReminder,
     };
     try {
       if (task) await updateTask(task.id, input); else await createTask(input);
@@ -117,6 +119,7 @@ const TaskForm: React.FC<{ task: RecurringTask | null; onClose: () => void; onSa
     }
   };
 
+  const reminderSupported = taskReminderSupported({ frequency, weekdays, monthDay: frequency === 'monthly' && useDay ? monthDay : null, monthNth: frequency === 'monthly' && useNth ? { week: nthWeek, weekday: nthWeekday } : null });
   const toggleDay = (day: number) => setWeekdays((current) => (current.includes(day) ? current.filter((d) => d !== day) : [...current, day]));
 
   return (
@@ -158,6 +161,13 @@ const TaskForm: React.FC<{ task: RecurringTask | null; onClose: () => void; onSa
           </label>
         </div>
       )}
+
+      <AlexaReminderField
+        checked={alexaReminder}
+        onChange={setAlexaReminder}
+        disabled={!reminderSupported}
+        disabledReason="A Alexa só repete lembretes diários, semanais ou mensais em dia fixo (1 a 28). Esta recorrência não é suportada."
+      />
 
       {task && <p className="text-[11px] text-white/40">As alterações valem para as próximas ocorrências; o histórico anterior é preservado.</p>}
       <ErrorNote message={error} />

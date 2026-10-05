@@ -80,6 +80,16 @@ export function validateTask(input) {
 }
 
 /**
+ * A tarefa pode ter lembrete recorrente na Alexa? A API só aceita regras simples: diária, semanal e mensal em dia fixo (1 a 28).
+ * "N-ésimo dia da semana" e dia fixo 29-31 (que aqui cai no último dia do mês) não têm equivalente, então ficam sem lembrete.
+ */
+export function taskReminderSupported(task) {
+  if (task.frequency === 'daily') return true;
+  if (task.frequency === 'weekly') return Array.isArray(task.weekdays) && task.weekdays.length > 0;
+  return task.frequency === 'monthly' && !task.monthNth && Number.isInteger(task.monthDay) && task.monthDay >= 1 && task.monthDay <= 28;
+}
+
+/**
  * Plano de geração: datas (> lastGeneratedDate, <= hoje) em que a tarefa recorre. Datas anteriores a hoje
  * nascem como `missed` (a aplicação ficou fora do ar), a de hoje nasce `pending`.
  * Limite de 62 dias de retroativo; pausas não geram backlog porque a retomada reposiciona lastGeneratedDate.

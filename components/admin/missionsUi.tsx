@@ -7,6 +7,19 @@ export const cardClass = 'rounded-2xl border border-white/10 bg-[#0D1527] p-4 sh
 export const primaryButton = 'inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition-colors hover:bg-blue-500 disabled:opacity-50';
 export const ghostButton = 'inline-flex items-center justify-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-white/70 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-50';
 
+/** Opção "Lembrete pela Alexa": o lembrete é criado/atualizado quando você pede à skill para sincronizar. */
+export const AlexaReminderField: React.FC<{ checked: boolean; onChange: (value: boolean) => void; disabled?: boolean; disabledReason?: string }> = ({ checked, onChange, disabled, disabledReason }) => (
+  <div className="rounded-xl border border-white/10 p-3">
+    <label className={`flex items-center gap-2 text-xs font-semibold ${disabled ? 'text-white/40' : 'text-white/80'}`}>
+      <input type="checkbox" checked={checked && !disabled} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+      Lembrete pela Alexa
+    </label>
+    <p className="mt-1 text-[11px] leading-snug text-white/45">
+      {disabled && disabledReason ? disabledReason : 'A Alexa avisa no horário: "Alerta de missão: …". Depois de salvar, diga "Alexa, peça ao Herói da Cidade para sincronizar lembretes" para criar ou atualizar o lembrete.'}
+    </p>
+  </div>
+);
+
 export const WEEKDAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 export const DifficultyStars: React.FC<{ value: number }> = ({ value }) => (
