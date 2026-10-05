@@ -211,23 +211,23 @@ test('cliente da Reminders API: rotas, cabeçalho e proteção do token (só hos
 
 const SKILL = 'amzn1.ask.skill.test';
 const config = { skillId: SKILL, allowedUserIds: [USER] };
-const envelope = ({ granted = true, withToken = true } = {}) => ({
+const envelope = ({ withToken = true } = {}) => ({
   session: { application: { applicationId: SKILL }, user: { userId: USER } },
   context: { System: {
-    user: { userId: USER, permissions: granted ? { scopes: { 'alexa::alerts:reminders:skill:readwrite': { status: 'GRANTED' } } } : {} },
+    user: { userId: USER },
     ...(withToken ? { apiEndpoint: 'https://api.amazonalexa.com', apiAccessToken: 'TOKEN' } : {}),
   } },
   request: { type: 'IntentRequest', requestId: 'r1', intent: { name: 'SincronizarLembretesIntent', slots: {} } },
 });
 
-test('intent "sincronizar lembretes": pede permissão quando falta, e sincroniza usando o token da requisição', async () => {
+test('intent "sincronizar lembretes": pede permissão quando falta token ou a API responde 401/403, e sincroniza usando o token da requisição', async () => {
   const db = fakeDb({ missions: { m1: mission() } });
   const calls = [];
   const fetchImpl = async (url, init) => { calls.push([init.method, url, init.headers.Authorization]); return { ok: true, status: 201, json: async () => ({ alertToken: 'a1' }) }; };
   const run = (env) => handleAlexaEnvelope(env, { database: db, config, now: NOW, logger: quiet, fetchImpl });
 
-  const denied = await run(envelope({ granted: false }));
-  assert.deepEqual(denied.response.card, { type: 'AskForPermissionsConsent', permissions: ['alexa::alerts:reminders:skill:readwrite'] });
+  const noToken = await run(envelope({ withToken: false }));
+  assert.deepEqual(noToken.response.card, { type: 'AskForPermissionsConsent', permissions: ['alexa::alerts:reminders:skill:readwrite'] });
   assert.equal(calls.length, 0);
 
   const ok = await run(envelope());
