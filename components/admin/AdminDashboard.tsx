@@ -112,6 +112,16 @@ export const AdminDashboard: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  // Ícone do iOS ("Adicionar à Tela de Início") acompanha o módulo aberto
+  useEffect(() => {
+    const link = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
+    if (!link) return;
+    const original = link.getAttribute('href') ?? '';
+    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes' } as Record<string, string>)[path] ?? path.split('/')[2];
+    if (slug) link.setAttribute('href', `/images/modules/${slug}.png`);
+    return () => link.setAttribute('href', original);
+  }, [path]);
+
   // Monitora alterações na URL para refletir na aba
   useEffect(() => {
     if (path === '/admin/servicos' || path === '/admin/services') {
