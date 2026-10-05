@@ -605,9 +605,12 @@ export const AdminOrdersPage: React.FC = () => {
           }
         }
         const event = order.eventForm;
-        const detailRows: Array<[string, string]> = event ? [
+        const titleColor = (() => { const c = getServiceColor(service); return c ? SERVICE_COLOR_CLASSES[c].title : 'text-white'; })();
+        const technicalRows: Array<[string, string]> = [
           ['Referência do pedido', formatOrderReference(order, allOrderRecords)],
           ['ID do documento', order.id],
+        ];
+        const detailRows: Array<[string, string]> = event ? [
           ['Cliente', client?.name || 'Cliente não encontrado'],
           ['WhatsApp', client?.whatsapp || '—'],
           ['Nome da criança', order.childName || '—'],
@@ -623,8 +626,6 @@ export const AdminOrdersPage: React.FC = () => {
           ['Custo', typeof event.cost === 'number' ? formatMoney(event.cost) : '—'],
           ['Observações', event.observations || '—'],
         ] : [
-          ['Referência do pedido', formatOrderReference(order, allOrderRecords)],
-          ['ID do documento', order.id],
           ['Cliente', client?.name || 'Cliente não encontrado'],
           ['WhatsApp', client?.whatsapp || '—'],
           ['Serviço', service?.title || 'Serviço não encontrado'],
@@ -645,10 +646,18 @@ export const AdminOrdersPage: React.FC = () => {
               <header className="sticky top-0 flex items-start justify-between gap-4 border-b border-white/10 bg-[#0D1527]/95 px-5 py-4 backdrop-blur sm:px-6">
                 <div className="min-w-0">
                   <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-300">Detalhes do pedido</p>
-                  <h2 id="order-details-title" className="mt-1 truncate text-lg font-bold text-white">{client?.name || 'Cliente não encontrado'}</h2>
-                  <p className="mt-0.5 truncate text-sm text-white/50">{service?.title || 'Serviço não encontrado'}</p>
+                  <h2 id="order-details-title" className={`mt-1 break-words text-2xl font-extrabold leading-tight ${titleColor}`}>{client?.name || 'Cliente não encontrado'}</h2>
+                  <p className={`mt-0.5 break-words text-sm font-semibold ${titleColor}`}>{service?.title || 'Serviço não encontrado'}</p>
                 </div>
-                <button type="button" onClick={() => setSelectedOrder(null)} disabled={isUpdatingSelectedOrder} aria-label="Fechar detalhes" className="rounded-lg p-2 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-40"><X className="h-5 w-5" /></button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button type="button" onClick={() => { setDuplicateSource(selectedOrder); setSelectedOrder(null); }} disabled={Boolean(updatingOrderId || deletingOrderId)} aria-label="Duplicar pedido" title="Duplicar pedido" className="rounded-lg border border-white/10 p-2 text-white/70 hover:bg-white/5 disabled:opacity-50">
+                    <Copy className="h-4 w-4" />
+                  </button>
+                  <button type="button" onClick={() => setEditOrderOpen(true)} disabled={Boolean(updatingOrderId || deletingOrderId)} aria-label="Editar pedido" title="Editar pedido" className="rounded-lg border border-blue-500/25 bg-blue-500/10 p-2 text-blue-200 hover:bg-blue-500/20 disabled:opacity-50">
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button type="button" onClick={() => setSelectedOrder(null)} disabled={isUpdatingSelectedOrder} aria-label="Fechar detalhes" title="Fechar" className="ml-2 rounded-lg p-2 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-40"><X className="h-5 w-5" /></button>
+                </div>
               </header>
 
               <div className="space-y-5 p-5 sm:p-6">
@@ -711,22 +720,28 @@ export const AdminOrdersPage: React.FC = () => {
                       <Tv className="h-4 w-4" /> Teleprompter
                     </button>
                   )}
-                  <button type="button" onClick={() => setEditOrderOpen(true)} disabled={Boolean(updatingOrderId || deletingOrderId)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-500/25 bg-blue-500/10 px-4 py-2.5 text-sm font-semibold text-blue-200 hover:bg-blue-500/20 disabled:opacity-50">
-                    <Pencil className="h-4 w-4" /> Editar pedido
-                  </button>
-                  <button type="button" onClick={() => { setDuplicateSource(selectedOrder); setSelectedOrder(null); }} disabled={Boolean(updatingOrderId || deletingOrderId)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/70 hover:bg-white/5 disabled:opacity-50">
-                    <Copy className="h-4 w-4" /> Duplicar
-                  </button>
-                  <button type="button" onClick={() => void handleDeleteOrder(selectedOrder)} disabled={Boolean(updatingOrderId || deletingOrderId)} aria-label="Excluir pedido" title="Excluir pedido" className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-sm font-semibold text-red-200 hover:bg-red-500/20 disabled:opacity-50 sm:ml-auto">
-                    {deletingOrderId === order.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                    <span>{deletingOrderId === order.id ? 'Excluindo…' : 'Excluir'}</span>
-                  </button>
                   {whatsappUrl ? (
                     <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20">
                       <MessageCircle className="h-4 w-4" /> Abrir WhatsApp
                     </a>
                   ) : <span className="text-xs text-white/40">WhatsApp indisponível para este cliente.</span>}
+                  <button type="button" onClick={() => void handleDeleteOrder(selectedOrder)} disabled={Boolean(updatingOrderId || deletingOrderId)} aria-label="Excluir pedido" title="Excluir pedido" className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2.5 text-sm font-semibold text-red-200 hover:bg-red-500/20 disabled:opacity-50 sm:ml-auto">
+                    {deletingOrderId === order.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    <span>{deletingOrderId === order.id ? 'Excluindo…' : 'Excluir'}</span>
+                  </button>
                 </div>
+
+                <details className="group border-t border-white/[0.07] pt-3">
+                  <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.12em] text-white/35 hover:text-white/60">Informações técnicas</summary>
+                  <dl className="mt-2 grid gap-x-5 sm:grid-cols-2">
+                    {technicalRows.map(([label, value]) => (
+                      <div key={label} className="min-w-0 py-1.5">
+                        <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/40">{label}</dt>
+                        <dd className="mt-0.5 break-all text-sm text-white/70">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </details>
               </div>
             </section>
           </div>
