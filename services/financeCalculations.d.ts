@@ -30,3 +30,8 @@ export function financeMetrics(entries: RevenueEntry[], expenses: FixedExpense[]
   recordMonth: { monthKey: string; total: number } | null; cumulative: number; evolutionPct: number | null;
   goalStreak: number; operatingMarginPct: number | null; servicesCount: number;
 };
+export type RankingPeriod = 'all' | '30d' | '7d' | 'month';
+export interface ServiceRankingRow { serviceId: string; count: number; revenue: number }
+export const RANKING_PERIODS: RankingPeriod[];
+export function entryInPeriod(entry: RevenueEntry, period: RankingPeriod, now?: Date): boolean;
+export function serviceRanking(entries: RevenueEntry[], period: RankingPeriod, by?: 'count' | 'revenue', now?: Date): ServiceRankingRow[];

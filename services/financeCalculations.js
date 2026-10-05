@@ -150,3 +150,36 @@ export function financeMetrics(entries, expenses, monthKey, monthlyGoal = null) 
     servicesCount: monthTotals(entries, monthKey).count,
   };
 }
+
+// ---- Rankings por serviço (Leaderboard) ----
+// Mesma base do Financeiro: `entries` de buildRevenueEntries (pedidos concluídos, sem duplicidade, datados pelo evento,
+// valor = totalPaid). Não há status "cancelado" no CRM; pedidos não concluídos não entram, como no restante do Financeiro.
+// Datas no fuso local do navegador, como o resto do módulo.
+
+export const RANKING_PERIODS = ['all', '30d', '7d', 'month'];
+const DAY_MS = 86_400_000;
+
+/** all: todo o histórico; 30d/7d: janela móvel até agora; month: do dia 1º do mês-calendário vigente até agora. */
+export function entryInPeriod(entry, period, now = new Date()) {
+  const t = entry.eventDate.getTime();
+  const end = now.getTime();
+  if (period === 'all') return true;
+  if (t > end) return false;
+  if (period === '7d') return t >= end - 7 * DAY_MS;
+  if (period === '30d') return t >= end - 30 * DAY_MS;
+  if (period === 'month') return entry.monthKey === monthKeyOf(now);
+  throw new Error(`Período inválido: ${period}`);
+}
+
+/** [{ serviceId, count, revenue }] ordenado por `by` ('count' | 'revenue') desc; empate: o outro critério e depois o id. */
+export function serviceRanking(entries, period, by = 'count', now = new Date()) {
+  const groups = new Map();
+  for (const e of entries) {
+    if (!entryInPeriod(e, period, now)) continue;
+    const id = e.order.serviceId || 'sem-servico';
+    const g = groups.get(id) ?? { serviceId: id, count: 0, revenue: 0 };
+    g.count += 1; g.revenue += e.value; groups.set(id, g);
+  }
+  const other = by === 'count' ? 'revenue' : 'count';
+  return [...groups.values()].sort((a, b) => b[by] - a[by] || b[other] - a[other] || a.serviceId.localeCompare(b.serviceId));
+}
