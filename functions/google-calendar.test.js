@@ -31,21 +31,35 @@ test('a data não desloca por fuso: meio-dia local de qualquer fuso cai no mesmo
   assert.equal(eventDateKey(null), null);
 });
 
-test('descrição enxuta: só contato, autorização de imagem, teia extra, observações e link de WhatsApp (com emojis)', () => {
+test('descrição enxuta: link de WhatsApp primeiro, depois contato, autorização de imagem, teia extra e observações (com emojis)', () => {
   const text = eventDescription(order(), client);
   const lines = text.split('\n');
-  assert.deepEqual(lines.slice(0, 5), [
+  assert.equal(lines[0], 'Abrir conversa com a mensagem pronta:');
+  assert.equal(lines[1], whatsappLink(order(), client));
+  assert.equal(lines[2], '');
+  assert.deepEqual(lines.slice(3), [
     '👤 Cliente: Maria Silva', '📱 WhatsApp: (31) 99904-4206', '📸 Autorização do uso de imagem: Sim', '🕸️ Teia extra: 2', '📝 Observações: Bolo às 16h',
   ]);
-  assert.equal(lines[5], '');
-  assert.equal(lines[6], '💬 Abrir conversa com a mensagem pronta:');
-  assert.equal(lines[7], whatsappLink(order(), client));
   assert.equal(lines.length, 8);
   for (const omitted of ['Valor', 'Custo', 'Local', 'Horário', 'Data do evento', 'Nome da criança', 'Formulário']) assert.ok(!text.includes(omitted), `não deveria conter: ${omitted}`);
   const none = { ...order(), eventForm: { ...order().eventForm, extraWeb: 0, imageAuthorization: false, observations: '' } };
   const plain = eventDescription(none, client);
   assert.ok(plain.includes('🕸️ Teia extra: Não') && plain.includes('imagem: Não') && plain.includes('📝 Observações: —'));
   assert.ok(eventDescription(order(), { name: 'X', whatsapp: '123' }).includes('Link indisponível'));
+});
+
+test('link inteiro clicável no Google Agenda mobile: nada com emoji (nem acento) antes da URL, mesmo com emoji nas Observações', () => {
+  const segmenter = new Intl.Segmenter('pt', { granularity: 'grapheme' });
+  const withEmojiNotes = { ...order(), eventForm: { ...order().eventForm, observations: 'Bolo 🎂🎉 às 16h 🕷️' } };
+  for (const o of [order(), withEmojiNotes]) {
+    const text = eventDescription(o, client);
+    const prefix = text.slice(0, text.indexOf('https://wa.me/'));
+    assert.ok(prefix.length > 0 && !text.startsWith('https://wa.me/'.slice(1))); // existe cabeçalho antes do link
+    // sem emoji/combinação antes da URL: unidades UTF-16 = code points = caracteres visíveis => deslocamento zero
+    assert.equal(prefix.length, [...prefix].length);
+    assert.equal(prefix.length, [...segmenter.segment(prefix)].length);
+    assert.match(prefix, /^[\x00-\x7F]*$/);
+  }
 });
 
 test('evento criado na cor Tangerina (colorId 6)', () => {
