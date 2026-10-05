@@ -67,3 +67,22 @@ export const DailyCompass: React.FC<{ days: DayRevenue[]; topDay: number | null;
     </svg>
   );
 };
+
+/** Barras horizontais: serviços com mais pedidos (já ordenados). */
+export const ServiceBars: React.FC<{ rows: { id: string; label: string; count: number }[] }> = ({ rows }) => {
+  const max = Math.max(...rows.map((r) => r.count), 0);
+  if (max === 0) return <p className="py-10 text-center text-sm text-white/45">Nenhum pedido concluído neste mês.</p>;
+  return (
+    <ul className="space-y-2.5" aria-label="Serviços mais pedidos no mês">
+      {rows.map((r, i) => (
+        <li key={r.id}>
+          <div className="mb-1 flex items-baseline justify-between gap-3 text-xs">
+            <span className="min-w-0 truncate font-semibold text-white/85">{i + 1}. {r.label}</span>
+            <span className="shrink-0 font-bold tabular-nums text-white">{r.count} {r.count === 1 ? 'pedido' : 'pedidos'}</span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full ${i === 0 ? 'bg-amber-400' : 'bg-blue-500'}`} style={{ width: `${(r.count / max) * 100}%` }} /></div>
+        </li>
+      ))}
+    </ul>
+  );
+};

@@ -208,3 +208,41 @@ export function buildStatement(entries, expenses, monthKey, costs = []) {
   const sum = (kind) => rows.filter((r) => r.kind === kind).reduce((s, r) => s + r.amount, 0);
   return { rows, totalIn: sum('in'), totalOut: -sum('out'), balance: sum('in') + sum('out') };
 }
+
+// ---- Rankings por serviço (Leaderboard) ----
+// Mesma base do Financeiro: `entries` de buildRevenueEntries (receita já resolvida: pedidos concluídos e parcelas do livro de
+// eventos, sem duplicidade; data = revenueDate, valor = totalPaid/parcela). Custos (edição, despesa de evento) ficam em `costs`
+// e não entram. Não há status "cancelado" no CRM; o que não é concluído não gera entrada, como no resto do Financeiro.
+// Contagem = pedidos distintos (um evento com 2 parcelas conta 1 pedido; ajustes de receita não contam pedido).
+// Datas no fuso local do navegador.
+
+export const RANKING_PERIODS = ['all', '30d', '7d', 'month'];
+const DAY_MS = 86_400_000;
+
+/** all: todo o histórico; 30d/7d: janela móvel até agora; month: do dia 1º do mês-calendário vigente até agora. */
+export function entryInPeriod(entry, period, now = new Date()) {
+  const t = entry.revenueDate.getTime();
+  const end = now.getTime();
+  if (period === 'all') return true;
+  if (t > end) return false;
+  if (period === '7d') return t >= end - 7 * DAY_MS;
+  if (period === '30d') return t >= end - 30 * DAY_MS;
+  if (period === 'month') return entry.monthKey === monthKeyOf(now);
+  throw new Error(`Período inválido: ${period}`);
+}
+
+/** [{ serviceId, count, revenue }] ordenado por `by` ('count' | 'revenue') desc; empate: o outro critério e depois o id. */
+export function serviceRanking(entries, period, by = 'count', now = new Date()) {
+  const groups = new Map();
+  for (const e of entries) {
+    if (!entryInPeriod(e, period, now)) continue;
+    const id = e.order.serviceId || 'sem-servico';
+    const g = groups.get(id) ?? { serviceId: id, orders: new Set(), revenue: 0 };
+    g.revenue += e.value;
+    if (e.order.ledgerKind !== 'adjrev') g.orders.add(e.order.orderId || e.order.id); // pedido real, não a linha do livro
+    groups.set(id, g);
+  }
+  const rows = [...groups.values()].map((g) => ({ serviceId: g.serviceId, count: g.orders.size, revenue: g.revenue }));
+  const other = by === 'count' ? 'revenue' : 'count';
+  return rows.filter((r) => by !== 'count' || r.count > 0).sort((a, b) => b[by] - a[by] || b[other] - a[other] || a.serviceId.localeCompare(b.serviceId));
+}

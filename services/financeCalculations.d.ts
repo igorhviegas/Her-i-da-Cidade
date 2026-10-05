@@ -36,3 +36,8 @@ export function financeMetrics(entries: RevenueEntry[], expenses: FixedExpense[]
 };
 export interface StatementRow { id: string; kind: 'in' | 'out'; source: 'order' | 'editing' | 'eventCost' | 'expense'; date: Date; amount: number; entry?: RevenueEntry; expense?: FixedExpense }
 export function buildStatement(entries: RevenueEntry[], expenses: FixedExpense[], monthKey: string, costs?: RevenueEntry[]): { rows: StatementRow[]; totalIn: number; totalOut: number; balance: number };
+export type RankingPeriod = 'all' | '30d' | '7d' | 'month';
+export interface ServiceRankingRow { serviceId: string; count: number; revenue: number }
+export const RANKING_PERIODS: RankingPeriod[];
+export function entryInPeriod(entry: { revenueDate: Date; monthKey: string }, period: RankingPeriod, now?: Date): boolean;
+export function serviceRanking(entries: RevenueEntry[], period: RankingPeriod, by?: 'count' | 'revenue', now?: Date): ServiceRankingRow[];

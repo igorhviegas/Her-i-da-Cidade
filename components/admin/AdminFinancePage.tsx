@@ -7,19 +7,20 @@ import { extractBirthdayPerson } from '../../services/orderReference.js';
 import { LEDGER_LABELS, type LedgerKind } from '../../services/eventFinance.js';
 import { listAssets, listFixedExpenses, subscribeCompletedOrders } from '../../services/financeService';
 import {
-  buildRevenueEntries, buildStatement, dailyRevenue, editingCostForMonth, eventCostForMonth, expensesForMonth, monthKeyOf, monthTotals, patrimonySummary, revenueSeries, shiftMonth, topDay, variationPct,
+  buildRevenueEntries, buildStatement, dailyRevenue, editingCostForMonth, eventCostForMonth, expensesForMonth, monthKeyOf, monthTotals, patrimonySummary, revenueSeries, serviceRanking, shiftMonth, topDay, variationPct,
   type Asset, type FixedExpense,
 } from '../../services/financeCalculations.js';
 import type { Client, Order, Service } from '../../types';
-import { DailyCompass, MonthlyBars } from './FinanceCharts';
+import { DailyCompass, MonthlyBars, ServiceBars } from './FinanceCharts';
+import { FinanceLeaderboard } from './FinanceLeaderboard';
 import { FinanceExpenses } from './FinanceExpenses';
 import { FinanceAssets } from './FinanceAssets';
 import { FinanceStock } from './FinanceStock';
 import { cardClass, formatDate, formatMoney, ghostBtn, inputClass, labelClass, MONTH_NAMES, monthLabel } from './financeFormat';
 
-type FinanceTab = 'summary' | 'statement' | 'expenses' | 'assets' | 'stock';
+type FinanceTab = 'summary' | 'statement' | 'expenses' | 'assets' | 'stock' | 'leaderboard';
 const TABS: { id: FinanceTab; label: string }[] = [
-  { id: 'summary', label: 'Resumo' }, { id: 'statement', label: 'Extrato' }, { id: 'expenses', label: 'Despesas' }, { id: 'assets', label: 'Patrimônio' }, { id: 'stock', label: 'Estoque' },
+  { id: 'summary', label: 'Resumo' }, { id: 'statement', label: 'Extrato' }, { id: 'expenses', label: 'Despesas' }, { id: 'assets', label: 'Patrimônio' }, { id: 'stock', label: 'Estoque' }, { id: 'leaderboard', label: 'Leaderboard' },
 ];
 
 interface Loaded { expenses: FixedExpense[]; assets: Asset[] }
@@ -118,6 +119,10 @@ export const AdminFinancePage: React.FC = () => {
       .sort((x, y) => (newestFirst ? -1 : 1) * (x.r.date.getTime() - y.r.date.getTime()));
   }, [statement, clients, services, search, newestFirst, kindFilter]);
 
+  const serviceName = useCallback((id: string) => services.get(id)?.title || (services.has(id) ? 'Serviço removido' : 'Carregando…'), [services]);
+  // Serviços mais pedidos no mês-calendário vigente (independe do filtro de mês da página); mesma base dos rankings.
+  const topServices = useMemo(() => serviceRanking(entries, 'month', 'count', new Date()).slice(0, 8).map((r) => ({ id: r.serviceId, label: serviceName(r.serviceId), count: r.count })), [entries, serviceName]);
+
   const selectedEntries = selectedDay ? view?.days[selectedDay - 1]?.entries ?? [] : [];
 
   return (
@@ -201,6 +206,11 @@ export const AdminFinancePage: React.FC = () => {
                   )}
                 </section>
               </div>
+
+              <section className={cardClass}>
+                <h3 className="mb-4 text-sm font-bold text-white">Serviços mais pedidos · {monthLabel(monthKeyOf(new Date()))}</h3>
+                <ServiceBars rows={topServices} />
+              </section>
             </div>
           )}
 
@@ -254,6 +264,7 @@ export const AdminFinancePage: React.FC = () => {
           {tab === 'expenses' && <FinanceExpenses expenses={data.expenses} videoCost={view.editing} eventCost={view.eventCost} monthKey={monthKey} onChanged={reloadCollections} />}
           {tab === 'assets' && <FinanceAssets assets={data.assets} onChanged={reloadCollections} />}
           {tab === 'stock' && <FinanceStock />}
+          {tab === 'leaderboard' && <FinanceLeaderboard entries={entries} nameOf={serviceName} />}
         </>
       )}
     </div>
