@@ -86,19 +86,24 @@ export function whatsappLink(order, client) {
   return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(whatsappMessage(order, client))}` : null;
 }
 
-/** Descrição enxuta (com emojis para leitura rápida): contato, autorização de imagem, teia extra, observações e o link de WhatsApp. */
+/**
+ * Descrição enxuta (com emojis nos campos): link de WhatsApp, contato, autorização de imagem, teia extra e observações.
+ * O LINK VEM PRIMEIRO, e o texto antes dele não pode ter emoji: o Google Agenda mobile conta o início/fim do link de um jeito
+ * (caracteres visíveis) e o aplica em outro (unidades UTF-16), então cada emoji antes do link deixa 1+ caractere do final dele
+ * fora da zona clicável. Sem nada com emoji antes, o deslocamento é zero (inclusive se as Observações tiverem emoji).
+ */
 export function eventDescription(order, client) {
   const f = order.eventForm;
   const link = whatsappLink(order, client);
   return [
+    'Abrir conversa com a mensagem pronta:',
+    link || 'Link indisponível: o WhatsApp do cliente não é um número válido.',
+    '',
     `👤 Cliente: ${client.name}`,
     `📱 WhatsApp: ${client.whatsapp}`,
     `📸 Autorização do uso de imagem: ${f.imageAuthorization ? 'Sim' : 'Não'}`,
     `🕸️ Teia extra: ${f.extraWeb ? f.extraWeb : 'Não'}`,
     `📝 Observações: ${f.observations || '—'}`,
-    '',
-    '💬 Abrir conversa com a mensagem pronta:',
-    link || '⚠️ Link indisponível: o WhatsApp do cliente não é um número válido.',
   ].join('\n');
 }
 
