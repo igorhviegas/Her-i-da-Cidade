@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ChevronLeft, ChevronRight, CircleHelp, ClipboardList, Info, MessageCircle, Minus, Music, Pause, Play, Plus, Repeat1, SkipBack, SkipForward, Timer, TriangleAlert, ChevronDown,
+  ChevronLeft, ChevronRight, CircleHelp, ClipboardList, Info, MessageCircle, Minus, Music, Pause, Play, Plus, Repeat1, Search, SkipBack, SkipForward, Timer, TriangleAlert, ChevronDown, X,
 } from 'lucide-react';
-import { useAgentContent, type AgentFaqCategory, type AgentStep } from '../../services/agentService';
+import { useAgentContent, type AgentFaqCategory, type AgentFaqItem, type AgentStep } from '../../services/agentService';
 import {
-  SUPPORT_WHATSAPP_URL, TIMER_ALERTS, computeTimer, dueAlert, formatClock, markFired, resetFired, type AlertKey, type FiredAlerts,
+  SUPPORT_WHATSAPP_URL, TIMER_ALERTS, computeTimer, dueAlert, formatClock, markFired, matchesQuery, resetFired, searchFaq, type AlertKey, type FiredAlerts,
 } from '../../services/agentContent.js';
 import { useAgentPlayer } from './useAgentPlayer';
 
@@ -42,6 +42,8 @@ export const AgentApp: React.FC = () => {
   const [now, setNow] = useState(() => Date.now());
   const [alertKey, setAlertKey] = useState<AlertKey | null>(null);
   const [timerOpen, setTimerOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  useEffect(() => setQuery(''), [view]); // cada tela começa sem filtro
 
   const event = saved.event;
   const timer = event ? computeTimer(event, now) : null;
@@ -180,10 +182,12 @@ export const AgentApp: React.FC = () => {
           />
         )}
 
-        {view === 'music' && <MusicView player={player} tracks={tracks} loading={tracksLoading} />}
+        {view === 'music' && <MusicView player={player} tracks={tracks} loading={tracksLoading} query={query} onQuery={setQuery} />}
 
         {view === 'support' && (
           <>
+            <SearchBox value={query} onChange={setQuery} placeholder="Buscar em todas as perguntas e respostas" />
+            {query.trim() ? <FaqResults results={searchFaq(faq, query)} /> : <>
             <button onClick={() => setView('support:info')} className={bigBtn}>
               <Info className="h-7 w-7 shrink-0 text-amber-300" />
               <span className="min-w-0 flex-1"><span className="block text-lg font-bold">Informações importantes</span><span className="block text-sm text-white/50">Duração, alertas e novo evento</span></span>
@@ -197,6 +201,7 @@ export const AgentApp: React.FC = () => {
               </button>
             ))}
             <p className="px-1 pt-2 text-center text-sm text-white/40">Não achou? Toque no botão verde para falar com o Vitor.</p>
+            </>}
           </>
         )}
 
@@ -226,12 +231,12 @@ export const AgentApp: React.FC = () => {
         </div>
       )}
 
-      <a
+      {view.startsWith('support') && <a
         href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noopener noreferrer" aria-label="Suporte urgente: WhatsApp do Vitor"
         className={`${btn} fixed right-4 z-30 flex h-14 items-center gap-2 rounded-full bg-[#25D366] px-5 text-base font-black text-[#04210F] shadow-lg shadow-black/50 ${showMini ? 'bottom-24' : 'bottom-5'}`}
       >
         <MessageCircle className="h-6 w-6" />Vitor
-      </a>
+      </a>}
 
       {alertKey && <AlertOverlay alertKey={alertKey} onClose={() => setAlertKey(null)} />}
     </div>
@@ -325,22 +330,41 @@ const StepView: React.FC<{
   </>
 );
 
+const FaqItemCard: React.FC<{ item: AgentFaqItem; label?: string }> = ({ item, label }) => (
+  <details className="group rounded-2xl border border-white/10 bg-[#0D1527]">
+    <summary className="flex min-h-[3.5rem] cursor-pointer list-none items-center gap-3 px-4 py-3 text-[17px] font-bold leading-snug [&::-webkit-details-marker]:hidden">
+      <span className="flex-1">{label && <span className="mb-0.5 block text-[11px] font-bold uppercase tracking-widest text-blue-300">{label}</span>}{item.question}</span>
+      <ChevronDown className="h-5 w-5 shrink-0 text-white/40 transition-transform group-open:rotate-180" />
+    </summary>
+    <p className="whitespace-pre-line border-t border-white/10 px-4 py-4 text-[16px] leading-relaxed text-white/80">{item.answer}</p>
+  </details>
+);
+
 const FaqView: React.FC<{ category: AgentFaqCategory }> = ({ category }) => (
   category.items.length === 0 ? (
     <p className="rounded-2xl border border-white/10 bg-[#0D1527] px-5 py-6 text-center text-white/60">Nenhuma pergunta cadastrada ainda.</p>
   ) : (
-    <div className="space-y-2">
-      {category.items.map((item) => (
-        <details key={item.id} className="group rounded-2xl border border-white/10 bg-[#0D1527]">
-          <summary className="flex min-h-[3.5rem] cursor-pointer list-none items-center gap-3 px-4 py-3 text-[17px] font-bold leading-snug [&::-webkit-details-marker]:hidden">
-            <span className="flex-1">{item.question}</span>
-            <ChevronDown className="h-5 w-5 shrink-0 text-white/40 transition-transform group-open:rotate-180" />
-          </summary>
-          <p className="whitespace-pre-line border-t border-white/10 px-4 py-4 text-[16px] leading-relaxed text-white/80">{item.answer}</p>
-        </details>
-      ))}
-    </div>
+    <div className="space-y-2">{category.items.map((item) => <FaqItemCard key={item.id} item={item} />)}</div>
   )
+);
+
+const FaqResults: React.FC<{ results: { category: AgentFaqCategory; item: AgentFaqItem }[] }> = ({ results }) => (
+  results.length === 0 ? (
+    <p className="rounded-2xl border border-white/10 bg-[#0D1527] px-5 py-6 text-center text-white/60">Nada encontrado. Tente outra palavra ou fale com o Vitor pelo botão verde.</p>
+  ) : (
+    <div className="space-y-2">{results.map(({ category, item }) => <FaqItemCard key={item.id} item={item} label={category.title} />)}</div>
+  )
+);
+
+const SearchBox: React.FC<{ value: string; onChange: (v: string) => void; placeholder: string }> = ({ value, onChange, placeholder }) => (
+  <div className="relative">
+    <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/40" />
+    <input
+      type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={placeholder}
+      className="h-14 w-full rounded-2xl border border-white/10 bg-[#0D1527] pl-12 pr-12 text-base text-white placeholder:text-white/35 focus:border-blue-400 focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+    />
+    {value && <button onClick={() => onChange('')} aria-label="Limpar busca" className={`${btn} absolute right-2 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full text-white/60`}><X className="h-5 w-5" /></button>}
+  </div>
 );
 
 const PlayerButtons: React.FC<{ player: Player; size: 'sm' | 'lg' }> = ({ player, size }) => {
@@ -358,7 +382,7 @@ const PlayerButtons: React.FC<{ player: Player; size: 'sm' | 'lg' }> = ({ player
   );
 };
 
-const MusicView: React.FC<{ player: Player; tracks: ReturnType<typeof useAgentContent>['tracks']; loading: boolean }> = ({ player, tracks, loading }) => (
+const MusicView: React.FC<{ player: Player; tracks: ReturnType<typeof useAgentContent>['tracks']; loading: boolean; query: string; onQuery: (v: string) => void }> = ({ player, tracks, loading, query, onQuery }) => (
   <>
     {tracks.length === 0 ? (
       <p className="rounded-2xl border border-white/10 bg-[#0D1527] px-5 py-6 text-center text-white/60">{loading ? 'Carregando playlist...' : 'Nenhuma música ativa na playlist.'}</p>
@@ -371,8 +395,11 @@ const MusicView: React.FC<{ player: Player; tracks: ReturnType<typeof useAgentCo
           <button onClick={player.toggleLoop} aria-pressed={player.loop} className={`${btn} mx-auto flex items-center gap-2 rounded-full border px-5 py-3 text-sm font-bold ${player.loop ? 'border-pink-400 bg-pink-500/25 text-pink-100' : 'border-white/15 text-white/60'}`}><Repeat1 className="h-5 w-5" />{player.loop ? 'Repetindo esta música' : 'Repetir música'}</button>
           {player.error && <p className="text-sm font-semibold text-red-300">{player.error}</p>}
         </div>
+        <SearchBox value={query} onChange={onQuery} placeholder="Buscar música" />
+        {query.trim() && !tracks.some((t) => matchesQuery(query, t.title)) && <p className="rounded-2xl border border-white/10 bg-[#0D1527] px-5 py-6 text-center text-white/60">Nenhuma música encontrada.</p>}
         <ol className="space-y-2">
           {tracks.map((track, i) => {
+            if (!matchesQuery(query, track.title)) return null; // o número continua o da playlist
             const active = player.current?.id === track.id;
             return (
               <li key={track.id}>

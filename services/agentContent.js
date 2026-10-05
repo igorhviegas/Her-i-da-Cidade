@@ -202,3 +202,20 @@ export const DEFAULT_AGENT_FAQ = [
   active: true, ...category, order,
   items: category.items.map((item, i) => ({ ...item, id: `${category.id}-${i + 1}` })),
 }));
+
+/** Minúsculas e sem acentos, para a busca não depender de como o agente digita ("voltagem" = "Voltagém"). */
+export const normalizeText = (text) => String(text ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/** Todas as palavras da busca precisam aparecer em algum dos textos (em qualquer ordem; uma frase exata também casa). */
+export function matchesQuery(query, ...texts) {
+  const terms = normalizeText(query).split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return true;
+  const haystack = normalizeText(texts.join(' '));
+  return terms.every((term) => haystack.includes(term));
+}
+
+/** Perguntas e respostas de todas as categorias que casam com a busca, mantendo a ordem do FAQ. */
+export function searchFaq(categories, query) {
+  return categories.flatMap((category) =>
+    category.items.filter((item) => matchesQuery(query, item.question, item.answer)).map((item) => ({ category, item })));
+}

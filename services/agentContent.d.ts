@@ -26,3 +26,6 @@ export interface AgentFaqItem { id: string; question: string; answer: string }
 export interface AgentFaqCategory { id: string; order: number; title: string; active: boolean; items: AgentFaqItem[] }
 export const SUPPORT_WHATSAPP_URL: string;
 export const DEFAULT_AGENT_FAQ: AgentFaqCategory[];
+export function normalizeText(text: unknown): string;
+export function matchesQuery(query: string, ...texts: unknown[]): boolean;
+export function searchFaq(categories: AgentFaqCategory[], query: string): { category: AgentFaqCategory; item: AgentFaqItem }[];
