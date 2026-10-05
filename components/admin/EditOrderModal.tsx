@@ -1,8 +1,9 @@
-import React, { FormEvent, useEffect, useState } from 'react';
+import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Loader2, Save, X } from 'lucide-react';
 import { createClient, getClientByWhatsApp, normalizeWhatsApp, updateClient } from '../../services/clientsService';
 import { updateOrder } from '../../services/ordersService';
 import { eventContentSummary, validateEventForm } from '../../services/eventForm.js';
+import { planAdjustments } from '../../services/eventFinance.js';
 import { EventOrderFields, eventFormFromOrder } from './EventOrderFields';
 import { calculateOrderDeadlines } from '../../services/orderDates';
 import { getServices } from '../../services/servicesService';
@@ -68,6 +69,16 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
   const [eventState, setEventState] = useState(() => eventFormFromOrder(order));
   const booked = order.eventLedger;
   const money = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  const signed = (value: number) => `${value > 0 ? '+' : '−'} ${money(Math.abs(value))}`;
+  // Ajustes que este salvamento geraria no Financeiro (só para eventos com lançamentos; mesma regra que o servidor aplica).
+  const adjustment = useMemo(() => {
+    if (isDraft || !order.eventLedger) return null;
+    const parsed = validateEventForm(eventState).value;
+    if (!parsed) return null;
+    const plan = planAdjustments(order.id, order, parsed, null);
+    return plan.records.length ? plan : null;
+  }, [eventState, order, isDraft]);
+  const describeAdjustment = () => (adjustment?.records ?? []).map((r) => `${r.type === 'revenue' ? 'Receita' : 'Despesa evento'}: ${signed(r.amount)}`).join(' · ');
 
   useEffect(() => {
     let cancelled = false;
@@ -116,6 +127,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
     if (paidTotal === null) return setError('Informe um total pago válido.');
     if (!content.trim()) return setError('Informe o conteúdo do pedido.');
 
+    if (adjustment && !window.confirm(`Salvar vai lançar no Financeiro, na data de hoje: ${describeAdjustment()}.\nOs lançamentos anteriores continuam como estão (histórico preservado). Confirmar?`)) return;
     setSaving(true);
     try {
       const existingClient = await getClientByWhatsApp(normalizedWhatsApp);
@@ -180,6 +192,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
         totalPaid: paidTotal,
         ...eventUpdates,
         ...(isDraft && eventValues ? { eventDraft: undefined, eventLedger: { entry: eventValues.entryValue } } : {}),
+        ...(adjustment?.next ? { eventLedger: adjustment.next } : {}),
       };
       if (paidAtChanged || deliveryDaysChanged) {
         const deadlinePaidAt = paidAtChanged ? paidAt : toDate(order.paidAt);
@@ -225,7 +238,12 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
             {isEventOrder && booked && (
               <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-[11px] text-amber-200">
                 Lançamentos já efetivados no Financeiro: entrada {money(booked.entry)}{booked.final !== undefined ? ` · 2ª parcela ${money(booked.final)}` : ''}{booked.cost !== undefined ? ` · despesa evento ${money(booked.cost)}` : ''}.
-                Alterar valor total, entrada ou custo aqui NÃO modifica esses lançamentos; a 2ª parcela e a despesa ainda não lançadas usam os valores vigentes na primeira conclusão.
+                Alterar valor total, entrada ou custo gera um ajuste no Financeiro (a diferença, na data da alteração); os lançamentos originais não são reescritos. A 2ª parcela e a despesa ainda não lançadas usam os valores vigentes na primeira conclusão.
+              </p>
+            )}
+            {adjustment && (
+              <p role="status" className="rounded-xl border border-blue-500/25 bg-blue-500/10 p-3 text-[11px] text-blue-100">
+                Ao salvar, será lançado no Financeiro: <strong>{describeAdjustment()}</strong>
               </p>
             )}
             {isEventOrder ? <EventOrderFields value={eventState} onChange={setEventState} disabled={saving} /> : (

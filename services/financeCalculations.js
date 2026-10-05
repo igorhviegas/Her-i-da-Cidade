@@ -50,7 +50,7 @@ export function buildRevenueEntries(orders) {
     seen.add(order.id);
     const revenueDate = revenueDateOf(order);
     if (!revenueDate) { undated += 1; continue; }
-    if (order.ledgerKind === 'cost') {
+    if (order.ledgerKind === 'cost' || order.ledgerKind === 'adjcost') {
       costs.push({ orderId: order.id, order, revenueDate, value: order.eventCost, monthKey: monthKeyOf(revenueDate), dayKey: dayKeyOf(revenueDate) });
       continue;
     }
@@ -64,7 +64,8 @@ export function buildRevenueEntries(orders) {
 
 export function monthTotals(entries, monthKey) {
   let total = 0; let count = 0;
-  for (const e of entries) if (e.monthKey === monthKey) { total += e.value; count += 1; }
+  // Ajustes de receita (livro de eventos) mudam o total, mas não contam como um serviço a mais.
+  for (const e of entries) if (e.monthKey === monthKey) { total += e.value; if (e.order?.ledgerKind !== 'adjrev') count += 1; }
   return { total, count };
 }
 
@@ -82,7 +83,7 @@ export function dailyRevenue(entries, monthKey) {
   for (const e of entries) {
     if (e.monthKey !== monthKey) continue;
     const slot = days[e.revenueDate.getDate() - 1];
-    slot.total += e.value; slot.count += 1; slot.entries.push(e);
+    slot.total += e.value; if (e.order?.ledgerKind !== 'adjrev') slot.count += 1; slot.entries.push(e);
   }
   return days;
 }
@@ -196,11 +197,11 @@ export function buildStatement(entries, expenses, monthKey, costs = []) {
   const firstDay = new Date(y, m - 1, 1);
   const rows = [
     ...entries.filter((e) => e.monthKey === monthKey)
-      .map((e) => ({ id: `in-${e.orderId}`, kind: 'in', source: 'order', date: e.revenueDate, amount: e.value, entry: e })),
+      .map((e) => ({ id: `in-${e.orderId}`, kind: e.value < 0 ? 'out' : 'in', source: 'order', date: e.revenueDate, amount: e.value, entry: e })), // ajuste negativo vira saída
     ...editingCostForMonth(entries, monthKey).items
       .map((e) => ({ id: `edit-${e.orderId}`, kind: 'out', source: 'editing', date: e.revenueDate, amount: -e.order.editingCost, entry: e })),
     ...eventCostForMonth(costs, monthKey).items
-      .map((e) => ({ id: e.orderId, kind: 'out', source: 'eventCost', date: e.revenueDate, amount: -e.value, entry: e })),
+      .map((e) => ({ id: e.orderId, kind: e.value < 0 ? 'in' : 'out', source: 'eventCost', date: e.revenueDate, amount: -e.value, entry: e })), // ajuste que reduz o custo vira entrada
     ...expensesForMonth(expenses, monthKey).items
       .map(({ expense, amount }) => ({ id: `exp-${expense.id}`, kind: 'out', source: 'expense', date: firstDay, amount: -amount, expense })),
   ];

@@ -73,7 +73,7 @@ export interface Order {
   /** Pedido presencial criado pelo ManyChat só com cliente e WhatsApp: os dados do evento ainda não foram preenchidos. Sai ao salvar o formulário de evento. */
   eventDraft?: boolean;
   /** Presente em pedidos de evento com livro de lançamentos (collection financeEntries). Valores já lançados (congelados). */
-  eventLedger?: { entry: number; final?: number; cost?: number };
+  eventLedger?: { entry: number; final?: number; cost?: number; /** soma dos ajustes de receita */ adj?: number; /** soma dos ajustes de despesa */ adjCost?: number; /** nº do último ajuste */ seq?: number };
   /** Vínculo com o Google Agenda, gravado pelo servidor (/api/google-calendar). */
   googleCalendar?: { eventId: string; calendarId: string; htmlLink?: string; syncedAt?: any };
   /** Custo de edição (R$) gravado na primeira conclusão de Vídeo Personalizado; entra nas despesas do Financeiro. */

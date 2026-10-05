@@ -231,7 +231,7 @@ export const AdminFinancePage: React.FC = () => {
                     const out = r.kind === 'out';
                     const who = child ? `${child} · ` : '';
                     const title = r.source === 'expense' ? r.expense!.name : `${who}${client?.name || `Pedido ${r.entry!.orderId.slice(0, 6)}`}`;
-                    const subtitle = r.source === 'expense' ? `Despesa · ${r.expense!.category}` : r.source === 'editing' ? 'Custo de edição — Vídeo personalizado' : r.source === 'eventCost' ? LEDGER_LABELS.cost : `${service?.title || 'Serviço não encontrado'}${r.entry?.order.ledgerKind ? ` · ${LEDGER_LABELS[r.entry.order.ledgerKind as LedgerKind]}` : ''}`;
+                    const subtitle = r.source === 'expense' ? `Despesa · ${r.expense!.category}` : r.source === 'editing' ? 'Custo de edição — Vídeo personalizado' : r.source === 'eventCost' ? LEDGER_LABELS[(r.entry?.order.ledgerKind ?? 'cost') as LedgerKind] : `${service?.title || 'Serviço não encontrado'}${r.entry?.order.ledgerKind ? ` · ${LEDGER_LABELS[r.entry.order.ledgerKind as LedgerKind]}` : ''}`;
                     return (
                       <div key={r.id} className={`flex items-center justify-between gap-3 p-4 ${out ? 'bg-red-500/10' : ''}`}>
                         <div className="min-w-0">

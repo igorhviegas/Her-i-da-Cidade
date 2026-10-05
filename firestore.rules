@@ -82,11 +82,18 @@ service cloud.firestore {
       return data.keys().hasAll(['orderId', 'kind', 'type', 'amount', 'date', 'createdAt'])
         && data.orderId is string
         && data.orderId.size() > 0
-        && data.kind in ['entry', 'final', 'cost']
-        && entryId == 'evt-' + data.orderId + '-' + data.kind
-        && data.type == (data.kind == 'cost' ? 'expense' : 'revenue')
+        && data.kind in ['entry', 'final', 'cost', 'adjrev', 'adjcost']
+        && data.type == (data.kind in ['cost', 'adjcost'] ? 'expense' : 'revenue')
         && data.amount is number
-        && data.amount >= 0
+        && ((data.kind in ['entry', 'final', 'cost']
+            && data.amount >= 0
+            && entryId == 'evt-' + data.orderId + '-' + data.kind)
+          // Ajuste: diferença com sinal, ID evt-{pedido}-adjrev|adjcost-{seq}; nunca zero.
+          || (data.kind in ['adjrev', 'adjcost']
+            && data.amount != 0
+            && data.seq is int
+            && data.seq >= 1
+            && entryId == 'evt-' + data.orderId + '-' + data.kind + '-' + string(data.seq)))
         && data.date is timestamp
         && data.createdAt is timestamp
         && data.createdAt == request.time

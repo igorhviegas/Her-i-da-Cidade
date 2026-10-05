@@ -175,7 +175,7 @@ test('orderImports: admin cria uma vez por PDF; ninguém altera, apaga ou lê se
 
 // ---- Livro de lançamentos dos eventos (financeEntries) ----
 const ledgerData = (orderId, kind, over = {}) => ({
-  orderId, kind, type: kind === 'cost' ? 'expense' : 'revenue', amount: 500, date: serverTimestamp(), createdAt: serverTimestamp(), ...over,
+  orderId, kind, type: kind === 'cost' || kind === 'adjcost' ? 'expense' : 'revenue', amount: 500, date: serverTimestamp(), createdAt: serverTimestamp(), ...over,
 });
 const ledgerPath = (orderId, kind) => `financeEntries/evt-${orderId}-${kind}`;
 
@@ -220,4 +220,23 @@ test('financeEntries: só pode ser apagado na mesma transação que exclui o ped
     tx.delete(doc(adminDb, 'orders/ev3'));
     tx.delete(doc(adminDb, ledgerPath('ev3', 'entry')));
   }));
+});
+
+test('financeEntries: ajustes têm ID com sequência, valor com sinal (nunca zero) e também são imutáveis', async () => {
+  const adminDb = env.authenticatedContext('admin-user').firestore();
+  await env.withSecurityRulesDisabled(async (context) => { await setDoc(doc(context.firestore(), 'orders/ev4'), { status: 'completed' }); });
+  const adj = (kind, seq, over = {}) => ledgerData('ev4', kind, { seq, amount: -200, ...over });
+  const path = (kind, seq) => `financeEntries/evt-ev4-${kind}-${seq}`;
+  await assertSucceeds(setDoc(doc(adminDb, path('adjrev', 1)), adj('adjrev', 1)));
+  await assertSucceeds(setDoc(doc(adminDb, path('adjcost', 1)), adj('adjcost', 1, { amount: 50 })));
+  await assertSucceeds(setDoc(doc(adminDb, path('adjrev', 2)), adj('adjrev', 2, { amount: 120 })));
+  await assertFails(setDoc(doc(adminDb, path('adjrev', 1)), adj('adjrev', 1, { amount: 999 }))); // mesma chave = sobrescrita
+  await assertFails(updateDoc(doc(adminDb, path('adjrev', 1)), { amount: 1 }));
+  await assertFails(setDoc(doc(adminDb, path('adjrev', 3)), adj('adjrev', 3, { amount: 0 }))); // ajuste zero
+  await assertFails(setDoc(doc(adminDb, path('adjrev', 4)), adj('adjrev', 3))); // ID não bate com a sequência
+  await assertFails(setDoc(doc(adminDb, 'financeEntries/evt-ev4-adjrev'), adj('adjrev', 5))); // sem sequência no ID
+  const { seq: _omitted, ...withoutSeq } = adj('adjrev', 6);
+  await assertFails(setDoc(doc(adminDb, path('adjrev', 6)), withoutSeq)); // ajuste sem seq
+  await assertFails(setDoc(doc(adminDb, path('adjrev', 7)), adj('adjrev', 7, { type: 'expense' }))); // tipo incoerente
+  await assertFails(setDoc(doc(adminDb, 'financeEntries/evt-ev4-entry'), ledgerData('ev4', 'entry', { amount: -5 }))); // entrada continua >= 0
 });
