@@ -34,6 +34,7 @@ Qualquer campo fora da lista do serviço é rejeitado com `400`.
 | Vídeo Personalizado | `custom-video` | pela modalidade (tabela abaixo) | opcional | `modality` **obrigatório**; `details` e `eventDate` opcionais |
 | Vídeo Convite | `invite-video` | pela modalidade (tabela abaixo) | opcional | `modality` **obrigatório**; `details` e `eventDate` opcionais |
 | Vídeo Chamada ao Vivo | `live-call` | **R$ 75,00 fixo** | opcional | `details` opcional. **Sem data de agendamento** |
+| Serviços Presenciais (evento) | `presential-event` | **sem valor** (definido depois no CRM) | **não aceito** | **nenhum**: só `customer`. Ver [Evento presencial](#evento-presencial-pedido-incompleto) |
 
 O ManyChat **não envia preço** nos serviços de Personalizado, Convite e Chamada ao Vivo: o CRM calcula o valor.
 
@@ -134,9 +135,38 @@ No ManyChat, o corpo do External Request é montado com campos personalizados (*
 6. Envolva todos os valores em aspas: o CRM só aceita texto.
 7. Header `Authorization: Bearer <segredo>` e `Content-Type: application/json`.
 
+## Evento presencial (pedido incompleto)
+
+Para o serviço **Serviços Presenciais** (ID `6`, categoria Presencial) o ManyChat envia **somente o nome e o WhatsApp** da cliente. Todo o resto (nome da criança, data, horário, local, autorização de imagem, teia extra, valores, custo, observações e #formulário) é preenchido depois, na equipe, pelo formulário de evento do CRM.
+
+Campos aceitos: `eventType` (`"payment.paid"`, o mesmo valor dos demais serviços; aqui significa "automação concluída"), `service` (`"presential-event"`), `customer.name` e `customer.whatsapp`. **Qualquer outro campo gera `400`** (`childName`, `eventDate`, `modality`, `amountPaid`, `details`…).
+
+```json
+{ "eventType": "payment.paid", "service": "presential-event",
+  "customer": { "name": "Maria Silva", "whatsapp": "+55 31 99999-0000" } }
+```
+
+Sucesso (`200`), igual aos demais serviços:
+```json
+{ "ok": true, "orderId": "<id>", "technicalPurchaseId": "<id>" }
+```
+
+Obrigatórios: `eventType`, `service`, `customer.name` (até 120 caracteres) e `customer.whatsapp` (telefone brasileiro com DDD). Erros: os mesmos códigos da tabela de respostas (`400`, `401`, `422`…).
+
+**O que acontece no CRM**
+- Cria o pedido no Kanban com o status inicial configurado para o serviço (Admin → Serviços; tipo de produção e status inicial são obrigatórios, como nos demais). Se o serviço estiver configurado como **Concluído**, a resposta é `422` e nada é criado: evento presencial não nasce concluído.
+- O pedido guarda cliente e WhatsApp (cliente criado ou reaproveitado pelo WhatsApp), `servicePrice`/`totalPaid` = 0 e a marca `eventDraft`. O card mostra "⚠ Dados do evento pendentes" e o botão **Completar cadastro**, que abre "Editar pedido" no formulário de evento, com nome e WhatsApp já preenchidos.
+- **Nenhum lançamento financeiro é feito na criação.** A **entrada** é lançada quando o cadastro do evento é salvo pela primeira vez (valor de entrada do formulário, data = esse momento); salvar de novo não lança outra. A **2ª parcela** e a "Despesa evento" são lançadas na primeira conclusão, como nos eventos cadastrados manualmente (ver `docs/eventos.md`).
+- Enquanto o cadastro não for completado, o pedido **não pode ser concluído** (o Kanban avisa e abre a edição; o servidor também recusa).
+- Origem do pedido: `manychat`.
+
+**Requisições repetidas (só este serviço):** para evitar pedido duplicado por reenvio, o mesmo WhatsApp **dentro de 10 minutos** devolve o pedido já criado (`200`, mesmo `orderId`, com `"duplicate": true`) em vez de criar outro. Passada a janela, ou se o pedido tiver sido excluído, uma nova chamada cria um pedido novo. A reserva fica na coleção `manychatRequests` (só o servidor acessa).
+
+**Configurar no ManyChat:** um External Request `POST` com o corpo acima no final do fluxo (quando o cliente concluir a automação), mesmo `Authorization: Bearer <segredo>` e `Content-Type: application/json`. `service` é texto fixo `presential-event`; `customer.name` e `customer.whatsapp` vêm do nome e do telefone do contato; não inclua nenhum outro campo.
+
 ## Requisições repetidas
 
-**Não há deduplicação.** O ManyChat não fornece um identificador único por pedido ou pagamento, então cada chamada aceita cria um novo pedido. Em caso de timeout ou erro, confira o CRM antes de reenviar. Se aparecer um pedido duplicado, ele deve ser identificado e removido manualmente no CRM (o cliente é reaproveitado pelo WhatsApp, então só o pedido precisa ser removido).
+**Não há deduplicação** (exceto no evento presencial, acima). O ManyChat não fornece um identificador único por pedido ou pagamento, então cada chamada aceita cria um novo pedido. Em caso de timeout ou erro, confira o CRM antes de reenviar. Se aparecer um pedido duplicado, ele deve ser identificado e removido manualmente no CRM (o cliente é reaproveitado pelo WhatsApp, então só o pedido precisa ser removido).
 
 ## Respostas
 
@@ -173,6 +203,7 @@ O CRM não pode ser conferido a partir do código. Em cada serviço abaixo, abra
 | Vídeo Personalizado (`3`) | sim | sim | Gravação | Gravar |
 | Vídeo Convite (`4`) | sim | sim | Gravação | Gravar |
 | Vídeo Temático (`5`) | sim | sim | Imediato | **Entregar** |
+| Serviços Presenciais (`6`) | sim | sim | conforme a operação (ex.: Agendado) | conforme a operação, **nunca Concluído** |
 
 O título precisa continuar igual ao nome da tabela (sem diferença de acento ou caixa). Serviços que hoje estão como "Concluído" por causa da regra antiga **precisam ser alterados para Entregar**: o CRM agora respeita o que está salvo.
 

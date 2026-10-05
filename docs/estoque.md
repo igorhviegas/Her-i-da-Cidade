@@ -39,6 +39,6 @@ Quem tem papel `admin` ou `superadmin` (e `active: true`) em `/admins/{uid}` pod
 - Reabrir devolve apenas o que foi baixado e muda as pendências do ciclo para `voided` (permanecem como histórico). Concluir de novo abre outro ciclo.
 - Limite das regras: elas garantem quem pode registrar pendências/consumo excepcional e que o saldo nunca fica negativo, mas não conseguem conferir se a quantidade "necessária" informada pelo cliente do app é a real.
 
-## Importação de PDF (Novo pedido)
+## Cadastro de eventos
 
-Ver `services/pdfExtract.js` (texto nativo; OCR por página quando a página não tem texto), `services/pdfFormParser.js` (campos) e `components/admin/ImportPdfPanel.tsx` (revisão). pdf.js e Tesseract são carregados só ao escolher um arquivo; o PDF não sai do navegador nem é armazenado. O Tesseract baixa o motor e o idioma `por` de CDN na primeira execução. O mapeamento **não foi validado com um PDF real do formulário** (nenhum exemplo disponível).
+A importação de PDF foi removida. Eventos presenciais são cadastrados pelo formulário manual (ver `docs/eventos.md`).

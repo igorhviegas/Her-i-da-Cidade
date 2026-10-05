@@ -5,21 +5,21 @@ import {
   expensesForMonth, expenseAmountForMonth, patrimonySummary, financeMetrics, orderValue,
 } from './financeCalculations.js';
 
-const order = (id, status, eventDate, totalPaid, extra = {}) => ({ id, status, eventDate, totalPaid, servicePrice: totalPaid, rushFee: 0, ...extra });
+const order = (id, status, completedAt, totalPaid, extra = {}) => ({ id, status, completedAt, totalPaid, servicePrice: totalPaid, rushFee: 0, ...extra });
 const orders = [
   order('a', 'completed', new Date(2026, 9, 3, 10), 100),
   order('a', 'completed', new Date(2026, 9, 3, 10), 100), // duplicado
   order('b', 'completed', new Date(2026, 9, 3, 20), 50, { paidAt: null }), // concluído e não pago
   order('c', 'delivery', new Date(2026, 9, 4), 999), // não concluído
-  order('d', 'completed', new Date(2026, 8, 30, 23, 30), 70), // evento em setembro (conclusão em outubro não importa)
-  order('e', 'completed', null, 40), // sem data do evento
+  order('d', 'completed', new Date(2026, 8, 30, 23, 30), 70), // concluído em setembro
+  order('e', 'completed', null, 40), // sem nenhuma data
   order('f', 'completed', new Date(2026, 9, 5), 0, { scriptId: 's1' }), // interno de conteúdo
 ];
 
-test('faturamento: só concluídos, sem duplicidade, agrupado pela data do evento', () => {
-  const { entries, withoutEventDate } = buildRevenueEntries(orders);
+test('faturamento: só concluídos, sem duplicidade, agrupado pela data de conclusão', () => {
+  const { entries, undated } = buildRevenueEntries(orders);
   assert.equal(entries.length, 3);
-  assert.equal(withoutEventDate, 1);
+  assert.equal(undated, 1);
   assert.deepEqual(monthTotals(entries, '2026-10'), { total: 150, count: 2 });
   assert.deepEqual(monthTotals(entries, '2026-09'), { total: 70, count: 1 });
   const days = dailyRevenue(entries, '2026-10');
@@ -30,7 +30,7 @@ test('faturamento: só concluídos, sem duplicidade, agrupado pela data do event
 });
 
 test('mudanças no pedido refletem no recálculo', () => {
-  const changed = orders.map((o) => (o.id === 'c' ? { ...o, status: 'completed', totalPaid: 10 } : o.id === 'b' ? { ...o, eventDate: new Date(2026, 10, 1) } : o));
+  const changed = orders.map((o) => (o.id === 'c' ? { ...o, status: 'completed', totalPaid: 10 } : o.id === 'b' ? { ...o, completedAt: new Date(2026, 10, 1) } : o));
   const { entries } = buildRevenueEntries(changed);
   assert.deepEqual(monthTotals(entries, '2026-10'), { total: 110, count: 2 });
   assert.deepEqual(monthTotals(entries, '2026-11'), { total: 50, count: 1 });
@@ -97,49 +97,142 @@ test('total do pedido editado (pagamento parcial) é o que entra hoje: totalPaid
   assert.equal(orderValue({ totalPaid: 60, servicePrice: 100, rushFee: 20 }), 60);
 });
 
+test('data do faturamento: completedAt (automática) tem prioridade; sem ela cai em eventDate e depois paidAt', () => {
+  const june = new Date(2026, 5, 10);
+  const { entries, undated } = buildRevenueEntries([
+    { id: 'x', status: 'completed', totalPaid: 10, completedAt: new Date(2026, 9, 2), eventDate: june, paidAt: june },
+    { id: 'y', status: 'completed', totalPaid: 20, eventDate: new Date(2026, 8, 5), paidAt: june },
+    { id: 'z', status: 'completed', totalPaid: 30, paidAt: new Date(2026, 7, 1) },
+    { id: 'w', status: 'completed', totalPaid: 40 },
+  ]);
+  assert.deepEqual(entries.map((e) => [e.orderId, e.monthKey]), [['x', '2026-10'], ['y', '2026-09'], ['z', '2026-08']]);
+  assert.equal(undated, 1);
+});
+
+// ---- Custo de edição (Vídeo Personalizado) ----
+import { EDITING_COST, editingCostFields, editingCostForMonth } from './financeCalculations.js';
+
+// Espelha a regra de updateOrder: o campo só é gravado na transição para "concluído".
+const complete = (current, serviceId = '3') => ({ ...current, status: 'completed', ...(current.status !== 'completed' ? editingCostFields(serviceId, current) : {}) });
+const monthCost = (list, month = '2026-10') => editingCostForMonth(buildRevenueEntries(list).entries, month).total;
+const video = (id, extra = {}) => ({ id, serviceId: '3', status: 'delivery', totalPaid: 85, completedAt: new Date(2026, 9, 10), ...extra });
+
+test('custo de edição: concluir gera R$ 25 e é igual para prazos de 2, 4 e 7 dias', () => {
+  assert.equal(EDITING_COST, 25);
+  for (const deliveryDays of [2, 4, 7]) {
+    const done = complete(video(`v${deliveryDays}`, { deliveryDays }));
+    assert.equal(done.editingCost, 25);
+    assert.equal(monthCost([done]), 25);
+  }
+});
+
+test('custo de edição: concluir de novo ou editar pedido concluído não gera custo extra', () => {
+  const done = complete(video('a'));
+  assert.deepEqual(editingCostFields('3', done), {});
+  const again = complete(done);
+  const edited = { ...again, content: 'novo texto', totalPaid: 90 };
+  assert.equal(edited.editingCost, 25);
+  assert.equal(monthCost([edited]), 25);
+});
+
+test('custo de edição: não concluído e outros serviços não geram custo', () => {
+  assert.equal(monthCost([video('a')]), 0);
+  assert.equal(monthCost([complete(video('b', { serviceId: '1' }), '1')]), 0);
+  assert.equal(monthCost([video('c', { status: 'completed' })]), 0); // concluído antes da regra: sem retroativo
+});
+
+test('custo de edição: reabrir tira o custo do mês e concluir de novo devolve um único custo', () => {
+  const done = complete(video('a'));
+  const reopened = { ...done, status: 'editing', completedAt: undefined };
+  assert.equal(monthCost([reopened]), 0);
+  const recompleted = complete(reopened);
+  assert.equal(recompleted.editingCost, 25);
+  assert.equal(monthCost([{ ...recompleted, completedAt: new Date(2026, 10, 2) }], '2026-11'), 25);
+  assert.equal(monthCost([{ ...recompleted, completedAt: new Date(2026, 10, 2) }], '2026-10'), 0);
+});
+
+test('custo de edição: entra no resultado sem alterar faturamento nem despesas fixas', () => {
+  const done = complete(video('a'));
+  const { entries } = buildRevenueEntries([done]);
+  const fixed = [{ id: 'x', name: 'n', category: 'c', startMonth: '2026-01', active: true, amountHistory: { '2026-01': 100 } }];
+  assert.equal(monthTotals(entries, '2026-10').total, 85);
+  assert.equal(expensesForMonth(fixed, '2026-10').total, 100);
+  assert.equal(expensesForMonth(fixed, '2026-10').total + editingCostForMonth(entries, '2026-10').total, 125);
+});
+
+test('despesa única: deactivatedFrom no mês seguinte conta só no mês de início', () => {
+  const once = { id: 'u', name: 'n', category: 'c', startMonth: '2026-12', active: true, deactivatedFrom: '2027-01', amountHistory: { '2026-12': 80 } };
+  assert.equal(expensesForMonth([once], '2026-11').total, 0);
+  assert.equal(expensesForMonth([once], '2026-12').total, 80);
+  assert.equal(expensesForMonth([once], '2027-01').total, 0);
+});
+
+test('extrato: entradas, custo de edição individual e despesas no dia 1, com saídas negativas', async () => {
+  const { buildStatement } = await import('./financeCalculations.js');
+  const done = complete(video('a'));
+  const { entries } = buildRevenueEntries([done]);
+  const fixed = [{ id: 'x', name: 'Ferramenta', category: 'c', startMonth: '2026-01', active: true, amountHistory: { '2026-01': 100 } }];
+  const s = buildStatement(entries, fixed, '2026-10');
+  assert.deepEqual(s.rows.map((r) => [r.source, r.kind, r.amount]), [['order', 'in', 85], ['editing', 'out', -25], ['expense', 'out', -100]]);
+  assert.equal(s.rows[2].date.getDate(), 1);
+  assert.deepEqual([s.totalIn, s.totalOut, s.balance], [85, 125, -40]);
+});
+
 // ---- Rankings por serviço ----
-import { serviceRanking, entryInPeriod, monthKeyOf } from './financeCalculations.js';
+import { serviceRanking, entryInPeriod, monthKeyOf as monthKeyOfRk } from './financeCalculations.js';
 const NOW = new Date(2026, 9, 15, 14, 0); // 15/10/2026 14:00 local
-const o = (id, serviceId, eventDate, totalPaid, extra = {}) => ({ id, serviceId, status: 'completed', eventDate, totalPaid, servicePrice: totalPaid, rushFee: 0, ...extra });
-const ranked = [
-  o('1', 'A', new Date(2026, 9, 14, 10), 30), o('2', 'A', new Date(2026, 9, 10, 10), 30), o('3', 'A', new Date(2026, 8, 20, 10), 30), // A: 2 no mês, 3 em 30d
-  o('4', 'B', new Date(2026, 9, 12, 10), 500), o('5', 'B', new Date(2026, 5, 1, 10), 500), // B: 1 no mês; 2 no geral
-  o('6', 'C', new Date(2026, 9, 14, 23, 59), 75), o('7', 'C', new Date(2026, 9, 9, 14, 0), 75), o('8', 'C', new Date(2026, 9, 9, 13, 59), 75),
-  o('9', 'A', new Date(2026, 9, 14, 10), 30, { status: 'delivery' }), // não concluído: fora
-  o('1', 'A', new Date(2026, 9, 14, 10), 30), // duplicado do pedido 1
-  o('10', 'A', new Date(2026, 9, 20, 10), 30), // evento futuro: fora de 7d/30d/mês
-  o('11', 'A', new Date(2026, 9, 5, 10), 0, { scriptId: 's' }), // roteiro interno: fora
+const rk0 = (id, serviceId, completedAt, totalPaid, extra = {}) => ({ id, serviceId, status: 'completed', completedAt, totalPaid, servicePrice: totalPaid, rushFee: 0, ...extra });
+const ledger = (orderId, kind, serviceId, completedAt, amount) => ({
+  id: `evt-${orderId}-${kind}`, orderId, ledger: true, ledgerKind: kind, status: 'completed', serviceId, completedAt,
+  ...(kind === 'cost' || kind === 'adjcost' ? { eventCost: amount } : { totalPaid: amount }),
+});
+const rkOrders = [
+  rk0('1', 'A', new Date(2026, 9, 14, 10), 30), rk0('2', 'A', new Date(2026, 9, 10, 10), 30), rk0('3', 'A', new Date(2026, 8, 20, 10), 30),
+  rk0('4', 'B', new Date(2026, 9, 12, 10), 500), rk0('5', 'B', new Date(2026, 5, 1, 10), 500),
+  rk0('6', 'C', new Date(2026, 9, 14, 23, 59), 75), rk0('7', 'C', new Date(2026, 9, 9, 14, 0), 75), rk0('8', 'C', new Date(2026, 9, 9, 13, 59), 75),
+  rk0('9', 'A', new Date(2026, 9, 14, 10), 30, { status: 'delivery' }), // não concluído: fora
+  rk0('1', 'A', new Date(2026, 9, 14, 10), 30), // duplicado do pedido 1
+  rk0('10', 'A', new Date(2026, 9, 20, 10), 30), // data futura: fora de 7d/30d/mês
+  rk0('11', 'A', new Date(2026, 9, 5, 10), 0, { scriptId: 's' }), // roteiro interno: fora
 ];
-const rk = (period, by) => serviceRanking(buildRevenueEntries(ranked).entries, period, by, NOW).map((r) => [r.serviceId, r.count, r.revenue]);
+const rk = (period, by, orders = rkOrders) => serviceRanking(buildRevenueEntries(orders).entries, period, by, NOW).map((r) => [r.serviceId, r.count, r.revenue]);
 
 test('ranking: agrupa por serviço, ordena por pedidos e por faturamento, sem duplicar nem contar não concluídos', () => {
-  assert.deepEqual(rk('all', 'count'), [['A', 4, 120], ['C', 3, 225], ['B', 2, 1000]]); // A: pedidos 1,2,3,10 (o duplicado e o de entrega ficam fora)
+  assert.deepEqual(rk('all', 'count'), [['A', 4, 120], ['C', 3, 225], ['B', 2, 1000]]); // A: pedidos 1,2,3,10
   assert.deepEqual(rk('all', 'revenue').map((r) => r[0]), ['B', 'C', 'A']);
 });
 
-test('ranking: filtros 30d, 7d (janelas móveis) e mês vigente (calendário) e exclusão fora do período', () => {
+test('ranking: filtros 30d, 7d (janelas móveis) e mês vigente (calendário); fora do período não entra', () => {
   assert.deepEqual(rk('month', 'count'), [['C', 3, 225], ['A', 2, 60], ['B', 1, 500]]);
-  assert.deepEqual(rk('30d', 'count').find((r) => r[0] === 'A'), ['A', 3, 90]); // 20/09 está dentro de 30 dias; evento futuro não
-  // janela de 7 dias: de 08/10 14:00 até 15/10 14:00 (09/10 13:59 ainda entra; 20/09 e 01/06 não)
-  assert.deepEqual(rk('7d', 'count'), [['C', 3, 225], ['A', 2, 60], ['B', 1, 500]]);
+  assert.deepEqual(rk('30d', 'count').find((r) => r[0] === 'A'), ['A', 3, 90]); // 20/09 dentro de 30 dias; data futura não
+  assert.deepEqual(rk('7d', 'count'), [['C', 3, 225], ['A', 2, 60], ['B', 1, 500]]); // janela 08/10 14:00 → 15/10 14:00
   assert.deepEqual(rk('7d', 'revenue').map((r) => r[0]), ['B', 'C', 'A']);
 });
 
 test('ranking: viradas de dia e de mês no fuso local', () => {
-  const at = (y, m, d, h, mi) => ({ eventDate: new Date(y, m, d, h, mi), monthKey: monthKeyOf(new Date(y, m, d, h, mi)) });
-  const first = new Date(2026, 9, 1, 0, 30); // 01/10 00:30 local
-  assert.equal(entryInPeriod(at(2026, 8, 30, 23, 59), 'month', first), false); // 30/09 23:59 ainda é setembro
-  assert.equal(entryInPeriod(at(2026, 9, 1, 0, 0), 'month', first), true); // 01/10 00:00 já é outubro
-  assert.equal(entryInPeriod(at(2026, 9, 1, 0, 31), 'month', first), false); // depois de agora
-  assert.equal(entryInPeriod(at(2026, 9, 8, 14, 0), '7d', NOW), true); // exatamente 7 dias
+  const at = (y, m, d, h, mi) => ({ revenueDate: new Date(y, m, d, h, mi), monthKey: monthKeyOfRk(new Date(y, m, d, h, mi)) });
+  const first = new Date(2026, 9, 1, 0, 30);
+  assert.equal(entryInPeriod(at(2026, 8, 30, 23, 59), 'month', first), false);
+  assert.equal(entryInPeriod(at(2026, 9, 1, 0, 0), 'month', first), true);
+  assert.equal(entryInPeriod(at(2026, 9, 1, 0, 31), 'month', first), false);
+  assert.equal(entryInPeriod(at(2026, 9, 8, 14, 0), '7d', NOW), true);
   assert.equal(entryInPeriod(at(2026, 9, 8, 13, 59), '7d', NOW), false);
   assert.throws(() => entryInPeriod(at(2026, 9, 1, 0, 0), 'ano', NOW));
 });
 
-test('ranking: faturamento = totalPaid do pedido; custo de edição e despesas não entram nem duplicam', () => {
-  const e = buildRevenueEntries([o('p', 'V', new Date(2026, 9, 14, 10), 60, { editingCost: 25, installments: [{ v: 30 }, { v: 30 }], payments: [{ v: 60 }] })]).entries;
-  assert.deepEqual(serviceRanking(e, 'month', 'revenue', NOW), [{ serviceId: 'V', count: 1, revenue: 60 }]);
-  const rent = { id: 'x', startMonth: '2026-10', active: true, amountHistory: { '2026-10': 25 } };
-  assert.equal(expensesForMonth([rent], '2026-10').total, 25); // despesas seguem separadas
-  assert.equal(serviceRanking(e, 'month', 'revenue', NOW)[0].revenue, 60);
+test('ranking: evento com parcelas conta 1 pedido e soma as parcelas; ajuste muda a receita sem contar pedido; custos ficam fora', () => {
+  const orders = [
+    { id: 'E', serviceId: 'EV', status: 'completed', eventLedger: { entry: 100 }, totalPaid: 300 }, // pedido-mãe: não duplica as parcelas
+    ledger('E', 'entry', 'EV', new Date(2026, 9, 1, 10), 150), ledger('E', 'final', 'EV', new Date(2026, 9, 14, 10), 150),
+    ledger('E', 'adjrev-1', 'EV', new Date(2026, 9, 14, 11), 40), // ajuste (kind real: adjrev)
+    ledger('E', 'cost', 'EV', new Date(2026, 9, 14, 10), 120), // despesa de evento: fora
+  ].map((x) => (x.ledgerKind === 'adjrev-1' ? { ...x, ledgerKind: 'adjrev' } : x));
+  assert.deepEqual(rk('month', 'count', orders), [['EV', 1, 340]]);
+  assert.deepEqual(rk('month', 'revenue', orders), [['EV', 1, 340]]);
+});
+
+test('ranking: faturamento = valor do pedido; custo de edição (R$ 25) e parcelas auxiliares não reduzem nem duplicam', () => {
+  const o = [rk0('p', 'V', new Date(2026, 9, 14, 10), 60, { editingCost: 25, installments: [{ v: 30 }, { v: 30 }] })];
+  assert.deepEqual(rk('month', 'revenue', o), [['V', 1, 60]]);
+  assert.equal(editingCostForMonth(buildRevenueEntries(o).entries, '2026-10').total, 25); // continua como custo, à parte
 });

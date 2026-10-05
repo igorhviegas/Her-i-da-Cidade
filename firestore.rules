@@ -77,6 +77,29 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('active', false) == true;
     }
 
+    // Livro de lançamentos dos eventos (financeEntries): ID determinístico evt-{pedido}-{entry|final|cost}, criado uma única vez.
+    function validLedgerEntry(entryId, data) {
+      return data.keys().hasAll(['orderId', 'kind', 'type', 'amount', 'date', 'createdAt'])
+        && data.orderId is string
+        && data.orderId.size() > 0
+        && data.kind in ['entry', 'final', 'cost', 'adjrev', 'adjcost']
+        && data.type == (data.kind in ['cost', 'adjcost'] ? 'expense' : 'revenue')
+        && data.amount is number
+        && ((data.kind in ['entry', 'final', 'cost']
+            && data.amount >= 0
+            && entryId == 'evt-' + data.orderId + '-' + data.kind)
+          // Ajuste: diferença com sinal, ID evt-{pedido}-adjrev|adjcost-{seq}; nunca zero.
+          || (data.kind in ['adjrev', 'adjcost']
+            && data.amount != 0
+            && data.seq is int
+            && data.seq >= 1
+            && entryId == 'evt-' + data.orderId + '-' + data.kind + '-' + string(data.seq)))
+        && data.date is timestamp
+        && data.createdAt is timestamp
+        && data.createdAt == request.time
+        && existsAfter(orderDocumentPath(data.orderId));
+    }
+
     function consumptionPath(orderId) {
       return /databases/$(database)/documents/stockConsumptions/$(orderId);
     }
@@ -257,7 +280,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // PDFs importados: um documento por formulário (id = hash do texto), criado junto do pedido; nunca alterado nem apagado.
+    // Lançamentos financeiros de eventos: imutáveis. Só podem ser removidos junto da exclusão do pedido de origem
+    // (o pedido deixa de existir na mesma transação); caso contrário, nunca são alterados nem apagados.
+    match /financeEntries/{entryId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && validLedgerEntry(entryId, request.resource.data);
+      allow update: if false;
+      allow delete: if isAdmin() && !existsAfter(orderDocumentPath(resource.data.orderId));
+    }
+
+    // PDFs importados (importação removida; coleção mantida para os documentos já gravados): um documento por formulário (id = hash do texto), criado junto do pedido; nunca alterado nem apagado.
     match /orderImports/{importId} {
       allow read, create: if isAdmin();
       allow update, delete: if false;
@@ -321,6 +353,22 @@ service cloud.firestore {
       allow write: if false;
     }
 
+
+    // Instagram Analytics: espelho dos dados da Meta, gravado só pelo servidor (Admin SDK); administradores apenas leem.
+    // instagramPrivate guarda o token renovado e não é acessível por nenhum cliente.
+    match /instagramMeta/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /instagramPosts/{postId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /instagramPrivate/{docId} {
+      allow read, write: if false;
+    }
 
     // =========================================================
     // SITE CONFIG (Configurações do Site)

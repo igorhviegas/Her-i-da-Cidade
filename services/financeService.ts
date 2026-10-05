@@ -3,7 +3,8 @@ import {
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Order } from "../types";
-import type { Asset, FixedExpense } from "./financeCalculations";
+import { shiftMonth, type Asset, type FixedExpense } from "./financeCalculations.js";
+import { LEDGER_COLLECTION, ledgerToOrders, type LedgerRecord } from "./eventFinance.js";
 
 export const FIXED_EXPENSES_COLLECTION = "fixedExpenses";
 export const ASSETS_COLLECTION = "assets";
@@ -27,7 +28,8 @@ let stopListening: (() => void) | null = null;
 let lastOrders: Order[] | null = null;
 
 /**
- * Pedidos concluídos em tempo real (única fonte do faturamento; nada é duplicado em coleção financeira).
+ * Pedidos concluídos em tempo real (fonte do faturamento). Pedidos de evento não entram por aqui: suas parcelas e a "Despesa evento"
+ * vêm do livro imutável `financeEntries` (services/eventFinance.js) e são entregues como itens sintéticos na mesma lista.
  * Um único listener Firestore é compartilhado entre o indicador do topo e a página Financeiro:
  * conclusão, edição ou reabertura de pedido em qualquer tela chega aqui sem nova leitura completa.
  */
@@ -36,14 +38,34 @@ export function subscribeCompletedOrders(onData: (orders: Order[]) => void, onEr
   listeners.add(listener);
   if (lastOrders) onData(lastOrders);
   if (!stopListening) {
-    stopListening = onSnapshot(
-      query(collection(requireDb(), "orders"), where("status", "==", "completed")),
-      (snapshot) => {
-        lastOrders = snapshot.docs.map((item) => ({ ...item.data(), id: item.id } as Order));
-        listeners.forEach((l) => l.onData(lastOrders!));
-      },
-      (error) => listeners.forEach((l) => l.onError(error)),
+    let completed: Order[] | null = null;
+    let ledger: Order[] | null = null;
+    const emit = () => {
+      if (!completed || !ledger) return;
+      lastOrders = [...completed, ...ledger];
+      listeners.forEach((l) => l.onData(lastOrders!));
+    };
+    const fail = (error: Error) => {
+      // O Firestore encerra a escuta após um erro: limpa o estado para que a próxima assinatura crie uma nova (sem dados velhos nem escuta morta).
+      stopListening?.();
+      stopListening = null;
+      lastOrders = null;
+      const failed = [...listeners];
+      listeners.clear();
+      failed.forEach((l) => l.onError(error));
+    };
+    const firestore = requireDb();
+    const stopOrders = onSnapshot(
+      query(collection(firestore, "orders"), where("status", "==", "completed")),
+      (snapshot) => { completed = snapshot.docs.map((item) => ({ ...item.data(), id: item.id } as Order)); emit(); },
+      fail,
     );
+    const stopLedger = onSnapshot(
+      collection(firestore, LEDGER_COLLECTION),
+      (snapshot) => { ledger = ledgerToOrders(snapshot.docs.map((item) => ({ ...item.data(), id: item.id } as LedgerRecord & { id: string }))); emit(); },
+      fail,
+    );
+    stopListening = () => { stopOrders(); stopLedger(); };
   }
   return () => {
     listeners.delete(listener);
@@ -58,14 +80,17 @@ export async function listFixedExpenses(): Promise<FixedExpense[]> {
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
-export async function createFixedExpense(input: { name: string; category: string; amount: number; description?: string; startMonth: string }) {
+export async function createFixedExpense(input: { name: string; category: string; amount: number; description?: string; startMonth: string; oneTime?: boolean }) {
   const name = input.name.trim();
   if (!name || !input.category.trim()) throw new Error("Nome e categoria são obrigatórios.");
   assertAmount(input.amount, "O valor mensal");
   assertMonth(input.startMonth);
   await addDoc(collection(requireDb(), FIXED_EXPENSES_COLLECTION), {
     name, category: input.category.trim(), description: input.description?.trim() || "",
-    startMonth: input.startMonth, active: true, amountHistory: { [input.startMonth]: input.amount },
+    startMonth: input.startMonth, active: true,
+    // Despesa única: encerra no mês seguinte ao de início (mesmo mecanismo de "desativar"), então só conta em startMonth.
+    ...(input.oneTime ? { deactivatedFrom: shiftMonth(input.startMonth, 1) } : {}),
+    amountHistory: { [input.startMonth]: input.amount },
     createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
   });
 }

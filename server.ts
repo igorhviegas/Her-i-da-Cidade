@@ -5,6 +5,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { handleThumbnailUpload } from "./api/upload-thumbnail";
 import { handleManyChatWebhook } from "./api/manychat";
 import { handleMissionsCron } from "./api/missions-cron";
+import { handleAlexa } from "./api/alexa";
+import { handleInstagramSync } from "./api/instagram-sync";
+import { handleGoogleCalendar } from "./api/google-calendar";
+import { handleCalendarEvents } from "./api/calendar-events";
 
 const PORT = 3000;
 
@@ -149,7 +153,8 @@ async function refreshReviewsInBackground() {
 
 async function startServer() {
   const app = express();
-  app.use(express.json());
+  // rawBody: a assinatura da Alexa é verificada sobre os bytes exatos da requisição.
+  app.use(express.json({ verify: (req: any, _res, buf) => { req.rawBody = buf; } }));
 
   // Health endpoint
   app.get("/api/health", (_req, res) => {
@@ -177,6 +182,25 @@ async function startServer() {
   // Missions daily sync (Vercel Cron in production; manual call with CRON_SECRET locally)
   app.all("/api/missions-cron", (req, res) => {
     handleMissionsCron(req, res);
+  });
+
+  // Alexa Skill: cria missões a partir de lembretes por voz
+  app.all("/api/instagram-sync", (req, res) => {
+    handleInstagramSync(req, res);
+  });
+
+  // Google Agenda: envio manual de pedidos de evento (administrador autenticado)
+  app.all("/api/google-calendar", (req, res) => {
+    handleGoogleCalendar(req, res);
+  });
+
+  // Calendário: listar/criar/editar/excluir eventos da agenda (administrador autenticado)
+  app.all("/api/calendar-events", (req, res) => {
+    handleCalendarEvents(req, res);
+  });
+
+  app.all("/api/alexa", (req, res) => {
+    handleAlexa(req, res);
   });
 
   // Vite middleware for development

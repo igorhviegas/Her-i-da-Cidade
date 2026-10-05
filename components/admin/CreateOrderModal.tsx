@@ -2,10 +2,12 @@ import React, { FormEvent, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, Loader2, Plus, X } from 'lucide-react';
 import { createClient, getClientByWhatsApp, normalizeWhatsApp } from '../../services/clientsService';
 import { createOrder } from '../../services/ordersService';
+import { eventContentSummary, validateEventForm } from '../../services/eventForm.js';
+import { isPresentialService } from '../../services/stockCalculations.js';
 import { calculateOrderDeadlines } from '../../services/orderDates';
 import { resolveInitialStatus } from '../../services/orderInitialStatus.js';
 import { getServices } from '../../services/servicesService';
-import { ImportPdfPanel, type ImportedValues } from './ImportPdfPanel';
+import { EventOrderFields, emptyEventForm, eventFormFromOrder, type EventFormState } from './EventOrderFields';
 import type { Order, OrderStatus, ProductionType, Service } from '../../types';
 
 interface CreateOrderModalProps {
@@ -21,6 +23,9 @@ interface CreateOrderModalProps {
     servicePrice: number;
     rushFee: number;
     totalPaid: number;
+    /** Duplicação de pedido de evento: pré-preenche o formulário manual (nenhum lançamento financeiro é copiado). */
+    eventForm?: Order['eventForm'];
+    childName?: string;
   };
 }
 
@@ -86,7 +91,9 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
   const [servicePrice, setServicePrice] = useState(initialValues ? String(initialValues.servicePrice) : '');
   const [rushFee, setRushFee] = useState(initialValues ? String(initialValues.rushFee) : '0');
   const [totalPaid, setTotalPaid] = useState(initialValues ? String(initialValues.totalPaid) : '');
-  const [importFingerprint, setImportFingerprint] = useState('');
+  const [eventState, setEventState] = useState<EventFormState>(() => (initialValues?.eventForm
+    ? eventFormFromOrder({ eventForm: initialValues.eventForm, childName: initialValues.childName, eventDate: initialValues.eventDate })
+    : emptyEventForm()));
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -100,6 +107,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
   }, [initialValues]);
 
   const selectedService = services.find((service) => service.id === serviceId);
+  // Eventos presenciais usam o formulário manual de evento (entrada na criação; 2ª parcela e despesa na conclusão).
+  const isEvent = isPresentialService(selectedService);
   const serviceConfigured = Boolean(
     selectedService && selectedService.generateOrder === true && selectedService.productionType &&
     (selectedService.initialStatus || selectedService.autoComplete),
@@ -167,15 +176,27 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
     if (!serviceConfigured || !initialStatus || !selectedService.productionType) {
       return setFormError('Este serviço ainda não tem configuração de pedido. Configure geração, tipo de produção e status inicial antes de criar pedidos.');
     }
-    if (!paidDate) return setFormError('Informe a data do pagamento.');
-    const paidAt = dateFromInput(paidDate);
-    const serviceAmount = inputAmount(servicePrice);
-    const rushAmount = rushFee.trim() ? inputAmount(rushFee) : 0;
-    if (serviceAmount === null) return setFormError('Informe um valor válido para o serviço.');
-    if (rushAmount === null) return setFormError('Informe uma taxa de urgência válida.');
-    if (!content.trim()) return setFormError('Informe o conteúdo do pedido.');
-    if (deliveryDays && (!Number.isInteger(Number(deliveryDays)) || Number(deliveryDays) <= 0)) {
-      return setFormError('Selecione um prazo válido ou deixe o pedido sem prazo.');
+    let paidAt: Date | undefined;
+    let serviceAmount = 0;
+    let rushAmount = 0;
+    let eventValues: ReturnType<typeof validateEventForm>['value'];
+    if (isEvent) {
+      const validated = validateEventForm(eventState);
+      if (validated.error) return setFormError(validated.error);
+      eventValues = validated.value;
+    } else {
+      if (!paidDate) return setFormError('Informe a data do pagamento.');
+      paidAt = dateFromInput(paidDate);
+      const parsedService = inputAmount(servicePrice);
+      const parsedRush = rushFee.trim() ? inputAmount(rushFee) : 0;
+      if (parsedService === null) return setFormError('Informe um valor válido para o serviço.');
+      if (parsedRush === null) return setFormError('Informe uma taxa de urgência válida.');
+      serviceAmount = parsedService;
+      rushAmount = parsedRush;
+      if (!content.trim()) return setFormError('Informe o conteúdo do pedido.');
+      if (deliveryDays && (!Number.isInteger(Number(deliveryDays)) || Number(deliveryDays) <= 0)) {
+        return setFormError('Selecione um prazo válido ou deixe o pedido sem prazo.');
+      }
     }
 
     setSubmitting(true);
@@ -185,7 +206,23 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
       const client = await createClient({ name: cleanName, whatsapp: whatsapp.trim() });
       const days = deliveryDays ? Number(deliveryDays) : undefined;
       const completed = initialStatus === 'completed';
-      const order = await createOrder({
+      const order = await createOrder(eventValues ? {
+        clientId: client.id,
+        serviceId: selectedService.id,
+        status: initialStatus,
+        eventDate: dateFromInput(eventValues.eventDate),
+        childName: eventValues.childName,
+        content: eventContentSummary(eventValues),
+        servicePrice: eventValues.totalValue,
+        rushFee: 0,
+        totalPaid: eventValues.totalValue,
+        productionType: selectedService.productionType,
+        source: 'manual',
+        eventForm: {
+          eventTime: eventValues.eventTime, location: eventValues.location, imageAuthorization: eventValues.imageAuthorization, extraWeb: eventValues.extraWeb,
+          totalValue: eventValues.totalValue, entryValue: eventValues.entryValue, cost: eventValues.cost, observations: eventValues.observations, formType: eventValues.formType,
+        },
+      } : {
         clientId: client.id,
         serviceId: selectedService.id,
         status: initialStatus,
@@ -198,7 +235,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
         totalPaid: initialValues && totalPaid.trim() ? inputAmount(totalPaid)! : serviceAmount + rushAmount,
         productionType: selectedService.productionType,
         source: 'manual',
-        ...(importFingerprint ? { importFingerprint } : {}),
         ...(completed ? { completedAt: new Date() } : {}),
       });
       await onCreated(order);
@@ -229,21 +265,6 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
           <div className="space-y-5 p-5 sm:p-6">
             {formError && <div role="alert" className="flex gap-2 rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-200"><AlertCircle className="h-4 w-4 shrink-0" />{formError}</div>}
 
-            {!initialValues && (
-              <ImportPdfPanel
-                disabled={submitting}
-                applied={Boolean(importFingerprint)}
-                onClear={() => setImportFingerprint('')}
-                onApply={(values: ImportedValues, fingerprint) => {
-                  if (values.name) setName(values.name);
-                  if (values.whatsapp) { setWhatsapp(values.whatsapp); setLookupState('idle'); setLookupMessage(''); }
-                  if (values.eventDate) setEventDate(values.eventDate);
-                  if (values.content) setContent(values.content);
-                  setImportFingerprint(fingerprint);
-                }}
-              />
-            )}
-
             <section className="space-y-3">
               <h3 className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-blue-300">Cliente</h3>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -270,6 +291,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
               ) : <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">Este serviço ainda não possui configuração de pedido. É necessário habilitar a geração e definir o tipo de produção e o status inicial.</p>)}
             </section>
 
+            {isEvent ? <EventOrderFields value={eventState} onChange={setEventState} disabled={submitting} /> : (
+              <>
             <section className="space-y-3 border-t border-white/10 pt-4">
               <h3 className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-blue-300">Pedido</h3>
               <div className="grid gap-3 sm:grid-cols-2">
@@ -295,6 +318,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
               {initialValues && <label className={labelClass}>Total pago *<input required type="number" min="0" step="0.01" value={totalPaid || String(total)} onChange={(event) => setTotalPaid(event.target.value)} className={inputClass} /></label>}
               <div className="flex items-center justify-between rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3.5 py-3"><span className="text-xs font-semibold text-white/60">Total pago</span><strong className="text-base text-emerald-300">{formatMoney(total)}</strong></div>
             </section>
+              </>
+            )}
           </div>
 
           <footer className="flex flex-col-reverse gap-2 border-t border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:justify-end sm:px-6">

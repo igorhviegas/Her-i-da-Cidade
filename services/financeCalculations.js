@@ -1,6 +1,6 @@
 // Cálculos financeiros puros (sem Firebase/React): faturamento, despesas fixas e patrimônio.
 // Faturamento = valor registrado nos pedidos concluídos (totalPaid, com fallback servicePrice + rushFee),
-// agrupado pela data do evento (eventDate) no fuso local. Não representa dinheiro recebido.
+// agrupado pela data de conclusão (completedAt, gravada automaticamente ao concluir) no fuso local. Não representa dinheiro recebido.
 
 export function toDate(value) {
   if (!value) return null;
@@ -29,30 +29,43 @@ export function orderValue(order) {
 }
 
 /**
- * Entradas de faturamento: pedidos concluídos com data do evento, sem duplicidade por id.
+ * Data do faturamento: completedAt (automática na conclusão). Pedidos concluídos antes dessa regra, sem completedAt, caem em eventDate e depois paidAt.
+ */
+export const revenueDateOf = (order) => toDate(order.completedAt) || toDate(order.eventDate) || toDate(order.paidAt);
+
+/**
+ * Entradas de faturamento: pedidos concluídos com data de faturamento, sem duplicidade por id.
  * Pedidos internos de Conteúdo (scriptId, valor 0) não são serviços vendidos e ficam de fora.
- * `withoutEventDate` conta concluídos que não puderam ser datados.
+ * `undated` conta concluídos que não puderam ser datados.
  */
 export function buildRevenueEntries(orders) {
   const seen = new Set();
   const entries = [];
-  let withoutEventDate = 0;
+  const costs = [];
+  let undated = 0;
   for (const order of orders) {
     if (!order || order.status !== 'completed' || order.scriptId || seen.has(order.id)) continue;
+    // Pedido de evento com livro de lançamentos (eventLedger): as parcelas vêm do livro (itens `ledger`), não do pedido em si.
+    if (order.eventLedger && !order.ledger) continue;
     seen.add(order.id);
-    const eventDate = toDate(order.eventDate);
-    if (!eventDate) { withoutEventDate += 1; continue; }
+    const revenueDate = revenueDateOf(order);
+    if (!revenueDate) { undated += 1; continue; }
+    if (order.ledgerKind === 'cost' || order.ledgerKind === 'adjcost') {
+      costs.push({ orderId: order.id, order, revenueDate, value: order.eventCost, monthKey: monthKeyOf(revenueDate), dayKey: dayKeyOf(revenueDate) });
+      continue;
+    }
     entries.push({
-      orderId: order.id, order, eventDate, value: orderValue(order),
-      monthKey: monthKeyOf(eventDate), dayKey: dayKeyOf(eventDate),
+      orderId: order.id, order, revenueDate, value: orderValue(order),
+      monthKey: monthKeyOf(revenueDate), dayKey: dayKeyOf(revenueDate),
     });
   }
-  return { entries, withoutEventDate };
+  return { entries, undated, costs };
 }
 
 export function monthTotals(entries, monthKey) {
   let total = 0; let count = 0;
-  for (const e of entries) if (e.monthKey === monthKey) { total += e.value; count += 1; }
+  // Ajustes de receita (livro de eventos) mudam o total, mas não contam como um serviço a mais.
+  for (const e of entries) if (e.monthKey === monthKey) { total += e.value; if (e.order?.ledgerKind !== 'adjrev') count += 1; }
   return { total, count };
 }
 
@@ -69,8 +82,8 @@ export function dailyRevenue(entries, monthKey) {
   const days = Array.from({ length: daysInMonth(monthKey) }, (_, i) => ({ day: i + 1, total: 0, count: 0, entries: [] }));
   for (const e of entries) {
     if (e.monthKey !== monthKey) continue;
-    const slot = days[e.eventDate.getDate() - 1];
-    slot.total += e.value; slot.count += 1; slot.entries.push(e);
+    const slot = days[e.revenueDate.getDate() - 1];
+    slot.total += e.value; if (e.order?.ledgerKind !== 'adjrev') slot.count += 1; slot.entries.push(e);
   }
   return days;
 }
@@ -84,6 +97,31 @@ export function topDay(days) {
 /** Variação percentual; null quando não há base de comparação (mês anterior zerado). */
 export function variationPct(current, previous) {
   return previous > 0 ? ((current - previous) / previous) * 100 : null;
+}
+
+// ---- Custo de edição (Vídeo Personalizado) ----
+// Custo variável fixo por vídeo concluído, independente do prazo (2/4/7 dias). Gravado como snapshot `editingCost` no pedido
+// na PRIMEIRA conclusão (nunca reescrito) e somado ao mês da conclusão: sem coleção nova, sem duplicidade, sem efeito retroativo
+// (pedidos concluídos antes não têm o campo). Reabrir tira o pedido (e o custo) do mês; concluir de novo o devolve, sem 2º custo.
+export const EDITING_COST = 25;
+const CUSTOM_VIDEO_SERVICE_ID = '3'; // id fixo do seed/ManyChat (ver services/teleprompter.js)
+
+/** Campo a gravar no pedido ao concluí-lo pela primeira vez; {} se não for Vídeo Personalizado ou já tiver custo. */
+export function editingCostFields(serviceId, existingOrder) {
+  if (serviceId !== CUSTOM_VIDEO_SERVICE_ID || typeof existingOrder?.editingCost === 'number') return {};
+  return { editingCost: EDITING_COST };
+}
+
+/** Custo de edição do mês: pedidos concluídos com `editingCost`, pela mesma data do faturamento. */
+export function editingCostForMonth(entries, monthKey) {
+  const items = entries.filter((e) => e.monthKey === monthKey && typeof e.order.editingCost === 'number');
+  return { items, total: items.reduce((sum, e) => sum + e.order.editingCost, 0) };
+}
+
+/** "Despesa evento" do mês: despesas do livro de lançamentos (data = conclusão do pedido), vindas de buildRevenueEntries().costs. */
+export function eventCostForMonth(costs, monthKey) {
+  const items = (costs ?? []).filter((e) => e.monthKey === monthKey);
+  return { items, total: items.reduce((sum, e) => sum + e.value, 0) };
 }
 
 // ---- Despesas fixas ----
@@ -151,17 +189,39 @@ export function financeMetrics(entries, expenses, monthKey, monthlyGoal = null) 
   };
 }
 
+// ---- Extrato do mês ----
+// Entradas: pedidos concluídos (data de conclusão). Saídas: custo de edição de cada vídeo (data de conclusão) e despesas do mês
+// (data = dia 1 do mês, para entrar no balanço do mês). `amount` já vem com sinal: saídas são negativas.
+export function buildStatement(entries, expenses, monthKey, costs = []) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const firstDay = new Date(y, m - 1, 1);
+  const rows = [
+    ...entries.filter((e) => e.monthKey === monthKey)
+      .map((e) => ({ id: `in-${e.orderId}`, kind: e.value < 0 ? 'out' : 'in', source: 'order', date: e.revenueDate, amount: e.value, entry: e })), // ajuste negativo vira saída
+    ...editingCostForMonth(entries, monthKey).items
+      .map((e) => ({ id: `edit-${e.orderId}`, kind: 'out', source: 'editing', date: e.revenueDate, amount: -e.order.editingCost, entry: e })),
+    ...eventCostForMonth(costs, monthKey).items
+      .map((e) => ({ id: e.orderId, kind: e.value < 0 ? 'in' : 'out', source: 'eventCost', date: e.revenueDate, amount: -e.value, entry: e })), // ajuste que reduz o custo vira entrada
+    ...expensesForMonth(expenses, monthKey).items
+      .map(({ expense, amount }) => ({ id: `exp-${expense.id}`, kind: 'out', source: 'expense', date: firstDay, amount: -amount, expense })),
+  ];
+  const sum = (kind) => rows.filter((r) => r.kind === kind).reduce((s, r) => s + r.amount, 0);
+  return { rows, totalIn: sum('in'), totalOut: -sum('out'), balance: sum('in') + sum('out') };
+}
+
 // ---- Rankings por serviço (Leaderboard) ----
-// Mesma base do Financeiro: `entries` de buildRevenueEntries (pedidos concluídos, sem duplicidade, datados pelo evento,
-// valor = totalPaid). Não há status "cancelado" no CRM; pedidos não concluídos não entram, como no restante do Financeiro.
-// Datas no fuso local do navegador, como o resto do módulo.
+// Mesma base do Financeiro: `entries` de buildRevenueEntries (receita já resolvida: pedidos concluídos e parcelas do livro de
+// eventos, sem duplicidade; data = revenueDate, valor = totalPaid/parcela). Custos (edição, despesa de evento) ficam em `costs`
+// e não entram. Não há status "cancelado" no CRM; o que não é concluído não gera entrada, como no resto do Financeiro.
+// Contagem = pedidos distintos (um evento com 2 parcelas conta 1 pedido; ajustes de receita não contam pedido).
+// Datas no fuso local do navegador.
 
 export const RANKING_PERIODS = ['all', '30d', '7d', 'month'];
 const DAY_MS = 86_400_000;
 
 /** all: todo o histórico; 30d/7d: janela móvel até agora; month: do dia 1º do mês-calendário vigente até agora. */
 export function entryInPeriod(entry, period, now = new Date()) {
-  const t = entry.eventDate.getTime();
+  const t = entry.revenueDate.getTime();
   const end = now.getTime();
   if (period === 'all') return true;
   if (t > end) return false;
@@ -177,9 +237,12 @@ export function serviceRanking(entries, period, by = 'count', now = new Date()) 
   for (const e of entries) {
     if (!entryInPeriod(e, period, now)) continue;
     const id = e.order.serviceId || 'sem-servico';
-    const g = groups.get(id) ?? { serviceId: id, count: 0, revenue: 0 };
-    g.count += 1; g.revenue += e.value; groups.set(id, g);
+    const g = groups.get(id) ?? { serviceId: id, orders: new Set(), revenue: 0 };
+    g.revenue += e.value;
+    if (e.order.ledgerKind !== 'adjrev') g.orders.add(e.order.orderId || e.order.id); // pedido real, não a linha do livro
+    groups.set(id, g);
   }
+  const rows = [...groups.values()].map((g) => ({ serviceId: g.serviceId, count: g.orders.size, revenue: g.revenue }));
   const other = by === 'count' ? 'revenue' : 'count';
-  return [...groups.values()].sort((a, b) => b[by] - a[by] || b[other] - a[other] || a.serviceId.localeCompare(b.serviceId));
+  return rows.filter((r) => by !== 'count' || r.count > 0).sort((a, b) => b[by] - a[by] || b[other] - a[other] || a.serviceId.localeCompare(b.serviceId));
 }

@@ -3,8 +3,19 @@
     {
       "path": "/api/missions-cron",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/instagram-sync",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/instagram-sync",
+      "schedule": "0 9 * * *"
     }
   ],
+  "functions": {
+    "api/instagram-sync.ts": { "maxDuration": 60 }
+  },
   "rewrites": [
     {
       "source": "/((?!api/.*).*)",

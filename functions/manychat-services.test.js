@@ -316,3 +316,112 @@ test('todos os perfis têm serviceId único; tabelas e preços conforme as regra
   assert.equal(SERVICE_PROFILES['live-call'].price, 75);
   assert.equal(validateManyChatPayload(null).errors.length, 1);
 });
+
+// ---------- Evento presencial (pedido incompleto: só cliente e WhatsApp) ----------
+
+const PRESENTIAL = { title: 'Serviços Presenciais', price: 'Sob Consulta', category: 'Presencial', active: true, generateOrder: true, productionType: 'scheduled', initialStatus: 'scheduled' };
+const presentialDb = (patch = {}) => fakeDatabase({ '6': { ...PRESENTIAL, ...patch } });
+const presential = (extra = {}) => ({ eventType: 'payment.paid', service: 'presential-event', customer, ...extra });
+
+test('presencial: cria pedido só com cliente e WhatsApp, sem valores, sem dados do evento e sem lançamentos financeiros', async () => {
+  const { res, order, database } = await post(presential(), presentialDb());
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(Object.keys(res.body).sort(), ['ok', 'orderId', 'technicalPurchaseId']);
+  assert.equal(order.serviceId, '6');
+  assert.equal(order.status, 'scheduled'); // vem da configuração do serviço
+  assert.equal(order.productionType, 'scheduled');
+  assert.equal(order.source, 'manychat');
+  assert.equal(order.eventDraft, true);
+  assert.deepEqual([order.servicePrice, order.rushFee, order.totalPaid], [0, 0, 0]);
+  assert.equal(order.content, 'Pedido recebido via ManyChat.');
+  for (const absent of ['eventForm', 'eventLedger', 'childName', 'eventDate', 'paidAt', 'completedAt', 'deliveryDays']) assert.ok(!(absent in order), `não deveria ter ${absent}`);
+  const client = database.docs('clients').find((c) => c.recordType !== 'whatsapp-index');
+  assert.deepEqual([client.name, client.whatsappNormalized], ['Contato', '5531999990000']);
+  assert.equal(order.clientId.length > 0, true);
+  assert.equal(database.docs('financeEntries').length, 0); // nada é lançado enquanto incompleto
+});
+
+test('presencial: não pode nascer concluído (status inicial configurado como Concluído é recusado, nada criado)', async () => {
+  const database = presentialDb({ initialStatus: 'completed' });
+  const { res } = await post(presential(), database);
+  assert.equal(res.statusCode, 422);
+  assert.equal(res.body.error.code, 'service_configuration_changed');
+  assert.equal(database.docs('orders').length, 0);
+  assert.equal(database.docs('clients').length, 0);
+});
+
+test('presencial: serviço ausente, inativo ou sem gerar pedido → 422 sem criar nada', async () => {
+  for (const database of [fakeDatabase(), presentialDb({ active: false }), presentialDb({ generateOrder: false }), presentialDb({ productionType: undefined })]) {
+    const { res } = await post(presential(), database);
+    assert.equal(res.statusCode, 422);
+    assert.equal(database.docs('orders').length, 0);
+  }
+});
+
+test('presencial: só aceita eventType, service e customer; payloads inválidos → 400 sem criar nada', async () => {
+  const cases = [
+    presential({ childName: 'Ana' }), presential({ eventDate: '2026-11-10' }), presential({ modality: '7_days' }), presential({ amountPaid: 100 }), presential({ details: 'x' }),
+    presential({ customer: { name: 'Ana', whatsapp: '123' } }), presential({ customer: { name: '', whatsapp: '31999990000' } }),
+    presential({ customer: { name: 'Ana' } }), presential({ customer: undefined }), presential({ eventType: 'order.created' }),
+    { ...presential(), customer: { ...customer, email: 'a@b.c' } }, { service: 'presential-event' },
+  ];
+  for (const body of cases) {
+    const database = presentialDb();
+    const { res } = await post(body, database);
+    assert.equal(res.statusCode, 400, JSON.stringify(body));
+    assert.equal(database.docs('orders').length + database.docs('clients').length + database.docs('manychatRequests').length, 0);
+  }
+});
+
+test('presencial: chamada repetida do mesmo WhatsApp dentro da janela devolve o mesmo pedido (duplicate), sem criar outro', async () => {
+  const database = presentialDb();
+  const first = await post(presential(), database);
+  const second = await post(presential({ customer: { name: 'Outro nome', whatsapp: '(31) 99999-0000' } }), database); // mesmo número, formatação diferente
+  assert.equal(second.res.statusCode, 200);
+  assert.equal(second.res.body.orderId, first.res.body.orderId);
+  assert.equal(second.res.body.duplicate, true);
+  assert.equal(database.docs('orders').length, 1);
+});
+
+test('presencial: 5 chamadas simultâneas geram um único pedido', async () => {
+  const database = presentialDb();
+  const results = await Promise.all(Array.from({ length: 5 }, () => post(presential(), database)));
+  assert.ok(results.every(({ res }) => res.statusCode === 200));
+  assert.equal(new Set(results.map(({ res }) => res.body.orderId)).size, 1);
+  assert.equal(database.docs('orders').length, 1);
+});
+
+test('presencial: outro WhatsApp, ou o mesmo depois da janela, ou depois de o pedido ser excluído, cria pedido novo', async () => {
+  const database = presentialDb();
+  const first = await post(presential(), database);
+  const other = await post(presential({ customer: { name: 'Outra', whatsapp: '31988887777' } }), database);
+  assert.notEqual(other.res.body.orderId, first.res.body.orderId);
+  assert.equal(database.docs('orders').length, 2);
+
+  const realNow = Date.now;
+  try {
+    Date.now = () => realNow() + 11 * 60 * 1000; // passou a janela de 10 minutos
+    const later = await post(presential(), database);
+    assert.notEqual(later.res.body.orderId, first.res.body.orderId);
+    assert.ok(!later.res.body.duplicate);
+  } finally { Date.now = realNow; }
+  assert.equal(database.docs('orders').length, 3);
+
+  const fresh = presentialDb();
+  const created = await post(presential(), fresh);
+  fresh.store.delete(`orders/${created.res.body.orderId}`); // equipe excluiu o pedido logo depois
+  const again = await post(presential(), fresh);
+  assert.notEqual(again.res.body.orderId, created.res.body.orderId);
+  assert.equal(fresh.docs('orders').length, 1);
+});
+
+test('presencial: o contrato dos serviços digitais não mudou (sem reserva anti-duplicidade e com paidAt)', async () => {
+  const database = fakeDatabase();
+  const a = await post(base('live-call'), database);
+  const b = await post(base('live-call'), database);
+  assert.notEqual(a.res.body.orderId, b.res.body.orderId); // digitais continuam sem deduplicação
+  assert.equal(database.docs('manychatRequests').length, 0);
+  assert.ok(a.order.paidAt);
+  assert.ok(!('eventDraft' in a.order));
+  assert.equal(SERVICE_PROFILES['presential-event'].serviceId, '6');
+});

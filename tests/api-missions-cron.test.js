@@ -38,7 +38,15 @@ test('cron: falha da rotina devolve 500 genérico, sem vazar a mensagem do erro'
 
 test('vercel.json agenda /api/missions-cron uma vez por dia às 03:00 UTC (00:00 de Brasília) e mantém o rewrite do SPA', async () => {
   const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
-  assert.deepEqual(config.crons, [{ path: '/api/missions-cron', schedule: '0 3 * * *' }]);
+  assert.ok(config.crons.some((c) => c.path === '/api/missions-cron' && c.schedule === '0 3 * * *'));
   assert.ok(config.rewrites.some((r) => r.destination === '/index.html'));
   assert.match(config.rewrites[0].source, /\(\?!api\/\.\*\)/); // /api/* não cai no SPA
+});
+
+test('nenhum arquivo de api/ importa outro arquivo de api/ (na Vercel a função falha ao carregar: FUNCTION_INVOCATION_FAILED)', async () => {
+  const { readdir } = await import('node:fs/promises');
+  const dir = new URL('../api/', import.meta.url);
+  for (const file of (await readdir(dir)).filter((name) => name.endsWith('.ts'))) {
+    assert.doesNotMatch(await readFile(new URL(file, dir), 'utf8'), /from '\.\/[^']+'/, `${file} importa um irmão de api/`);
+  }
 });

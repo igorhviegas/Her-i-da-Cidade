@@ -26,14 +26,3 @@ test('interface: só admin/superadmin vê a opção; confirmação explícita; u
   assert.match(modal, /exceptional && !canOverride/);
   assert.match(modal, /setAcknowledged\(false\)/); // mudar quantidades invalida a ciência
 });
-
-test('importação: nada é criado na leitura; o pedido só nasce no envio do formulário; duplicidade por impressão digital', async () => {
-  const panel = await read('../components/admin/ImportPdfPanel.tsx');
-  assert.doesNotMatch(panel, /createOrder|createClient/);
-  assert.match(panel, /findOrderByImportFingerprint/);
-  const modal = await read('../components/admin/CreateOrderModal.tsx');
-  assert.match(modal, /importFingerprint \? \{ importFingerprint \} : \{\}/);
-  const browser = await read('./pdfImportBrowser.ts');
-  assert.match(browser, /import\("tesseract\.js"\)/); // OCR carregado sob demanda
-  assert.match(browser, /import\("pdfjs-dist\/legacy\/build\/pdf\.mjs"\)/);
-});

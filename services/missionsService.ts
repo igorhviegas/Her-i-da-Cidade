@@ -7,6 +7,7 @@ import {
   occurrenceNotificationIds, syncRecurringTasks, validateGoal, validateTask,
   type GoalMetric, type GoalPeriod, type GoalProgress, type Frequency,
 } from '../functions/missions-core.js';
+import { cleanChecklist, type ChecklistItem } from '../functions/event-missions.js';
 import { ORDERS_COLLECTION } from './ordersService';
 import { CONTENT_SCRIPTS_COLLECTION } from './contentScriptsService';
 import { activityRefs, prepareActivityLog } from './activityLog';
@@ -20,7 +21,7 @@ export const NOTIFICATIONS_COLLECTION = 'notifications';
 const GAMIFICATION_CONFIG = ['siteConfig', 'gamification'] as const;
 const HISTORY_DAYS = 30;
 
-export interface Mission { id: string; title: string; description: string; dueAt?: Date; difficulty: number; status: 'pending' | 'completed'; source?: string; createdAt?: Date; completedAt?: Date; }
+export interface Mission { id: string; title: string; description: string; dueAt?: Date; difficulty: number; status: 'pending' | 'completed'; source?: string; createdAt?: Date; completedAt?: Date; checklist?: ChecklistItem[]; orderState?: 'active' | 'deleted'; }
 export interface RecurringTask { id: string; title: string; description: string; difficulty: number; time: string; frequency: Frequency; weekdays: number[]; monthDay: number | null; monthNth: { week: number; weekday: number } | null; status: 'active' | 'paused'; startDate: string; lastGeneratedDate?: string; }
 export interface TaskOccurrence { id: string; taskId: string; date: string; time: string; title: string; description: string; difficulty: number; status: 'pending' | 'completed' | 'missed' | 'skipped'; dueAt?: Date; completedAt?: Date; }
 export interface Goal { id: string; title: string; description: string; period: GoalPeriod; target: number; source: 'manual' | 'auto'; metric?: GoalMetric; progress: number; status: 'active' | 'paused'; weekStartsOn: number; monthStartDay: number; cycleKey: string; cycleStart: Date; cycleEnd: Date; completedAt?: Date; }
@@ -28,7 +29,7 @@ export interface GoalCycle { id: string; goalId: string; title: string; startKey
 export interface GoalView extends Goal { actual: number; view: GoalProgress; }
 export interface AppNotification { id: string; type: string; title: string; body: string; refType: string; refId: string; dismissed: boolean; createdAt?: Date; }
 
-export type MissionInput = { title: string; description: string; dueAt: Date | null; difficulty: number };
+export type MissionInput = { title: string; description: string; dueAt: Date | null; difficulty: number; checklist?: ChecklistItem[] };
 export type TaskInput = Omit<RecurringTask, 'id' | 'status' | 'startDate' | 'lastGeneratedDate'>;
 export type GoalInput = Pick<Goal, 'title' | 'description' | 'period' | 'target' | 'source' | 'metric' | 'weekStartsOn' | 'monthStartDay'>;
 
@@ -67,7 +68,7 @@ function cleanMission(input: MissionInput): MissionInput {
   const title = input.title.trim();
   if (!title) throw new Error('Informe o título da missão.');
   if (!Number.isInteger(input.difficulty) || input.difficulty < 1 || input.difficulty > 5) throw new Error('A dificuldade deve ser de 1 a 5.');
-  return { title, description: input.description.trim(), dueAt: input.dueAt, difficulty: input.difficulty };
+  return { title, description: input.description.trim(), dueAt: input.dueAt, difficulty: input.difficulty, checklist: cleanChecklist(input.checklist) };
 }
 
 /** Pendentes + concluídas nos últimos 30 dias. Concluídas mais antigas continuam no banco (gamificação), só não são exibidas. */
@@ -87,14 +88,25 @@ export async function createMission(input: MissionInput): Promise<void> {
   const clean = cleanMission(input);
   await setDoc(doc(collection(firestore(), MISSIONS_COLLECTION)), {
     title: clean.title, description: clean.description, difficulty: clean.difficulty, status: 'pending', source: 'crm',
-    ...(clean.dueAt ? { dueAt: clean.dueAt } : {}), createdAt: serverTimestamp(),
+    ...(clean.dueAt ? { dueAt: clean.dueAt } : {}), ...(clean.checklist!.length ? { checklist: clean.checklist } : {}), createdAt: serverTimestamp(),
   });
 }
 
 export async function updateMission(id: string, input: MissionInput): Promise<void> {
   const clean = cleanMission(input);
   await updateDoc(doc(firestore(), MISSIONS_COLLECTION, id), {
-    title: clean.title, description: clean.description, difficulty: clean.difficulty, dueAt: clean.dueAt ?? deleteField(), updatedAt: serverTimestamp(),
+    title: clean.title, description: clean.description, difficulty: clean.difficulty, dueAt: clean.dueAt ?? deleteField(), checklist: clean.checklist!.length ? clean.checklist : deleteField(), updatedAt: serverTimestamp(),
+  });
+}
+
+/** Marca/desmarca um item lendo o checklist salvo (transação), então dois cliques rápidos ou outra aba não sobrescrevem os demais itens. */
+export async function toggleChecklistItem(missionId: string, itemId: string, done: boolean): Promise<void> {
+  const ref = doc(firestore(), MISSIONS_COLLECTION, missionId);
+  await runTransaction(firestore(), async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    if (!snapshot.exists()) throw new Error('Missão não encontrada.');
+    const checklist = cleanChecklist(snapshot.data().checklist).map((item) => (item.id === itemId ? { ...item, done } : item));
+    transaction.update(ref, { checklist, updatedAt: serverTimestamp() });
   });
 }
 

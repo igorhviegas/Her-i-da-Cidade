@@ -18,6 +18,8 @@ export interface Service {
   initialStatus?: OrderStatus;
   autoComplete?: boolean;
   defaultDeliveryDays?: number;
+  /** Mensagem de WhatsApp do botão de envio do Kanban; ausente/vazia = padrão do tipo de serviço. */
+  deliveryMessage?: string;
   internalOnly?: boolean;
 }
 
@@ -62,8 +64,34 @@ export interface Order {
   completedAt?: any;
   source: OrderSource;
   scriptId?: string;
-  /** Impressão digital do PDF importado (sha256 do texto normalizado); evita importar o mesmo formulário duas vezes. */
+  /** Legado: impressão digital de PDF importado (importação removida; mantido para não perder dados de pedidos antigos). */
   importFingerprint?: string;
+  /** Nome do aniversariante (pedidos de evento criados pelo formulário manual); lido por extractBirthdayPerson. */
+  childName?: string;
+  /** Dados do formulário manual de evento. Ausente em pedidos antigos / ManyChat. */
+  eventForm?: EventForm;
+  /** Pedido presencial criado pelo ManyChat só com cliente e WhatsApp: os dados do evento ainda não foram preenchidos. Sai ao salvar o formulário de evento. */
+  eventDraft?: boolean;
+  /** Presente em pedidos de evento com livro de lançamentos (collection financeEntries). Valores já lançados (congelados). */
+  eventLedger?: { entry: number; final?: number; cost?: number; /** soma dos ajustes de receita */ adj?: number; /** soma dos ajustes de despesa */ adjCost?: number; /** nº do último ajuste */ seq?: number };
+  /** Vínculo com o Google Agenda, gravado pelo servidor (/api/google-calendar). */
+  googleCalendar?: { eventId: string; calendarId: string; htmlLink?: string; syncedAt?: any };
+  /** Custo de edição (R$) gravado na primeira conclusão de Vídeo Personalizado; entra nas despesas do Financeiro. */
+  editingCost?: number;
+}
+
+export interface EventForm {
+  eventTime: string;
+  location: string;
+  imageAuthorization: boolean;
+  extraWeb: 0 | 1 | 2;
+  totalValue: number;
+  entryValue: number;
+  /** null = ainda não informado; obrigatório só para concluir o pedido. */
+  cost: number | null;
+  observations: string;
+  /** "#formulário": tipo/identificação do evento; compõe o título no Google Agenda. */
+  formType: string;
 }
 
 export interface FirestoreOrder extends Order {}
@@ -115,6 +143,7 @@ export interface FirestoreService {
   initialStatus?: OrderStatus;
   autoComplete?: boolean;
   defaultDeliveryDays?: number;
+  deliveryMessage?: string;
   internalOnly?: boolean;
 }
 
