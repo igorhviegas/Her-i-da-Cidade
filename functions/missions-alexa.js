@@ -180,7 +180,9 @@ const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 /** "Sincronizar lembretes": cria/atualiza/remove os lembretes das missões e tarefas marcadas com "Lembrete pela Alexa". */
 async function syncRemindersReply(envelope, userId, { database, now, logger, fetchImpl }) {
   const system = envelope.context?.System ?? {};
-  if (system.user?.permissions?.scopes?.[REMINDERS_SCOPE]?.status !== 'GRANTED') return askReminderPermission();
+  // Sem token/endpoint da requisição não há como chamar a API. Com eles, quem diz se a permissão existe é a própria API (401/403):
+  // o formato do campo de permissões na requisição não é confiável o bastante para decidir daqui.
+  if (!system.apiAccessToken || !system.apiEndpoint) return askReminderPermission();
   try {
     const client = createRemindersClient({ endpoint: system.apiEndpoint, token: system.apiAccessToken, fetchImpl });
     const r = await syncReminders({ database, client, userId, now, logger });
