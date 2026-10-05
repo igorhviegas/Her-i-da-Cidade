@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { REMINDERS_SCOPE, ReminderApiError, createRemindersClient, syncReminders } from './alexa-reminders.js';
 import { addDays, dateKey, endOfDay, occurrenceDueAt, parseDateKey, weekdayOf } from './missions-core.js';
 
 // Skill Alexa → missão. Autoriza (skill + usuário), valida e grava em `missions` com os mesmos campos do ManyChat.
@@ -109,7 +110,7 @@ const list = (value) => String(value ?? '').split(',').map((s) => s.trim()).filt
  * Processa o envelope JSON da Alexa e devolve o JSON de resposta. `config`: { skillId, allowedUserIds[] }.
  * Pressupõe assinatura e timestamp já verificados.
  */
-export async function handleAlexaEnvelope(envelope, { database, config, now = new Date(), logger = console }) {
+export async function handleAlexaEnvelope(envelope, { database, config, now = new Date(), logger = console, fetchImpl = fetch }) {
   const request = envelope?.request;
   const appId = envelope?.session?.application?.applicationId ?? envelope?.context?.System?.application?.applicationId;
   const userId = envelope?.session?.user?.userId ?? envelope?.context?.System?.user?.userId;
@@ -134,6 +135,7 @@ export async function handleAlexaEnvelope(envelope, { database, config, now = ne
   if (intent === 'AMAZON.HelpIntent') {
     return say('Você pode dizer: me lembrar de pagar a conta amanhã, ou: adicionar tarefa preparar o roteiro.', { end: false, reprompt: 'O que você quer registrar?' });
   }
+  if (intent === 'SincronizarLembretesIntent') return syncRemindersReply(envelope, userId, { database, now, logger, fetchImpl });
   if (intent !== 'CriarMissaoIntent') {
     return say('Não entendi. Diga, por exemplo: me lembrar de pagar a conta amanhã.', { end: false, reprompt: 'O que você quer registrar?' });
   }
@@ -162,6 +164,38 @@ export async function handleAlexaEnvelope(envelope, { database, config, now = ne
   }
   const when = result.dueKey ? ` para ${spokenDate(result.dueKey)}${result.time ? ` às ${spokenTime(result.time)}` : ''}` : ', sem prazo';
   return say(`Missão criada${when}: ${result.title}.`);
+}
+
+const askReminderPermission = () => ({
+  version: '1.0',
+  response: {
+    outputSpeech: { type: 'PlainText', text: 'Para criar lembretes, preciso da sua permissão. Abri um pedido no aplicativo da Alexa; aceite lá e peça de novo para sincronizar os lembretes.' },
+    card: { type: 'AskForPermissionsConsent', permissions: [REMINDERS_SCOPE] },
+    shouldEndSession: true,
+  },
+});
+
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+/** "Sincronizar lembretes": cria/atualiza/remove os lembretes das missões e tarefas marcadas com "Lembrete pela Alexa". */
+async function syncRemindersReply(envelope, userId, { database, now, logger, fetchImpl }) {
+  const system = envelope.context?.System ?? {};
+  if (system.user?.permissions?.scopes?.[REMINDERS_SCOPE]?.status !== 'GRANTED') return askReminderPermission();
+  try {
+    const client = createRemindersClient({ endpoint: system.apiEndpoint, token: system.apiAccessToken, fetchImpl });
+    const r = await syncReminders({ database, client, userId, now, logger });
+    if (r.permissionDenied) return askReminderPermission();
+    const parts = [];
+    if (r.created) parts.push(`criei ${plural(r.created, 'lembrete', 'lembretes')}`);
+    if (r.updated) parts.push(`atualizei ${plural(r.updated, 'lembrete', 'lembretes')}`);
+    if (r.removed) parts.push(`removi ${plural(r.removed, 'lembrete', 'lembretes')}`);
+    let text = parts.length ? `Pronto, ${parts.join(', ')}.` : r.unchanged ? 'Seus lembretes já estão em dia.' : 'Não há missões com lembrete pela Alexa para agendar.';
+    if (r.failed) text += ` ${plural(r.failed, 'não pôde ser sincronizado', 'não puderam ser sincronizados')}; tente de novo mais tarde.`;
+    return say(text);
+  } catch (error) {
+    logger.error('[Alexa] Falha ao sincronizar lembretes.', { error: error instanceof Error ? error.message : String(error), status: error instanceof ReminderApiError ? error.status : undefined });
+    return say('Não consegui sincronizar os lembretes agora. Tente novamente em instantes.');
+  }
 }
 
 export const parseAllowedUsers = list;
