@@ -59,8 +59,7 @@ test('mensagem de WhatsApp: texto exato, campos substituídos, URL codificada pr
     'Olá Maria Silva, bom dia! Aqui é o Vitor, tudo bem?', '',
     'Sou o Agente que acompanhará o Homem Aranha para o aniversário do Pedro! 🕸️🕷️ Me confirme alguns dados, por gentileza:', '',
     'O horário de início da nossa participação será às 14:30 e o endereço é no: Rua das Flores, 10 - BH', '',
-    'Qualquer coisa que precisar, estou a disposição! Pode me mandar mensagem ou me ligar! 🫡', '',
-    'Te enviaremos mensagem assim que chegarmos!😉',
+    'Qualquer coisa que precisar, estou a disposição! Pode me mandar mensagem ou me ligar! 🫡',
   ].join('\n'));
   const url = new URL(whatsappLink(order(), client));
   assert.equal(url.pathname, '/5531999044206');

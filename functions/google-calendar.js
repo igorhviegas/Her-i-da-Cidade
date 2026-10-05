@@ -71,8 +71,6 @@ export function whatsappMessage(order, client) {
     `O horário de início da nossa participação será às ${eventTime} e o endereço é no: ${location}`,
     '',
     'Qualquer coisa que precisar, estou a disposição! Pode me mandar mensagem ou me ligar! 🫡',
-    '',
-    'Te enviaremos mensagem assim que chegarmos!😉',
   ].join('\n');
 }
 
