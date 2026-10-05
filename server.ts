@@ -3,6 +3,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { handleThumbnailUpload } from "./api/upload-thumbnail";
+import { handleAgentAudioUpload } from "./api/upload-agent-audio";
 import { handleManyChatWebhook } from "./api/manychat";
 import { handleMissionsCron } from "./api/missions-cron";
 import { handleAlexa } from "./api/alexa";
@@ -172,6 +173,11 @@ async function startServer() {
   // Vercel Blob Thumbnail Upload endpoint
   app.all("/api/upload-thumbnail", (req, res) => {
     handleThumbnailUpload(req, res);
+  });
+
+  // Upload de áudio do /agente-hdc (administrador autenticado)
+  app.all("/api/upload-agent-audio", (req, res) => {
+    handleAgentAudioUpload(req, res);
   });
 
   // ManyChat Webhook endpoint
