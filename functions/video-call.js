@@ -274,7 +274,7 @@ export async function markVideoCallEventPaid({ database, orderId, updateEvent = 
 }
 
 /**
- * Exclui pré-agendamentos que passaram do prazo de pagamento: pedido + trava (o horário volta a ficar livre) e o evento da agenda.
+ * Exclui pré-agendamentos sem pagamento depois de `expireAfterHours` (maior que o prazo informado ao cliente): pedido + trava (o horário volta a ficar livre) e o evento da agenda.
  * O pedido é conferido de novo dentro da transação, então um pagamento que chegue no mesmo instante vence e nada é apagado.
  * Devolve quantos foram excluídos.
  */
@@ -285,7 +285,7 @@ export async function expireUnpaidBookings({ database, nowMs = Date.now(), confi
   for (const document of snapshot.docs) {
     const call = document.get('videoCall');
     const bookedAtMs = call?.bookedAtMs ?? document.get('createdAt')?.toMillis?.();
-    if (!call || !(nowMs - bookedAtMs >= settings.paymentDeadlineHours * 3_600_000)) continue;
+    if (!call || !(nowMs - bookedAtMs >= settings.expireAfterHours * 3_600_000)) continue;
     const removed = await database.runTransaction(async (transaction) => {
       const slotRef = database.collection(SLOTS).doc(String(call.slotId));
       const [fresh, slot] = await Promise.all([transaction.get(document.ref), transaction.get(slotRef)]);

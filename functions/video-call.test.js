@@ -265,6 +265,9 @@ test('normalizeVideoCallConfig: valores inválidos caem no padrão, horários s�
   assert.deepEqual(config.busyCalendarIds, ['a@x']);
   assert.equal(config.texts.info, DEFAULT_VIDEO_CALL_CONFIG.texts.info);
   assert.equal(config.texts.whatsapp, 'Oi {data}');
+  // prazo dito ao cliente (24 h) e exclusão real (72 h) são separados; a exclusão nunca vem antes do prazo
+  assert.deepEqual([config.paymentDeadlineHours, config.expireAfterHours], [24, 72]);
+  assert.equal(normalizeVideoCallConfig({ paymentDeadlineHours: 48, expireAfterHours: 12 }).expireAfterHours, 48);
 });
 
 test('textos: {valor} {duracao} {prazo} {data} {horario} são preenchidos; a página pública recebe os textos prontos', () => {
@@ -324,9 +327,10 @@ test('pré-agendamento sem pagamento no prazo é excluído: pedido, trava e even
   const { orderId } = await book(database, form());
   const deleted = [];
   const expire = (nowMs) => expireUnpaidBookings({ database, nowMs, deleteEvent: async ({ id }) => { deleted.push(id); }, logger: quietLogger });
-  assert.equal(await expire(NOW + 23 * HOUR), 0); // ainda no prazo
+  assert.equal(await expire(NOW + 25 * HOUR), 0); // passou das 24 h ditas ao cliente, mas a exclusão só vem em 72 h
+  assert.equal(await expire(NOW + 71 * HOUR), 0);
   assert.ok(database.docs.has(`orders/${orderId}`));
-  assert.equal(await expire(NOW + 24 * HOUR), 1);
+  assert.equal(await expire(NOW + 72 * HOUR), 1);
   assert.deepEqual(deleted, ['evt1']);
   assert.equal(database.count('orders/'), 0);
   assert.equal(database.count('videoCallSlots/'), 0);
@@ -344,7 +348,7 @@ test('reserva paga nunca é excluída pelo prazo; falha ao apagar o evento não 
 
   const other = seeded();
   await book(other, form());
-  assert.equal(await expireUnpaidBookings({ database: other, nowMs: NOW + 25 * HOUR, deleteEvent: async () => { throw new Error('google fora'); }, logger: quietLogger }), 1);
+  assert.equal(await expireUnpaidBookings({ database: other, nowMs: NOW + 73 * HOUR, deleteEvent: async () => { throw new Error('google fora'); }, logger: quietLogger }), 1);
   assert.equal(other.count('orders/'), 0);
 });
 

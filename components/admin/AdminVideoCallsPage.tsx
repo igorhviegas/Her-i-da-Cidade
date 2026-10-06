@@ -91,18 +91,19 @@ const BookingsList: React.FC = () => {
 
 // ---------- Configurações ----------
 
-interface Draft { price: string; durationMinutes: string; minNoticeHours: string; maxAdvanceDays: string; paymentDeadlineHours: string; weekly: string[]; busy: string; info: string; confirm: string; whatsapp: string }
+interface Draft { price: string; durationMinutes: string; minNoticeHours: string; maxAdvanceDays: string; paymentDeadlineHours: string; expireAfterHours: string; weekly: string[]; busy: string; info: string; confirm: string; whatsapp: string }
 
 const toDraft = (c: VideoCallConfig): Draft => ({
   price: String(c.price).replace('.', ','), durationMinutes: String(c.durationMinutes), minNoticeHours: String(c.minNoticeHours), maxAdvanceDays: String(c.maxAdvanceDays),
-  paymentDeadlineHours: String(c.paymentDeadlineHours), weekly: WEEKDAYS.map((_, day) => (c.weekly[day] ?? []).join(', ')), busy: c.busyCalendarIds.join('\n'),
+  paymentDeadlineHours: String(c.paymentDeadlineHours), expireAfterHours: String(c.expireAfterHours), weekly: WEEKDAYS.map((_, day) => (c.weekly[day] ?? []).join(', ')), busy: c.busyCalendarIds.join('\n'),
   info: c.texts.info, confirm: c.texts.confirm, whatsapp: c.texts.whatsapp,
 });
 
-const NUMBER_FIELDS: { key: 'price' | 'durationMinutes' | 'minNoticeHours' | 'maxAdvanceDays' | 'paymentDeadlineHours'; label: string; hint: string }[] = [
+const NUMBER_FIELDS: { key: 'price' | 'durationMinutes' | 'minNoticeHours' | 'maxAdvanceDays' | 'paymentDeadlineHours' | 'expireAfterHours'; label: string; hint: string }[] = [
   { key: 'price', label: 'Valor (R$)', hint: 'Usado nos textos e gravado no pedido.' },
   { key: 'durationMinutes', label: 'Duração (min)', hint: 'Tamanho do evento na agenda.' },
-  { key: 'paymentDeadlineHours', label: 'Prazo de pagamento (h)', hint: 'Depois disso a reserva é excluída.' },
+  { key: 'paymentDeadlineHours', label: 'Prazo informado ao cliente (h)', hint: 'Aparece nos textos como {prazo}.' },
+  { key: 'expireAfterHours', label: 'Exclusão automática (h)', hint: 'Sem pagamento, a reserva é excluída depois disso.' },
   { key: 'minNoticeHours', label: 'Antecedência mínima (h)', hint: 'Não agenda mais perto que isso.' },
   { key: 'maxAdvanceDays', label: 'Antecedência máxima (dias)', hint: 'Até quando o cliente pode agendar.' },
 ];
@@ -111,11 +112,12 @@ const NUMBER_FIELDS: { key: 'price' | 'durationMinutes' | 'minNoticeHours' | 'ma
 function fromDraft(draft: Draft): { config?: VideoCallConfig; problem?: string } {
   const raw = {
     price: Number(draft.price.replace(',', '.')), durationMinutes: Number(draft.durationMinutes), minNoticeHours: Number(draft.minNoticeHours),
-    maxAdvanceDays: Number(draft.maxAdvanceDays), paymentDeadlineHours: Number(draft.paymentDeadlineHours),
+    maxAdvanceDays: Number(draft.maxAdvanceDays), paymentDeadlineHours: Number(draft.paymentDeadlineHours), expireAfterHours: Number(draft.expireAfterHours),
     weekly: Object.fromEntries(draft.weekly.map((value, day) => [day, parseTimes(value)])),
     busyCalendarIds: draft.busy.split(/\s+/).filter(Boolean),
     texts: { info: draft.info, confirm: draft.confirm, whatsapp: draft.whatsapp },
   };
+  if (raw.expireAfterHours < raw.paymentDeadlineHours) return { problem: 'A exclusão automática não pode acontecer antes do prazo informado ao cliente.' };
   const config = normalizeVideoCallConfig(raw);
   // O normalizador troca valor inválido pelo padrão; aqui isso vira aviso, para nada ser salvo diferente do que foi digitado.
   for (const { key, label } of NUMBER_FIELDS) if (config[key] !== raw[key]) return { problem: `Confira o campo "${label}".` };
@@ -183,7 +185,7 @@ const Settings: React.FC = () => {
 
       <section className={`${cardClass} space-y-4`}>
         <h3 className="font-bold text-white">Valor e prazos</h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {NUMBER_FIELDS.map(({ key, label, hint }) => (
             <label key={key} className={labelClass}>{label}
               <input inputMode="decimal" value={draft[key]} onChange={(e) => set({ [key]: e.target.value })} className={inputClass} />

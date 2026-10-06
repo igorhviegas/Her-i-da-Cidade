@@ -17,18 +17,18 @@ Módulo admin **Agendamento de chamadas**: `/admin/agendamento-chamadas`, filho 
 3. Pedido: serviço **Vídeo Chamada ao Vivo** (id 2), status inicial configurado no serviço, `paymentPending: true`, sem `paidAt`, `totalPaid: 0`, `servicePrice` = valor configurado no momento da reserva, `source: 'booking'`, `eventDate` (meio-dia de Brasília) e `videoCall { date, time, durationMinutes, slotId, bookedAtMs, whatsapp, childAge, theme, details }`; nome da criança em `childName`; vínculo em `googleCalendar`.
 4. **Pagamento (fluxo existente):** o `payment.paid` de `live-call` do ManyChat, se houver pré-agendamento pendente com o mesmo WhatsApp (`videoCallPending/{whatsapp}`), **confirma esse pedido** (`paidAt`, `totalPaid` = valor da reserva, prazos; remove `paymentPending`) e responde `confirmedBooking: true`. Sem pendente, o comportamento antigo é idêntico (cria pedido pago de R$ 75). O contrato do webhook não mudou.
 5. **Agenda depois do pagamento:** `/api/manychat` (Vercel) troca o título do evento de "(aguardando pagamento)" para "(paga)". É melhor esforço: se o Google falhar, o pagamento continua confirmado. A Function do Firebase (`receiveManyChatOrder`) não faz essa troca; e ela só passa a confirmar pré-agendamentos depois de um `firebase deploy --only functions`.
-6. **Prazo de pagamento:** pré-agendamento sem pagamento depois de `paymentDeadlineHours` é **excluído** (pedido + trava + evento da agenda) por `expireUnpaidBookings`, que roda antes de toda chamada ao endpoint e uma vez por dia pelo cron da Vercel (`vercel.json`, GET em `/api/video-call`). O pedido é conferido de novo dentro da transação: pagamento que chegue no mesmo instante vence. Se o evento não puder ser apagado, fica na agenda (e o log avisa).
+6. **Prazo de pagamento:** o cliente é informado de `paymentDeadlineHours` (padrão 24 h), mas o pré-agendamento sem pagamento só é **excluído** depois de `expireAfterHours` (padrão 72 h, para cobrir o fim de semana sem atendimento). A exclusão apaga pedido + trava + evento da agenda (`expireUnpaidBookings`) e roda antes de toda chamada ao endpoint e uma vez por dia pelo cron da Vercel (`vercel.json`, GET em `/api/video-call`). O pedido é conferido de novo dentro da transação: pagamento que chegue no mesmo instante vence. Se o evento não puder ser apagado, fica na agenda (e o log avisa).
 
 ## Configurações (`siteConfig/videoCall`)
 
 Editáveis na aba **Configurações**; padrão e validação em `functions/video-call-config.js` (o que faltar ou vier inválido cai no padrão):
 
-- Valor, duração, prazo de pagamento, antecedência mínima e máxima.
+- Valor, duração, prazo informado ao cliente, exclusão automática, antecedência mínima e máxima.
 - Dias e horários (por dia da semana).
 - Textos: informações, aviso final e mensagem do WhatsApp. Aceitam `**negrito**` e `{valor}`, `{duracao}`, `{prazo}`; a mensagem do WhatsApp aceita também `{data}` e `{horario}`.
 - Agendas extras para checar conflitos (`busyCalendarIds`).
 
-Padrão: R$ 75 · 15 min · 24 h para pagar · mínimo 24 h · máximo 30 dias · Seg e Qua 19:30/20:00/20:30 · Sáb 09:30/10:00/10:30. Horário local `America/Sao_Paulo` (deslocamento fixo −03:00; o Brasil não tem horário de verão desde 2019).
+Padrão: R$ 75 · 15 min · 24 h informadas ao cliente / exclusão em 72 h · mínimo 24 h · máximo 30 dias · Seg e Qua 19:30/20:00/20:30 · Sáb 09:30/10:00/10:30. Horário local `America/Sao_Paulo` (deslocamento fixo −03:00; o Brasil não tem horário de verão desde 2019).
 
 O valor configurado vale para os agendamentos do site. O ManyChat continua com o seu próprio valor fixo para pedidos sem pré-agendamento.
 

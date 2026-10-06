@@ -1,5 +1,5 @@
 export interface VideoCallConfig {
-  profile: string; price: number; durationMinutes: number; minNoticeHours: number; maxAdvanceDays: number; paymentDeadlineHours: number;
+  profile: string; price: number; durationMinutes: number; minNoticeHours: number; maxAdvanceDays: number; paymentDeadlineHours: number; expireAfterHours: number;
   weekly: Record<number, string[]>; busyCalendarIds: string[];
   texts: { info: string; confirm: string; whatsapp: string };
 }

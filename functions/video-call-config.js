@@ -9,8 +9,10 @@ export const DEFAULT_VIDEO_CALL_CONFIG = {
   durationMinutes: 15,
   minNoticeHours: 24,
   maxAdvanceDays: 30,
-  /** Prazo para pagar; depois disso o pré-agendamento é excluído (pedido, evento e trava). */
+  /** Prazo de pagamento informado ao cliente ({prazo} nos textos). */
   paymentDeadlineHours: 24,
+  /** Quando o pré-agendamento sem pagamento é de fato excluído (pedido, evento e trava). Maior que o prazo informado: cobre o fim de semana, sem atendimento. */
+  expireAfterHours: 72,
   /** Dia da semana (0 = domingo) → horários de início, no horário local da agenda (America/Sao_Paulo). */
   weekly: {
     1: ['19:30', '20:00', '20:30'],
@@ -57,13 +59,16 @@ export function normalizeVideoCallConfig(raw) {
     }
   }
   const texts = source.texts && typeof source.texts === 'object' ? source.texts : {};
+  const paymentDeadlineHours = integer(source.paymentDeadlineHours, d.paymentDeadlineHours, 1, 720);
   return {
     profile: d.profile,
     price: number(source.price, d.price, 0, 100000),
     durationMinutes: integer(source.durationMinutes, d.durationMinutes, 5, 240),
     minNoticeHours: integer(source.minNoticeHours, d.minNoticeHours, 0, 720),
     maxAdvanceDays: integer(source.maxAdvanceDays, d.maxAdvanceDays, 1, 365),
-    paymentDeadlineHours: integer(source.paymentDeadlineHours, d.paymentDeadlineHours, 1, 720),
+    paymentDeadlineHours,
+    // nunca exclui antes do prazo prometido ao cliente
+    expireAfterHours: Math.max(paymentDeadlineHours, integer(source.expireAfterHours, d.expireAfterHours, 1, 720)),
     weekly,
     busyCalendarIds: [...new Set((Array.isArray(source.busyCalendarIds) ? source.busyCalendarIds : []).map((id) => String(id).trim()).filter((id) => id && id.length <= 200))].slice(0, 5),
     texts: { info: text(texts.info, d.texts.info, 4000), confirm: text(texts.confirm, d.texts.confirm, 2000), whatsapp: text(texts.whatsapp, d.texts.whatsapp, 1000) },
