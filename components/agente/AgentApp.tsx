@@ -4,7 +4,7 @@ import {
 } from 'lucide-react';
 import { useAgentContent, type AgentFaqCategory, type AgentFaqItem, type AgentStep } from '../../services/agentService';
 import {
-  SUPPORT_WHATSAPP_URL, TIMER_ALERTS, computeTimer, dueAlert, formatClock, markFired, matchesQuery, resetFired, searchFaq, type AlertKey, type FiredAlerts,
+  SUPPORT_WHATSAPP_URL, TIMER_ALERTS, computeTimer, dueAlert, formatClock, groupTracks, markFired, matchesQuery, resetFired, searchFaq, type AlertKey, type FiredAlerts,
 } from '../../services/agentContent.js';
 import { useAgentPlayer } from './useAgentPlayer';
 
@@ -260,8 +260,8 @@ const TimerBar: React.FC<{ timer: ReturnType<typeof computeTimer>; open: boolean
   const { remainingMs, elapsedMs, finished } = timer;
   const tone = finished ? 'bg-red-600 animate-pulse' : remainingMs <= 5 * 60_000 ? 'bg-red-700' : remainingMs <= 30 * 60_000 ? 'bg-amber-600' : 'bg-blue-800';
   const adj = (m: number, label?: string) => (
-    <button key={m} onClick={() => onAdjust(m)} className={`${btn} flex h-11 min-w-[3.25rem] flex-1 items-center justify-center gap-1 rounded-xl bg-black/25 text-sm font-bold`}>
-      {m < 0 ? <Minus className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}{label ?? Math.abs(m)}
+    <button key={m} onClick={() => onAdjust(m)} className={`${btn} flex h-11 min-w-0 flex-1 items-center justify-center gap-0.5 rounded-xl bg-black/25 text-sm font-bold`}>
+      {m < 0 ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}{label ?? Math.abs(m)}
     </button>
   );
   return (
@@ -272,9 +272,13 @@ const TimerBar: React.FC<{ timer: ReturnType<typeof computeTimer>; open: boolean
           <span className="block text-3xl font-black leading-none tabular-nums">{finished ? `+${formatClock(remainingMs)}` : formatClock(remainingMs)}</span>
           <span className="mt-0.5 block text-[11px] text-white/70">Decorrido {formatClock(elapsedMs)} <ChevronDown className={`inline h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} /></span>
         </button>
-        <div className="flex w-36 gap-2">{adj(-5, '5 min')}{adj(5, '5 min')}</div>
       </div>
-      {open && <div className="mt-2 flex gap-2">{adj(-10)}{adj(-1)}{adj(1)}{adj(10)}<span className="flex items-center text-[11px] text-white/70">min</span></div>}
+      {open && (
+        <div className="mt-2">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-white/70">Ajustar tempo (minutos)</p>
+          <div className="flex gap-1.5">{adj(-10)}{adj(-5)}{adj(-1)}{adj(1)}{adj(5)}{adj(10)}</div>
+        </div>
+      )}
     </div>
   );
 };
@@ -389,48 +393,80 @@ const PlayerButtons: React.FC<{ player: Player; size: 'sm' | 'lg' }> = ({ player
   );
 };
 
-const MusicView: React.FC<{ player: Player; tracks: ReturnType<typeof useAgentContent>['tracks']; loading: boolean; query: string; onQuery: (v: string) => void }> = ({ player, tracks, loading, query, onQuery }) => (
-  <>
-    {tracks.length === 0 ? (
-      <p className="rounded-2xl border border-white/10 bg-[#0D1527] px-5 py-6 text-center text-white/60">{loading ? 'Carregando playlist...' : 'Nenhuma música ativa na playlist.'}</p>
-    ) : (
-      <>
-        <div className="space-y-4 rounded-3xl border border-white/10 bg-[#0D1527] px-4 py-5 text-center">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-pink-300">{player.current ? (player.playing ? 'Tocando agora' : 'Pausado') : 'Toque em play'}</p>
-          <div className="flex min-h-[2.5rem] items-center justify-center gap-2">
-            <p className="text-xl font-extrabold leading-tight">{player.current?.title ?? tracks[0].title}</p>
-            {player.current && player.elapsed >= 1 && <RestartButton onClick={() => player.restart(player.current!)} />}
+const MusicView: React.FC<{ player: Player; tracks: ReturnType<typeof useAgentContent>['tracks']; loading: boolean; query: string; onQuery: (v: string) => void }> = ({ player, tracks, loading, query, onQuery }) => {
+  const groups = groupTracks<(typeof tracks)[number]>(tracks);
+  const currentId = player.current?.id;
+  // Grupos de efeitos abertos: tocar uma música com parent abre o grupo; tocar fora dele recolhe (a seta abre/fecha só para ver).
+  const [open, setOpen] = useState<string[]>([]);
+  useEffect(() => {
+    const group = groups.find((g) => g.track.id === currentId || g.children.some((c) => c.id === currentId));
+    setOpen(group && group.children.length > 0 ? [group.track.id] : []);
+  }, [currentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const searching = !!query.trim();
+  const matches = tracks.filter((t) => matchesQuery(query, t.title));
+
+  const renderRow = (track: (typeof tracks)[number], opts: { badge: React.ReactNode; child?: boolean; effects?: number; groupId?: string }) => {
+    const active = currentId === track.id;
+    const expanded = !!opts.groupId && open.includes(opts.groupId);
+    return (
+      <li key={track.id} className="flex items-center gap-2">
+        <button
+          onClick={() => { if (opts.groupId) setOpen((o) => (o.includes(opts.groupId!) ? o : [...o, opts.groupId!])); if (active) player.toggle(); else player.playTrack(track); }}
+          className={`${btn} flex min-w-0 flex-1 items-center gap-4 rounded-2xl border px-4 ${opts.child ? 'py-3' : 'py-4'} text-left ${active ? 'border-pink-400 bg-pink-500/20' : 'border-white/10 bg-[#0D1527]'}`}
+        >
+          <span className={`flex shrink-0 items-center justify-center rounded-full text-sm font-bold ${opts.child ? 'h-8 w-8' : 'h-10 w-10'} ${active ? 'bg-pink-500' : 'bg-white/10 text-white/70'}`}>
+            {active && player.playing ? <Pause className="h-4 w-4" fill="currentColor" /> : active ? <Play className="h-4 w-4" fill="currentColor" /> : opts.badge}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className={`block truncate ${opts.child ? 'text-base' : 'text-[17px]'} ${active ? 'font-extrabold' : 'font-semibold'}`}>{track.title}</span>
+            {!!opts.effects && <span className="block text-xs text-white/50">{opts.effects} {opts.effects === 1 ? 'efeito sonoro' : 'efeitos sonoros'}</span>}
+          </span>
+        </button>
+        {((active && player.elapsed >= 1) || player.startedIds.includes(track.id)) && <RestartButton onClick={() => player.restart(track)} />}
+        {!!opts.effects && (
+          <button onClick={() => setOpen((o) => (o.includes(opts.groupId!) ? o.filter((id) => id !== opts.groupId) : [...o, opts.groupId!]))} aria-expanded={expanded} aria-label={expanded ? 'Recolher efeitos' : 'Mostrar efeitos'} className={`${btn} flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/70`}>
+            <ChevronDown className={`h-5 w-5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          </button>
+        )}
+      </li>
+    );
+  };
+
+  return (
+    <>
+      {tracks.length === 0 ? (
+        <p className="rounded-2xl border border-white/10 bg-[#0D1527] px-5 py-6 text-center text-white/60">{loading ? 'Carregando playlist...' : 'Nenhuma música ativa na playlist.'}</p>
+      ) : (
+        <>
+          <div className="space-y-4 rounded-3xl border border-white/10 bg-[#0D1527] px-4 py-5 text-center">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-pink-300">{player.current ? (player.playing ? 'Tocando agora' : 'Pausado') : 'Toque em play'}</p>
+            <div className="flex min-h-[2.5rem] items-center justify-center gap-2">
+              <p className="text-xl font-extrabold leading-tight">{player.current?.title ?? groups[0]?.track.title}</p>
+              {player.current && player.elapsed >= 1 && <RestartButton onClick={() => player.restart(player.current!)} />}
+            </div>
+            <div className="flex justify-center"><PlayerButtons player={player} size="lg" /></div>
+            <button onClick={player.toggleLoop} aria-pressed={player.loop} className={`${btn} mx-auto flex items-center gap-2 rounded-full border px-5 py-3 text-sm font-bold ${player.loop ? 'border-pink-400 bg-pink-500/25 text-pink-100' : 'border-white/15 text-white/60'}`}><Repeat1 className="h-5 w-5" />{player.loop ? 'Repetindo esta música' : 'Repetir música'}</button>
+            {player.error && <p className="text-sm font-semibold text-red-300">{player.error}</p>}
           </div>
-          <div className="flex justify-center"><PlayerButtons player={player} size="lg" /></div>
-          <button onClick={player.toggleLoop} aria-pressed={player.loop} className={`${btn} mx-auto flex items-center gap-2 rounded-full border px-5 py-3 text-sm font-bold ${player.loop ? 'border-pink-400 bg-pink-500/25 text-pink-100' : 'border-white/15 text-white/60'}`}><Repeat1 className="h-5 w-5" />{player.loop ? 'Repetindo esta música' : 'Repetir música'}</button>
-          {player.error && <p className="text-sm font-semibold text-red-300">{player.error}</p>}
-        </div>
-        <SearchBox value={query} onChange={onQuery} placeholder="Buscar música" />
-        {query.trim() && !tracks.some((t) => matchesQuery(query, t.title)) && <p className="rounded-2xl border border-white/10 bg-[#0D1527] px-5 py-6 text-center text-white/60">Nenhuma música encontrada.</p>}
-        <ol className="space-y-2">
-          {tracks.map((track, i) => {
-            if (!matchesQuery(query, track.title)) return null; // o número continua o da playlist
-            const active = player.current?.id === track.id;
-            return (
-              <li key={track.id} className="flex items-center gap-2">
-                <button
-                  onClick={() => (active ? player.toggle() : player.playTrack(track))}
-                  className={`${btn} flex min-w-0 flex-1 items-center gap-4 rounded-2xl border px-4 py-4 text-left ${active ? 'border-pink-400 bg-pink-500/20' : 'border-white/10 bg-[#0D1527]'}`}
-                >
-                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${active ? 'bg-pink-500' : 'bg-white/10 text-white/70'}`}>
-                    {active && player.playing ? <Pause className="h-4 w-4" fill="currentColor" /> : active ? <Play className="h-4 w-4" fill="currentColor" /> : i + 1}
-                  </span>
-                  <span className={`min-w-0 flex-1 truncate text-[17px] ${active ? 'font-extrabold' : 'font-semibold'}`}>{track.title}</span>
-                </button>
-                {((active && player.elapsed >= 1) || player.startedIds.includes(track.id)) && <RestartButton onClick={() => player.restart(track)} />}
-              </li>
-            );
-          })}
-        </ol>
-      </>
-    )}
-  </>
-);
+          <SearchBox value={query} onChange={onQuery} placeholder="Buscar música" />
+          {searching && matches.length === 0 && <p className="rounded-2xl border border-white/10 bg-[#0D1527] px-5 py-6 text-center text-white/60">Nenhuma música encontrada.</p>}
+          <ol className="space-y-2">
+            {searching
+              ? matches.map((track) => renderRow(track, { badge: <Music className="h-4 w-4" /> }))
+              : groups.map(({ track, children }, i) => (
+                <React.Fragment key={track.id}>
+                  {renderRow(track, { badge: i + 1, effects: children.length, groupId: track.id })}
+                  {children.length > 0 && open.includes(track.id) && (
+                    <li><ol className="ml-5 space-y-2 border-l-2 border-pink-400/30 pl-3">{children.map((child) => renderRow(child, { badge: <Music className="h-4 w-4" />, child: true }))}</ol></li>
+                  )}
+                </React.Fragment>
+              ))}
+          </ol>
+        </>
+      )}
+    </>
+  );
+};
 
 const AlertOverlay: React.FC<{ alertKey: AlertKey; onClose: () => void }> = ({ alertKey, onClose }) => {
   const alert = TIMER_ALERTS[alertKey];

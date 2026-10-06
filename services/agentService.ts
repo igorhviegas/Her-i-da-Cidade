@@ -88,7 +88,7 @@ export async function seedDefaultAgentSteps() {
 }
 
 export const saveAgentTrack = (track: AgentTrack) => setDoc(doc(requireDb(), AGENT_TRACKS_COLLECTION, track.id), {
-  title: track.title.trim(), url: track.url, active: track.active !== false, order: track.order, updatedAt: serverTimestamp(),
+  title: track.title.trim(), url: track.url, active: track.active !== false, order: track.order, parentId: track.parentId ?? '', updatedAt: serverTimestamp(),
 });
 export const deleteAgentTrack = (id: string) => deleteDoc(doc(requireDb(), AGENT_TRACKS_COLLECTION, id));
 

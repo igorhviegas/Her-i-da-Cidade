@@ -44,14 +44,15 @@ const AppContent: React.FC = () => {
   const isAgent = path === '/agente-hdc' || path.startsWith('/agente-hdc/');
   const homeContent = useHomeContent(!isAdmin && !isVideos && !isAgent);
 
-  // Ícone do iOS ("Adicionar à Tela de Início") próprio da plataforma de streaming
+  // Ícone do iOS ("Adicionar à Tela de Início") próprio da plataforma de streaming e da área do agente
+  const iosIcon = isVideos ? '/images/modules/streaming.png' : isAgent ? '/images/modules/agente-hdc.png' : null;
   useEffect(() => {
     const link = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
-    if (!link || !isVideos) return;
+    if (!link || !iosIcon) return;
     const original = link.getAttribute('href') ?? '';
-    link.setAttribute('href', '/images/modules/streaming.png');
+    link.setAttribute('href', iosIcon);
     return () => link.setAttribute('href', original);
-  }, [isVideos]);
+  }, [iosIcon]);
 
   useEffect(() => {
     const structuredDataId = 'site-seo-structured-data';

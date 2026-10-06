@@ -85,3 +85,12 @@ test('busca: ignora acento/maiúscula, exige todas as palavras e olha pergunta e
   assert.deepEqual(searchFaq(faq, 'nao liga').map((r) => r.item.id), ['a1']); // acha na pergunta, sem acento
   assert.deepEqual(searchFaq(faq, 'xyz'), []);
 });
+
+test('parents: agrupa efeitos sob a música principal, sem perder faixas órfãs ou aninhadas', async () => {
+  const { groupTracks } = await import('./agentContent.js');
+  const t = (id, parentId) => ({ id, parentId, title: id });
+  const groups = groupTracks([t('a'), t('estatua'), t('e1', 'estatua'), t('b'), t('e2', 'estatua'), t('orf', 'sumiu'), t('neto', 'e1'), t('eu', 'eu')]);
+  assert.deepEqual(groups.map((g) => g.track.id), ['a', 'estatua', 'b', 'orf', 'neto', 'eu']); // órfã, neto e auto-parent viram principais
+  assert.deepEqual(groups.find((g) => g.track.id === 'estatua').children.map((c) => c.id), ['e1', 'e2']); // ordem preservada
+  assert.deepEqual(groupTracks([]), []);
+});

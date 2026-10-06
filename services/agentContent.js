@@ -219,3 +219,13 @@ export function searchFaq(categories, query) {
   return categories.flatMap((category) =>
     category.items.filter((item) => matchesQuery(query, item.question, item.answer)).map((item) => ({ category, item })));
 }
+
+/**
+ * Agrupa a playlist (já ordenada): cada música principal com seus "efeitos" (músicas com parentId apontando para ela).
+ * Parent inexistente/inativo ou aninhado em outra filha vira música principal: nada some da lista.
+ */
+export function groupTracks(tracks) {
+  const byId = new Map(tracks.map((t) => [t.id, t]));
+  const isChild = (t) => !!t.parentId && t.parentId !== t.id && byId.has(t.parentId) && !byId.get(t.parentId).parentId;
+  return tracks.filter((t) => !isChild(t)).map((track) => ({ track, children: tracks.filter((c) => isChild(c) && c.parentId === track.id) }));
+}

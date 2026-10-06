@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AgentTrack } from '../../services/agentService';
+import { groupTracks } from '../../services/agentContent.js';
 
 /**
  * Player único da área do agente. Mora no componente raiz (AgentApp), então trocar de tela não o desmonta
@@ -72,10 +73,11 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
   }, [playTrack]);
 
   const step = useCallback((delta: -1 | 1) => {
-    const list = tracksRef.current;
-    if (list.length === 0) return;
-    const index = list.findIndex((t) => t.id === currentIdRef.current);
-    playTrack(list[(index + delta + list.length) % list.length]);
+    // Anterior/próxima andam só pelas músicas principais; os efeitos (parents) são tocados direto pela lista.
+    const groups = groupTracks(tracksRef.current);
+    if (groups.length === 0) return;
+    const index = groups.findIndex((g) => g.track.id === currentIdRef.current || g.children.some((c) => c.id === currentIdRef.current));
+    playTrack(groups[(index + delta + groups.length) % groups.length].track);
   }, [playTrack]);
   const stepRef = useRef(step);
   stepRef.current = step;
@@ -88,9 +90,10 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
     const onEnded = () => {
       const endedId = currentIdRef.current;
       if (endedId) { positions.current.delete(endedId); setStartedIds((ids) => ids.filter((id) => id !== endedId)); }
-      const list = tracksRef.current;
-      // Avança sozinho; na última música da playlist para.
-      if (list.findIndex((t) => t.id === currentIdRef.current) < list.length - 1) stepRef.current(1);
+      // Avança sozinho entre as principais; ao fim de um efeito ou da última música, para.
+      const groups = groupTracks(tracksRef.current);
+      const index = groups.findIndex((g) => g.track.id === currentIdRef.current);
+      if (index >= 0 && index < groups.length - 1) stepRef.current(1);
       else setPlaying(false);
     };
     const onTime = () => { setProgress(audio.duration > 0 ? audio.currentTime / audio.duration : 0); setElapsed(audio.currentTime); };
