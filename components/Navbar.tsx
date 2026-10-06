@@ -98,7 +98,7 @@ export const Navbar: React.FC = () => {
             onClick={handleLogoClick}
           >
             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#0072d2] rounded-full flex items-center justify-center shadow-lg shadow-blue-600/30 overflow-hidden flex-shrink-0">
-              <img src={spider} alt="Herói da Cidade" className="w-6 h-6 sm:w-8 sm:h-8 object-contain" />
+              <img src={spider} alt="Herói da Cidade" className="h-full w-full scale-125 object-cover" />
             </div>
             <span className="text-white font-bold text-sm sm:text-base md:text-lg tracking-tight sm:tracking-wide whitespace-nowrap">
               Herói da Cidade
