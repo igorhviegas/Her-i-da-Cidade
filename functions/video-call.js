@@ -11,7 +11,7 @@
 // A trava só vale enquanto o pedido existe: excluir o pedido no CRM libera o horário sozinho (sem limpeza manual).
 
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { addDayKey, createCalendarEvent, deleteCalendarEvent, eventDateKey, eventTimes, listCalendarEvents, updateCalendarEvent } from './google-calendar.js';
+import { BANANA_COLOR_ID, BASIL_COLOR_ID, addDayKey, createCalendarEvent, deleteCalendarEvent, eventDateKey, eventTimes, listCalendarEvents, updateCalendarEvent } from './google-calendar.js';
 import { SERVICE_PROFILES, bookingKey, evaluateService } from './manychat-handler.js';
 import { DEFAULT_VIDEO_CALL_CONFIG, VIDEO_CALL_CONFIG_PATH, fillText, formatPrice, normalizeVideoCallConfig } from './video-call-config.js';
 
@@ -36,7 +36,7 @@ export async function loadVideoCallConfig(database) {
 /** O que a página pública precisa mostrar (textos já com valor, duração e prazo preenchidos). */
 export const publicConfig = (config) => ({
   price: config.price, priceLabel: formatPrice(config.price), durationMinutes: config.durationMinutes, paymentDeadlineHours: config.paymentDeadlineHours,
-  texts: { info: fillText(config.texts.info, config), confirm: fillText(config.texts.confirm, config) },
+  texts: { info: fillText(config.texts.info, config), confirm: fillText(config.texts.confirm, config), security: fillText(config.texts.security, config) },
 });
 
 // ---------- horários (puro) ----------
@@ -153,12 +153,12 @@ function orderContent(form) {
   ].join('\n');
 }
 
-/** Evento da agenda. O título diz se já foi paga, para a agenda bastar sem abrir o CRM. */
+/** Evento da agenda. Título e cor dizem se já foi paga (Banana = aguardando, Manjericão = paga), para a agenda bastar sem abrir o CRM. */
 function eventInput({ date, time, durationMinutes, customerName, whatsapp, callWhatsapp, childName, childAge, theme, details, paid }) {
   const { end } = eventTimes(date, time, durationMinutes);
   return {
     title: `Vídeo Chamada (${paid ? 'paga' : 'aguardando pagamento'}): ${customerName} - ${childName}`,
-    date, startTime: time, endTime: end.slice(11, 16),
+    date, startTime: time, endTime: end.slice(11, 16), colorId: paid ? BASIL_COLOR_ID : BANANA_COLOR_ID,
     description: [
       `👤 Responsável: ${customerName}`, `📱 WhatsApp: ${whatsapp}`, ...(callWhatsapp ? [`📞 Chamada em outro número: ${callWhatsapp}`] : []), `🧒 Criança: ${childName} (${childAge})`,
       `🎯 Tema: ${theme}`, `📝 Detalhes: ${details || '—'}`, '',

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 interface Day { date: string; times: string[] }
 interface Booked { date: string; time: string; whatsappUrl: string | null }
-interface PublicConfig { priceLabel: string; durationMinutes: number; paymentDeadlineHours: number; texts: { info: string; confirm: string } }
+export interface PublicConfig { priceLabel: string; durationMinutes: number; paymentDeadlineHours: number; texts: { info: string; confirm: string; security: string } }
 type Step = 'slot' | 'info' | 'form';
 
 const WEEKDAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
@@ -15,19 +15,22 @@ const label = 'block text-xs font-semibold text-white/70';
 const heading = 'text-xs font-black uppercase tracking-[0.2em] text-blue-400';
 const primary = 'min-h-12 w-full rounded-xl bg-blue-600 px-6 text-sm font-extrabold uppercase tracking-wide text-white hover:bg-blue-500 disabled:opacity-60';
 
+/** Trechos entre ** viram negrito (textos configuráveis no admin). */
+export const renderBold = (text: string) => text.split('**').map((part, i) => (i % 2 ? <strong key={i} className="font-bold text-white">{part}</strong> : part));
+
 /** Texto configurável no admin: parágrafos separados por linha em branco e **negrito**. */
 const Rich: React.FC<{ text: string; className?: string }> = ({ text, className }) => (
   <div className={`space-y-3 text-sm leading-relaxed text-white/75 ${className ?? ''}`}>
     {text.split(/\n\s*\n/).map((paragraph, i) => (
       <p key={i} className="whitespace-pre-line">
-        {paragraph.split('**').map((part, j) => (j % 2 ? <strong key={j} className="font-bold text-white">{part}</strong> : part))}
+        {renderBold(paragraph)}
       </p>
     ))}
   </div>
 );
 
 /** Dia e horário → informações → dados → pré-reserva. Só dá sucesso depois que o servidor confirma pedido e evento no Google Agenda. */
-export const VideoCallBooking: React.FC = () => {
+export const VideoCallBooking: React.FC<{ /** Avisa quem hospeda o componente quando os textos/valor chegam (ex.: a página mostra o aviso de segurança). */ onConfig?: (config: PublicConfig) => void }> = ({ onConfig }) => {
   const [days, setDays] = useState<Day[] | null>(null);
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [loadError, setLoadError] = useState('');
@@ -49,11 +52,12 @@ export const VideoCallBooking: React.FC = () => {
       if (!response.ok || !data?.ok) throw new Error(data?.error?.message || 'Não foi possível carregar os horários.');
       setDays(data.days);
       setConfig(data.config);
+      onConfig?.(data.config);
       setMonth((current) => current || data.days[0]?.date.slice(0, 7) || '');
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Não foi possível carregar os horários.');
     }
-  }, []);
+  }, [onConfig]);
   useEffect(() => { load(); }, [load]);
 
   const available = useMemo(() => new Map((days ?? []).map((d) => [d.date, d.times])), [days]);

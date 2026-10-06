@@ -133,6 +133,7 @@ test('reserva cria pedido aguardando pagamento com todos os dados, trava e vínc
   assert.equal(order.googleCalendar.eventId, 'evt1');
   assert.equal(order.googleCalendar.calendarId, 'agenda@x');
   assert.deepEqual([created.input.date, created.input.startTime, created.input.endTime], ['2026-10-12', '20:00', '20:15']);
+  assert.equal(created.input.colorId, '5'); // Banana: aguardando pagamento
   assert.match(created.input.description, /Davi/);
   const client = database.docs.get(`clients/${order.clientId}`);
   assert.deepEqual([client.name, client.whatsappNormalized], ['Maria', '5531999990001']);
@@ -276,6 +277,8 @@ test('textos: {valor} {duracao} {prazo} {data} {horario} são preenchidos; a pá
   const shown = publicConfig(config);
   assert.match(shown.texts.info, /R\$ 89,90/);
   assert.match(shown.texts.confirm, /12h/);
+  assert.equal(shown.texts.security, DEFAULT_VIDEO_CALL_CONFIG.texts.security);
+  assert.equal(publicConfig(normalizeVideoCallConfig({ texts: { security: 'Pagamento de {valor} só pelo WhatsApp.' } })).texts.security, 'Pagamento de R$ 75,00 só pelo WhatsApp.');
   assert.doesNotMatch(shown.texts.info + shown.texts.confirm, /\{valor\}|\{prazo\}|\{duracao\}/);
 });
 
@@ -364,6 +367,7 @@ test('pagamento confirmado marca o evento da agenda como pago (gancho do ManyCha
   assert.equal(updates.length, 1);
   assert.equal(updates[0].id, 'evt1');
   assert.equal(updates[0].input.title, 'Vídeo Chamada (paga): Maria - Davi');
+  assert.equal(updates[0].input.colorId, '10'); // Manjericão: paga
   assert.deepEqual([updates[0].input.date, updates[0].input.startTime, updates[0].input.endTime], ['2026-10-12', '20:00', '20:15']);
   assert.match(updates[0].input.description, /5531999990001/);
   assert.equal(await markVideoCallEventPaid({ database, orderId: 'nao-existe', updateEvent: async () => { throw new Error('x'); } }), false);

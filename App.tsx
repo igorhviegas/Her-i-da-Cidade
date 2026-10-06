@@ -3,7 +3,7 @@ import { RouterProvider, useRouter } from './lib/router';
 import { AuthProvider } from './context/AuthContext';
 import { PublicSite } from './components/PublicSite';
 import { VideoCatalog } from './components/VideoCatalog';
-import { VideoCallBooking } from './components/VideoCallBooking';
+import { VideoCallPage } from './components/VideoCallPage';
 import { useHomeContent } from './services/homeContentService';
 
 const HOME_TITLE = 'Homem-Aranha Personagem Vivo em BH | Herói da Cidade';
@@ -153,16 +153,7 @@ const AppContent: React.FC = () => {
   }
 
   // Página pública de agendamento de Vídeo Chamada (link compartilhável; substitui o link do Calendly)
-  if (isCall) {
-    return (
-      <main className="min-h-screen bg-gradient-to-b from-black to-[#0B1929] px-4 py-10 text-white">
-        <div className="mx-auto max-w-xl">
-          <h1 className="mb-6 text-center text-3xl font-extrabold uppercase italic tracking-tighter">Agende sua Vídeo Chamada</h1>
-          <VideoCallBooking />
-        </div>
-      </main>
-    );
-  }
+  if (isCall) return <VideoCallPage />;
 
   // Rota dedicada para o catálogo de vídeos estilo Netflix
   if (isVideos) {

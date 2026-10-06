@@ -1,7 +1,7 @@
 export interface VideoCallConfig {
   profile: string; price: number; durationMinutes: number; minNoticeHours: number; maxAdvanceDays: number; paymentDeadlineHours: number; expireAfterHours: number;
   weekly: Record<number, string[]>; busyCalendarIds: string[];
-  texts: { info: string; confirm: string; whatsapp: string };
+  texts: { info: string; confirm: string; whatsapp: string; security: string };
 }
 export const VIDEO_CALL_CONFIG_PATH: [string, string];
 export const DEFAULT_VIDEO_CALL_CONFIG: VideoCallConfig;
