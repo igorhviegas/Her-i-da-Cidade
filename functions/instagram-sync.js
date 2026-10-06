@@ -16,6 +16,7 @@ export const TOKEN_PATH = 'instagramPrivate/token'; // regras do Firestore: nenh
 export const LOCK_PATH = 'instagramPrivate/lock';
 export const DAILY_PATH = 'instagramPrivate/daily'; // referências do balanço diário (estado interno; o saldo exibido vai em profile.daily)
 export const POSTS_COLLECTION = 'instagramPosts';
+export const DAY_PREFIX = 'instagramMeta/day-'; // saldo diário (calendário); coberto pela regra de instagramMeta (leitura admin, escrita negada)
 export const STATS_COLLECTION = 'instagramStats'; // retrato diário de seguidores (metas de ganho de seguidores); id = dia em Brasília
 
 const MESSAGES = {
@@ -170,6 +171,8 @@ async function sync({ db, fetchImpl, env, now }) {
     const prevDaily = await dailyRef.get();
     const daily = applyDaily({ prev: prevDaily.exists ? prevDaily.data() : null, nowMs: now, followers: me.followers_count, posts });
     batch.set(dailyRef, daily.state);
+    // Saldo do dia no histórico do calendário (um documento por dia, regravado a cada sincronização; o dia anterior fica como estava).
+    batch.set(db.doc(`${DAY_PREFIX}${daily.summary.day}`), daily.summary);
     // Retrato diário: a referência de seguidores da 1ª sincronização do dia (a mesma do balanço), gravada uma única vez por dia.
     if (daily.state.baselineAt === iso && daily.state.followers0 !== null) {
       batch.set(db.doc(`${STATS_COLLECTION}/${daily.state.day}`), { day: daily.state.day, followers: daily.state.followers0, baselineAt: iso });

@@ -38,3 +38,9 @@ A integração nunca foi executada contra a API real da Meta (sem credenciais): 
 
 ## Retrato diário de seguidores (`instagramStats`)
 No mesmo batch da sincronização, a 1ª sincronização bem-sucedida de cada dia (Brasília) grava `instagramStats/{YYYY-MM-DD}` = `{ day, followers, baselineAt }` (a mesma referência do balanço diário), uma única vez por dia; repetições e falhas não alteram. Base das metas "ganho de seguidores" do módulo Missões (`docs/missoes.md`). Regras: leitura admin, escrita `false`.
+
+## Calendário de publicações e filtro dos destaques
+- **Calendário** (`/admin/instagram`): mês com um quadradinho por dia; **roxo = publicou** (feed ou Reel; a dica do dia detalha quantos de cada). Dentro de cada dia, o saldo de seguidores e de visualizações.
+- Os dias de publicação vêm de `instagramPosts` (histórico completo guardado, não só das últimas 100). A API só entrega as 100 mais recentes: antes da publicação mais antiga conhecida, o calendário não afirma nada.
+- **Saldos por dia** ficam em `instagramMeta/day-AAAA-MM-DD` (mesmo resumo do balanço diário, regravado a cada sincronização; ao virar o dia o anterior fica como estava; sincronização que falha não grava). Só existem a partir da primeira sincronização com esta versão; dia sem registro fica em branco. Cobrem o período da 1ª à última sincronização do dia (com o cron das 00:xx, quase 24 h). Regras: já cobertas por `instagramMeta` (leitura admin, escrita negada).
+- **Destaques** (Mais curtidas / visualizações / comentários): filtro Hoje, 7 dias, 30 dias (padrão) e Geral, pela **data de publicação** em Brasília entre as publicações da última sincronização. Não é o "ganho no período": a API não dá histórico de curtidas por publicação.

@@ -1,4 +1,5 @@
 // Normalização, totais e ranking das publicações do Instagram (puro, sem React/Firebase).
+import { addDays, dateKey } from '../functions/missions-core.js';
 
 const KINDS = { REELS: 'reel', CAROUSEL_ALBUM: 'carousel', VIDEO: 'video', IMAGE: 'image' };
 
@@ -60,4 +61,24 @@ export const currentPosts = (posts, syncedAt) => (syncedAt ? posts.filter((post)
 export function formatDateTime(value) {
   const time = typeof value === 'string' ? Date.parse(value) : NaN;
   return Number.isNaN(time) ? '—' : new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(time);
+}
+
+export const PERIODS = [
+  { id: 'today', label: 'Hoje' }, { id: '7d', label: '7 dias' }, { id: '30d', label: '30 dias' }, { id: 'all', label: 'Geral' },
+];
+
+/**
+ * Publicações feitas no período, por data de publicação em Brasília: today = hoje; 7d/30d = hoje e os 6/29 dias anteriores; all = todas.
+ * (Não é o "ganho no período": a API não entrega histórico de curtidas por publicação.) Data ausente/inválida só entra em 'all'.
+ */
+export function filterByPeriod(posts, period, nowMs) {
+  if (period === 'all') return posts;
+  const today = dateKey(new Date(nowMs));
+  const from = period === 'today' ? today : addDays(today, period === '7d' ? -6 : -29);
+  return posts.filter((post) => {
+    const time = post.publishedAt ? Date.parse(post.publishedAt) : NaN;
+    if (Number.isNaN(time)) return false;
+    const day = dateKey(new Date(time));
+    return day >= from && day <= today;
+  });
 }

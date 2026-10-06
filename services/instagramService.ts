@@ -1,4 +1,4 @@
-import { collection, doc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, documentId, onSnapshot, query, where } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import type { InstagramPost } from './instagramMetrics.js';
 import type { DailySummary } from './instagramDaily.js';
@@ -19,6 +19,14 @@ export function subscribeInstagramProfile(onData: (profile: InstagramProfile | n
 export function subscribeInstagramPosts(onData: (posts: InstagramPost[]) => void, onError: (e: Error) => void) {
   if (!db) { onError(new Error('Firestore não inicializado.')); return () => {}; }
   return onSnapshot(collection(db, 'instagramPosts'), (snap) => onData(snap.docs.map((d) => d.data() as InstagramPost)), onError);
+}
+
+/** Saldos diários (instagramMeta/day-AAAA-MM-DD) para o calendário. Um documento pequeno por dia. */
+export function subscribeInstagramDays(onData: (days: DailySummary[]) => void, onError: (e: Error) => void) {
+  if (!db) { onError(new Error('Firestore não inicializado.')); return () => {}; }
+  // ids 'day-…' ficam entre 'day-' e 'day.' ('.' vem logo depois de '-')
+  const days = query(collection(db, 'instagramMeta'), where(documentId(), '>=', 'day-'), where(documentId(), '<', 'day.'));
+  return onSnapshot(days, (snap) => onData(snap.docs.map((d) => d.data() as DailySummary)), onError);
 }
 
 /** Sincronização manual: o servidor valida o administrador e usa o token guardado no backend. */

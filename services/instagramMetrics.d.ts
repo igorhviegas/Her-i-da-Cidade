@@ -12,3 +12,5 @@ export function sortPosts(posts: InstagramPost[], key: MetricKey | 'recent'): In
 export function topPost(posts: InstagramPost[], key: MetricKey): InstagramPost | null;
 export function currentPosts(posts: InstagramPost[], syncedAt: string | undefined): InstagramPost[];
 export function formatDateTime(value: unknown): string;
+export const PERIODS: { id: 'today' | '7d' | '30d' | 'all'; label: string }[];
+export function filterByPeriod(posts: InstagramPost[], period: 'today' | '7d' | '30d' | 'all', nowMs: number): InstagramPost[];

@@ -307,3 +307,27 @@ test('retrato diário: só o 1º sync de cada dia grava instagramStats; repetir,
   assert.equal(db.store.get('instagramStats/2026-03-11').followers, 1130);
   assert.equal([...db.store.keys()].filter((k) => k.startsWith('instagramStats/')).length, 2);
 });
+
+// --- histórico diário do calendário (instagramMeta/day-AAAA-MM-DD) ---
+test('calendário: cada sincronização grava o saldo do dia; o dia anterior fica preservado; falha não grava', async () => {
+  const db = fakeDb();
+  await run(db, fakeFetch({ followers: 1000, media: [likesOf(10)], insight: () => views(100) }).impl, { now: D1 });
+  assert.deepEqual([db.store.get('instagramMeta/day-2026-03-10').followers, db.store.get('instagramMeta/day-2026-03-10').views], [0, 0]);
+  await run(db, fakeFetch({ followers: 1500, media: [likesOf(40)], insight: () => views(1300) }).impl, { now: D1 + 6 * 3600_000 });
+  const day10 = db.store.get('instagramMeta/day-2026-03-10');
+  assert.deepEqual([day10.day, day10.followers, day10.views], ['2026-03-10', 500, 1200]);
+  await assert.rejects(run(db, fakeFetch({ error: { code: 190 } }).impl, { now: D1 + 7 * 3600_000 }), { code: 'token_invalid' });
+  assert.equal(db.store.get('instagramMeta/day-2026-03-10').followers, 500); // falha não altera
+  await run(db, fakeFetch({ followers: 1450, media: [likesOf(41)], insight: () => views(1310) }).impl, { now: Date.parse('2026-03-11T12:00:00Z') });
+  assert.equal(db.store.get('instagramMeta/day-2026-03-10').followers, 500); // virou o dia: o anterior fica como estava
+  assert.equal(db.store.get('instagramMeta/day-2026-03-11').followers, 0);
+  assert.equal([...db.store.keys()].filter((k) => k.startsWith('instagramMeta/day-')).length, 2);
+});
+
+test('página: calendário e filtro de período (padrão 30 dias) ligados; saldos têm erro próprio', async () => {
+  const page = await readFile(new URL('../components/admin/AdminInstagramPage.tsx', import.meta.url), 'utf8');
+  assert.match(page, /useState<Period>\('30d'\)/);
+  assert.match(page, /<InstagramCalendar /);
+  assert.match(page, /subscribeInstagramDays\(setDays, \(\) => setDaysError\(true\)\)/);
+  assert.match(page, /filterByPeriod\(current, period/);
+});
