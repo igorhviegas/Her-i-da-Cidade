@@ -118,7 +118,7 @@ export const VideoCallBooking: React.FC = () => {
     return (
       <div className={box}>
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3">
-          <p className="text-sm font-bold capitalize text-white">📅 {longDate(date)} <span className="normal-case">às {time}</span></p>
+          <p className="text-sm font-bold text-white">📅 {longDate(date)} às {time}</p>
           <button type="button" onClick={backToSlots} className="text-xs font-bold text-blue-300 underline hover:text-blue-200">Alterar horário</button>
         </div>
 
