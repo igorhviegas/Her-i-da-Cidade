@@ -197,7 +197,7 @@ export const VideoCallBooking: React.FC<{ /** Avisa quem hospeda o componente qu
             <p className={heading}>Seus dados</p>
             <label className={label}>Nome do responsável<input required maxLength={120} autoComplete="name" value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })} className={field} /></label>
             <label className={label}>E-mail<input required type="email" inputMode="email" autoComplete="email" maxLength={254} placeholder="voce@exemplo.com" value={values.email} onChange={(e) => setValues({ ...values, email: e.target.value })} className={field} />
-              <span className={hint}>Depois do pagamento, você recebe por e-mail o convite para adicionar a chamada à sua agenda.</span>
+              <span className={hint}>Usamos para enviar o convite da chamada para a sua agenda, depois do pagamento.</span>
             </label>
             <PhoneField title="Seu WhatsApp" note="Use o mesmo número que vai falar com a gente no WhatsApp para fazer o pagamento." country={country} number={values.whatsapp} autoComplete="tel-national"
               onCountry={(iso) => { setCountry(iso); if (sameNumber) setCallCountry(iso); }} onNumber={(whatsapp) => setValues({ ...values, whatsapp })} />

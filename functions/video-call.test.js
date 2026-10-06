@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FieldValue } from 'firebase-admin/firestore';
 import { VIDEO_CALL_CONFIG, VideoCallError, candidateSlots, createVideoCallBooking, expireUnpaidBookings, getAvailability, hasCalendarConflict, markVideoCallEventPaid, normalizePhone, publicConfig } from './video-call.js';
-import { GoogleCalendarError } from './google-calendar.js';
 import { bookingKey } from './manychat-handler.js';
 import { DEFAULT_VIDEO_CALL_CONFIG, fillText, normalizeVideoCallConfig, parseTimes } from './video-call-config.js';
 import { handleManyChatOrderRequest } from './manychat-handler.js';
@@ -363,7 +362,7 @@ test('pagamento confirmado marca o evento da agenda como pago (gancho do ManyCha
   const database = seeded();
   const { orderId } = await book(database, form());
   const updates = [];
-  const res = await payment(database, paid('31999990001'), { onBookingConfirmed: (id) => markVideoCallEventPaid({ database, orderId: id, updateEvent: async (args) => { updates.push(args); }, addGuest: async () => ({ added: true }) }) });
+  const res = await payment(database, paid('31999990001'), { onBookingConfirmed: (id) => markVideoCallEventPaid({ database, orderId: id, updateEvent: async (args) => { updates.push(args); } }) });
   assert.equal(res.body.confirmedBooking, true);
   assert.equal(orderId, res.body.orderId);
   assert.equal(updates.length, 1);
@@ -429,9 +428,9 @@ test('pagamento de outro WhatsApp não dá baixa na reserva de ninguém: cria pe
   assert.equal(database.count('orders/'), 2);
 });
 
-// ---- e-mail do cliente e convite do Google Agenda depois do pagamento ----
+// ---- e-mail do cliente (o convite da agenda é feito à mão, copiando o e-mail) ----
 
-test('e-mail é obrigatório e tem validação básica; fica no pedido e não entra como convidado na reserva', async () => {
+test('e-mail é obrigatório e tem validação básica; fica no pedido e na descrição do evento, sem convidar ninguém', async () => {
   const database = seeded();
   for (const email of [undefined, '', 'maria', 'maria@exemplo', 'ma ria@exemplo.com', '@exemplo.com']) {
     await assert.rejects(book(database, form({ email })), (e) => e.code === 'validation_error' && /e-mail/.test(e.message), String(email));
@@ -444,67 +443,19 @@ test('e-mail é obrigatório e tem validação básica; fica no pedido e não en
   assert.equal(order.videoCall.email, 'maria.silva@exemplo.com');
   assert.match(order.content, /E-mail: maria\.silva@exemplo\.com/);
   assert.match(created.input.description, /E-mail: maria\.silva@exemplo\.com/);
-  // pré-agendamento: ninguém é convidado ainda (o pagamento não foi confirmado)
   assert.equal('attendees' in created.input, false);
-  assert.equal(order.calendarInvite, undefined);
 });
 
-test('pagamento confirmado: o e-mail do pedido vira convidado do MESMO evento; nenhum evento novo', async () => {
+test('pagamento confirmado: o evento só muda título, cor e descrição; o e-mail continua lá para o convite manual', async () => {
   const database = seeded();
-  let events = 0;
-  const { orderId } = await book(database, form(), { createEvent: async () => { events += 1; return { id: 'evt-da-reserva' }; } });
-  const guests = [];
+  const { orderId } = await book(database, form());
   const updates = [];
-  const res = await payment(database, paid('31999990001'), { onBookingConfirmed: (id) => markVideoCallEventPaid({ database, orderId: id, updateEvent: async (args) => { updates.push(args); }, addGuest: async (args) => { guests.push(args); return { added: true }; } }) });
+  const res = await payment(database, paid('31999990001'), { onBookingConfirmed: (id) => markVideoCallEventPaid({ database, orderId: id, updateEvent: async (args) => { updates.push(args); } }) });
   assert.equal(res.body.confirmedBooking, true);
-  assert.deepEqual(guests.map(({ id, email }) => [id, email]), [['evt-da-reserva', 'maria@exemplo.com']]);
-  assert.equal(updates[0].id, 'evt-da-reserva');
-  assert.equal(events, 1);
-  const invite = database.docs.get(`orders/${orderId}`).calendarInvite;
-  assert.deepEqual([invite.email, invite.status], ['maria@exemplo.com', 'sent']);
-});
-
-test('convite recusado pelo Google não passa por concluído: fica registrado no pedido e o erro sobe; o pagamento continua confirmado', async () => {
-  const database = seeded();
-  const { orderId } = await book(database, form());
-  const logged = [];
-  let titled = 0;
-  const res = await payment(database, paid('31999990001'), {
-    logger: { error: (...args) => logged.push(args) },
-    onBookingConfirmed: (id) => markVideoCallEventPaid({ database, orderId: id, updateEvent: async () => { titled += 1; }, addGuest: async () => { throw new GoogleCalendarError('guests_not_allowed'); } }),
-  });
-  assert.equal(res.statusCode, 200);
-  const order = database.docs.get(`orders/${orderId}`);
-  assert.ok(order.paidAt);
-  assert.equal(titled, 1); // título e cor foram atualizados mesmo sem o convite
-  assert.deepEqual([order.calendarInvite.status, order.calendarInvite.code, order.calendarInvite.email], ['failed', 'guests_not_allowed', 'maria@exemplo.com']);
-  assert.match(order.calendarInvite.message, /conta de serviço/);
-  assert.equal(logged.length, 1);
-});
-
-test('evento que sumiu ou pedido sem vínculo do evento: erro explícito e registro no pedido', async () => {
-  const database = seeded();
-  const { orderId } = await book(database, form());
-  const gone = () => { throw new GoogleCalendarError('event_not_found'); };
-  await assert.rejects(markVideoCallEventPaid({ database, orderId, updateEvent: gone, addGuest: gone }), (e) => e.code === 'event_not_found');
-  assert.deepEqual([database.docs.get(`orders/${orderId}`).calendarInvite.status, database.docs.get(`orders/${orderId}`).calendarInvite.code], ['failed', 'event_not_found']);
-
-  const noLink = seeded();
-  const second = await book(noLink, form());
-  delete noLink.docs.get(`orders/${second.orderId}`).googleCalendar;
-  let called = 0;
-  await assert.rejects(markVideoCallEventPaid({ database: noLink, orderId: second.orderId, updateEvent: async () => { called += 1; }, addGuest: async () => { called += 1; } }), (e) => e.code === 'event_not_found');
-  assert.equal(called, 0);
-  assert.equal(noLink.docs.get(`orders/${second.orderId}`).calendarInvite.code, 'event_link_missing');
-});
-
-test('reserva antiga, sem e-mail: só marca como paga, sem convidar ninguém', async () => {
-  const database = seeded();
-  const { orderId } = await book(database, form());
-  delete database.docs.get(`orders/${orderId}`).videoCall.email;
-  let invited = 0;
-  assert.equal(await markVideoCallEventPaid({ database, orderId, updateEvent: async () => {}, addGuest: async () => { invited += 1; } }), true);
-  assert.equal(invited, 0);
+  assert.equal(updates.length, 1);
+  assert.equal('attendees' in updates[0].input, false);
+  assert.match(updates[0].input.description, /E-mail: maria@exemplo\.com/);
+  assert.equal(database.docs.get(`orders/${orderId}`).videoCall.email, 'maria@exemplo.com');
   assert.equal(database.docs.get(`orders/${orderId}`).calendarInvite, undefined);
 });
 

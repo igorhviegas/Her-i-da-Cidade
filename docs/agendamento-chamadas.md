@@ -19,13 +19,11 @@ Módulo admin **Agendamento de chamadas**: `/admin/agendamento-chamadas`, filho 
 5. **Agenda depois do pagamento:** `/api/manychat` (Vercel) troca o título do evento de "(aguardando pagamento)" para "(paga)" e a cor de **Banana** para **Manjericão** (a API do Google só aceita as 11 cores de evento; "Abacate" é cor de agenda). É melhor esforço: se o Google falhar, o pagamento continua confirmado. A Function do Firebase (`receiveManyChatOrder`) não faz essa troca; e ela só passa a confirmar pré-agendamentos depois de um `firebase deploy --only functions`.
 6. **Prazo de pagamento:** o cliente é informado de `paymentDeadlineHours` (padrão 24 h), mas o pré-agendamento sem pagamento só é **excluído** depois de `expireAfterHours` (padrão 72 h, para cobrir o fim de semana sem atendimento). A exclusão apaga pedido + trava + evento da agenda (`expireUnpaidBookings`) e roda antes de toda chamada ao endpoint e uma vez por dia pelo cron da Vercel (`vercel.json`, GET em `/api/video-call`). O pedido é conferido de novo dentro da transação: pagamento que chegue no mesmo instante vence. Se o evento não puder ser apagado, fica na agenda (e o log avisa).
 
-## E-mail e convite do Google Agenda
+## E-mail do cliente
 
-- O formulário pede **e-mail** (obrigatório, validação básica). Fica em `videoCall.email`, no resumo do pedido e na descrição do evento.
-- **Na reserva ninguém é convidado.** Quando o pagamento é confirmado pelo ManyChat (`/api/manychat` → `markVideoCallEventPaid`), o **mesmo** evento da reserva (`googleCalendar.eventId`) recebe o e-mail como convidado (`addCalendarEventGuest`: lê os convidados atuais e regrava com o novo, `sendUpdates=all`), e o Google envia o convite. Nenhum evento novo é criado.
-- O resultado fica em `orders/{id}.calendarInvite` (`sent` ou `failed`, com código e mensagem) e aparece na lista de Agendamentos ("Convite enviado" / "Convite não enviado"). Falha no convite não desfaz o pagamento nem a troca de título/cor.
-- **Risco conhecido:** o Google costuma recusar convites feitos por **conta de serviço** sem delegação em todo o domínio (recurso do Google Workspace; erro `forbiddenForServiceAccounts`, aqui `guests_not_allowed`). Isso só se confirma com um pagamento real. Se acontecer, o convite fica como "não enviado" e é preciso outro caminho (ex.: convidar manualmente pela agenda, ou autenticar com a conta dona da agenda).
-- A baixa manual no CRM (data de pagamento em "Editar pedido") não passa por esse fluxo: não muda o evento nem convida.
+- O formulário pede **e-mail** (obrigatório, validação básica). Fica em `videoCall.email`, no resumo do pedido, na lista de Agendamentos e na descrição do evento.
+- **O convite da agenda é manual.** O Google não aceita convites feitos por conta de serviço sem delegação em todo o domínio (recurso do Google Workspace; testado em produção), então o sistema não tenta convidar ninguém. Depois do pagamento, copie o e-mail do pedido ou do evento e adicione o cliente como convidado direto no Google Agenda.
+- A confirmação do pagamento pelo ManyChat (`/api/manychat` → `markVideoCallEventPaid`) só troca título, cor e descrição do mesmo evento.
 
 ## Telefone com DDI
 

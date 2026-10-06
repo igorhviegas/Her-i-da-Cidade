@@ -75,7 +75,6 @@ const BookingsList: React.FC = () => {
           const call = order.videoCall!;
           // Cliente em outro fuso: o horário dele ao lado do de Brasília (a agenda é sempre a de Brasília).
           const local = call.timezone && call.timezone !== BUSINESS_TIME_ZONE ? localSlot(call.date, call.time, call.timezone) : null;
-          const invite = order.calendarInvite;
           return (
             <li key={order.id}>
               <button type="button" onClick={() => navigate(`/admin/pedidos?orderId=${encodeURIComponent(order.id)}`)} className={`${cardClass} flex w-full flex-wrap items-center gap-x-4 gap-y-2 text-left hover:bg-white/[0.03]`}>
@@ -85,11 +84,6 @@ const BookingsList: React.FC = () => {
                   <span className="block truncate text-xs text-white/50">{[client?.whatsapp, call.email, call.theme].filter(Boolean).join(' · ')}</span>
                   {local && !local.same && <span className="block truncate text-xs text-sky-300/80">Cliente em {call.timezone}: {brDate(local.date)} às {local.time} no horário dele</span>}
                 </span>
-                {invite && (
-                  <span title={invite.status === 'failed' ? invite.message : `Convite enviado para ${invite.email}`} className={`rounded-full px-2.5 py-1 text-xs font-bold ${invite.status === 'sent' ? 'bg-sky-500/15 text-sky-300' : 'bg-red-500/15 text-red-300'}`}>
-                    {invite.status === 'sent' ? 'Convite enviado' : 'Convite não enviado'}
-                  </span>
-                )}
                 <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${pending ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300'}`}>{pending ? 'Aguardando pagamento' : 'Confirmada'}</span>
               </button>
             </li>

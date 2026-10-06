@@ -11,7 +11,7 @@
 // A trava só vale enquanto o pedido existe: excluir o pedido no CRM libera o horário sozinho (sem limpeza manual).
 
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { BANANA_COLOR_ID, BASIL_COLOR_ID, GoogleCalendarError, addCalendarEventGuest, addDayKey, createCalendarEvent, deleteCalendarEvent, eventDateKey, eventTimes, listCalendarEvents, updateCalendarEvent } from './google-calendar.js';
+import { BANANA_COLOR_ID, BASIL_COLOR_ID, addDayKey, createCalendarEvent, deleteCalendarEvent, eventDateKey, eventTimes, listCalendarEvents, updateCalendarEvent } from './google-calendar.js';
 import { SERVICE_PROFILES, bookingKey, evaluateService } from './manychat-handler.js';
 import { DEFAULT_VIDEO_CALL_CONFIG, VIDEO_CALL_CONFIG_PATH, fillText, formatPrice, normalizeVideoCallConfig } from './video-call-config.js';
 import { isValidTimeZone, localSlot, zonedInstant } from './video-call-time.js';
@@ -301,43 +301,20 @@ export async function createVideoCallBooking({ database, input, nowMs = Date.now
 // ---------- depois da reserva ----------
 
 /**
- * Pagamento confirmado (chamado pelo fluxo existente do ManyChat). No MESMO evento criado na reserva: marca como paga (título, cor,
- * descrição) e adiciona o e-mail do cliente como convidado, para o Google enviar o convite. Nenhum evento novo é criado.
- * O resultado do convite fica no pedido (`calendarInvite`): se o Google recusar ou o evento não existir mais, isso aparece no CRM
- * em vez de passar por concluído. Lança ao final se alguma parte falhou (quem chama registra; o pagamento já está confirmado).
- * Devolve false para pedidos que não são agendamento do site.
+ * Pagamento confirmado (chamado pelo fluxo existente do ManyChat): no MESMO evento criado na reserva, marca como paga (título, cor e
+ * descrição). Melhor esforço: o pedido já está confirmado no CRM. Ninguém é convidado por aqui: o Google não aceita convites feitos
+ * pela conta de serviço, então o convite é manual, com o e-mail que fica no pedido e na descrição do evento.
  */
-export async function markVideoCallEventPaid({ database, orderId, updateEvent = updateCalendarEvent, addGuest = addCalendarEventGuest, ctx = {} }) {
-  const orderRef = database.collection(ORDERS).doc(String(orderId));
-  const order = await orderRef.get();
+export async function markVideoCallEventPaid({ database, orderId, updateEvent = updateCalendarEvent, ctx = {} }) {
+  const order = await database.collection(ORDERS).doc(String(orderId)).get();
   const call = order.exists ? order.get('videoCall') : null;
-  if (!call) return false;
-  const eventId = order.get('googleCalendar')?.eventId;
-  const email = call.email || null;
-  const record = (invite) => orderRef.update({ calendarInvite: { email, ...invite, at: FieldValue.serverTimestamp() } }).catch(() => {});
-  if (!eventId) {
-    await record({ status: 'failed', code: 'event_link_missing', message: 'O pedido não tem o vínculo do evento da agenda.' });
-    throw new GoogleCalendarError('event_not_found');
-  }
+  const eventId = order.exists ? order.get('googleCalendar')?.eventId : null;
+  if (!call || !eventId) return false;
   const client = await database.collection(CLIENTS).doc(String(order.get('clientId'))).get();
-  const failures = [];
-  try {
-    await updateEvent({
-      id: eventId, ...ctx,
-      input: eventInput({ ...call, customerName: client.get('name') || 'Cliente', whatsapp: call.whatsapp ?? client.get('whatsappNormalized') ?? '', childName: order.get('childName'), paid: true }),
-    });
-  } catch (error) { failures.push(error); }
-  // Reservas anteriores ao campo de e-mail não têm quem convidar: só o título/cor mudam.
-  if (email) {
-    try {
-      await addGuest({ id: eventId, email, ...ctx });
-      await record({ status: 'sent' });
-    } catch (error) {
-      failures.push(error);
-      await record({ status: 'failed', code: error?.code ?? 'error', message: error instanceof Error ? error.message : 'Falha ao convidar.' });
-    }
-  }
-  if (failures.length) throw failures[0];
+  await updateEvent({
+    id: eventId, ...ctx,
+    input: eventInput({ ...call, customerName: client.get('name') || 'Cliente', whatsapp: call.whatsapp ?? client.get('whatsappNormalized') ?? '', childName: order.get('childName'), paid: true }),
+  });
   return true;
 }
 
