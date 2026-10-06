@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ExternalLink, Image as ImageIcon, Loader2, RefreshCw } from 'lucide-react';
-import { subscribeInstagramPosts, subscribeInstagramProfile, syncInstagramNow, type InstagramProfile } from '../../services/instagramService';
-import { currentPosts, formatDateTime as fmtDateTime, sortPosts, topPost, totalFor, type InstagramPost, type MetricKey } from '../../services/instagramMetrics.js';
+import { subscribeInstagramDays, subscribeInstagramPosts, subscribeInstagramProfile, syncInstagramNow, type InstagramProfile } from '../../services/instagramService';
+import { currentPosts, filterByPeriod, formatDateTime as fmtDateTime, PERIODS, sortPosts, topPost, totalFor, type InstagramPost, type MetricKey } from '../../services/instagramMetrics.js';
+import type { DailySummary } from '../../services/instagramDaily.js';
 import { describeDelta } from '../../services/instagramDaily.js';
 import { dateKey } from '../../functions/missions-core.js';
 import { cardClass, ghostBtn, primaryBtn } from './financeFormat';
+import { InstagramCalendar } from './InstagramCalendar';
 
 type SortKey = MetricKey | 'recent';
 const SORTS: { id: SortKey; label: string }[] = [
@@ -43,7 +45,9 @@ const Thumb: React.FC<{ post: InstagramPost; className: string }> = ({ post, cla
     : <div className={`${className} flex shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/30`}><ImageIcon className="h-5 w-5" aria-hidden /></div>;
 };
 
-const Highlight: React.FC<{ title: string; post: InstagramPost | null; metric: MetricKey }> = ({ title, post, metric }) => (
+type Period = (typeof PERIODS)[number]['id'];
+
+const Highlight: React.FC<{ title: string; post: InstagramPost | null; metric: MetricKey; empty: string }> = ({ title, post, metric, empty }) => (
   <div className={cardClass}>
     <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">{title}</p>
     {post ? (
@@ -54,7 +58,7 @@ const Highlight: React.FC<{ title: string; post: InstagramPost | null; metric: M
           <p className="truncate text-xs text-white/55">{post.caption || KIND_LABEL[post.kind]}</p>
         </div>
       </a>
-    ) : <p className="mt-2 text-sm text-white/45">Sem dados disponíveis</p>}
+    ) : <p className="mt-2 text-sm text-white/45">{empty}</p>}
   </div>
 );
 
@@ -66,10 +70,14 @@ export const AdminInstagramPage: React.FC = () => {
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const [sort, setSort] = useState<SortKey>('recent');
   const [visible, setVisible] = useState(PAGE_SIZE);
+  const [period, setPeriod] = useState<Period>('30d'); // período dos cards "Mais curtidas/visualizações/comentários"
+  const [days, setDays] = useState<DailySummary[] | undefined>(undefined);
+  const [daysError, setDaysError] = useState(false);
 
   useEffect(() => {
     const onError = () => setLoadError(true);
-    const stops = [subscribeInstagramProfile(setProfile, onError), subscribeInstagramPosts(setPosts, onError)];
+    // Os saldos diários têm erro próprio: se falharem, o resto da página continua funcionando.
+    const stops = [subscribeInstagramProfile(setProfile, onError), subscribeInstagramPosts(setPosts, onError), subscribeInstagramDays(setDays, () => setDaysError(true))];
     return () => stops.forEach((stop) => stop());
   }, []);
 
@@ -91,6 +99,7 @@ export const AdminInstagramPage: React.FC = () => {
   const current = useMemo(() => currentPosts(posts ?? [], profile?.syncedAt), [posts, profile?.syncedAt]);
   const sorted = useMemo(() => sortPosts(current, sort), [current, sort]);
   const totals = useMemo(() => ({ likes: totalFor(current, 'likes'), comments: totalFor(current, 'comments'), views: totalFor(current, 'views') }), [current]);
+  const periodPosts = useMemo(() => filterByPeriod(current, period, Date.now()), [current, period]);
   const tokenDays = profile?.tokenExpiresAt ? Math.floor((Date.parse(profile.tokenExpiresAt) - Date.now()) / 86_400_000) : null;
 
   const scope = (key: MetricKey) => `Soma de ${totals[key].counted} de ${current.length} publicações da última sincronização (não é o total histórico).`;
@@ -143,11 +152,26 @@ export const AdminInstagramPage: React.FC = () => {
             <Kpi label="Visualizações" value={fmt(totals.views.counted ? totals.views.total : null)} delta={<DeltaText daily={profile.daily} metric="views" today={today} />} hint={scope('views')} />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Highlight title="Mais curtidas" post={topPost(current, 'likes')} metric="likes" />
-            <Highlight title="Mais visualizações" post={topPost(current, 'views')} metric="views" />
-            <Highlight title="Mais comentários" post={topPost(current, 'comments')} metric="comments" />
+          <div>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-white/50">Destaques entre as publicações feitas no período</p>
+              <div role="group" aria-label="Período dos destaques" className="flex gap-1">
+                {PERIODS.map((option) => (
+                  <button key={option.id} type="button" aria-pressed={period === option.id} onClick={() => setPeriod(option.id)}
+                    className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${period === option.id ? 'border-purple-400/60 bg-purple-500/30 text-white' : 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10'}`}>
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {([['Mais curtidas', 'likes'], ['Mais visualizações', 'views'], ['Mais comentários', 'comments']] as const).map(([title, metric]) => (
+                <Highlight key={metric} title={title} post={topPost(periodPosts, metric)} metric={metric} empty={periodPosts.length ? 'Sem dados disponíveis' : 'Nenhuma publicação no período'} />
+              ))}
+            </div>
           </div>
+
+          <InstagramCalendar posts={posts} days={days} daysError={daysError} today={today} />
 
           <section className={cardClass} aria-label="Publicações">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">

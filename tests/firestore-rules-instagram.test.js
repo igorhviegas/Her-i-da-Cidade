@@ -15,6 +15,7 @@ before(async () => {
     const db = context.firestore();
     await setDoc(doc(db, 'admins/admin-user'), { enabled: true });
     await setDoc(doc(db, 'instagramMeta/profile'), { followers: 1 });
+    await setDoc(doc(db, 'instagramMeta/day-2026-03-10'), { followers: 1 });
     await setDoc(doc(db, 'instagramPosts/p1'), { likes: 1 });
     await setDoc(doc(db, 'instagramPrivate/token'), { accessToken: 'segredo' });
     await setDoc(doc(db, 'instagramPrivate/lock'), { until: 0 });
@@ -29,7 +30,7 @@ const stranger = () => env.authenticatedContext('not-admin').firestore();
 const anonymous = () => env.unauthenticatedContext().firestore();
 
 test('instagramMeta e instagramPosts: só administrador lê; ninguém escreve pelo cliente', async () => {
-  for (const path of ['instagramMeta/profile', 'instagramPosts/p1']) {
+  for (const path of ['instagramMeta/profile', 'instagramMeta/day-2026-03-10', 'instagramPosts/p1']) {
     await assertSucceeds(getDoc(doc(admin(), path)));
     await assertFails(getDoc(doc(stranger(), path)));
     await assertFails(getDoc(doc(anonymous(), path)));

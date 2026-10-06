@@ -5,6 +5,7 @@ export const PROFILE_PATH: string;
 export const LOCK_PATH: string;
 export const DAILY_PATH: string;
 export const POSTS_COLLECTION: string;
+export const DAY_PREFIX: string;
 export type SyncResult =
   | { status: 'completed'; posts: number; warning: string | null; videos?: { imported: number; failed: number } }
   | { status: 'running' }
