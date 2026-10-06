@@ -51,7 +51,8 @@ export const MissionGoalsTab: React.FC<{ goals: GoalView[]; reload: () => Promis
             <ProgressBar percent={g.view.percent} done={g.view.reached} />
             <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="font-semibold text-white">{show(g, g.view.shown)} / {show(g, g.target)} <span className="font-normal text-white/50">({g.view.percent}%)</span>
-                {g.actual > g.target && <span className="ml-2 font-normal text-emerald-300/80">real: {show(g, g.actual)}</span>}</span>
+                {g.actual > g.target && <span className="ml-2 font-normal text-emerald-300/80">real: {show(g, g.actual)}</span>}
+                {g.actual < 0 && <span className="ml-2 font-normal text-red-300/90">real: {show(g, g.actual)} (a barra não mostra valor negativo)</span>}</span>
               {g.source === 'manual' && <ManualProgress goal={g} busy={busyId === g.id} onSave={(value) => run(g.id, () => setGoalProgress(g.id, value))} />}
             </div>
             {g.note && <p className="text-[11px] text-white/45">{g.note}</p>}
