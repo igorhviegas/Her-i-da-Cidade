@@ -299,13 +299,26 @@ test('Principal: widget do Instagram só lê o Firestore; o aviso "Em preparaç�
 test('retrato diário: só o 1º sync de cada dia grava instagramStats; repetir, falhar ou rodar de novo no dia não altera', async () => {
   const db = fakeDb();
   await run(db, fakeFetch({ followers: 1000, media: [likesOf(10)] }).impl, { now: D1 });
-  assert.deepEqual(db.store.get('instagramStats/2026-03-10'), { day: '2026-03-10', followers: 1000, baselineAt: new Date(D1).toISOString() });
+  const first = db.store.get('instagramStats/2026-03-10');
+  assert.deepEqual([first.day, first.followers, first.baselineAt, first.postsAt], ['2026-03-10', 1000, new Date(D1).toISOString(), new Date(D1).toISOString()]);
+  assert.deepEqual(first.posts, { 1: [10, 2, 123] }); // retrato por publicação: [curtidas, comentários, views]
   await run(db, fakeFetch({ followers: 1125, media: [likesOf(40)] }).impl, { now: D1 + 6 * 3600_000 }); // mesmo dia
   await assert.rejects(run(db, fakeFetch({ error: { code: 190 } }).impl, { now: D1 + 7 * 3600_000 }), { code: 'token_invalid' });
   assert.equal(db.store.get('instagramStats/2026-03-10').followers, 1000); // retrato intacto
+  assert.deepEqual(db.store.get('instagramStats/2026-03-10').posts, { 1: [10, 2, 123] }); // e o de publicações também (não é regravado com 40 curtidas)
   await run(db, fakeFetch({ followers: 1130, media: [likesOf(41)] }).impl, { now: Date.parse('2026-03-11T12:00:00Z') }); // 1º sync do dia 11
   assert.equal(db.store.get('instagramStats/2026-03-11').followers, 1130);
   assert.equal([...db.store.keys()].filter((k) => k.startsWith('instagramStats/')).length, 2);
+});
+
+test('retrato diário: referência do dia criada antes do recurso (sem retrato) ganha o retrato no próximo sync, com a referência e não o valor atual', async () => {
+  const db = fakeDb();
+  await run(db, fakeFetch({ followers: 1000, media: [likesOf(10)] }).impl, { now: D1 });
+  db.store.delete('instagramStats/2026-03-10'); // como se o 1º sync do dia tivesse rodado antes do deploy que criou o retrato
+  await run(db, fakeFetch({ followers: 1125, media: [likesOf(40)] }).impl, { now: D1 + 6 * 3600_000 });
+  const created = db.store.get('instagramStats/2026-03-10');
+  assert.deepEqual([created.day, created.followers, created.baselineAt], ['2026-03-10', 1000, new Date(D1).toISOString()]);
+  assert.deepEqual(created.posts, { 1: [40, 2, 123] }); // sem retrato anterior: o das publicações nasce neste sync
 });
 
 // --- histórico diário do calendário (instagramMeta/day-AAAA-MM-DD) ---
