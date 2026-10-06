@@ -294,3 +294,16 @@ test('Principal: widget do Instagram só lê o Firestore; o aviso "Em preparaç�
   assert.doesNotMatch(dashboard, /SUBMÓDULOS EM BREVE/);
   assert.match(dashboard, /currentTab === 'home' && <AdminHomePage/);
 });
+
+// --- retrato diário de seguidores (base das metas de ganho de seguidores) ---
+test('retrato diário: só o 1º sync de cada dia grava instagramStats; repetir, falhar ou rodar de novo no dia não altera', async () => {
+  const db = fakeDb();
+  await run(db, fakeFetch({ followers: 1000, media: [likesOf(10)] }).impl, { now: D1 });
+  assert.deepEqual(db.store.get('instagramStats/2026-03-10'), { day: '2026-03-10', followers: 1000, baselineAt: new Date(D1).toISOString() });
+  await run(db, fakeFetch({ followers: 1125, media: [likesOf(40)] }).impl, { now: D1 + 6 * 3600_000 }); // mesmo dia
+  await assert.rejects(run(db, fakeFetch({ error: { code: 190 } }).impl, { now: D1 + 7 * 3600_000 }), { code: 'token_invalid' });
+  assert.equal(db.store.get('instagramStats/2026-03-10').followers, 1000); // retrato intacto
+  await run(db, fakeFetch({ followers: 1130, media: [likesOf(41)] }).impl, { now: Date.parse('2026-03-11T12:00:00Z') }); // 1º sync do dia 11
+  assert.equal(db.store.get('instagramStats/2026-03-11').followers, 1130);
+  assert.equal([...db.store.keys()].filter((k) => k.startsWith('instagramStats/')).length, 2);
+});

@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  GOAL_METRICS, INSTAGRAM_METRICS, followersGain, instagramNote,
   addDays, buildNotifications, cycleArchiveRecord, cycleBounds, cycleChanged, dateKey, goalProgress, metricValue, missionNotificationIds,
   occurrenceNotificationIds, planOccurrences, recursOn, startOfDay,
   syncRecurringTasks, taskStreak, validateTask,
 } from './missions-core.js';
+import { buildRevenueEntries, monthTotals, monthKeyOf } from '../services/financeCalculations.js';
+import { ledgerToOrders } from '../services/eventFinance.js';
 
 const at = (iso) => new Date(iso);
 
@@ -142,6 +145,7 @@ test('metas automáticas: contagem por documento e data do evento; vendido difer
     missions: [{ id: 'm1', status: 'completed', completedAt: day('07') }, { id: 'm2', status: 'pending' }],
     occurrences: [{ date: '2026-10-07', status: 'completed' }, { date: '2026-10-08', status: 'completed' }],
   };
+  data.revenueEntries = buildRevenueEntries(data.orders).entries; // o mesmo cálculo do Financeiro
   const value = (m) => metricValue(m, bounds, data, '2026-10-08');
   assert.equal(value('revenue_completed'), 100); // a + b + d(0)
   assert.equal(value('services_sold'), 2); // a, c (b foi paga antes; d é interno)
@@ -242,4 +246,107 @@ test('IDs de aviso ligados a missão e ocorrência são os mesmos gerados por bu
     assert.ok(related.includes(id), id);
   }
   assert.deepEqual(missionNotificationIds('x'), ['mission_overdue_x', 'mission_due_soon_x']);
+});
+
+// ------------------------------------------------ meta de faturamento = Financeiro
+
+const revenueOf = (orders, ledger, period, now) => {
+  const entries = buildRevenueEntries([...orders, ...ledgerToOrders(ledger)]).entries;
+  return { entries, goal: metricValue('revenue_completed', cycleBounds(period, now), { orders, scripts: [], missions: [], occurrences: [], revenueEntries: entries }, dateKey(now)) };
+};
+
+test('faturamento da meta usa a regra do Financeiro: pedido de evento vem do livro (parcelas e ajustes), não do pedido', () => {
+  const day = (d) => new Date(`2026-10-${d}T15:00:00Z`);
+  const orders = [
+    { id: 'v1', status: 'completed', totalPaid: 30, completedAt: day('06') },
+    // evento com livro: o pedido em si (R$ 800) NÃO conta; contam a entrada, o restante e o ajuste do livro
+    { id: 'ev1', status: 'completed', totalPaid: 800, completedAt: day('07'), eventLedger: { entry: 300, final: 500 } },
+  ];
+  const ledger = [
+    { id: 'l1', orderId: 'ev1', kind: 'entry', type: 'revenue', amount: 300, date: day('01'), clientId: 'c', serviceId: 's' }, // outra semana
+    { id: 'l2', orderId: 'ev1', kind: 'final', type: 'revenue', amount: 500, date: day('07'), clientId: 'c', serviceId: 's' },
+    { id: 'l3', orderId: 'ev1', kind: 'adjrev', type: 'revenue', amount: -50, date: day('08'), clientId: 'c', serviceId: 's', seq: 1 },
+    { id: 'l4', orderId: 'ev1', kind: 'cost', type: 'expense', amount: 200, date: day('07'), clientId: 'c', serviceId: 's' }, // despesa não é faturamento
+  ];
+  const { entries, goal } = revenueOf(orders, ledger, 'weekly', at('2026-10-08T15:00:00Z')); // semana 05–11/10
+  assert.equal(goal, 30 + 500 - 50);
+  // igual ao total do Financeiro para o mesmo recorte de datas (todo o mês, pois a entrada de 01/10 é da semana anterior)
+  assert.equal(metricValue('revenue_completed', cycleBounds('monthly', at('2026-10-08T15:00:00Z')), { revenueEntries: entries }, '2026-10-08'), monthTotals(entries, monthKeyOf(day('07'))).total);
+});
+
+test('faturamento da meta: pedido antigo sem completedAt cai em eventDate/paidAt e valor cai em servicePrice + rushFee, como no Financeiro', () => {
+  const day = (d) => new Date(`2026-10-${d}T15:00:00Z`);
+  const orders = [
+    { id: 'old1', status: 'completed', servicePrice: 40, rushFee: 10, eventDate: day('06') }, // sem completedAt nem totalPaid
+    { id: 'old2', status: 'completed', totalPaid: 25, paidAt: day('07') }, // só paidAt
+    { id: 'none', status: 'completed', totalPaid: 99 }, // sem nenhuma data: fora (o Financeiro também avisa "sem data")
+    { id: 'dup', status: 'completed', totalPaid: 15, completedAt: day('08') },
+    { id: 'dup', status: 'completed', totalPaid: 15, completedAt: day('08') }, // mesmo id: uma vez só
+    { id: 'open', status: 'delivery', totalPaid: 70, completedAt: day('08') }, // não concluído
+  ];
+  assert.equal(revenueOf(orders, [], 'weekly', at('2026-10-08T15:00:00Z')).goal, 50 + 25 + 15);
+});
+
+test('faturamento da meta respeita os limites do ciclo (início inclusivo, fim exclusivo, fuso de Brasília)', () => {
+  const bounds = cycleBounds('daily', at('2026-10-08T15:00:00Z')); // 08/10 03:00Z até 09/10 03:00Z
+  const orders = [
+    { id: 'a', status: 'completed', totalPaid: 10, completedAt: at('2026-10-08T03:00:00Z') }, // 00:00 de 08/10: dentro
+    { id: 'b', status: 'completed', totalPaid: 20, completedAt: at('2026-10-09T02:59:59Z') }, // 23:59 de 08/10: dentro
+    { id: 'c', status: 'completed', totalPaid: 40, completedAt: at('2026-10-09T03:00:00Z') }, // 00:00 de 09/10: fora
+    { id: 'd', status: 'completed', totalPaid: 80, completedAt: at('2026-10-08T02:59:59Z') }, // 23:59 de 07/10: fora
+  ];
+  const entries = buildRevenueEntries(orders).entries;
+  assert.equal(metricValue('revenue_completed', bounds, { revenueEntries: entries }, '2026-10-08'), 30);
+});
+
+// ------------------------------------------------ metas do Instagram
+
+const igDay = (d, h = 15) => new Date(`2026-10-${d}T${String(h).padStart(2, '0')}:00:00Z`);
+const igPost = (id, day, likes, comments, views) => ({ id, publishedAt: igDay(day).toISOString(), likes, comments, views });
+
+test('Instagram: curtidas, comentários, views e publicações contam só posts publicados no ciclo; métrica ausente fica fora', () => {
+  const bounds = cycleBounds('weekly', at('2026-10-08T15:00:00Z')); // 05–11/10
+  const instagram = {
+    followers: 1500, syncedAt: '2026-10-08T12:00:00.000Z', stats: [],
+    posts: [
+      igPost('a', '06', 100, 10, 1000), igPost('b', '07', 50, null, null), // ocultas/indisponíveis não somam
+      igPost('antes', '04', 999, 99, 9999), igPost('depois', '12', 999, 99, 9999), // fora do ciclo
+      { id: 'semdata', publishedAt: null, likes: 5, comments: 5, views: 5 },
+    ],
+  };
+  const value = (m) => metricValue(m, bounds, { instagram }, '2026-10-08');
+  assert.deepEqual(['ig_posts', 'ig_likes', 'ig_comments', 'ig_views'].map(value), [2, 150, 10, 1000]);
+  // limites: início inclusivo (00:00 BRT de 05/10 = 03:00Z), fim exclusivo
+  const edge = { ...instagram, posts: [{ publishedAt: '2026-10-05T03:00:00.000Z', likes: 1 }, { publishedAt: '2026-10-12T03:00:00.000Z', likes: 2 }, { publishedAt: '2026-10-05T02:59:59.000Z', likes: 4 }] };
+  assert.equal(metricValue('ig_likes', bounds, { instagram: edge }, '2026-10-08'), 1);
+  assert.equal(metricValue('ig_likes', bounds, {}, '2026-10-08'), 0); // sem dados do Instagram
+});
+
+test('Instagram: ganho de seguidores = atual − retrato do 1º dia do ciclo; parcial quando o 1º retrato é posterior; ciclo encerrado usa o retrato seguinte', () => {
+  const bounds = cycleBounds('weekly', at('2026-10-08T15:00:00Z')); // 05–11/10
+  const stats = [{ day: '2026-10-04', followers: 900 }, { day: '2026-10-05', followers: 1000 }, { day: '2026-10-06', followers: 1020 }, { day: '2026-10-12', followers: 1100 }];
+  const ig = { followers: 1060, syncedAt: 'x', posts: [], stats };
+  assert.equal(metricValue('ig_followers_gain', bounds, { instagram: ig }, '2026-10-08'), 60); // em andamento: atual − 1000
+  assert.equal(metricValue('ig_followers_gain', bounds, { instagram: ig }, '2026-10-14'), 100); // encerrado: retrato de 12/10 − 1000
+  const late = { ...ig, stats: [{ day: '2026-10-07', followers: 1030 }] };
+  assert.equal(metricValue('ig_followers_gain', bounds, { instagram: late }, '2026-10-08'), 30);
+  assert.equal(followersGain(bounds, late, '2026-10-08').partial, true);
+  assert.equal(followersGain(bounds, ig, '2026-10-08').partial, false);
+  // perdeu seguidores: valor negativo (a meta mostra 0% no progresso, o real fica preservado)
+  assert.equal(metricValue('ig_followers_gain', bounds, { instagram: { ...ig, followers: 980 } }, '2026-10-08'), -20);
+  // sem retrato no ciclo: 0 (e a observação avisa)
+  const none = { ...ig, stats: [{ day: '2026-10-01', followers: 800 }] };
+  assert.equal(metricValue('ig_followers_gain', bounds, { instagram: none }, '2026-10-08'), 0);
+});
+
+test('Instagram: observação informa frescor, base parcial e ausência de sincronização; outras metas não têm observação', () => {
+  const bounds = cycleBounds('weekly', at('2026-10-08T15:00:00Z'));
+  const base = { followers: 1000, syncedAt: '2026-10-08T12:00:00.000Z', posts: [], stats: [] };
+  assert.match(instagramNote('ig_likes', bounds, { instagram: { ...base } }, '2026-10-08'), /Dados do Instagram de 08\/10 às 09:00/);
+  assert.match(instagramNote('ig_followers_gain', bounds, { instagram: base }, '2026-10-08'), /Aguardando o primeiro retrato/);
+  assert.match(instagramNote('ig_followers_gain', bounds, { instagram: { ...base, stats: [{ day: '2026-10-07', followers: 990 }] } }, '2026-10-08'), /Contando desde 07\/10/);
+  assert.match(instagramNote('ig_likes', bounds, { instagram: { ...base, syncedAt: null } }, '2026-10-08'), /ainda não sincronizado/);
+  assert.match(instagramNote('ig_likes', bounds, {}, '2026-10-08'), /ainda não sincronizado/);
+  assert.equal(instagramNote('revenue_completed', bounds, {}, '2026-10-08'), null);
+  assert.ok(INSTAGRAM_METRICS.every((m) => Object.hasOwn(GOAL_METRICS, m)));
 });

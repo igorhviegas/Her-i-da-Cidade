@@ -1,6 +1,6 @@
 export type Frequency = 'daily' | 'weekly' | 'monthly';
 export type GoalPeriod = 'daily' | 'weekly' | 'monthly';
-export type GoalMetric = 'revenue_completed' | 'services_sold' | 'scripts_created' | 'scripts_ready' | 'content_published' | 'missions_completed' | 'task_streak';
+export type GoalMetric = 'ig_followers_gain' | 'ig_posts' | 'ig_likes' | 'ig_comments' | 'ig_views' | 'revenue_completed' | 'services_sold' | 'scripts_created' | 'scripts_ready' | 'content_published' | 'missions_completed' | 'task_streak';
 export interface TaskRecurrence { frequency: Frequency; weekdays?: number[]; monthDay?: number | null; monthNth?: { week: number; weekday: number } | null; }
 export interface OccurrenceLike { id?: string; taskId?: string; date: string; status: string; [key: string]: any; }
 export interface CycleBounds { key: string; startKey: string; endKey: string; start: Date; end: Date; }
@@ -21,7 +21,7 @@ export function occurrenceDueAt(date: string, time: string): Date;
 export function syncRecurringTasks(store: any, now?: Date): Promise<{ created: any[]; resolved: any[] }>;
 export function taskStreak(occurrences: OccurrenceLike[], today: string, since?: string | null): number;
 export function cycleBounds(period: GoalPeriod, now: Date, config?: { weekStartsOn?: number; monthStartDay?: number }): CycleBounds;
-export function metricValue(metric: GoalMetric, bounds: { start: Date; end: Date }, data: { orders: any[]; scripts: any[]; missions: any[]; occurrences: any[] }, today: string): number;
+export function metricValue(metric: GoalMetric, bounds: { start: Date; end: Date }, data: { orders: any[]; scripts: any[]; missions: any[]; occurrences: any[]; revenueEntries?: { revenueDate: any; value: number }[]; instagram?: InstagramGoalData }, today: string): number;
 export function goalProgress(actual: number, target: number): GoalProgress;
 export function validateGoal(input: any): string[];
 export function buildNotifications(data: { missions?: any[]; occurrences?: any[]; goals?: any[] }, now?: Date): { id: string; type: string; title: string; body: string; refType: string; refId: string }[];
@@ -29,3 +29,7 @@ export function cycleChanged(goal: { cycleKey: string; cycleEnd: any }, bounds: 
 export function cycleArchiveRecord(goal: any, value: number, now: Date, options?: { endedEarly?: boolean }): Record<string, any>;
 export function missionNotificationIds(missionId: string): string[];
 export function occurrenceNotificationIds(occurrenceId: string): string[];
+export interface InstagramGoalData { followers: number | null; syncedAt: string | null; posts: { publishedAt: string | null; likes: number | null; comments: number | null; views: number | null }[]; stats: { day: string; followers: number }[]; }
+export const INSTAGRAM_METRICS: GoalMetric[];
+export function followersGain(bounds: { start: Date; end: Date }, ig: InstagramGoalData, today: string): { value: number; from: string | null; partial: boolean };
+export function instagramNote(metric: GoalMetric, bounds: { start: Date; end: Date }, data: { instagram?: InstagramGoalData }, today: string): string | null;

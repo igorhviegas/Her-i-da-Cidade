@@ -54,6 +54,7 @@ export const MissionGoalsTab: React.FC<{ goals: GoalView[]; reload: () => Promis
                 {g.actual > g.target && <span className="ml-2 font-normal text-emerald-300/80">real: {show(g, g.actual)}</span>}</span>
               {g.source === 'manual' && <ManualProgress goal={g} busy={busyId === g.id} onSave={(value) => run(g.id, () => setGoalProgress(g.id, value))} />}
             </div>
+            {g.note && <p className="text-[11px] text-white/45">{g.note}</p>}
             <GoalHistory goal={g} />
           </li>
         ))}
