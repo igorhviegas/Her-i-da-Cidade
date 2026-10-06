@@ -1,23 +1,10 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
+import { VideoCallBooking } from './VideoCallBooking';
 import type { HomeSection } from '../types/homeContent';
 
 export const Booking: React.FC<{ section: HomeSection }> = ({ section }) => {
   const titleLines = section.title.split(/\r?\n/);
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://assets.calendly.com/assets/external/widget.js';
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      const existingScript = document.querySelector('script[src="https://assets.calendly.com/assets/external/widget.js"]');
-      if (existingScript) {
-        document.body.removeChild(existingScript);
-      }
-    };
-  }, []);
-
   return (
     <section id="booking" className="py-24 px-4 sm:px-6 bg-gradient-to-b from-black to-[#0B1929] relative overflow-hidden">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-blue-600/5 rounded-full blur-[120px] pointer-events-none" />
@@ -38,11 +25,7 @@ export const Booking: React.FC<{ section: HomeSection }> = ({ section }) => {
           
           <div className="bg-[#0B1929]/40 backdrop-blur-xl border border-white/10 rounded-[2rem] overflow-hidden shadow-[0_30px_60px_-12px_rgba(0,0,0,0.5)] transition-transform hover:scale-[1.005] duration-500">
             <div className="p-1 sm:p-2 bg-gradient-to-b from-white/10 to-transparent">
-              <div 
-                className="calendly-inline-widget w-full rounded-2xl overflow-hidden" 
-                data-url="https://calendly.com/heroidacidade/video-chamada-espetacular" 
-                style={{ minWidth: '320px', height: '700px' }}
-              ></div>
+              <VideoCallBooking />
             </div>
           </div>
 

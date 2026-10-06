@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, GripVertical, RotateCcw, type LucideIcon } from 'lucide-react';
 import { moveNavItem, resolveNavOrder, shiftNavItem } from '../../services/adminNav.js';
 
-export interface NavItem<Id extends string = string> { id: Id; label: string; icon: LucideIcon }
+/** `children` (só em itens fixos): subpáginas listadas abaixo do item enquanto ele ou uma delas estiver aberto. */
+export interface NavItem<Id extends string = string> { id: Id; label: string; icon: LucideIcon; children?: NavItem<Id>[] }
 export interface NavGroup<Id extends string = string> { key: string; label: string; icon: LucideIcon; ids: Id[] }
 
 const storageKey = (uid: string) => `hdc.admin.navOrder.${uid}`;
@@ -113,7 +114,17 @@ export function AdminNav<Id extends string>({ pinned, items, groups, order, onRe
   return (
     <>
       <div role="status" aria-live="polite" className="sr-only">{announce}</div>
-      <ul className="mb-1.5 space-y-1">{pinned.map((item) => <li key={item.id}>{renderButton(item)}</li>)}</ul>
+      <ul className="mb-1.5 space-y-1">
+        {pinned.map((item) => {
+          const open = !!item.children?.length && (current === item.id || item.children.some((child) => child.id === current));
+          return (
+            <li key={item.id}>
+              {renderButton(item)}
+              {open && <ul className="mt-1 ml-5 space-y-1 border-l border-white/10 pl-2">{item.children!.map((child) => <li key={child.id}>{renderButton(child)}</li>)}</ul>}
+            </li>
+          );
+        })}
+      </ul>
       <ul className="space-y-1" onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setOver(null); }}>
         {groups.map((group) => {
           const GroupIcon = group.icon;

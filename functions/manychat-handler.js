@@ -29,6 +29,12 @@ function parseCatalogPrice(value) {
   return Number.isFinite(amount) && amount >= 0 ? amount : null;
 }
 
+/**
+ * Chave do pré-agendamento de Vídeo Chamada: DDI + DDD + os 8 últimos dígitos. O número digitado no site e o que o WhatsApp informa
+ * ao ManyChat podem diferir só pelo nono dígito; sem ele os dois caem na mesma chave.
+ */
+export const bookingKey = (normalizedWhatsApp) => `${normalizedWhatsApp.slice(0, 4)}${normalizedWhatsApp.slice(-8)}`;
+
 export function validateManyChatOrderInput(body) {
   const errors = [];
   if (!body || typeof body !== 'object' || Array.isArray(body)) return ['O corpo deve ser um objeto JSON.'];
@@ -76,7 +82,7 @@ export const SERVICE_PROFILES = {
   'themed-video': { serviceId: '5', title: 'Vídeo Temático', pricing: 'catalog', fields: { childName: 'required', theme: 'required' } },
   'custom-video': { serviceId: '3', title: 'Vídeo Personalizado', pricing: 'tiers', tiers: tiers(60, 75, 85), fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
   'invite-video': { serviceId: '4', title: 'Vídeo Convite', pricing: 'tiers', tiers: tiers(65, 80, 95), fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
-  'live-call': { serviceId: '2', title: 'Vídeo Chamada ao Vivo', pricing: 'fixed', price: 75, fields: { childName: 'optional', details: 'optional' } },
+  'live-call': { serviceId: '2', title: 'Vídeo Chamada ao Vivo', pricing: 'fixed', price: 75, confirmsBooking: true, fields: { childName: 'optional', details: 'optional' } },
   'presential-event': { serviceId: '6', title: 'Serviços Presenciais', pricing: 'pending', dedupeMs: 10 * 60 * 1000, fields: {} },
 };
 
@@ -159,7 +165,7 @@ function calculateDeadlines(paidAt, deliveryDays) {
 }
 
 /** Confere se o serviço do CRM está configurado para gerar pedidos. Retorna { problem } ou { price, status, productionType, deliveryDays }. */
-function evaluateService(profile, service, modality) {
+export function evaluateService(profile, service, modality) {
   const serviceName = service.title || service.name || '';
   const status = resolveInitialStatus(service);
   if (normalizeTitle(serviceName) !== normalizeTitle(profile.title) || service.active !== true || service.generateOrder !== true
@@ -200,7 +206,7 @@ function secretsMatch(providedHeader, expectedSecret) {
   return supplied.length === expected.length && timingSafeEqual(supplied, expected);
 }
 
-export async function handleManyChatOrderRequest(req, res, { database, secret, logger: customLogger = console } = {}) {
+export async function handleManyChatOrderRequest(req, res, { database, secret, logger: customLogger = console, onBookingConfirmed } = {}) {
   res.set('Cache-Control', 'no-store');
   if (req.method !== 'POST') return jsonError(res, 405, 'method_not_allowed', 'Use POST.', { allowedMethods: ['POST'] });
   if (!req.is('application/json')) return jsonError(res, 415, 'unsupported_media_type', 'Envie application/json.');
@@ -246,6 +252,27 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
 
       const evaluation = evaluateService(profile, serviceSnapshot.data(), input.modality);
       if (evaluation.problem) return { problem: evaluation.problem };
+
+      // Vídeo Chamada: se este WhatsApp tem um pré-agendamento do site aguardando pagamento, o pagamento o confirma (sem pedido novo).
+      if (profile.confirmsBooking) {
+        const pendingSnapshot = await transaction.get(database.collection('videoCallPending').doc(bookingKey(normalizedWhatsApp)));
+        const bookedRef = pendingSnapshot.exists ? database.collection(ORDERS).doc(String(pendingSnapshot.get('orderId'))) : null;
+        const bookedSnapshot = bookedRef ? await transaction.get(bookedRef) : null;
+        if (bookedSnapshot?.exists && bookedSnapshot.get('paymentPending') === true) {
+          // O valor cobrado é o que estava configurado quando a reserva foi feita (gravado no pedido).
+          const bookedPrice = bookedSnapshot.get('servicePrice');
+          const price = typeof bookedPrice === 'number' && bookedPrice >= 0 ? bookedPrice : evaluation.price;
+          const confirmation = { paymentPending: FieldValue.delete(), paidAt, servicePrice: price, totalPaid: price, updatedAt: FieldValue.serverTimestamp() };
+          if (evaluation.deliveryDays !== undefined) {
+            const deadlines = calculateDeadlines(paidAt.toDate(), evaluation.deliveryDays);
+            confirmation.deliveryDays = evaluation.deliveryDays;
+            confirmation.customerDueDate = Timestamp.fromDate(deadlines.customerDueDate);
+            confirmation.internalDueDate = Timestamp.fromDate(deadlines.internalDueDate);
+          }
+          transaction.update(bookedRef, confirmation);
+          return { orderId: bookedRef.id, confirmedBooking: true };
+        }
+      }
 
       // Chamada repetida (reenvio do ManyChat, duplo clique): dentro da janela, devolve o pedido já criado em vez de criar outro.
       let dedupeRef = null;
@@ -342,11 +369,17 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
     if (transactionResult.problem === 'service_configuration_changed') return jsonError(res, 422, 'service_configuration_changed', `${profile.title} não está com a configuração esperada no CRM (ativo, gera pedido, tipo de produção e status inicial). Nenhum registro foi criado.`);
     if (transactionResult.problem === 'service_price_unavailable') return jsonError(res, 422, 'service_price_unavailable', 'O preço fixo cadastrado para o serviço não pôde ser interpretado. Nenhum registro foi criado.');
     if (transactionResult.problem === 'invalid_client_index') return jsonError(res, 409, 'invalid_client_index', 'O índice de WhatsApp existente é inválido; nenhum registro foi criado.');
+    // Pré-agendamento confirmado: avisa quem chamou (ex.: marcar o evento da agenda como pago). Falha aqui não desfaz a confirmação.
+    if (transactionResult.confirmedBooking && onBookingConfirmed) {
+      try { await onBookingConfirmed(transactionResult.orderId); }
+      catch (error) { (customLogger || console).error('Pagamento confirmado, mas o evento da agenda não foi atualizado.', { orderId: transactionResult.orderId, error: error instanceof Error ? error.message : String(error) }); }
+    }
     return res.status(200).json({
       ok: true,
       orderId: transactionResult.orderId,
       technicalPurchaseId: transactionResult.orderId,
       ...(transactionResult.duplicate ? { duplicate: true } : {}),
+      ...(transactionResult.confirmedBooking ? { confirmedBooking: true } : {}),
     });
   } catch (error) {
     const log = customLogger || console;

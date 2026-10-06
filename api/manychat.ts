@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import { handleManyChatOrderRequest } from '../functions/manychat-handler.js';
+import { markVideoCallEventPaid } from '../functions/video-call.js';
 
 let firestoreInstance: Firestore | null = null;
 
@@ -219,6 +220,7 @@ export async function handleManyChatWebhook(req: Request | any, res: Response | 
     database: db,
     secret,
     logger: console,
+    onBookingConfirmed: (orderId: string) => markVideoCallEventPaid({ database: db, orderId }),
   });
 }
 

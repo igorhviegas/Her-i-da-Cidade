@@ -25,7 +25,7 @@ test.beforeEach(() => resetTokenCache());
 const timed = { id: 'e1', summary: 'Reunião', location: 'Sala 1', description: 'Cliente: Maria', start: { dateTime: '2026-10-10T14:30:00-03:00' }, end: { dateTime: '2026-10-10T15:30:00-03:00' }, htmlLink: 'https://cal/e1' };
 
 test('normalizeEvent: horário em Brasília, dia inteiro com fim inclusivo, evento do CRM identificado pelo ID', () => {
-  assert.deepEqual(normalizeEvent(timed), { id: 'e1', title: 'Reunião', description: 'Cliente: Maria', location: 'Sala 1', allDay: false, startKey: '2026-10-10', startTime: '14:30', endKey: '2026-10-10', endTime: '15:30', htmlLink: 'https://cal/e1', crm: false });
+  assert.deepEqual(normalizeEvent(timed), { id: 'e1', title: 'Reunião', description: 'Cliente: Maria', location: 'Sala 1', allDay: false, startKey: '2026-10-10', startTime: '14:30', endKey: '2026-10-10', endTime: '15:30', htmlLink: 'https://cal/e1', crm: false, transparent: false });
   const utc = normalizeEvent({ id: 'u', start: { dateTime: '2026-10-11T01:30:00Z' }, end: { dateTime: '2026-10-11T02:30:00Z' } }); // 22:30 do dia 10 em Brasília
   assert.deepEqual([utc.startKey, utc.startTime, utc.title], ['2026-10-10', '22:30', '(Sem título)']);
   const allDay = normalizeEvent({ id: 'a', summary: 'Feriado', start: { date: '2026-10-12' }, end: { date: '2026-10-13' } });

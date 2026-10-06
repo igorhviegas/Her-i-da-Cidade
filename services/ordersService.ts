@@ -252,6 +252,16 @@ const activeListeners = new Set<ActiveListener>();
 let stopActive: (() => void) | null = null;
 let lastActive: Order[] | null = null;
 
+/** Pedidos de Vídeo Chamada agendados pelo site com data de hoje em diante (pendentes de pagamento ou já confirmados). */
+export function subscribeVideoCallOrders(todayKey: string, onData: (orders: Order[]) => void, onError: (error: Error) => void): () => void {
+  if (!db) { onError(new Error("Firebase Firestore não inicializado.")); return () => {}; }
+  return onSnapshot(
+    query(collection(db, ORDERS_COLLECTION), where("videoCall.date", ">=", todayKey), orderBy("videoCall.date")),
+    (snapshot) => onData(snapshot.docs.map((item) => mapOrder(item.id, item.data()))),
+    onError,
+  );
+}
+
 /**
  * Pedidos em andamento em tempo real. Um único listener Firestore é compartilhado entre o contador do menu e o widget
  * da página Principal; mudança de status, criação, exclusão ou conclusão chegam sem nova leitura completa.
@@ -345,6 +355,12 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
       stock = await prepareOrderReversal(transaction, firestore, { orderId: id, actor: currentActor() });
     }
 
+    // Pré-agendamento de Vídeo Chamada sem pagamento confirmado não pode ser concluído (salvo se o pagamento for informado junto).
+    if (updates.status === 'completed' && currentData.status !== 'completed' && currentData.paymentPending === true && !(updates.paidAt instanceof Date)) {
+      throw new Error('Este pré-agendamento ainda aguarda pagamento. Informe a data do pagamento em "Editar pedido" antes de concluir.');
+    }
+    // Informar a data de pagamento confirma o pré-agendamento.
+    if (currentData.paymentPending === true && updates.paidAt instanceof Date) payload.paymentPending = deleteField();
     // Pedido presencial do ManyChat (eventDraft): sem os dados do evento não há o que faturar, então não pode ser concluído.
     if (updates.status === 'completed' && currentData.status !== 'completed' && currentData.eventDraft === true) {
       throw new Error('Complete os dados do evento em "Editar pedido" antes de concluir.');

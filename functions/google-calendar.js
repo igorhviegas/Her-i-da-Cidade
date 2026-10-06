@@ -242,7 +242,7 @@ Object.assign(MESSAGES, {
 export const isCrmEventId = (id) => /^hc[0-9a-f]{40}$/.test(String(id));
 
 const clockIn = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-const addDayKey = (key, amount) => { const d = new Date(`${key}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + amount); return d.toISOString().slice(0, 10); };
+export const addDayKey = (key, amount) => { const d = new Date(`${key}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + amount); return d.toISOString().slice(0, 10); };
 
 /** Evento do Google → formato do módulo (datas como chaves no fuso de Brasília; fim de dia inteiro já inclusivo). */
 export function normalizeEvent(item) {
@@ -265,6 +265,8 @@ export function normalizeEvent(item) {
     endTime: allDay ? null : clockIn.format(endDate),
     htmlLink: item.htmlLink || null,
     crm: isCrmEventId(item.id),
+    /** Marcado como "Livre" na agenda: aparece, mas não ocupa o horário. */
+    transparent: item.transparency === 'transparent',
   };
 }
 
@@ -310,7 +312,7 @@ export async function listCalendarEvents({ from, to, q, ...ctx }) {
   const query = {
     singleEvents: 'true', orderBy: 'startTime', maxResults: '250', showDeleted: 'false',
     timeMin: startOfDay(from).toISOString(), timeMax: startOfDay(addDays(to, 1)).toISOString(), timeZone: TIME_ZONE,
-    fields: 'nextPageToken,items(id,status,summary,description,location,start,end,htmlLink)',
+    fields: 'nextPageToken,items(id,status,summary,description,location,start,end,htmlLink,transparency)',
     ...(q?.trim() ? { q: q.trim().slice(0, 200) } : {}),
   };
   const events = [];

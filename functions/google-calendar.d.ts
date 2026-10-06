@@ -19,7 +19,7 @@ export function resetTokenCache(): void;
 export function syncOrderToCalendar(opts: { orderId: string; order: any; client: any; env?: Record<string, string | undefined>; fetchImpl?: typeof fetch; now?: number }): Promise<{ eventId: string; htmlLink?: string; created: boolean; calendarId: string }>;
 export interface CalendarEvent {
   id: string; title: string; description: string; location: string; allDay: boolean;
-  startKey: string; startTime: string | null; endKey: string; endTime: string | null; htmlLink: string | null; crm: boolean;
+  startKey: string; startTime: string | null; endKey: string; endTime: string | null; htmlLink: string | null; crm: boolean; transparent: boolean;
 }
 export interface CalendarEventInput { title: string; date: string; allDay?: boolean; startTime?: string; endTime?: string; location?: string; description?: string }
 type CalendarCtx = { env?: Record<string, string | undefined>; fetchImpl?: typeof fetch; now?: number };
@@ -30,3 +30,4 @@ export function listCalendarEvents(opts: { from: string; to: string; q?: string 
 export function createCalendarEvent(opts: { input: CalendarEventInput } & CalendarCtx): Promise<CalendarEvent>;
 export function updateCalendarEvent(opts: { id: string; input: CalendarEventInput } & CalendarCtx): Promise<CalendarEvent>;
 export function deleteCalendarEvent(opts: { id: string } & CalendarCtx): Promise<{ id: string }>;
+export function addDayKey(key: string, amount: number): string;

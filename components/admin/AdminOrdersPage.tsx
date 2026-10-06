@@ -437,7 +437,8 @@ export const AdminOrdersPage: React.FC = () => {
                       const internalDate = formatDate(order.internalDueDate);
                       const eventDate = formatDate(order.eventDate);
                       const childName = extractBirthdayPerson(order);
-                      const deliveryUrl = buildDeliveryWhatsAppUrl(client?.whatsapp, order, service);
+                      // Vídeo Chamada agendada pelo site para outro número: a mensagem do dia vai para o número da chamada, não para o de contato.
+                      const deliveryUrl = buildDeliveryWhatsAppUrl(order.videoCall?.callWhatsapp ?? client?.whatsapp, order, service);
                       const serviceColor = getServiceColor(service);
                       const colorClasses = serviceColor ? SERVICE_COLOR_CLASSES[serviceColor] : null;
                       const completing = updatingOrderId === order.id;
@@ -477,7 +478,8 @@ export const AdminOrdersPage: React.FC = () => {
                               </p>}
                             </div>
                           )}
-                          {order.eventDraft ? <p className="mt-3 text-xs font-bold text-amber-300">⚠ Dados do evento pendentes</p> : <p className="mt-3 text-sm font-extrabold text-emerald-300">{formatMoney(order.totalPaid)}</p>}
+                          {order.paymentPending && order.videoCall && <p className="mt-3 text-xs font-bold text-amber-300">⏳ Aguardando pagamento · Chamada {order.videoCall.date.split('-').reverse().join('/')} às {order.videoCall.time}</p>}
+                          {order.eventDraft ? <p className="mt-3 text-xs font-bold text-amber-300">⚠ Dados do evento pendentes</p> : order.paymentPending ? null : <p className="mt-3 text-sm font-extrabold text-emerald-300">{formatMoney(order.totalPaid)}</p>}
                           <div className="mt-2.5 flex flex-wrap gap-2">
                             {order.eventDraft ? (
                               <button
