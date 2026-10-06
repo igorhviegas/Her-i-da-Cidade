@@ -10,6 +10,7 @@ import { handleAlexa } from "./api/alexa";
 import { handleInstagramSync } from "./api/instagram-sync";
 import { handleGoogleCalendar } from "./api/google-calendar";
 import { handleCalendarEvents } from "./api/calendar-events";
+import { handleVideoCall } from "./api/video-call";
 
 const PORT = 3000;
 
@@ -203,6 +204,11 @@ async function startServer() {
   // Calendário: listar/criar/editar/excluir eventos da agenda (administrador autenticado)
   app.all("/api/calendar-events", (req, res) => {
     handleCalendarEvents(req, res);
+  });
+
+  // Agendamento público de Vídeo Chamada (sem login): horários livres e pré-reserva
+  app.all("/api/video-call", (req, res) => {
+    handleVideoCall(req, res);
   });
 
   app.all("/api/alexa", (req, res) => {

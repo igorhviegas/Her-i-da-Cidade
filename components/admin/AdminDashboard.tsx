@@ -16,6 +16,7 @@ import { AdminFinancePage } from './AdminFinancePage';
 import { FinanceRevenueBadge } from './FinanceRevenueBadge';
 import { AdminHomePage } from './AdminHomePage';
 import { AdminCalendarPage } from './AdminCalendarPage';
+import { AdminVideoCallsPage } from './AdminVideoCallsPage';
 import { AdminInstagramPage } from './AdminInstagramPage';
 import { AdminAgentPage } from './AdminAgentPage';
 import { AdminNav, useNavOrder, type NavItem, type NavGroup } from './AdminNav';
@@ -46,13 +47,14 @@ import {
   Camera,
   House,
   CalendarDays,
+  CalendarCheck,
   Briefcase,
   Tv,
   SlidersHorizontal,
   Headset
 } from 'lucide-react';
 
-type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram' | 'calendar' | 'agent';
+type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram' | 'calendar' | 'videocalls' | 'agent';
 
 // Módulos reorganizáveis (ordem padrão). "Principal" é fixo no topo e fica fora desta lista.
 const NAV_ITEMS: NavItem<AdminTab>[] = [
@@ -107,6 +109,8 @@ export const AdminDashboard: React.FC = () => {
       ? 'finance'
       : path === '/admin/calendario'
       ? 'calendar'
+      : path === '/admin/agendamento-chamadas'
+      ? 'videocalls'
       : path === '/admin/agente'
       ? 'agent'
       : path === '/admin/dashboard'
@@ -122,7 +126,7 @@ export const AdminDashboard: React.FC = () => {
     const link = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
     if (!link) return;
     const original = link.getAttribute('href') ?? '';
-    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes' } as Record<string, string>)[path] ?? path.split('/')[2];
+    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes', '/admin/agendamento-chamadas': 'calendario' } as Record<string, string>)[path] ?? path.split('/')[2];
     if (slug) link.setAttribute('href', `/images/modules/${slug}.png`);
     return () => link.setAttribute('href', original);
   }, [path]);
@@ -153,6 +157,8 @@ export const AdminDashboard: React.FC = () => {
       setCurrentTab('finance');
     } else if (path === '/admin/calendario') {
       setCurrentTab('calendar');
+    } else if (path === '/admin/agendamento-chamadas') {
+      setCurrentTab('videocalls');
     } else if (path === '/admin/agente') {
       setCurrentTab('agent');
     } else if (path === '/admin/dashboard') {
@@ -188,6 +194,8 @@ export const AdminDashboard: React.FC = () => {
       navigate('/admin/financeiro');
     } else if (tabId === 'calendar') {
       navigate('/admin/calendario');
+    } else if (tabId === 'videocalls') {
+      navigate('/admin/agendamento-chamadas');
     } else if (tabId === 'agent') {
       navigate('/admin/agente');
     } else if (tabId === 'dashboard') {
@@ -253,7 +261,7 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const pinnedItems: NavItem<AdminTab>[] = [{ id: 'home', label: 'Principal', icon: House }, { id: 'calendar', label: 'Calendário', icon: CalendarDays }];
+  const pinnedItems: NavItem<AdminTab>[] = [{ id: 'home', label: 'Principal', icon: House }, { id: 'calendar', label: 'Calendário', icon: CalendarDays }, { id: 'videocalls', label: 'Agendamento de chamadas', icon: CalendarCheck }];
   const navItems: NavItem<AdminTab>[] = NAV_ITEMS;
   const { order: navOrder, setOrder: setNavOrder, reset: resetNavOrder, customized: navCustomized } = useNavOrder<AdminTab>(user?.uid, NAV_ORDER);
 
@@ -445,6 +453,7 @@ export const AdminDashboard: React.FC = () => {
           
           {currentTab === 'home' && <AdminHomePage onNavigate={handleTabChange} />}
           {currentTab === 'calendar' && <AdminCalendarPage />}
+          {currentTab === 'videocalls' && <AdminVideoCallsPage />}
 
           {/* TAB: DASHBOARD */}
           {currentTab === 'dashboard' && (

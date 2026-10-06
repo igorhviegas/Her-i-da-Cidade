@@ -242,7 +242,7 @@ Object.assign(MESSAGES, {
 export const isCrmEventId = (id) => /^hc[0-9a-f]{40}$/.test(String(id));
 
 const clockIn = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-const addDayKey = (key, amount) => { const d = new Date(`${key}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + amount); return d.toISOString().slice(0, 10); };
+export const addDayKey = (key, amount) => { const d = new Date(`${key}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + amount); return d.toISOString().slice(0, 10); };
 
 /** Evento do Google → formato do módulo (datas como chaves no fuso de Brasília; fim de dia inteiro já inclusivo). */
 export function normalizeEvent(item) {

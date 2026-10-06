@@ -477,7 +477,8 @@ export const AdminOrdersPage: React.FC = () => {
                               </p>}
                             </div>
                           )}
-                          {order.eventDraft ? <p className="mt-3 text-xs font-bold text-amber-300">⚠ Dados do evento pendentes</p> : <p className="mt-3 text-sm font-extrabold text-emerald-300">{formatMoney(order.totalPaid)}</p>}
+                          {order.paymentPending && order.videoCall && <p className="mt-3 text-xs font-bold text-amber-300">⏳ Aguardando pagamento · Chamada {order.videoCall.date.split('-').reverse().join('/')} às {order.videoCall.time}</p>}
+                          {order.eventDraft ? <p className="mt-3 text-xs font-bold text-amber-300">⚠ Dados do evento pendentes</p> : order.paymentPending ? null : <p className="mt-3 text-sm font-extrabold text-emerald-300">{formatMoney(order.totalPaid)}</p>}
                           <div className="mt-2.5 flex flex-wrap gap-2">
                             {order.eventDraft ? (
                               <button

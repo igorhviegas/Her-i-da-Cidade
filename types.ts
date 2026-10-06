@@ -25,7 +25,7 @@ export interface Service {
 
 export type ProductionType = 'scheduled' | 'recording' | 'editing' | 'immediate';
 export type OrderStatus = 'scheduled' | 'recording' | 'editing' | 'delivery' | 'completed';
-export type OrderSource = 'manual' | 'manychat';
+export type OrderSource = 'manual' | 'manychat' | 'booking';
 
 /** Cliente interno do CRM. whatsappNormalized é a chave lógica de busca. */
 export interface Client {
@@ -72,6 +72,10 @@ export interface Order {
   eventForm?: EventForm;
   /** Pedido presencial criado pelo ManyChat só com cliente e WhatsApp: os dados do evento ainda não foram preenchidos. Sai ao salvar o formulário de evento. */
   eventDraft?: boolean;
+  /** Pré-agendamento de Vídeo Chamada feito pelo site: o horário está reservado, mas o pagamento ainda não foi confirmado (sai quando o ManyChat confirma o pagamento). */
+  paymentPending?: boolean;
+  /** Dados do agendamento público de Vídeo Chamada (/agendar-chamada). `date`/`time` são o horário local da agenda. */
+  videoCall?: { date: string; time: string; durationMinutes: number; slotId: string; childAge: string; theme: string; details: string };
   /** Presente em pedidos de evento com livro de lançamentos (collection financeEntries). Valores já lançados (congelados). */
   eventLedger?: { entry: number; final?: number; cost?: number; /** soma dos ajustes de receita */ adj?: number; /** soma dos ajustes de despesa */ adjCost?: number; /** nº do último ajuste */ seq?: number };
   /** Vínculo com o Google Agenda, gravado pelo servidor (/api/google-calendar). */

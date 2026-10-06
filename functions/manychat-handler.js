@@ -76,7 +76,7 @@ export const SERVICE_PROFILES = {
   'themed-video': { serviceId: '5', title: 'Vídeo Temático', pricing: 'catalog', fields: { childName: 'required', theme: 'required' } },
   'custom-video': { serviceId: '3', title: 'Vídeo Personalizado', pricing: 'tiers', tiers: tiers(60, 75, 85), fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
   'invite-video': { serviceId: '4', title: 'Vídeo Convite', pricing: 'tiers', tiers: tiers(65, 80, 95), fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
-  'live-call': { serviceId: '2', title: 'Vídeo Chamada ao Vivo', pricing: 'fixed', price: 75, fields: { childName: 'optional', details: 'optional' } },
+  'live-call': { serviceId: '2', title: 'Vídeo Chamada ao Vivo', pricing: 'fixed', price: 75, confirmsBooking: true, fields: { childName: 'optional', details: 'optional' } },
   'presential-event': { serviceId: '6', title: 'Serviços Presenciais', pricing: 'pending', dedupeMs: 10 * 60 * 1000, fields: {} },
 };
 
@@ -159,7 +159,7 @@ function calculateDeadlines(paidAt, deliveryDays) {
 }
 
 /** Confere se o serviço do CRM está configurado para gerar pedidos. Retorna { problem } ou { price, status, productionType, deliveryDays }. */
-function evaluateService(profile, service, modality) {
+export function evaluateService(profile, service, modality) {
   const serviceName = service.title || service.name || '';
   const status = resolveInitialStatus(service);
   if (normalizeTitle(serviceName) !== normalizeTitle(profile.title) || service.active !== true || service.generateOrder !== true
@@ -246,6 +246,24 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
 
       const evaluation = evaluateService(profile, serviceSnapshot.data(), input.modality);
       if (evaluation.problem) return { problem: evaluation.problem };
+
+      // Vídeo Chamada: se este WhatsApp tem um pré-agendamento do site aguardando pagamento, o pagamento o confirma (sem pedido novo).
+      if (profile.confirmsBooking) {
+        const pendingSnapshot = await transaction.get(database.collection('videoCallPending').doc(normalizedWhatsApp));
+        const bookedRef = pendingSnapshot.exists ? database.collection(ORDERS).doc(String(pendingSnapshot.get('orderId'))) : null;
+        const bookedSnapshot = bookedRef ? await transaction.get(bookedRef) : null;
+        if (bookedSnapshot?.exists && bookedSnapshot.get('paymentPending') === true) {
+          const confirmation = { paymentPending: FieldValue.delete(), paidAt, servicePrice: evaluation.price, totalPaid: evaluation.price, updatedAt: FieldValue.serverTimestamp() };
+          if (evaluation.deliveryDays !== undefined) {
+            const deadlines = calculateDeadlines(paidAt.toDate(), evaluation.deliveryDays);
+            confirmation.deliveryDays = evaluation.deliveryDays;
+            confirmation.customerDueDate = Timestamp.fromDate(deadlines.customerDueDate);
+            confirmation.internalDueDate = Timestamp.fromDate(deadlines.internalDueDate);
+          }
+          transaction.update(bookedRef, confirmation);
+          return { orderId: bookedRef.id, confirmedBooking: true };
+        }
+      }
 
       // Chamada repetida (reenvio do ManyChat, duplo clique): dentro da janela, devolve o pedido já criado em vez de criar outro.
       let dedupeRef = null;
@@ -347,6 +365,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
       orderId: transactionResult.orderId,
       technicalPurchaseId: transactionResult.orderId,
       ...(transactionResult.duplicate ? { duplicate: true } : {}),
+      ...(transactionResult.confirmedBooking ? { confirmedBooking: true } : {}),
     });
   } catch (error) {
     const log = customLogger || console;

@@ -30,3 +30,4 @@ export function listCalendarEvents(opts: { from: string; to: string; q?: string 
 export function createCalendarEvent(opts: { input: CalendarEventInput } & CalendarCtx): Promise<CalendarEvent>;
 export function updateCalendarEvent(opts: { id: string; input: CalendarEventInput } & CalendarCtx): Promise<CalendarEvent>;
 export function deleteCalendarEvent(opts: { id: string } & CalendarCtx): Promise<{ id: string }>;
+export function addDayKey(key: string, amount: number): string;
