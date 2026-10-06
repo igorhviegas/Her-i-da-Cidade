@@ -55,7 +55,7 @@ export const Footer: React.FC = () => {
                 <img
                   src={spider}
                   alt="Logo do Herói da Cidade"
-                  className="w-6 h-6 object-contain"
+                  className="h-full w-full scale-125 object-cover"
                 />
               </div>
               <span className="text-xl font-extrabold tracking-tighter uppercase text-white">
