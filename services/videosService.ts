@@ -43,6 +43,7 @@ export function mapDocToVideo(docId: string, data: any): Video {
     publishedAt: data.publishedAt,
     active: data.active !== false,
     featured: data.featured === true,
+    ...(data.needsReview === true ? { needsReview: true } : {}),
     order: data.order !== undefined ? Number(data.order) : 1,
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
@@ -223,6 +224,7 @@ export async function updateVideo(
   const payload: any = {
     ...updates,
     updatedAt: serverTimestamp(),
+    needsReview: false, // salvar no formulário conta como revisão do vídeo importado
   };
 
   // Sincronizar category/categories: sempre que uma das duas mudar, recalcular a outra
@@ -339,6 +341,7 @@ export async function toggleVideoActive(id: string, isActive: boolean): Promise<
   if (!db) throw new Error("Firestore não inicializado");
   const docRef = doc(db, VIDEOS_COLLECTION, id);
   const updates: any = { active: isActive, updatedAt: serverTimestamp() };
+  if (isActive) updates.needsReview = false;
   if (!isActive) {
     updates.featured = false;
   }

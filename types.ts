@@ -182,6 +182,8 @@ export interface FirestoreVideo {
   active: boolean;
   featured?: boolean;
   badgeText?: string;
+  /** Criado pela sincronização do Instagram e ainda não revisado pelo administrador. */
+  needsReview?: boolean;
   order?: number;
   createdAt?: string;
   updatedAt?: string;

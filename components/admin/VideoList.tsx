@@ -6,6 +6,7 @@ import VideoRowAdmin from './VideoRowAdmin';
 import VideoFormModal from './VideoFormModal';
 import CsvImportModal from './CsvImportModal';
 import { Search, X, LayoutGrid, List } from 'lucide-react';
+import { syncInstagramNow } from '../../services/instagramService';
 import { getCategories, syncCategoriesFromVideos } from '../../services/categoriesService';
 
 type SortOption = 'order' | 'title-asc' | 'title-desc' | 'recent' | 'oldest';
@@ -24,6 +25,9 @@ export const VideoList: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('Todas');
   const [sortBy, setSortBy] = useState<SortOption>('order');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [onlyReview, setOnlyReview] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const fetchVideos = async () => {
     setLoading(true);
@@ -74,6 +78,7 @@ export const VideoList: React.FC = () => {
 
     // 1. Filtros (Busca + Categoria)
     const filtered = videos.filter((video) => {
+      if (onlyReview && !video.needsReview) return false;
       // Filtro de categoria
       if (selectedCategory !== 'Todas') {
         const cats = video.categories?.length
@@ -130,9 +135,28 @@ export const VideoList: React.FC = () => {
       }
       return 0;
     });
-  }, [videos, search, selectedCategory, sortBy]);
+  }, [videos, search, selectedCategory, sortBy, onlyReview]);
 
-  const isFiltered = Boolean(search.trim() || selectedCategory !== 'Todas');
+  const isFiltered = Boolean(search.trim() || selectedCategory !== 'Todas' || onlyReview);
+  const reviewCount = useMemo(() => videos.filter((v) => v.needsReview).length, [videos]);
+
+  const handleInstagramSync = async () => {
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const result = await syncInstagramNow();
+      setSyncMessage(
+        result.status === 'completed' ? 'Sincronização concluída.'
+          : result.status === 'running' ? 'Já há uma sincronização em andamento.'
+          : 'Aguarde um instante antes de sincronizar de novo.',
+      );
+      await fetchVideos();
+    } catch (e: any) {
+      setSyncMessage(e.message ?? 'Não foi possível sincronizar agora.');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Excluir este vídeo?')) return;
@@ -188,6 +212,14 @@ export const VideoList: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={handleInstagramSync}
+            disabled={syncing}
+            className="px-4 py-2 bg-sky-600/90 text-white rounded-xl hover:bg-sky-500 font-semibold text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+          >
+            {syncing ? 'Sincronizando...' : 'Importar do Instagram'}
+          </button>
+          <button
+            type="button"
             onClick={() => setShowCsvImport(true)}
             className="px-4 py-2 bg-emerald-600/90 text-white rounded-xl hover:bg-emerald-500 font-semibold text-xs sm:text-sm transition-all shadow-md active:scale-95 cursor-pointer"
           >
@@ -202,6 +234,8 @@ export const VideoList: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {syncMessage && <p className="text-xs text-white/70" role="status">{syncMessage}</p>}
 
       {/* Barra de Ferramentas Administrativa (Busca, Categoria, Ordenação e Alternância de Visualização) */}
       <div className="bg-[#0D1527] border border-white/10 rounded-2xl p-3.5 sm:p-4 space-y-3 shadow-lg">
@@ -247,6 +281,18 @@ export const VideoList: React.FC = () => {
                 ))}
               </select>
             </div>
+
+            {/* Filtro: importados do Instagram aguardando revisão */}
+            <button
+              type="button"
+              onClick={() => setOnlyReview((v) => !v)}
+              aria-pressed={onlyReview}
+              className={`px-3 py-1.5 rounded-xl border font-bold transition-colors cursor-pointer ${
+                onlyReview ? 'bg-sky-600 text-white border-sky-400' : 'bg-[#070B14] text-white/70 border-white/10 hover:text-white'
+              }`}
+            >
+              Aguardando revisão ({reviewCount})
+            </button>
 
             {/* Ordenação */}
             <div className="flex items-center gap-1.5">
@@ -328,6 +374,7 @@ export const VideoList: React.FC = () => {
                   onClick={() => {
                     setSearch('');
                     setSelectedCategory('Todas');
+                    setOnlyReview(false);
                   }}
                   className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
