@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  GOAL_METRICS, INSTAGRAM_METRICS, followersGain, instagramNote,
+  GOAL_METRICS, INSTAGRAM_METRICS, engagementInCycle, followersGain, instagramNote,
   addDays, buildNotifications, cycleArchiveRecord, cycleBounds, cycleChanged, dateKey, goalProgress, metricValue, missionNotificationIds,
   occurrenceNotificationIds, planOccurrences, recursOn, startOfDay,
   syncRecurringTasks, taskStreak, validateTask,
@@ -304,22 +304,58 @@ test('faturamento da meta respeita os limites do ciclo (início inclusivo, fim e
 const igDay = (d, h = 15) => new Date(`2026-10-${d}T${String(h).padStart(2, '0')}:00:00Z`);
 const igPost = (id, day, likes, comments, views) => ({ id, publishedAt: igDay(day).toISOString(), likes, comments, views });
 
-test('Instagram: curtidas, comentários, views e publicações contam só posts publicados no ciclo; métrica ausente fica fora', () => {
+// post: [id, dia da publicação, curtidas, comentários, views]; snap: retrato diário por publicação
+const post = (id, published, likes, comments, views) => ({ id, publishedAt: published, likes, comments, views });
+const snap = (day, posts) => ({ day, followers: 1000, posts });
+const ig = (over) => ({ followers: 1500, syncedAt: '2026-10-08T12:00:00.000Z', posts: [], stats: [], ...over });
+
+test('Instagram: curtidas/comentários/views = ganho de cada publicação no ciclo, inclusive posts antigos; post novo conta desde 0', () => {
   const bounds = cycleBounds('weekly', at('2026-10-08T15:00:00Z')); // 05–11/10
-  const instagram = {
-    followers: 1500, syncedAt: '2026-10-08T12:00:00.000Z', stats: [],
+  const data = ig({
     posts: [
-      igPost('a', '06', 100, 10, 1000), igPost('b', '07', 50, null, null), // ocultas/indisponíveis não somam
-      igPost('antes', '04', 999, 99, 9999), igPost('depois', '12', 999, 99, 9999), // fora do ciclo
+      post('antigo', '2026-09-20T12:00:00.000Z', 1150, 130, 40000), // ganhou 150 / 30 / 5000 no ciclo
+      post('novo', '2026-10-07T12:00:00.000Z', 80, 8, 900), // feito no ciclo: tudo é do ciclo
+      post('depois', '2026-10-12T12:00:00.000Z', 999, 99, 9999), // depois do ciclo: fora
+      post('semBase', '2026-08-01T12:00:00.000Z', 500, 50, 5000), // antigo e fora do retrato: ganho desconhecido, fica de fora
+      post('oculto', '2026-09-01T12:00:00.000Z', null, null, null), // métrica indisponível: fora, nunca vira 0
       { id: 'semdata', publishedAt: null, likes: 5, comments: 5, views: 5 },
     ],
-  };
-  const value = (m) => metricValue(m, bounds, { instagram }, '2026-10-08');
-  assert.deepEqual(['ig_posts', 'ig_likes', 'ig_comments', 'ig_views'].map(value), [2, 150, 10, 1000]);
-  // limites: início inclusivo (00:00 BRT de 05/10 = 03:00Z), fim exclusivo
-  const edge = { ...instagram, posts: [{ publishedAt: '2026-10-05T03:00:00.000Z', likes: 1 }, { publishedAt: '2026-10-12T03:00:00.000Z', likes: 2 }, { publishedAt: '2026-10-05T02:59:59.000Z', likes: 4 }] };
-  assert.equal(metricValue('ig_likes', bounds, { instagram: edge }, '2026-10-08'), 1);
+    stats: [snap('2026-10-05', { antigo: [1000, 100, 35000], oculto: [10, 1, 100] })],
+  });
+  const value = (m) => metricValue(m, bounds, { instagram: data }, '2026-10-08');
+  assert.deepEqual(['ig_posts', 'ig_likes', 'ig_comments', 'ig_views'].map(value), [1, 150 + 80, 30 + 8, 5000 + 900]);
+  const e = engagementInCycle('ig_likes', bounds, data, '2026-10-08');
+  assert.deepEqual([e.from, e.partial, e.pending], ['2026-10-05', false, false]);
   assert.equal(metricValue('ig_likes', bounds, {}, '2026-10-08'), 0); // sem dados do Instagram
+});
+
+test('Instagram: engajamento com base parcial (1º retrato depois do início) e pendente (sem retrato por publicação)', () => {
+  const bounds = cycleBounds('weekly', at('2026-10-08T15:00:00Z'));
+  const posts = [post('antigo', '2026-09-20T12:00:00.000Z', 1150, 130, 40000), post('novo', '2026-10-06T12:00:00.000Z', 80, 8, 900)];
+  const partial = ig({ posts, stats: [snap('2026-10-07', { antigo: [1100, 120, 38000] })] });
+  assert.equal(metricValue('ig_views', bounds, { instagram: partial }, '2026-10-08'), 2000 + 900);
+  assert.deepEqual([engagementInCycle('ig_views', bounds, partial, '2026-10-08').partial, engagementInCycle('ig_views', bounds, partial, '2026-10-08').from], [true, '2026-10-07']);
+  // retrato só de seguidores (sem posts por publicação) não serve de base de engajamento
+  const pending = ig({ posts, stats: [{ day: '2026-10-05', followers: 1000 }] });
+  const e = engagementInCycle('ig_likes', bounds, pending, '2026-10-08');
+  assert.deepEqual([e.value, e.pending, e.from], [80, true, null]); // só o post novo, até o 1º retrato
+  assert.match(instagramNote('ig_likes', bounds, { instagram: pending }, '2026-10-08'), /depois do primeiro retrato/);
+  assert.match(instagramNote('ig_likes', bounds, { instagram: partial }, '2026-10-08'), /Publicações antigas contam desde 07\/10/);
+});
+
+test('Instagram: ciclo encerrado usa o retrato do dia seguinte como fim; sem ele, o último retrato do ciclo; limites de data respeitados', () => {
+  const bounds = cycleBounds('weekly', at('2026-10-08T15:00:00Z')); // 05–11/10
+  const posts = [post('antigo', '2026-09-20T12:00:00.000Z', 9999, 99, 99999), post('novo', '2026-10-06T12:00:00.000Z', 9999, 99, 99999)]; // valores atuais não valem
+  const stats = [snap('2026-10-05', { antigo: [1000, 0, 0] }), snap('2026-10-09', { antigo: [1100, 0, 0], novo: [60, 0, 0] }), snap('2026-10-12', { antigo: [1200, 0, 0], novo: [70, 0, 0] })];
+  assert.equal(metricValue('ig_likes', bounds, { instagram: ig({ posts, stats }) }, '2026-10-14'), (1200 - 1000) + 70);
+  assert.equal(metricValue('ig_likes', bounds, { instagram: ig({ posts, stats: stats.slice(0, 2) }) }, '2026-10-14'), (1100 - 1000) + 60); // sem retrato do dia 12
+  // início inclusivo / fim exclusivo da data de publicação (fuso de Brasília): 05/10 00:00 entra; 12/10 00:00 não
+  const edge = ig({ posts: [post('a', '2026-10-05T03:00:00.000Z', 1, 0, 0), post('b', '2026-10-12T03:00:00.000Z', 2, 0, 0), post('c', '2026-10-05T02:59:59.000Z', 4, 0, 0)], stats: [snap('2026-10-05', { c: [3, 0, 0] })] });
+  assert.equal(metricValue('ig_likes', bounds, { instagram: edge }, '2026-10-08'), 1 + (4 - 3));
+});
+
+test('progresso exibido nunca é negativo (ganho de seguidores pode ser negativo); o valor real é preservado', () => {
+  assert.deepEqual(goalProgress(-20, 100), { actual: -20, shown: 0, percent: 0, reached: false });
 });
 
 test('Instagram: ganho de seguidores = atual − retrato do 1º dia do ciclo; parcial quando o 1º retrato é posterior; ciclo encerrado usa o retrato seguinte', () => {

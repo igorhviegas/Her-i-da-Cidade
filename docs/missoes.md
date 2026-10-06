@@ -53,8 +53,8 @@ Usam só os dados que a sincronização do Instagram já grava no Firestore (`in
 |---|---|
 | Ganho de seguidores | seguidores atuais − retrato diário do primeiro dia do ciclo (`instagramStats`); pode ser negativo |
 | Publicações feitas | publicações com data dentro do ciclo |
-| Curtidas / comentários / visualizações | soma dos totais atuais das **publicações feitas dentro do ciclo** (métrica ausente fica fora da soma) |
+| Curtidas / comentários / visualizações | **recebidas no ciclo, em qualquer publicação** (inclusive antigas): soma, por publicação, de (valor no fim − valor no início do ciclo). Publicação feita dentro do ciclo começa em 0. Métrica ausente deixa a publicação de fora (nunca vira 0) |
 
-- O retrato diário (`instagramStats/{dia}`) é a referência de seguidores da 1ª sincronização de cada dia, gravada uma única vez pelo servidor. Se o 1º retrato do ciclo é posterior ao início, a meta mostra "contando desde dd/mm". Antes do primeiro retrato (ou do primeiro sync) a meta mostra o aviso e valor 0. **O histórico só existe a partir da publicação desta versão.**
-- Limites da fonte: só as últimas 100 publicações sincronizadas; o total de cada publicação continua crescendo depois do ciclo; o valor só muda quando a sincronização roda (cron 00:00 e 09:00 UTC, ou "Sincronizar agora"). Cada meta mostra a data/hora dos dados do Instagram.
+- O retrato diário (`instagramStats/{dia}`) guarda os seguidores de referência do dia e, por publicação, `[curtidas, comentários, views]` do 1º sync do dia com este recurso (preservado nas sincronizações seguintes). Se o 1º retrato do ciclo é posterior ao início, a meta mostra "contando desde dd/mm" para as publicações antigas; sem retrato por publicação, só as publicações novas contam (aviso na meta). Antes do primeiro retrato (ou do primeiro sync) a meta mostra o aviso e valor 0. **O histórico só existe a partir da publicação desta versão.**
+- Limites da fonte: só as últimas 100 publicações sincronizadas; publicação que sai das últimas 100 deixa de contar; o valor só muda quando a sincronização roda (cron 00:00 e 09:00 UTC, ou "Sincronizar agora"). Cada meta mostra a data/hora dos dados do Instagram.
 - Publicar `firestore.rules` com a nova regra `instagramStats` (leitura admin, escrita `false`) antes de usar o indicador de seguidores; sem ela a leitura é negada.

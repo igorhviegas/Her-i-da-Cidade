@@ -211,13 +211,14 @@ export const GOAL_METRICS = {
   task_streak: 'Sequência de dias sem falhar',
   ig_followers_gain: 'Instagram: ganho de seguidores',
   ig_posts: 'Instagram: publicações feitas',
-  ig_likes: 'Instagram: curtidas das publicações do ciclo',
-  ig_comments: 'Instagram: comentários das publicações do ciclo',
-  ig_views: 'Instagram: visualizações das publicações do ciclo',
+  ig_likes: 'Instagram: curtidas recebidas no ciclo',
+  ig_comments: 'Instagram: comentários recebidos no ciclo',
+  ig_views: 'Instagram: visualizações recebidas no ciclo',
 };
 
 export const INSTAGRAM_METRICS = ['ig_followers_gain', 'ig_posts', 'ig_likes', 'ig_comments', 'ig_views'];
 const IG_POST_KEY = { ig_likes: 'likes', ig_comments: 'comments', ig_views: 'views' };
+const IG_SNAPSHOT_INDEX = { likes: 0, comments: 1, views: 2 }; // posição em instagramStats.posts[id] = [curtidas, comentários, views]
 const EMPTY_INSTAGRAM = { followers: null, syncedAt: null, posts: [], stats: [] };
 
 /** Publicações (da última sincronização) publicadas dentro do ciclo. */
@@ -244,6 +245,43 @@ export function followersGain({ start, end }, ig, today) {
   return { value: endFollowers - base.followers, from: base.day, partial: base.day > firstDay };
 }
 
+/**
+ * Curtidas, comentários ou visualizações recebidas no ciclo, em qualquer publicação (inclusive antigas): soma, por publicação,
+ * de (valor no fim do ciclo − valor no início). ig.posts: publicações da última sincronização (com id e valores atuais);
+ * ig.stats[].posts: retrato diário por publicação ({ id: [curtidas, comentários, views] }, null = indisponível).
+ *  - Início: publicação feita dentro do ciclo começa em 0 (tudo é do ciclo); publicação anterior usa o retrato do 1º dia do ciclo
+ *    que tem retrato por publicação. Sem retrato ou sem a publicação nele, a publicação não entra (não dá para saber o ganho).
+ *  - Fim: valor atual (ciclo em andamento) ou o retrato do dia seguinte ao ciclo (encerrado; sem ele, o último retrato do ciclo,
+ *    e sem retrato nenhum, o valor atual).
+ *  - Publicação feita depois do ciclo não entra. Valor ausente em qualquer ponta deixa a publicação de fora, nunca vira 0.
+ * Retorna { value, from, partial, pending }: from = dia do retrato-base; partial = o 1º retrato é posterior ao início do ciclo;
+ * pending = há publicações antigas mas ainda nenhum retrato no ciclo (o ganho delas ainda não é contado).
+ */
+export function engagementInCycle(metric, { start, end }, ig, today) {
+  const key = IG_POST_KEY[metric];
+  const idx = IG_SNAPSHOT_INDEX[key];
+  const firstDay = dateKey(start);
+  const lastDay = dateKey(new Date(end.getTime() - 1));
+  const snaps = ig.stats.filter((s) => s.posts && typeof s.posts === 'object').sort((a, b) => a.day.localeCompare(b.day));
+  const inCycle = snaps.filter((s) => s.day >= firstDay && s.day <= lastDay);
+  const baseSnap = inCycle[0] ?? null;
+  const ongoing = today <= lastDay;
+  const endSnap = ongoing ? null : (snaps.find((s) => s.day > lastDay) ?? inCycle[inCycle.length - 1] ?? null);
+  let value = 0;
+  let hasOlder = false;
+  for (const post of ig.posts) {
+    const published = millis(post.publishedAt);
+    if (!Number.isFinite(published) || published >= end.getTime()) continue;
+    const olderThanCycle = published < start.getTime();
+    if (olderThanCycle) hasOlder = true;
+    const endValue = endSnap ? endSnap.posts[post.id]?.[idx] : post[key];
+    const baseValue = olderThanCycle ? baseSnap?.posts[post.id]?.[idx] : 0;
+    if (!Number.isFinite(endValue) || !Number.isFinite(baseValue)) continue;
+    value += endValue - baseValue;
+  }
+  return { value, from: baseSnap?.day ?? null, partial: Boolean(baseSnap && baseSnap.day > firstDay), pending: !baseSnap && hasOlder };
+}
+
 const fmtDay = (key) => key.split('-').reverse().slice(0, 2).join('/');
 const fmtSync = (iso) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Sao_Paulo' }).format(new Date(iso)).replace(', ', ' às ');
 
@@ -258,7 +296,11 @@ export function instagramNote(metric, bounds, data, today) {
     if (gain.from === null) return `${fresh}. Aguardando o primeiro retrato diário de seguidores neste ciclo.`;
     return gain.partial ? `${fresh}. Contando desde ${fmtDay(gain.from)} (primeiro retrato do ciclo).` : fresh + '.';
   }
-  return `${fresh}. Soma das últimas publicações sincronizadas (até 100).`;
+  if (metric === 'ig_posts') return `${fresh}. Publicações feitas dentro do ciclo (entre as últimas 100 sincronizadas).`;
+  const e = engagementInCycle(metric, bounds, ig, today);
+  if (e.pending) return `${fresh}. Publicações anteriores ao ciclo só entram depois do primeiro retrato diário; por enquanto conta o das publicações novas.`;
+  if (e.partial) return `${fresh}. Publicações antigas contam desde ${fmtDay(e.from)} (primeiro retrato do ciclo); as novas, desde a publicação.`;
+  return `${fresh}. Conta o ganho de cada publicação no ciclo (entre as últimas 100 sincronizadas).`;
 }
 
 const millis = (v) => (v instanceof Date ? v.getTime() : typeof v?.toDate === 'function' ? v.toDate().getTime() : v ? new Date(v).getTime() : NaN);
@@ -267,7 +309,7 @@ const inRange = (v, start, end) => { const t = millis(v); return t >= start.getT
 /**
  * Valor real (sem limite) de uma meta automática no ciclo. A contagem é por documento e por campo de data
  * do evento (completedAt, paidAt, readyAt…), logo é idempotente: editar ou repetir não conta de novo.
- * data: { orders, scripts, missions, occurrences, revenueEntries, instagram: { followers, syncedAt, posts, stats } }. `revenueEntries` são as entradas de faturamento do módulo
+ * data: { orders, scripts, missions, occurrences, revenueEntries, instagram: { followers, syncedAt, posts, stats } } (ver engagementInCycle). `revenueEntries` são as entradas de faturamento do módulo
  * Financeiro (buildRevenueEntries em services/financeCalculations.js): a meta de faturamento só soma o que o Financeiro soma.
  */
 export function metricValue(metric, { start, end }, data, today) {
@@ -285,11 +327,8 @@ export function metricValue(metric, { start, end }, data, today) {
     case 'missions_completed': return data.missions.filter((m) => m.status === 'completed' && inRange(m.completedAt, start, end)).length;
     case 'ig_followers_gain': return followersGain({ start, end }, data.instagram ?? EMPTY_INSTAGRAM, today).value;
     case 'ig_posts': return igPostsIn(data.instagram ?? EMPTY_INSTAGRAM, start, end).length;
-    case 'ig_likes': case 'ig_comments': case 'ig_views': {
-      // Métrica ausente (curtidas ocultas, views indisponíveis) fica fora da soma, nunca vira 0 contado.
-      const key = IG_POST_KEY[metric];
-      return igPostsIn(data.instagram ?? EMPTY_INSTAGRAM, start, end).reduce((sum, p) => sum + (Number.isFinite(p[key]) ? p[key] : 0), 0);
-    }
+    case 'ig_likes': case 'ig_comments': case 'ig_views':
+      return engagementInCycle(metric, { start, end }, data.instagram ?? EMPTY_INSTAGRAM, today).value;
     case 'task_streak': {
       // Só conta até o último dia do ciclo; em ciclo encerrado, "hoje" é o último dia dele (não o dia atual).
       const lastDay = dateKey(new Date(end.getTime() - 1));
@@ -319,7 +358,7 @@ export function cycleArchiveRecord(goal, value, now, { endedEarly = false } = {}
 
 /** Valor mostrado: progresso limitado ao alvo; `actual` preserva o real. */
 export function goalProgress(actual, target) {
-  const shown = Math.min(actual, target);
+  const shown = Math.max(0, Math.min(actual, target));
   return { actual, shown, percent: target > 0 ? Math.round((shown / target) * 100) : 0, reached: target > 0 && actual >= target };
 }
 

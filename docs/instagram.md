@@ -37,7 +37,7 @@ Pendências adicionais: a classificação de erros de insights (permissão = có
 A integração nunca foi executada contra a API real da Meta (sem credenciais): os testes usam `fetch`/Firestore simulados. Confirme nomes de campos/métrica e permissões com o primeiro sync real.
 
 ## Retrato diário de seguidores (`instagramStats`)
-No mesmo batch da sincronização, a 1ª sincronização bem-sucedida de cada dia (Brasília) grava `instagramStats/{YYYY-MM-DD}` = `{ day, followers, baselineAt }` (a mesma referência do balanço diário), uma única vez por dia; repetições e falhas não alteram. Base das metas "ganho de seguidores" do módulo Missões (`docs/missoes.md`). Regras: leitura admin, escrita `false`.
+No mesmo batch da sincronização, a 1ª sincronização bem-sucedida de cada dia (Brasília) grava `instagramStats/{YYYY-MM-DD}` = `{ day, followers, baselineAt, posts, postsAt }`: `followers` é a referência do dia (a mesma do balanço diário) e `posts` o retrato por publicação (`{ id: [curtidas, comentários, views] }`) do 1º sync do dia com este recurso; ambos são preservados nas sincronizações seguintes, e repetições e falhas não os alteram. Base das metas "ganho de seguidores" e "curtidas/comentários/views recebidos no ciclo" do módulo Missões (`docs/missoes.md`). Regras: leitura admin, escrita `false`.
 
 ## Calendário de publicações e filtro dos destaques
 - **Calendário** (`/admin/instagram`): mês com um quadradinho por dia; **roxo = publicou** (feed ou Reel; a dica do dia detalha quantos de cada). Dentro de cada dia, o saldo de seguidores e de visualizações.

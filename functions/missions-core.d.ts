@@ -29,7 +29,8 @@ export function cycleChanged(goal: { cycleKey: string; cycleEnd: any }, bounds: 
 export function cycleArchiveRecord(goal: any, value: number, now: Date, options?: { endedEarly?: boolean }): Record<string, any>;
 export function missionNotificationIds(missionId: string): string[];
 export function occurrenceNotificationIds(occurrenceId: string): string[];
-export interface InstagramGoalData { followers: number | null; syncedAt: string | null; posts: { publishedAt: string | null; likes: number | null; comments: number | null; views: number | null }[]; stats: { day: string; followers: number }[]; }
+export interface InstagramGoalData { followers: number | null; syncedAt: string | null; posts: { id?: string; publishedAt: string | null; likes: number | null; comments: number | null; views: number | null }[]; stats: { day: string; followers: number; posts?: Record<string, (number | null)[]> }[]; }
 export const INSTAGRAM_METRICS: GoalMetric[];
 export function followersGain(bounds: { start: Date; end: Date }, ig: InstagramGoalData, today: string): { value: number; from: string | null; partial: boolean };
 export function instagramNote(metric: GoalMetric, bounds: { start: Date; end: Date }, data: { instagram?: InstagramGoalData }, today: string): string | null;
+export function engagementInCycle(metric: GoalMetric, bounds: { start: Date; end: Date }, ig: InstagramGoalData, today: string): { value: number; from: string | null; partial: boolean; pending: boolean };

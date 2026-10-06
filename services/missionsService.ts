@@ -319,8 +319,11 @@ async function loadInstagramData(): Promise<InstagramGoalData> {
     followers: typeof meta?.followers === 'number' ? meta.followers : null,
     syncedAt,
     posts: currentPosts(posts.docs.map((item) => item.data() as any), syncedAt ?? undefined)
-      .map((p: any) => ({ publishedAt: p.publishedAt ?? null, likes: p.likes ?? null, comments: p.comments ?? null, views: p.views ?? null })),
-    stats: stats.docs.map((item) => ({ day: String(item.data().day ?? item.id), followers: item.data().followers })).filter((s) => typeof s.followers === 'number'),
+      .map((p: any) => ({ id: String(p.id), publishedAt: p.publishedAt ?? null, likes: p.likes ?? null, comments: p.comments ?? null, views: p.views ?? null })),
+    stats: stats.docs.map((item) => {
+      const data = item.data();
+      return { day: String(data.day ?? item.id), followers: data.followers, ...(data.posts && typeof data.posts === 'object' ? { posts: data.posts } : {}) };
+    }).filter((s) => typeof s.followers === 'number' || s.posts),
   };
 }
 

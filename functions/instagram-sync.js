@@ -173,10 +173,20 @@ async function sync({ db, fetchImpl, env, now }) {
     batch.set(dailyRef, daily.state);
     // Saldo do dia no histórico do calendário (um documento por dia, regravado a cada sincronização; o dia anterior fica como estava).
     batch.set(db.doc(`${DAY_PREFIX}${daily.summary.day}`), daily.summary);
-    // Retrato diário: a referência de seguidores da 1ª sincronização do dia (a mesma do balanço), gravada uma única vez por dia.
-    if (daily.state.baselineAt === iso && daily.state.followers0 !== null) {
-      batch.set(db.doc(`${STATS_COLLECTION}/${daily.state.day}`), { day: daily.state.day, followers: daily.state.followers0, baselineAt: iso });
-    }
+    // Retrato diário: a referência de seguidores do dia (a mesma do balanço, fixada na 1ª sincronização do dia). É regravado a cada
+    // sincronização com o mesmo conteúdo (idempotente), assim também nasce quando a referência do dia foi criada antes desta versão.
+    // Retrato por publicação ([curtidas, comentários, views]): base das metas de "recebidos no ciclo". Fica o do 1º sync do dia com este
+    // recurso (preservado nas sincronizações seguintes), então o "início do dia" não se move; vale o que a Meta devolveu naquele sync.
+    const statsRef = db.doc(`${STATS_COLLECTION}/${daily.state.day}`);
+    const existingStats = await statsRef.get();
+    const kept = existingStats.exists && existingStats.data().posts ? existingStats.data() : null;
+    batch.set(statsRef, {
+      day: daily.state.day,
+      ...(daily.state.followers0 !== null ? { followers: daily.state.followers0 } : {}),
+      baselineAt: daily.state.baselineAt,
+      posts: kept ? kept.posts : Object.fromEntries(posts.map((p) => [p.id, [p.likes ?? null, p.comments ?? null, p.views ?? null]])),
+      postsAt: kept ? kept.postsAt : iso,
+    });
     batch.set(profileRef, {
       username: me.username ?? null, followers: me.followers_count ?? null, mediaCount: me.media_count ?? null,
       loadedPosts: posts.length, syncedAt: iso, lastAttemptAt: iso, lastError: null,
