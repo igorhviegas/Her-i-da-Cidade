@@ -16,5 +16,5 @@ export function normalizePhone(ddi: unknown, number: unknown): { e164: string; d
 export function validateBookingInput(input: any): { form?: any; errors?: string[] };
 export function bookingWhatsAppUrl(baseUrl: unknown, message: string): string | null;
 export function createVideoCallBooking(opts: { database: any; input: any; nowMs?: number; config?: VideoCallConfig; listEvents?: any; createEvent?: any; ctx?: any; logger?: any }): Promise<{ orderId: string; date: string; time: string; whatsappUrl: string | null }>;
-export function markVideoCallEventPaid(opts: { database: any; orderId: string; updateEvent?: any; addGuest?: any; ctx?: any }): Promise<boolean>;
+export function markVideoCallEventPaid(opts: { database: any; orderId: string; updateEvent?: any; ctx?: any }): Promise<boolean>;
 export function expireUnpaidBookings(opts: { database: any; nowMs?: number; config?: VideoCallConfig; deleteEvent?: any; ctx?: any; logger?: any }): Promise<number>;

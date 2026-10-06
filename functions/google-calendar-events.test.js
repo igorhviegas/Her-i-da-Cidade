@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import {
-  GoogleCalendarError, addCalendarEventGuest, buildStandaloneEvent, calendarEventId, createCalendarEvent, deleteCalendarEvent, isCrmEventId, listCalendarEvents,
+  GoogleCalendarError, buildStandaloneEvent, calendarEventId, createCalendarEvent, deleteCalendarEvent, isCrmEventId, listCalendarEvents,
   normalizeEvent, resetTokenCache, updateCalendarEvent,
 } from './google-calendar.js';
 
@@ -115,31 +115,6 @@ test('editar: PATCH no evento (preserva os demais campos do Google), ID validado
   await assert.rejects(updateCalendarEvent({ id: '../x', input, env, fetchImpl }), (e) => e.code === 'invalid_event');
   await assert.rejects(updateCalendarEvent({ id: 'e1', input, env, fetchImpl: fakeFetch(() => json(404, {})).fetchImpl }), (e) => e.code === 'event_not_found');
   assert.equal(calls.length, 1);
-});
-
-test('convidado: lê os convidados atuais e regrava com o novo (preserva os demais); o Google envia o convite (sendUpdates=all)', async () => {
-  const { fetchImpl, calls } = fakeFetch((call) => (call.init.method === 'GET' ? json(200, { id: 'e1', attendees: [{ email: 'agente@x.com', responseStatus: 'accepted' }] }) : json(200, { id: 'e1' })));
-  assert.deepEqual(await addCalendarEventGuest({ id: 'e1', email: ' Cliente@Exemplo.com ', env, fetchImpl }), { id: 'e1', added: true });
-  assert.deepEqual(calls.map((c) => c.init.method), ['GET', 'PATCH']);
-  assert.match(calls[1].url, /\/events\/e1\?sendUpdates=all$/);
-  assert.deepEqual(calls[1].body, { attendees: [{ email: 'agente@x.com', responseStatus: 'accepted' }, { email: 'Cliente@Exemplo.com' }] });
-  assert.deepEqual(Object.keys(calls[1].body), ['attendees']); // título, horário e descrição não são tocados
-});
-
-test('convidado: quem já está no evento não é reenviado; recusas do Google viram erro claro (nunca sucesso)', async () => {
-  const already = fakeFetch(() => json(200, { id: 'e1', attendees: [{ email: 'cliente@exemplo.com' }] }));
-  assert.deepEqual(await addCalendarEventGuest({ id: 'e1', email: 'Cliente@exemplo.com', env, fetchImpl: already.fetchImpl }), { id: 'e1', added: false });
-  assert.equal(already.calls.length, 1);
-
-  const refused = fakeFetch((call) => (call.init.method === 'GET' ? json(200, { id: 'e1' }) : json(403, { error: { errors: [{ reason: 'forbiddenForServiceAccounts' }] } })));
-  await assert.rejects(addCalendarEventGuest({ id: 'e1', email: 'a@b.com', env, fetchImpl: refused.fetchImpl }), (e) => e instanceof GoogleCalendarError && e.code === 'guests_not_allowed');
-  const forbidden = fakeFetch((call) => (call.init.method === 'GET' ? json(200, { id: 'e1' }) : json(403, {})));
-  await assert.rejects(addCalendarEventGuest({ id: 'e1', email: 'a@b.com', env, fetchImpl: forbidden.fetchImpl }), (e) => e.code === 'permission');
-  await assert.rejects(addCalendarEventGuest({ id: 'sumiu', email: 'a@b.com', env, fetchImpl: fakeFetch(() => json(404, {})).fetchImpl }), (e) => e.code === 'event_not_found');
-
-  const untouched = fakeFetch(() => json(200, {}));
-  for (const email of ['', 'sem-arroba', 'a b@c.com', undefined]) await assert.rejects(addCalendarEventGuest({ id: 'e1', email, env, fetchImpl: untouched.fetchImpl }), (e) => e.code === 'invalid_guest');
-  assert.equal(untouched.calls.length, 0);
 });
 
 test('excluir: só conclui com confirmação do Google (204/410); falhas propagam e 404 é erro', async () => {

@@ -76,8 +76,6 @@ export interface Order {
   paymentPending?: boolean;
   /** Dados do agendamento público de Vídeo Chamada (/agendar-chamada). `date`/`time` são o horário local da agenda. */
   videoCall?: { date: string; time: string; durationMinutes: number; slotId: string; childAge: string; theme: string; details: string; /** Momento da reserva (ms); conta o prazo de pagamento. */ bookedAtMs?: number; /** WhatsApp de contato em formato internacional, só dígitos (DDI + número). */ whatsapp?: string; /** Código do país (DDI) e número nacional do contato, como informados. */ ddi?: string; phone?: string; /** Número que recebe a chamada, quando não é o de contato. */ callWhatsapp?: string; email?: string; /** Fuso do cliente (identificador IANA detectado no navegador); a agenda é sempre a de Brasília. */ timezone?: string };
-  /** Convite do Google Agenda ao cliente depois do pagamento confirmado (mesmo evento da reserva). `failed` = o Google recusou ou o evento não foi achado. */
-  calendarInvite?: { email: string | null; status: 'sent' | 'failed'; code?: string; message?: string; at?: any };
   /** Presente em pedidos de evento com livro de lançamentos (collection financeEntries). Valores já lançados (congelados). */
   eventLedger?: { entry: number; final?: number; cost?: number; /** soma dos ajustes de receita */ adj?: number; /** soma dos ajustes de despesa */ adjCost?: number; /** nº do último ajuste */ seq?: number };
   /** Vínculo com o Google Agenda, gravado pelo servidor (/api/google-calendar). */
