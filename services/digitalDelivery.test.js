@@ -80,3 +80,15 @@ test('link: mesmo número e estrutura; texto com emoji, acento e quebra de linha
   assert.equal(buildDeliveryWhatsAppUrl('123', {}, { id: 'x', deliveryMessage: msg }), null);
   assert.equal(buildDeliveryWhatsAppUrl('(31) 98765-4321', {}, { id: '2' }).split('?text=')[0], 'https://wa.me/5531987654321');
 });
+
+test('número internacional (com "+") gera wa.me completo; números brasileiros seguem como antes', () => {
+  const base = (whatsapp) => buildDeliveryWhatsAppUrl(whatsapp, { content: 'x' })?.split('?text=')[0] ?? null;
+  assert.equal(base('+351 912 345 678'), 'https://wa.me/351912345678'); // Portugal
+  assert.equal(base('+1 (555) 123-4567'), 'https://wa.me/15551234567'); // EUA: 11 dígitos não viram "55…"
+  assert.equal(base('+5531988887777'), 'https://wa.me/5531988887777');
+  assert.equal(base('+55 31 98888-7777'), 'https://wa.me/5531988887777');
+  assert.equal(base('31988887777'), 'https://wa.me/5531988887777');
+  assert.equal(base('5531988887777'), 'https://wa.me/5531988887777');
+  assert.equal(base('+123'), null);
+  assert.equal(base('351912345678'), null); // sem "+", não dá para saber que é de outro país (regra antiga mantida)
+});

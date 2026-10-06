@@ -13,6 +13,8 @@ export function normalizeWhatsApp(value: string): string {
   const digits = String(value ?? "").replace(/\D/g, "");
   if (!digits) throw new Error("O WhatsApp é obrigatório.");
   if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) return digits;
+  // Com "+" o número já traz o código do país (cliente internacional): não recebe o 55 do Brasil.
+  if (String(value ?? "").trim().startsWith("+")) return digits;
   if (digits.length === 10 || digits.length === 11) return `55${digits}`;
   return digits;
 }

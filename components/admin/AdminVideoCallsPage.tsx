@@ -3,6 +3,7 @@ import { CalendarCheck, Copy, ExternalLink, Loader2, RotateCcw, Save } from 'luc
 import { useRouter } from '../../lib/router';
 import { dateKey } from '../../functions/missions-core.js';
 import { DEFAULT_VIDEO_CALL_CONFIG, normalizeVideoCallConfig, parseTimes, type VideoCallConfig } from '../../functions/video-call-config.js';
+import { BUSINESS_TIME_ZONE, localSlot } from '../../functions/video-call-time.js';
 import { listClients } from '../../services/clientsService';
 import { subscribeVideoCallOrders } from '../../services/ordersService';
 import { getVideoCallConfig, saveVideoCallConfig } from '../../services/siteConfigService';
@@ -71,14 +72,24 @@ const BookingsList: React.FC = () => {
         {rows.map((order) => {
           const client = clients.get(order.clientId);
           const pending = order.paymentPending === true;
+          const call = order.videoCall!;
+          // Cliente em outro fuso: o horário dele ao lado do de Brasília (a agenda é sempre a de Brasília).
+          const local = call.timezone && call.timezone !== BUSINESS_TIME_ZONE ? localSlot(call.date, call.time, call.timezone) : null;
+          const invite = order.calendarInvite;
           return (
             <li key={order.id}>
               <button type="button" onClick={() => navigate(`/admin/pedidos?orderId=${encodeURIComponent(order.id)}`)} className={`${cardClass} flex w-full flex-wrap items-center gap-x-4 gap-y-2 text-left hover:bg-white/[0.03]`}>
                 <span className="w-32 shrink-0 text-sm font-bold text-white">{weekday(order.videoCall!.date)}, {brDate(order.videoCall!.date)}<span className="block text-blue-300">{order.videoCall!.time}</span></span>
                 <span className="min-w-0 flex-1 text-sm text-white/80">
                   <span className="block truncate font-semibold text-white">{client?.name ?? 'Cliente'} · {order.childName} ({order.videoCall!.childAge})</span>
-                  <span className="block truncate text-xs text-white/50">{client?.whatsapp} · {order.videoCall!.theme}</span>
+                  <span className="block truncate text-xs text-white/50">{[client?.whatsapp, call.email, call.theme].filter(Boolean).join(' · ')}</span>
+                  {local && !local.same && <span className="block truncate text-xs text-sky-300/80">Cliente em {call.timezone}: {brDate(local.date)} às {local.time} no horário dele</span>}
                 </span>
+                {invite && (
+                  <span title={invite.status === 'failed' ? invite.message : `Convite enviado para ${invite.email}`} className={`rounded-full px-2.5 py-1 text-xs font-bold ${invite.status === 'sent' ? 'bg-sky-500/15 text-sky-300' : 'bg-red-500/15 text-red-300'}`}>
+                    {invite.status === 'sent' ? 'Convite enviado' : 'Convite não enviado'}
+                  </span>
+                )}
                 <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${pending ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300'}`}>{pending ? 'Aguardando pagamento' : 'Confirmada'}</span>
               </button>
             </li>

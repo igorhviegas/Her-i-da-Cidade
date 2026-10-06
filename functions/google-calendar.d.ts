@@ -31,5 +31,6 @@ export function buildStandaloneEvent(input: any, opts?: { patch?: boolean }): Re
 export function listCalendarEvents(opts: { from: string; to: string; q?: string } & CalendarCtx): Promise<{ events: CalendarEvent[]; truncated: boolean }>;
 export function createCalendarEvent(opts: { input: CalendarEventInput } & CalendarCtx): Promise<CalendarEvent>;
 export function updateCalendarEvent(opts: { id: string; input: CalendarEventInput } & CalendarCtx): Promise<CalendarEvent>;
+export function addCalendarEventGuest(opts: { id: string; email: string } & CalendarCtx): Promise<{ id: string; added: boolean }>;
 export function deleteCalendarEvent(opts: { id: string } & CalendarCtx): Promise<{ id: string }>;
 export function addDayKey(key: string, amount: number): string;

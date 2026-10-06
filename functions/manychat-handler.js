@@ -14,11 +14,22 @@ function jsonError(res, status, code, message, extra = {}) {
 }
 
 function normalizeWhatsApp(value) {
-  const digits = String(value ?? '').replace(/\D/g, '');
+  const raw = String(value ?? '').trim();
+  const digits = raw.replace(/\D/g, '');
   if (!digits) return null;
   if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) return digits;
+  // Com "+" o número já vem completo, com o código do país: cliente internacional não recebe o 55 do Brasil.
+  if (raw.startsWith('+')) return digits;
   if (digits.length === 10 || digits.length === 11) return `55${digits}`;
   return digits;
+}
+
+/** Brasileiro com DDD (como sempre) ou internacional completo: "+" + código do país + número, 8 a 15 dígitos (E.164). */
+function isValidWhatsApp(value) {
+  const normalized = normalizeWhatsApp(value);
+  if (!normalized) return false;
+  if (/^55\d{10,11}$/.test(normalized)) return true;
+  return String(value).trim().startsWith('+') && !normalized.startsWith('55') && /^[1-9]\d{7,14}$/.test(normalized);
 }
 
 function parseCatalogPrice(value) {
@@ -30,10 +41,10 @@ function parseCatalogPrice(value) {
 }
 
 /**
- * Chave do pré-agendamento de Vídeo Chamada: DDI + DDD + os 8 últimos dígitos. O número digitado no site e o que o WhatsApp informa
- * ao ManyChat podem diferir só pelo nono dígito; sem ele os dois caem na mesma chave.
+ * Chave do pré-agendamento de Vídeo Chamada. Número brasileiro: DDI + DDD + os 8 últimos dígitos (o número digitado no site e o que
+ * o WhatsApp informa ao ManyChat podem diferir só pelo nono dígito; sem ele os dois caem na mesma chave). Internacional: o número inteiro.
  */
-export const bookingKey = (normalizedWhatsApp) => `${normalizedWhatsApp.slice(0, 4)}${normalizedWhatsApp.slice(-8)}`;
+export const bookingKey = (normalizedWhatsApp) => (/^55\d{10,11}$/.test(normalizedWhatsApp) ? `${normalizedWhatsApp.slice(0, 4)}${normalizedWhatsApp.slice(-8)}` : normalizedWhatsApp);
 
 export function validateManyChatOrderInput(body) {
   const errors = [];
@@ -48,8 +59,7 @@ export function validateManyChatOrderInput(body) {
     const unexpectedCustomerKeys = Object.keys(body.customer).filter((key) => !['name', 'whatsapp'].includes(key));
     if (unexpectedCustomerKeys.length) errors.push(`Campos não aceitos em customer: ${unexpectedCustomerKeys.join(', ')}.`);
     if (typeof body.customer.name !== 'string' || !body.customer.name.trim() || body.customer.name.trim().length > 120) errors.push('customer.name é obrigatório (até 120 caracteres).');
-    const normalized = normalizeWhatsApp(body.customer.whatsapp);
-    if (!normalized || !/^55\d{10,11}$/.test(normalized)) errors.push('customer.whatsapp deve ser um número brasileiro válido com DDD.');
+    if (!isValidWhatsApp(body.customer.whatsapp)) errors.push('customer.whatsapp deve ser um número brasileiro válido com DDD, ou internacional com "+" e o código do país.');
   }
   if (typeof body.childName !== 'string' || !body.childName.trim() || body.childName.trim().length > 100) errors.push('childName é obrigatório (até 100 caracteres).');
   return errors;
@@ -124,8 +134,7 @@ export function validateManyChatPayload(body) {
     const unexpectedCustomer = Object.keys(body.customer).filter((key) => !['name', 'whatsapp'].includes(key));
     if (unexpectedCustomer.length) errors.push(`Campos não aceitos em customer: ${unexpectedCustomer.join(', ')}.`);
     if (typeof body.customer.name !== 'string' || !body.customer.name.trim() || body.customer.name.trim().length > 120) errors.push('customer.name é obrigatório (até 120 caracteres).');
-    const normalized = normalizeWhatsApp(body.customer.whatsapp);
-    if (!normalized || !/^55\d{10,11}$/.test(normalized)) errors.push('customer.whatsapp deve ser um número brasileiro válido com DDD.');
+    if (!isValidWhatsApp(body.customer.whatsapp)) errors.push('customer.whatsapp deve ser um número brasileiro válido com DDD, ou internacional com "+" e o código do país.');
   }
   const textRules = { childName: 100, theme: 100, details: 1000 };
   for (const [field, limit] of Object.entries(textRules)) {

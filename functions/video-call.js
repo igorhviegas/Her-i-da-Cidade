@@ -11,9 +11,10 @@
 // A trava só vale enquanto o pedido existe: excluir o pedido no CRM libera o horário sozinho (sem limpeza manual).
 
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { BANANA_COLOR_ID, BASIL_COLOR_ID, addDayKey, createCalendarEvent, deleteCalendarEvent, eventDateKey, eventTimes, listCalendarEvents, updateCalendarEvent } from './google-calendar.js';
+import { BANANA_COLOR_ID, BASIL_COLOR_ID, GoogleCalendarError, addCalendarEventGuest, addDayKey, createCalendarEvent, deleteCalendarEvent, eventDateKey, eventTimes, listCalendarEvents, updateCalendarEvent } from './google-calendar.js';
 import { SERVICE_PROFILES, bookingKey, evaluateService } from './manychat-handler.js';
 import { DEFAULT_VIDEO_CALL_CONFIG, VIDEO_CALL_CONFIG_PATH, fillText, formatPrice, normalizeVideoCallConfig } from './video-call-config.js';
+import { isValidTimeZone, localSlot, zonedInstant } from './video-call-time.js';
 
 export const VIDEO_CALL_CONFIG = DEFAULT_VIDEO_CALL_CONFIG;
 export const SLOTS = 'videoCallSlots';
@@ -41,8 +42,8 @@ export const publicConfig = (config) => ({
 
 // ---------- horários (puro) ----------
 
-// ponytail: o Brasil não tem horário de verão desde 2019, então o fuso é fixo; se voltar, derivar o deslocamento via Intl.
-const slotInstant = (date, time) => Date.parse(`${date}T${time}:00-03:00`);
+// Instante real do horário de Brasília, pelo banco de fusos (não por um deslocamento fixo).
+const slotInstant = (date, time) => zonedInstant(date, time);
 const weekdayOf = (date) => new Date(`${date}T12:00:00Z`).getUTCDay();
 export const slotId = (date, time) => `${date}_${time.replace(':', '')}`;
 
@@ -107,11 +108,25 @@ export async function getAvailability({ database, nowMs = Date.now(), config, li
 
 // ---------- reserva ----------
 
-const normalizeWhatsApp = (value) => {
-  const digits = String(value ?? '').replace(/\D/g, '');
-  const full = digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
-  return /^55\d{10,11}$/.test(full) ? full : null;
-};
+/**
+ * DDI + número digitado → { e164, ddi, phone }. `e164` é o formato internacional só com dígitos (DDI + número, sem "+"), o mesmo
+ * padrão de `whatsappNormalized` no CRM e do que o ManyChat informa. Sem DDI vale o Brasil (compatível com o formulário antigo).
+ * Brasil mantém a regra de sempre (DDD + número, 10 ou 11 dígitos). Demais países: 8 a 15 dígitos no total.
+ */
+export function normalizePhone(ddiInput, numberInput) {
+  const raw = String(numberInput ?? '').trim();
+  const ddi = String(ddiInput ?? '').replace(/\D/g, '') || '55';
+  let national = raw.replace(/\D/g, '');
+  // Número colado já com o código do país ("+351 912…", "55 31 9…"): não duplica o DDI.
+  if (national.startsWith(ddi) && (raw.startsWith('+') || (ddi === '55' && national.length >= 12))) national = national.slice(ddi.length);
+  if (ddi === '55') return /^\d{10,11}$/.test(national) ? { e164: `55${national}`, ddi, phone: national } : null;
+  // ponytail: tira o "0" de tronco (07… no Reino Unido vira +44 7…). Fixos italianos mantêm o 0, mas WhatsApp é celular; se precisar, usar uma biblioteca de telefones.
+  national = national.replace(/^0+/, '');
+  const e164 = `${ddi}${national}`;
+  return /^[1-9]\d{0,3}$/.test(ddi) && national.length >= 4 && e164.length >= 8 && e164.length <= 15 ? { e164, ddi, phone: national } : null;
+}
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const text = (value, max) => (typeof value === 'string' && value.trim() && value.trim().length <= max ? value.trim() : null);
 
@@ -119,8 +134,13 @@ const text = (value, max) => (typeof value === 'string' && value.trim() && value
 export function validateBookingInput(input) {
   const errors = [];
   const slot = input?.slot ?? {};
+  const contact = normalizePhone(input?.ddi, input?.whatsapp);
+  const email = typeof input?.email === 'string' ? input.email.trim().toLowerCase() : '';
   const form = {
-    name: text(input?.name, 120), whatsapp: normalizeWhatsApp(input?.whatsapp), childName: text(input?.childName, 100),
+    name: text(input?.name, 120), whatsapp: contact?.e164 ?? null, ddi: contact?.ddi ?? '', phone: contact?.phone ?? '', childName: text(input?.childName, 100),
+    email: EMAIL.test(email) && email.length <= 254 ? email : null,
+    // Fuso do navegador do cliente (IANA). Só informativo: sem ele (ou inválido) a reserva segue, sempre no horário de Brasília.
+    timezone: isValidTimeZone(input?.timezone) ? input.timezone : '',
     childAge: text(input?.childAge, 20), theme: text(input?.theme, 200),
     details: input?.details == null || input.details === '' ? '' : text(input.details, 1000),
     date: typeof slot.date === 'string' ? slot.date : '', time: typeof slot.time === 'string' ? slot.time : '',
@@ -128,12 +148,13 @@ export function validateBookingInput(input) {
   };
   // Número que recebe a chamada, só quando é outro: o de contato (que paga pelo WhatsApp) continua sendo a chave do pedido.
   if (input?.callWhatsapp != null && String(input.callWhatsapp).trim()) {
-    const other = normalizeWhatsApp(input.callWhatsapp);
+    const other = normalizePhone(input?.callDdi ?? input?.ddi, input.callWhatsapp);
     if (!other) errors.push('Informe um WhatsApp válido (com DDD) para receber a chamada.');
-    else if (other !== form.whatsapp) form.callWhatsapp = other;
+    else if (other.e164 !== form.whatsapp) form.callWhatsapp = other.e164;
   }
   if (!form.name) errors.push('Informe o nome do responsável.');
   if (!form.whatsapp) errors.push('Informe um WhatsApp válido com DDD.');
+  if (!form.email) errors.push('Informe um e-mail válido.');
   if (!form.childName) errors.push('Informe o nome da criança.');
   if (!form.childAge) errors.push('Informe a idade da criança.');
   if (!form.theme) errors.push('Informe o tema principal da ligação.');
@@ -143,9 +164,18 @@ export function validateBookingInput(input) {
 
 const brDate = (date) => date.split('-').reverse().join('/');
 
+/** Linha com o horário no fuso do cliente; null quando é igual ao de Brasília (ou o fuso não foi informado). */
+function clientTimeLine({ date, time, timezone }) {
+  if (!timezone) return null;
+  const local = localSlot(date, time, timezone);
+  return local.same ? null : `Fuso do cliente: ${timezone} (para ele: ${brDate(local.date)} às ${local.time})`;
+}
+
 function orderContent(form) {
   return [
-    `Vídeo Chamada: ${brDate(form.date)} às ${form.time}`,
+    `Vídeo Chamada: ${brDate(form.date)} às ${form.time} (horário de Brasília)`,
+    ...[clientTimeLine(form)].filter(Boolean),
+    `E-mail: ${form.email}`,
     `Criança: ${form.childName} (${form.childAge})`,
     `Tema: ${form.theme}`,
     ...(form.details ? [`Detalhes: ${form.details}`] : []),
@@ -154,13 +184,14 @@ function orderContent(form) {
 }
 
 /** Evento da agenda. Título e cor dizem se já foi paga (Banana = aguardando, Manjericão = paga), para a agenda bastar sem abrir o CRM. */
-function eventInput({ date, time, durationMinutes, customerName, whatsapp, callWhatsapp, childName, childAge, theme, details, paid }) {
+function eventInput({ date, time, durationMinutes, customerName, whatsapp, callWhatsapp, email, timezone, childName, childAge, theme, details, paid }) {
   const { end } = eventTimes(date, time, durationMinutes);
   return {
     title: `Vídeo Chamada (${paid ? 'paga' : 'aguardando pagamento'}): ${customerName} - ${childName}`,
     date, startTime: time, endTime: end.slice(11, 16), colorId: paid ? BASIL_COLOR_ID : BANANA_COLOR_ID,
     description: [
-      `👤 Responsável: ${customerName}`, `📱 WhatsApp: ${whatsapp}`, ...(callWhatsapp ? [`📞 Chamada em outro número: ${callWhatsapp}`] : []), `🧒 Criança: ${childName} (${childAge})`,
+      `👤 Responsável: ${customerName}`, `📱 WhatsApp: +${whatsapp}`, ...(callWhatsapp ? [`📞 Chamada em outro número: +${callWhatsapp}`] : []),
+      ...(email ? [`✉️ E-mail: ${email}`] : []), ...[clientTimeLine({ date, time, timezone })].filter(Boolean).map((line) => `🌍 ${line}`), `🧒 Criança: ${childName} (${childAge})`,
       `🎯 Tema: ${theme}`, `📝 Detalhes: ${details || '—'}`, '',
       paid ? 'Agendamento feito pelo site; pagamento confirmado.' : 'Pré-agendamento feito pelo site; pagamento ainda não confirmado.',
     ].join('\n'),
@@ -226,7 +257,8 @@ export async function createVideoCallBooking({ database, input, nowMs = Date.now
     const clientSnap = await transaction.get(clientRef);
     if (clientSnap.exists) customerName = clientSnap.get('name') || form.name;
     else {
-      transaction.set(clientRef, { name: form.name, whatsapp: input.whatsapp.trim(), whatsappNormalized: form.whatsapp, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+      // "+" + DDI + número: os links wa.me do CRM reconhecem o "+" como número completo (cliente de qualquer país).
+      transaction.set(clientRef, { name: form.name, whatsapp: `+${form.whatsapp}`, whatsappNormalized: form.whatsapp, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
     }
     if (!indexSnap.exists) transaction.set(indexRef, { clientId: clientRef.id, whatsappNormalized: form.whatsapp, recordType: 'whatsapp-index' });
 
@@ -234,10 +266,11 @@ export async function createVideoCallBooking({ database, input, nowMs = Date.now
       clientId: clientRef.id, serviceId: profile.serviceId, status: evaluation.status, paymentPending: true,
       content: orderContent(form), childName: form.childName,
       // Mesma convenção do ManyChat: a data fica ao meio-dia de Brasília; o horário exato está em videoCall.time.
-      eventDate: Timestamp.fromDate(new Date(`${form.date}T12:00:00-03:00`)),
+      eventDate: Timestamp.fromDate(new Date(zonedInstant(form.date, '12:00'))),
       videoCall: {
         date: form.date, time: form.time, durationMinutes: settings.durationMinutes, slotId: id, bookedAtMs: nowMs,
-        whatsapp: form.whatsapp, ...(form.callWhatsapp ? { callWhatsapp: form.callWhatsapp } : {}), childAge: form.childAge, theme: form.theme, details: form.details,
+        whatsapp: form.whatsapp, ddi: form.ddi, phone: form.phone, ...(form.callWhatsapp ? { callWhatsapp: form.callWhatsapp } : {}),
+        email: form.email, ...(form.timezone ? { timezone: form.timezone } : {}), childAge: form.childAge, theme: form.theme, details: form.details,
       },
       // O valor é o da configuração no momento da reserva; a confirmação do pagamento usa este valor.
       servicePrice: settings.price, rushFee: 0, totalPaid: 0, productionType: evaluation.productionType,
@@ -267,17 +300,44 @@ export async function createVideoCallBooking({ database, input, nowMs = Date.now
 
 // ---------- depois da reserva ----------
 
-/** Pagamento confirmado: troca o título/descrição do evento para "paga". Melhor esforço (o pedido já está confirmado no CRM). */
-export async function markVideoCallEventPaid({ database, orderId, updateEvent = updateCalendarEvent, ctx = {} }) {
-  const order = await database.collection(ORDERS).doc(String(orderId)).get();
+/**
+ * Pagamento confirmado (chamado pelo fluxo existente do ManyChat). No MESMO evento criado na reserva: marca como paga (título, cor,
+ * descrição) e adiciona o e-mail do cliente como convidado, para o Google enviar o convite. Nenhum evento novo é criado.
+ * O resultado do convite fica no pedido (`calendarInvite`): se o Google recusar ou o evento não existir mais, isso aparece no CRM
+ * em vez de passar por concluído. Lança ao final se alguma parte falhou (quem chama registra; o pagamento já está confirmado).
+ * Devolve false para pedidos que não são agendamento do site.
+ */
+export async function markVideoCallEventPaid({ database, orderId, updateEvent = updateCalendarEvent, addGuest = addCalendarEventGuest, ctx = {} }) {
+  const orderRef = database.collection(ORDERS).doc(String(orderId));
+  const order = await orderRef.get();
   const call = order.exists ? order.get('videoCall') : null;
-  const eventId = order.exists ? order.get('googleCalendar')?.eventId : null;
-  if (!call || !eventId) return false;
+  if (!call) return false;
+  const eventId = order.get('googleCalendar')?.eventId;
+  const email = call.email || null;
+  const record = (invite) => orderRef.update({ calendarInvite: { email, ...invite, at: FieldValue.serverTimestamp() } }).catch(() => {});
+  if (!eventId) {
+    await record({ status: 'failed', code: 'event_link_missing', message: 'O pedido não tem o vínculo do evento da agenda.' });
+    throw new GoogleCalendarError('event_not_found');
+  }
   const client = await database.collection(CLIENTS).doc(String(order.get('clientId'))).get();
-  await updateEvent({
-    id: eventId, ...ctx,
-    input: eventInput({ ...call, customerName: client.get('name') || 'Cliente', whatsapp: call.whatsapp ?? client.get('whatsappNormalized') ?? '', childName: order.get('childName'), paid: true }),
-  });
+  const failures = [];
+  try {
+    await updateEvent({
+      id: eventId, ...ctx,
+      input: eventInput({ ...call, customerName: client.get('name') || 'Cliente', whatsapp: call.whatsapp ?? client.get('whatsappNormalized') ?? '', childName: order.get('childName'), paid: true }),
+    });
+  } catch (error) { failures.push(error); }
+  // Reservas anteriores ao campo de e-mail não têm quem convidar: só o título/cor mudam.
+  if (email) {
+    try {
+      await addGuest({ id: eventId, email, ...ctx });
+      await record({ status: 'sent' });
+    } catch (error) {
+      failures.push(error);
+      await record({ status: 'failed', code: error?.code ?? 'error', message: error instanceof Error ? error.message : 'Falha ao convidar.' });
+    }
+  }
+  if (failures.length) throw failures[0];
   return true;
 }
 
