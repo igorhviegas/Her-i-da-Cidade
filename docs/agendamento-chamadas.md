@@ -14,15 +14,38 @@ Módulo admin **Agendamento de chamadas**: `/admin/agendamento-chamadas`, filho 
 
 1. `GET /api/video-call` devolve os horários livres (regra ∩ janela de antecedência − eventos com hora marcada das agendas − reservas do sistema) e os textos/valor para a página.
 2. `POST /api/video-call` **revalida tudo** (regra, Google, trava), grava numa transação do Firestore a trava do horário + pedido + cliente, e só então cria o evento no Google Agenda. Se o Google falhar, a reserva é desfeita e o cliente vê o erro (nunca "reservado" sem evento).
-3. Pedido: serviço **Vídeo Chamada ao Vivo** (id 2), status inicial configurado no serviço, `paymentPending: true`, sem `paidAt`, `totalPaid: 0`, `servicePrice` = valor configurado no momento da reserva, `source: 'booking'`, `eventDate` (meio-dia de Brasília) e `videoCall { date, time, durationMinutes, slotId, bookedAtMs, whatsapp, childAge, theme, details }`; nome da criança em `childName`; vínculo em `googleCalendar`.
+3. Pedido: serviço **Vídeo Chamada ao Vivo** (id 2), status inicial configurado no serviço, `paymentPending: true`, sem `paidAt`, `totalPaid: 0`, `servicePrice` = valor configurado no momento da reserva, `source: 'booking'`, `eventDate` (meio-dia de Brasília) e `videoCall { date, time, durationMinutes, slotId, bookedAtMs, whatsapp, ddi, phone, callWhatsapp?, email, timezone?, childAge, theme, details }`; nome da criança em `childName`; vínculo em `googleCalendar`.
 4. **Pagamento (fluxo existente):** o `payment.paid` de `live-call` do ManyChat, se houver pré-agendamento pendente com o mesmo WhatsApp (`videoCallPending/{whatsapp}`), **confirma esse pedido** (`paidAt`, `totalPaid` = valor da reserva, prazos; remove `paymentPending`) e responde `confirmedBooking: true`. Sem pendente, o comportamento antigo é idêntico (cria pedido pago de R$ 75). O contrato do webhook não mudou.
 5. **Agenda depois do pagamento:** `/api/manychat` (Vercel) troca o título do evento de "(aguardando pagamento)" para "(paga)" e a cor de **Banana** para **Manjericão** (a API do Google só aceita as 11 cores de evento; "Abacate" é cor de agenda). É melhor esforço: se o Google falhar, o pagamento continua confirmado. A Function do Firebase (`receiveManyChatOrder`) não faz essa troca; e ela só passa a confirmar pré-agendamentos depois de um `firebase deploy --only functions`.
 6. **Prazo de pagamento:** o cliente é informado de `paymentDeadlineHours` (padrão 24 h), mas o pré-agendamento sem pagamento só é **excluído** depois de `expireAfterHours` (padrão 72 h, para cobrir o fim de semana sem atendimento). A exclusão apaga pedido + trava + evento da agenda (`expireUnpaidBookings`) e roda antes de toda chamada ao endpoint e uma vez por dia pelo cron da Vercel (`vercel.json`, GET em `/api/video-call`). O pedido é conferido de novo dentro da transação: pagamento que chegue no mesmo instante vence. Se o evento não puder ser apagado, fica na agenda (e o log avisa).
 
+## E-mail e convite do Google Agenda
+
+- O formulário pede **e-mail** (obrigatório, validação básica). Fica em `videoCall.email`, no resumo do pedido e na descrição do evento.
+- **Na reserva ninguém é convidado.** Quando o pagamento é confirmado pelo ManyChat (`/api/manychat` → `markVideoCallEventPaid`), o **mesmo** evento da reserva (`googleCalendar.eventId`) recebe o e-mail como convidado (`addCalendarEventGuest`: lê os convidados atuais e regrava com o novo, `sendUpdates=all`), e o Google envia o convite. Nenhum evento novo é criado.
+- O resultado fica em `orders/{id}.calendarInvite` (`sent` ou `failed`, com código e mensagem) e aparece na lista de Agendamentos ("Convite enviado" / "Convite não enviado"). Falha no convite não desfaz o pagamento nem a troca de título/cor.
+- **Risco conhecido:** o Google costuma recusar convites feitos por **conta de serviço** sem delegação em todo o domínio (recurso do Google Workspace; erro `forbiddenForServiceAccounts`, aqui `guests_not_allowed`). Isso só se confirma com um pagamento real. Se acontecer, o convite fica como "não enviado" e é preciso outro caminho (ex.: convidar manualmente pela agenda, ou autenticar com a conta dona da agenda).
+- A baixa manual no CRM (data de pagamento em "Editar pedido") não passa por esse fluxo: não muda o evento nem convida.
+
+## Telefone com DDI
+
+- O WhatsApp é informado em duas partes: país/DDI (lista em `services/phoneCountries.js`, **Brasil +55 por padrão**) e número. O número da chamada, quando é outro, tem o seu próprio DDI.
+- O servidor junta os dois em formato internacional só com dígitos (`videoCall.whatsapp`, ex.: `5531999990001`, `351912345678`), o mesmo padrão de `whatsappNormalized`; guarda também `videoCall.ddi` e `videoCall.phone`. Sem DDI na requisição vale o Brasil, com a regra de sempre (DDD + número).
+- Cliente novo criado pelo agendamento ganha `whatsapp: "+<DDI><número>"`. O `+` é o que faz os links `wa.me` do CRM e a busca de cliente tratarem o número como completo; cadastros antigos não são alterados e continuam valendo.
+- ManyChat: `customer.whatsapp` continua aceitando número brasileiro com DDD; passa a aceitar também internacional **com `+` e o código do país**. Sem `+`, um número de outro país continua recusado (não dá para distinguir de um número brasileiro).
+
+## Fuso horário do cliente
+
+- A agenda é sempre a de **Brasília**: disponibilidade, trava do horário e evento do Google não mudam com o fuso de quem agenda.
+- O navegador informa o fuso (identificador IANA, ex.: `Europe/Lisbon`). Se o horário local do cliente for igual ao de Brasília, nada extra aparece. Se for diferente, a página mostra os dois, com rótulo ("Brasília" e "seu horário", com o dia quando a data muda), na escolha do horário, no resumo e na confirmação.
+- A conversão usa o banco de fusos do `Intl` (`functions/video-call-time.js`), sem somar horas fixas: horário de verão e troca de data saem certos. O servidor também deixou de usar `-03:00` fixo para Brasília.
+- O pedido guarda `videoCall.timezone`; quando difere de Brasília, o resumo do pedido e o evento trazem o horário do cliente.
+- Para conferir o que um cliente de fora vê: `/agendar-chamada?fuso=Europe/Lisbon` (simula o fuso; não altera a reserva).
+
 ## WhatsApp de contato x número da chamada
 
 - O formulário pede o **WhatsApp de contato** (o que vai falar com o negócio e pagar) e pergunta se a chamada será nesse mesmo número. Se não, pede o **número da chamada**, gravado em `videoCall.callWhatsapp`, mostrado como observação no pedido e no evento.
-- A baixa do pagamento usa só o número de contato: o ManyChat informa o WhatsApp que conversou, e o pedido é achado por `videoCallPending/{bookingKey}` (DDI + DDD + 8 últimos dígitos, então o nono dígito não atrapalha). Se quem paga escreve de **outro** WhatsApp, não há como casar: o ManyChat cria um pedido novo e a baixa é manual (informar a data de pagamento em "Editar pedido").
+- A baixa do pagamento usa só o número de contato: o ManyChat informa o WhatsApp que conversou, e o pedido é achado por `videoCallPending/{bookingKey}` (número brasileiro: DDI + DDD + 8 últimos dígitos, então o nono dígito não atrapalha; internacional: o número inteiro). Se quem paga escreve de **outro** WhatsApp, não há como casar: o ManyChat cria um pedido novo e a baixa é manual (informar a data de pagamento em "Editar pedido").
 - No Kanban, o botão "Enviar pelo WhatsApp" do card (mensagem do dia da chamada) vai para o número da chamada quando ele existe; o contato do pedido continua sendo o cliente.
 
 ## Configurações (`siteConfig/videoCall`)

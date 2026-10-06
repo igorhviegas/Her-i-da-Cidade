@@ -46,8 +46,11 @@ export function buildDeliveryMessage(order, service) {
 
 /** Link wa.me com a mensagem de entrega, ou null se o telefone for inválido. Nunca envia sozinho. */
 export function buildDeliveryWhatsAppUrl(whatsapp, order, service) {
-  const digits = String(whatsapp ?? '').replace(/\D/g, '');
-  const phone = digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
-  if (!/^55\d{10,11}$/.test(phone)) return null;
+  const raw = String(whatsapp ?? '').trim();
+  const digits = raw.replace(/\D/g, '');
+  // Com "+" o número já está completo (código do país incluído): vale para clientes internacionais. Sem "+", a regra brasileira de sempre.
+  const international = raw.startsWith('+') && !/^55\d{10,11}$/.test(digits);
+  const phone = international || !(digits.length === 10 || digits.length === 11) ? digits : `55${digits}`;
+  if (!(international ? /^[1-9]\d{7,14}$/.test(phone) : /^55\d{10,11}$/.test(phone))) return null;
   return `https://wa.me/${phone}?text=${encodeURIComponent(buildDeliveryMessage(order, service))}`;
 }

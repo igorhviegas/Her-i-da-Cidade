@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FieldValue } from 'firebase-admin/firestore';
-import { VIDEO_CALL_CONFIG, VideoCallError, candidateSlots, createVideoCallBooking, expireUnpaidBookings, getAvailability, hasCalendarConflict, markVideoCallEventPaid, publicConfig } from './video-call.js';
+import { VIDEO_CALL_CONFIG, VideoCallError, candidateSlots, createVideoCallBooking, expireUnpaidBookings, getAvailability, hasCalendarConflict, markVideoCallEventPaid, normalizePhone, publicConfig } from './video-call.js';
+import { GoogleCalendarError } from './google-calendar.js';
+import { bookingKey } from './manychat-handler.js';
 import { DEFAULT_VIDEO_CALL_CONFIG, fillText, normalizeVideoCallConfig, parseTimes } from './video-call-config.js';
 import { handleManyChatOrderRequest } from './manychat-handler.js';
 
@@ -57,7 +59,7 @@ function fakeDatabase(seed = {}) {
 
 const SERVICE = { title: 'Vídeo Chamada ao Vivo', active: true, generateOrder: true, productionType: 'scheduled', initialStatus: 'scheduled', whatsappUrl: 'https://wa.me/5531999044206?text=Ol%C3%A1' };
 const seeded = () => fakeDatabase({ 'services/2': SERVICE });
-const form = (over = {}) => ({ slot: { date: '2026-10-12', time: '20:00' }, name: 'Maria', whatsapp: '(31) 99999-0001', childName: 'Davi', childAge: '5 anos', theme: 'Aniversário', details: 'Gosta de dinossauros', ...over });
+const form = (over = {}) => ({ slot: { date: '2026-10-12', time: '20:00' }, name: 'Maria', whatsapp: '(31) 99999-0001', email: 'maria@exemplo.com', childName: 'Davi', childAge: '5 anos', theme: 'Aniversário', details: 'Gosta de dinossauros', ...over });
 const noEvents = async () => ({ events: [] });
 const quietLogger = { error() {} };
 const book = (database, input, extra = {}) => createVideoCallBooking({ database, input, nowMs: NOW, listEvents: noEvents, createEvent: async () => ({ id: 'evt1', htmlLink: 'https://cal/evt1' }), ctx: { env: { GOOGLE_CALENDAR_ID: 'agenda@x' } }, logger: quietLogger, ...extra });
@@ -361,7 +363,7 @@ test('pagamento confirmado marca o evento da agenda como pago (gancho do ManyCha
   const database = seeded();
   const { orderId } = await book(database, form());
   const updates = [];
-  const res = await payment(database, paid('31999990001'), { onBookingConfirmed: (id) => markVideoCallEventPaid({ database, orderId: id, updateEvent: async (args) => { updates.push(args); } }) });
+  const res = await payment(database, paid('31999990001'), { onBookingConfirmed: (id) => markVideoCallEventPaid({ database, orderId: id, updateEvent: async (args) => { updates.push(args); }, addGuest: async () => ({ added: true }) }) });
   assert.equal(res.body.confirmedBooking, true);
   assert.equal(orderId, res.body.orderId);
   assert.equal(updates.length, 1);
@@ -391,7 +393,7 @@ test('chamada em outro número: fica no pedido como observação e no evento; o 
   assert.equal(order.videoCall.whatsapp, '5531999990001');
   assert.equal(order.videoCall.callWhatsapp, '5531988887777');
   assert.match(order.content, /outro número, \+5531988887777/);
-  assert.match(created.input.description, /Chamada em outro número: 5531988887777/);
+  assert.match(created.input.description, /Chamada em outro número: \+5531988887777/);
   assert.equal(database.docs.get(`clients/${order.clientId}`).whatsappNormalized, '5531999990001');
   const res = await payment(database, paid('31999990001')); // quem paga é o número de contato
   assert.deepEqual([res.body.orderId, res.body.confirmedBooking], [orderId, true]);
@@ -425,4 +427,192 @@ test('pagamento de outro WhatsApp não dá baixa na reserva de ninguém: cria pe
   assert.notEqual(res.body.orderId, orderId);
   assert.equal(database.docs.get(`orders/${orderId}`).paymentPending, true);
   assert.equal(database.count('orders/'), 2);
+});
+
+// ---- e-mail do cliente e convite do Google Agenda depois do pagamento ----
+
+test('e-mail é obrigatório e tem validação básica; fica no pedido e não entra como convidado na reserva', async () => {
+  const database = seeded();
+  for (const email of [undefined, '', 'maria', 'maria@exemplo', 'ma ria@exemplo.com', '@exemplo.com']) {
+    await assert.rejects(book(database, form({ email })), (e) => e.code === 'validation_error' && /e-mail/.test(e.message), String(email));
+  }
+  assert.equal(database.count('orders/'), 0);
+
+  let created;
+  const { orderId } = await book(database, form({ email: '  Maria.Silva@Exemplo.COM ' }), { createEvent: async (args) => { created = args; return { id: 'evt1' }; } });
+  const order = database.docs.get(`orders/${orderId}`);
+  assert.equal(order.videoCall.email, 'maria.silva@exemplo.com');
+  assert.match(order.content, /E-mail: maria\.silva@exemplo\.com/);
+  assert.match(created.input.description, /E-mail: maria\.silva@exemplo\.com/);
+  // pré-agendamento: ninguém é convidado ainda (o pagamento não foi confirmado)
+  assert.equal('attendees' in created.input, false);
+  assert.equal(order.calendarInvite, undefined);
+});
+
+test('pagamento confirmado: o e-mail do pedido vira convidado do MESMO evento; nenhum evento novo', async () => {
+  const database = seeded();
+  let events = 0;
+  const { orderId } = await book(database, form(), { createEvent: async () => { events += 1; return { id: 'evt-da-reserva' }; } });
+  const guests = [];
+  const updates = [];
+  const res = await payment(database, paid('31999990001'), { onBookingConfirmed: (id) => markVideoCallEventPaid({ database, orderId: id, updateEvent: async (args) => { updates.push(args); }, addGuest: async (args) => { guests.push(args); return { added: true }; } }) });
+  assert.equal(res.body.confirmedBooking, true);
+  assert.deepEqual(guests.map(({ id, email }) => [id, email]), [['evt-da-reserva', 'maria@exemplo.com']]);
+  assert.equal(updates[0].id, 'evt-da-reserva');
+  assert.equal(events, 1);
+  const invite = database.docs.get(`orders/${orderId}`).calendarInvite;
+  assert.deepEqual([invite.email, invite.status], ['maria@exemplo.com', 'sent']);
+});
+
+test('convite recusado pelo Google não passa por concluído: fica registrado no pedido e o erro sobe; o pagamento continua confirmado', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form());
+  const logged = [];
+  let titled = 0;
+  const res = await payment(database, paid('31999990001'), {
+    logger: { error: (...args) => logged.push(args) },
+    onBookingConfirmed: (id) => markVideoCallEventPaid({ database, orderId: id, updateEvent: async () => { titled += 1; }, addGuest: async () => { throw new GoogleCalendarError('guests_not_allowed'); } }),
+  });
+  assert.equal(res.statusCode, 200);
+  const order = database.docs.get(`orders/${orderId}`);
+  assert.ok(order.paidAt);
+  assert.equal(titled, 1); // título e cor foram atualizados mesmo sem o convite
+  assert.deepEqual([order.calendarInvite.status, order.calendarInvite.code, order.calendarInvite.email], ['failed', 'guests_not_allowed', 'maria@exemplo.com']);
+  assert.match(order.calendarInvite.message, /conta de serviço/);
+  assert.equal(logged.length, 1);
+});
+
+test('evento que sumiu ou pedido sem vínculo do evento: erro explícito e registro no pedido', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form());
+  const gone = () => { throw new GoogleCalendarError('event_not_found'); };
+  await assert.rejects(markVideoCallEventPaid({ database, orderId, updateEvent: gone, addGuest: gone }), (e) => e.code === 'event_not_found');
+  assert.deepEqual([database.docs.get(`orders/${orderId}`).calendarInvite.status, database.docs.get(`orders/${orderId}`).calendarInvite.code], ['failed', 'event_not_found']);
+
+  const noLink = seeded();
+  const second = await book(noLink, form());
+  delete noLink.docs.get(`orders/${second.orderId}`).googleCalendar;
+  let called = 0;
+  await assert.rejects(markVideoCallEventPaid({ database: noLink, orderId: second.orderId, updateEvent: async () => { called += 1; }, addGuest: async () => { called += 1; } }), (e) => e.code === 'event_not_found');
+  assert.equal(called, 0);
+  assert.equal(noLink.docs.get(`orders/${second.orderId}`).calendarInvite.code, 'event_link_missing');
+});
+
+test('reserva antiga, sem e-mail: só marca como paga, sem convidar ninguém', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form());
+  delete database.docs.get(`orders/${orderId}`).videoCall.email;
+  let invited = 0;
+  assert.equal(await markVideoCallEventPaid({ database, orderId, updateEvent: async () => {}, addGuest: async () => { invited += 1; } }), true);
+  assert.equal(invited, 0);
+  assert.equal(database.docs.get(`orders/${orderId}`).calendarInvite, undefined);
+});
+
+// ---- DDI / números internacionais ----
+
+test('normalizePhone: Brasil é o padrão e mantém a regra de sempre; outros países viram DDI + número (E.164 só com dígitos)', () => {
+  assert.deepEqual(normalizePhone(undefined, '(31) 99999-0001'), { e164: '5531999990001', ddi: '55', phone: '31999990001' }); // formulário antigo, sem DDI
+  assert.deepEqual(normalizePhone('55', '31 9999-0001'), { e164: '553199990001', ddi: '55', phone: '3199990001' });
+  assert.equal(normalizePhone('55', '+55 31 99999-0001').e164, '5531999990001'); // colado já com o DDI
+  assert.equal(normalizePhone('55', '5531999990001').e164, '5531999990001');
+  assert.equal(normalizePhone('55', '55 99999-0001').e164, '5555999990001'); // DDD 55 (RS) não é confundido com o DDI
+  assert.equal(normalizePhone('55', '99999-0001'), null); // sem DDD
+  assert.deepEqual(normalizePhone('351', '912 345 678'), { e164: '351912345678', ddi: '351', phone: '912345678' }); // Portugal
+  assert.equal(normalizePhone('+351', '+351 912 345 678').e164, '351912345678');
+  assert.equal(normalizePhone('1', '(555) 123-4567').e164, '15551234567'); // EUA
+  assert.equal(normalizePhone('44', '07911 123456').e164, '447911123456'); // Reino Unido: o 0 inicial sai
+  assert.equal(normalizePhone('351', '123'), null);
+  assert.equal(normalizePhone('351', '9'.repeat(14)), null); // passa de 15 dígitos
+  assert.equal(normalizePhone('abc', '912345678'), null);
+});
+
+test('reserva com outro país: pedido guarda DDI, número e formato internacional; cliente ganha WhatsApp com "+"', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form({ ddi: '351', whatsapp: '912 345 678' }));
+  const order = database.docs.get(`orders/${orderId}`);
+  assert.deepEqual([order.videoCall.whatsapp, order.videoCall.ddi, order.videoCall.phone], ['351912345678', '351', '912345678']);
+  const client = database.docs.get(`clients/${order.clientId}`);
+  assert.deepEqual([client.whatsapp, client.whatsappNormalized], ['+351912345678', '351912345678']);
+  assert.ok(database.docs.has('clients/whatsapp_351912345678'));
+  assert.equal(bookingKey('351912345678'), '351912345678'); // internacional: a chave é o número inteiro
+  assert.equal(bookingKey('5531999990001'), '553199990001'); // brasileiro: sem o nono dígito
+});
+
+test('Brasil por padrão: reserva sem DDI (ou com 55) grava igual a antes, agora com DDI e número separados', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form());
+  const order = database.docs.get(`orders/${orderId}`);
+  assert.deepEqual([order.videoCall.whatsapp, order.videoCall.ddi, order.videoCall.phone], ['5531999990001', '55', '31999990001']);
+  assert.equal(database.docs.get(`clients/${order.clientId}`).whatsappNormalized, '5531999990001');
+  // cliente antigo, cadastrado no formato de antes, continua sendo reaproveitado (nada é reescrito)
+  const existing = fakeDatabase({ 'services/2': SERVICE, 'clients/whatsapp_5531999990001': { clientId: 'c9', recordType: 'whatsapp-index' }, 'clients/c9': { name: 'Maria Antiga', whatsapp: '(31) 99999-0001', whatsappNormalized: '5531999990001' } });
+  const again = await book(existing, form({ ddi: '55' }));
+  assert.equal(existing.docs.get(`orders/${again.orderId}`).clientId, 'c9');
+  assert.equal(existing.docs.get('clients/c9').whatsapp, '(31) 99999-0001');
+});
+
+test('pagamento do ManyChat com número internacional ("+" e código do país) dá baixa na reserva', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form({ ddi: '351', whatsapp: '912345678' }));
+  const res = await payment(database, paid('+351 912 345 678'));
+  assert.deepEqual([res.statusCode, res.body.orderId, res.body.confirmedBooking], [200, orderId, true]);
+
+  const usa = seeded();
+  const second = await book(usa, form({ ddi: '1', whatsapp: '(555) 123-4567' }));
+  assert.equal((await payment(usa, paid('+1 555 123 4567'))).body.orderId, second.orderId); // 11 dígitos com "+" não viram número brasileiro
+});
+
+test('ManyChat: números brasileiros seguem como antes; internacional só com "+"; lixo continua recusado', async () => {
+  const database = seeded();
+  assert.equal((await payment(database, paid('31988887777'))).statusCode, 200);
+  assert.equal((await payment(database, paid('+55 (31) 98888-7777'))).statusCode, 200);
+  assert.equal(database.count('clients/whatsapp_5531988887777'), 1); // os dois formatos caem no mesmo cliente
+  for (const bad of ['351912345678', '+55 31 9999', '123', '+123', '']) assert.equal((await payment(seeded(), paid(bad))).statusCode, 400, bad);
+});
+
+test('número da chamada em outro país: DDI próprio; o botão do Kanban recebe o número completo', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form({ callDdi: '1', callWhatsapp: '555 123 4567' }));
+  const order = database.docs.get(`orders/${orderId}`);
+  assert.equal(order.videoCall.whatsapp, '5531999990001');
+  assert.equal(order.videoCall.callWhatsapp, '15551234567');
+  assert.match(order.content, /outro número, \+15551234567/);
+});
+
+// ---- fuso do cliente (a agenda continua em Brasília) ----
+
+test('cliente em Lisboa: pedido guarda o fuso e o horário dele; trava e evento continuam no horário de Brasília', async () => {
+  const database = seeded();
+  let created;
+  const { orderId } = await book(database, form({ slot: { date: '2026-10-07', time: '20:00' }, timezone: 'Europe/Lisbon' }), { createEvent: async (args) => { created = args; return { id: 'evt1' }; } });
+  const order = database.docs.get(`orders/${orderId}`);
+  assert.equal(order.videoCall.timezone, 'Europe/Lisbon');
+  assert.deepEqual([order.videoCall.date, order.videoCall.time], ['2026-10-07', '20:00']);
+  assert.match(order.content, /07\/10\/2026 às 20:00 \(horário de Brasília\)/);
+  assert.match(order.content, /Fuso do cliente: Europe\/Lisbon \(para ele: 08\/10\/2026 às 00:00\)/); // lá já é o dia seguinte
+  // o Google recebe o horário de parede de Brasília (o fuso America/Sao_Paulo é aplicado por buildStandaloneEvent)
+  assert.deepEqual([created.input.date, created.input.startTime, created.input.endTime], ['2026-10-07', '20:00', '20:15']);
+  assert.match(created.input.description, /Fuso do cliente: Europe\/Lisbon/);
+  assert.equal(database.docs.get('videoCallSlots/2026-10-07_2000').startsAtMs, Date.parse('2026-10-07T23:00:00Z'));
+  assert.equal(order.eventDate.toDate().toISOString(), '2026-10-07T15:00:00.000Z'); // meio-dia de Brasília, como antes
+});
+
+test('cliente no Brasil: sem linha de conversão; fuso inválido ou ausente não impede a reserva', async () => {
+  const brazil = seeded();
+  const first = await book(brazil, form({ timezone: 'America/Sao_Paulo' }));
+  const order = brazil.docs.get(`orders/${first.orderId}`);
+  assert.equal(order.videoCall.timezone, 'America/Sao_Paulo');
+  assert.doesNotMatch(order.content, /Fuso do cliente/);
+
+  for (const timezone of ['-03:00', 'Marte/Fobos', 42, undefined]) {
+    const database = seeded();
+    const { orderId } = await book(database, form({ timezone }));
+    assert.equal('timezone' in database.docs.get(`orders/${orderId}`).videoCall, false, String(timezone));
+  }
+});
+
+test('o fuso do cliente não muda a disponibilidade: os horários oferecidos são sempre os de Brasília', async () => {
+  const { days } = await getAvailability({ database: seeded(), nowMs: NOW, listEvents: noEvents });
+  assert.deepEqual(days.find((d) => d.date === '2026-10-07').times, ['19:30', '20:00', '20:30']);
+  await assert.rejects(book(seeded(), form({ slot: { date: '2026-10-08', time: '00:00' }, timezone: 'Europe/Lisbon' })), (e) => e.code === 'slot_unavailable'); // horário local do cliente não é um horário da agenda
 });

@@ -239,6 +239,8 @@ Object.assign(MESSAGES, {
   invalid_event: 'Dados do evento inválidos. Confira título, data e horários.',
   invalid_range: 'Período inválido para consulta.',
   event_not_found: 'Evento não encontrado na agenda (talvez já tenha sido excluído).',
+  guests_not_allowed: 'O Google não permite que a conta de serviço convide participantes (exige delegação em todo o domínio, recurso do Google Workspace).',
+  invalid_guest: 'E-mail do convidado inválido.',
 });
 
 /** Evento do pedido (ID determinístico gerado por calendarEventId). */
@@ -350,6 +352,27 @@ export const createCalendarEvent = async ({ input, ...ctx }) => confirmedEvent(a
 export async function updateCalendarEvent({ id, input, ...ctx }) {
   const body = buildStandaloneEvent(input, { patch: true });
   return confirmedEvent(await calendarRequest('PATCH', `/${encodeURIComponent(ensureId(id))}`, { ...ctx, body }));
+}
+
+/**
+ * Adiciona um convidado ao evento, preservando os que já existem (lê a lista atual e regrava com o novo). `sendUpdates=all` faz o
+ * próprio Google enviar o convite por e-mail. Só resolve depois da confirmação do Google; 404 e recusas viram erro com código.
+ * Retorna { id, added } (added = false se o e-mail já era convidado: nada é reenviado).
+ */
+export async function addCalendarEventGuest({ id, email, ...ctx }) {
+  const guest = typeof email === 'string' ? email.trim() : '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest) || guest.length > 254) throw new GoogleCalendarError('invalid_guest');
+  const suffix = `/${encodeURIComponent(ensureId(id))}`;
+  const current = await calendarRequest('GET', suffix, { ...ctx, query: { fields: 'id,attendees' } });
+  if (!current.ok) throw failWith(current);
+  const attendees = (await current.json().catch(() => null))?.attendees ?? [];
+  if (attendees.some((attendee) => String(attendee.email ?? '').toLowerCase() === guest.toLowerCase())) return { id, added: false };
+  const response = await calendarRequest('PATCH', suffix, { ...ctx, query: { sendUpdates: 'all' }, body: { attendees: [...attendees, { email: guest }] } });
+  if (!response.ok) {
+    const reason = (await response.json().catch(() => null))?.error?.errors?.[0]?.reason;
+    throw reason === 'forbiddenForServiceAccounts' ? new GoogleCalendarError('guests_not_allowed') : failWith(response);
+  }
+  return { id, added: true };
 }
 
 /** Só resolve depois de o Google confirmar. 410 (já excluído) conta como concluído; 404 é erro. */

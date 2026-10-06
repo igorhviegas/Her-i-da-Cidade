@@ -21,7 +21,7 @@ Use apenas uma das duas URLs (a que estiver publicada). O limite do corpo é 256
 | `eventType` | string | sim | Sempre `"payment.paid"`. |
 | `service` | string | sim* | Identificador do serviço (tabela abaixo). *Se omitido, vale o contrato antigo do Vídeo Especial de Aniversário. |
 | `customer.name` | string | sim | Nome do contato (até 120 caracteres). |
-| `customer.whatsapp` | string | sim | Telefone brasileiro com DDD (`+55 31 99999-0000`, `31999990000`…). |
+| `customer.whatsapp` | string | sim | Telefone brasileiro com DDD (`+55 31 99999-0000`, `31999990000`…) ou internacional com `+` e o código do país (`+351 912 345 678`). Sem `+`, só número brasileiro é aceito. |
 
 Qualquer campo fora da lista do serviço é rejeitado com `400`.
 
