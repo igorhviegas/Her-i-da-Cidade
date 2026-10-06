@@ -3,12 +3,15 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import {
-  addDays, buildNotifications, cycleArchiveRecord, cycleBounds, cycleChanged, dateKey, goalProgress, metricValue, missionNotificationIds,
+  addDays, buildNotifications, cycleArchiveRecord, cycleBounds, cycleChanged, dateKey, goalProgress, INSTAGRAM_METRICS, instagramNote, metricValue, missionNotificationIds,
   occurrenceNotificationIds, syncRecurringTasks, taskReminderSupported, validateGoal, validateTask,
-  type GoalMetric, type GoalPeriod, type GoalProgress, type Frequency,
+  type GoalMetric, type GoalPeriod, type GoalProgress, type Frequency, type InstagramGoalData,
 } from '../functions/missions-core.js';
 import { cleanChecklist, type ChecklistItem } from '../functions/event-missions.js';
 import { ORDERS_COLLECTION } from './ordersService';
+import { buildRevenueEntries } from './financeCalculations.js';
+import { LEDGER_COLLECTION, ledgerToOrders } from './eventFinance.js';
+import { currentPosts } from './instagramMetrics.js';
 import { CONTENT_SCRIPTS_COLLECTION } from './contentScriptsService';
 import { activityRefs, prepareActivityLog } from './activityLog';
 
@@ -26,7 +29,7 @@ export interface RecurringTask { id: string; title: string; description: string;
 export interface TaskOccurrence { id: string; taskId: string; date: string; time: string; title: string; description: string; difficulty: number; status: 'pending' | 'completed' | 'missed' | 'skipped'; dueAt?: Date; completedAt?: Date; }
 export interface Goal { id: string; title: string; description: string; period: GoalPeriod; target: number; source: 'manual' | 'auto'; metric?: GoalMetric; progress: number; status: 'active' | 'paused'; weekStartsOn: number; monthStartDay: number; cycleKey: string; cycleStart: Date; cycleEnd: Date; completedAt?: Date; }
 export interface GoalCycle { id: string; goalId: string; title: string; startKey: string; endKey: string; target: number; value: number; reached: boolean; }
-export interface GoalView extends Goal { actual: number; view: GoalProgress; }
+export interface GoalView extends Goal { actual: number; view: GoalProgress; /** Observação do indicador (ex.: frescor dos dados do Instagram, base parcial). */ note?: string | null; }
 export interface AppNotification { id: string; type: string; title: string; body: string; refType: string; refId: string; dismissed: boolean; createdAt?: Date; }
 
 export type MissionInput = { title: string; description: string; dueAt: Date | null; difficulty: number; checklist?: ChecklistItem[]; alexaReminder?: boolean };
@@ -287,16 +290,52 @@ export async function listGoalCycles(goalId: string): Promise<GoalCycle[]> {
   return result.sort((a, b) => b.startKey.localeCompare(a.startKey));
 }
 
-async function loadMetricData(since: Date) {
+/**
+ * Faturamento = o do módulo Financeiro: todos os pedidos concluídos + livro dos eventos (financeEntries), passando por
+ * buildRevenueEntries (data de faturamento, valor do pedido, parcelas e ajustes de evento). Só é lido quando alguma meta usa esse indicador.
+ */
+async function loadRevenueEntries() {
+  const [completed, ledger] = await Promise.all([
+    getDocs(query(collection(firestore(), ORDERS_COLLECTION), where('status', '==', 'completed'))),
+    getDocs(collection(firestore(), LEDGER_COLLECTION)),
+  ]);
+  const orders = [...mapAll<any>(completed), ...ledgerToOrders(ledger.docs.map((item) => ({ ...item.data(), id: item.id }) as any))];
+  return buildRevenueEntries(orders).entries;
+}
+
+/**
+ * Dados do Instagram já espelhados no Firestore pelo servidor (o painel só lê): perfil, publicações da última sincronização
+ * e retratos diários de seguidores (instagramStats). Só é lido quando alguma meta usa um indicador do Instagram.
+ */
+async function loadInstagramData(): Promise<InstagramGoalData> {
+  const [profile, posts, stats] = await Promise.all([
+    getDoc(doc(firestore(), 'instagramMeta', 'profile')),
+    getDocs(collection(firestore(), 'instagramPosts')),
+    getDocs(collection(firestore(), 'instagramStats')),
+  ]);
+  const meta = profile.exists() ? profile.data() : null;
+  const syncedAt: string | null = typeof meta?.syncedAt === 'string' ? meta.syncedAt : null;
+  return {
+    followers: typeof meta?.followers === 'number' ? meta.followers : null,
+    syncedAt,
+    posts: currentPosts(posts.docs.map((item) => item.data() as any), syncedAt ?? undefined)
+      .map((p: any) => ({ publishedAt: p.publishedAt ?? null, likes: p.likes ?? null, comments: p.comments ?? null, views: p.views ?? null })),
+    stats: stats.docs.map((item) => ({ day: String(item.data().day ?? item.id), followers: item.data().followers })).filter((s) => typeof s.followers === 'number'),
+  };
+}
+
+async function loadMetricData(since: Date, withRevenue: boolean, withInstagram: boolean) {
   const col = (name: string) => collection(firestore(), name);
   const range = async (name: string, field: string) => mapAll<any>(await getDocs(query(col(name), where(field, '>=', since))));
   const merge = (...lists: any[][]) => [...new Map(lists.flat().map((item) => [item.id, item])).values()];
-  const [completedOrders, paidOrders, created, ready, published, missions, occurrences] = await Promise.all([
+  const [revenueEntries, instagram, completedOrders, paidOrders, created, ready, published, missions, occurrences] = await Promise.all([
+    withRevenue ? loadRevenueEntries() : Promise.resolve([]),
+    withInstagram ? loadInstagramData() : Promise.resolve(undefined),
     range(ORDERS_COLLECTION, 'completedAt'), range(ORDERS_COLLECTION, 'paidAt'),
     range(CONTENT_SCRIPTS_COLLECTION, 'createdAt'), range(CONTENT_SCRIPTS_COLLECTION, 'readyAt'), range(CONTENT_SCRIPTS_COLLECTION, 'publishedAt'),
     range(MISSIONS_COLLECTION, 'completedAt'), listOccurrencesSince(dateKey(since)),
   ]);
-  return { orders: merge(completedOrders, paidOrders), scripts: merge(created, ready, published), missions, occurrences };
+  return { orders: merge(completedOrders, paidOrders), scripts: merge(created, ready, published), missions, occurrences, revenueEntries, instagram };
 }
 
 /**
@@ -309,7 +348,8 @@ export async function loadGoals(now = new Date()): Promise<GoalView[]> {
   const today = dateKey(now);
   const boundsOf = (g: Goal, at: Date) => cycleBounds(g.period, at, g);
   const since = new Date(Math.min(...goals.map((g) => Math.min(g.cycleStart.getTime(), boundsOf(g, now).start.getTime()))));
-  const data = await loadMetricData(since);
+  const usesMetric = (test: (metric: GoalMetric) => boolean) => goals.some((g) => g.source === 'auto' && g.metric && test(g.metric));
+  const data = await loadMetricData(since, usesMetric((m) => m === 'revenue_completed'), usesMetric((m) => INSTAGRAM_METRICS.includes(m)));
   const valueIn = (g: Goal, bounds: { start: Date; end: Date }) => (g.source === 'manual' ? g.progress : metricValue(g.metric!, bounds, data, today));
 
   const views: GoalView[] = [];
@@ -338,7 +378,8 @@ export async function loadGoals(now = new Date()): Promise<GoalView[]> {
       });
       goal = { ...goal, completedAt: now };
     }
-    views.push({ ...goal, actual, view });
+    const note = goal.source === 'auto' && goal.metric ? instagramNote(goal.metric, { start: goal.cycleStart, end: goal.cycleEnd }, data, today) : null;
+    views.push({ ...goal, actual, view, note });
   }
   return views;
 }

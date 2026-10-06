@@ -44,3 +44,17 @@ A rotina diária (`/api/missions-cron` → `runMissionsSync` → `functions/even
 - Pedido excluído depois da criação: a missão é mantida (com o progresso) e marcada `orderState: 'deleted'` (selo "Pedido excluído"); apagar é decisão do usuário. Não há status "cancelado" em pedidos.
 - Se o pedido for excluído/alterado antes do dia, nada é criado.
 - Sem nova configuração: reutiliza o cron e o `CRON_SECRET` já existentes. Se a execução do dia falhar, rode de novo (idempotente) com `curl -H "Authorization: Bearer $CRON_SECRET" https://<domínio>/api/missions-cron` no mesmo dia. Limitação: não há catch-up ao abrir o CRM; no plano Hobby o cron roda em qualquer minuto entre 00:00 e 00:59. Excluir a missão no dia do evento e o cron disparar duplicado nesse mesmo dia pode recriá-la.
+
+## Metas automáticas do Instagram
+
+Usam só os dados que a sincronização do Instagram já grava no Firestore (`instagramMeta/profile`, `instagramPosts`, `instagramStats`); o CRM nunca chama a Meta.
+
+| Indicador | O que conta no ciclo |
+|---|---|
+| Ganho de seguidores | seguidores atuais − retrato diário do primeiro dia do ciclo (`instagramStats`); pode ser negativo |
+| Publicações feitas | publicações com data dentro do ciclo |
+| Curtidas / comentários / visualizações | soma dos totais atuais das **publicações feitas dentro do ciclo** (métrica ausente fica fora da soma) |
+
+- O retrato diário (`instagramStats/{dia}`) é a referência de seguidores da 1ª sincronização de cada dia, gravada uma única vez pelo servidor. Se o 1º retrato do ciclo é posterior ao início, a meta mostra "contando desde dd/mm". Antes do primeiro retrato (ou do primeiro sync) a meta mostra o aviso e valor 0. **O histórico só existe a partir da publicação desta versão.**
+- Limites da fonte: só as últimas 100 publicações sincronizadas; o total de cada publicação continua crescendo depois do ciclo; o valor só muda quando a sincronização roda (cron 00:00 e 09:00 UTC, ou "Sincronizar agora"). Cada meta mostra a data/hora dos dados do Instagram.
+- Publicar `firestore.rules` com a nova regra `instagramStats` (leitura admin, escrita `false`) antes de usar o indicador de seguidores; sem ela a leitura é negada.

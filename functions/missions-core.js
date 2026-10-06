@@ -209,7 +209,57 @@ export const GOAL_METRICS = {
   content_published: 'Conteúdos publicados',
   missions_completed: 'Missões concluídas',
   task_streak: 'Sequência de dias sem falhar',
+  ig_followers_gain: 'Instagram: ganho de seguidores',
+  ig_posts: 'Instagram: publicações feitas',
+  ig_likes: 'Instagram: curtidas das publicações do ciclo',
+  ig_comments: 'Instagram: comentários das publicações do ciclo',
+  ig_views: 'Instagram: visualizações das publicações do ciclo',
 };
+
+export const INSTAGRAM_METRICS = ['ig_followers_gain', 'ig_posts', 'ig_likes', 'ig_comments', 'ig_views'];
+const IG_POST_KEY = { ig_likes: 'likes', ig_comments: 'comments', ig_views: 'views' };
+const EMPTY_INSTAGRAM = { followers: null, syncedAt: null, posts: [], stats: [] };
+
+/** Publicações (da última sincronização) publicadas dentro do ciclo. */
+const igPostsIn = (ig, start, end) => ig.posts.filter((p) => inRange(p.publishedAt, start, end));
+
+/**
+ * Ganho de seguidores no ciclo = seguidores no fim − seguidores no início. O início é o retrato diário (primeira sincronização
+ * do dia, gravada em instagramStats) do primeiro dia do ciclo que tiver um; se o primeiro retrato é de depois do início do ciclo,
+ * o ganho é parcial (`partial`, contado desde `from`). O fim é o valor atual (ciclo em andamento) ou o retrato do dia seguinte ao
+ * ciclo (ciclo encerrado). Sem nenhum retrato no ciclo: value 0 e from null.
+ * ig.stats: [{ day: 'YYYY-MM-DD', followers }].
+ */
+export function followersGain({ start, end }, ig, today) {
+  const firstDay = dateKey(start);
+  const lastDay = dateKey(new Date(end.getTime() - 1));
+  const valid = ig.stats.filter((s) => Number.isFinite(s.followers)).sort((a, b) => a.day.localeCompare(b.day));
+  const inCycle = valid.filter((s) => s.day >= firstDay && s.day <= lastDay);
+  const base = inCycle[0];
+  if (!base) return { value: 0, from: null, partial: false };
+  let endFollowers = null;
+  if (today <= lastDay) endFollowers = Number.isFinite(ig.followers) ? ig.followers : null;
+  else endFollowers = (valid.find((s) => s.day > lastDay) ?? inCycle[inCycle.length - 1]).followers;
+  if (endFollowers === null) return { value: 0, from: base.day, partial: base.day > firstDay };
+  return { value: endFollowers - base.followers, from: base.day, partial: base.day > firstDay };
+}
+
+const fmtDay = (key) => key.split('-').reverse().slice(0, 2).join('/');
+const fmtSync = (iso) => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/Sao_Paulo' }).format(new Date(iso)).replace(', ', ' às ');
+
+/** Observação exibida na meta do Instagram: frescor dos dados e limitações (base parcial, sem retrato, sem sincronização). */
+export function instagramNote(metric, bounds, data, today) {
+  if (!INSTAGRAM_METRICS.includes(metric)) return null;
+  const ig = data.instagram ?? EMPTY_INSTAGRAM;
+  if (!ig.syncedAt) return 'Instagram ainda não sincronizado: sem dados para esta meta.';
+  const fresh = `Dados do Instagram de ${fmtSync(ig.syncedAt)}`;
+  if (metric === 'ig_followers_gain') {
+    const gain = followersGain(bounds, ig, today);
+    if (gain.from === null) return `${fresh}. Aguardando o primeiro retrato diário de seguidores neste ciclo.`;
+    return gain.partial ? `${fresh}. Contando desde ${fmtDay(gain.from)} (primeiro retrato do ciclo).` : fresh + '.';
+  }
+  return `${fresh}. Soma das últimas publicações sincronizadas (até 100).`;
+}
 
 const millis = (v) => (v instanceof Date ? v.getTime() : typeof v?.toDate === 'function' ? v.toDate().getTime() : v ? new Date(v).getTime() : NaN);
 const inRange = (v, start, end) => { const t = millis(v); return t >= start.getTime() && t < end.getTime(); };
@@ -217,13 +267,14 @@ const inRange = (v, start, end) => { const t = millis(v); return t >= start.getT
 /**
  * Valor real (sem limite) de uma meta automática no ciclo. A contagem é por documento e por campo de data
  * do evento (completedAt, paidAt, readyAt…), logo é idempotente: editar ou repetir não conta de novo.
- * data: { orders, scripts, missions, occurrences } já filtrados pela janela.
+ * data: { orders, scripts, missions, occurrences, revenueEntries, instagram: { followers, syncedAt, posts, stats } }. `revenueEntries` são as entradas de faturamento do módulo
+ * Financeiro (buildRevenueEntries em services/financeCalculations.js): a meta de faturamento só soma o que o Financeiro soma.
  */
 export function metricValue(metric, { start, end }, data, today) {
   switch (metric) {
     case 'revenue_completed':
-      return data.orders.filter((o) => o.status === 'completed' && inRange(o.completedAt, start, end))
-        .reduce((sum, o) => sum + (Number(o.totalPaid) || 0), 0);
+      // Mesma regra do Financeiro: valor e data de faturamento de cada entrada (inclui parcelas/ajustes do livro dos eventos).
+      return data.revenueEntries.filter((e) => inRange(e.revenueDate, start, end)).reduce((sum, e) => sum + e.value, 0);
     case 'services_sold':
       // vendido = pagamento confirmado (paidAt); pedidos internos de produção de roteiro não são venda.
       return data.orders.filter((o) => !o.scriptId && inRange(o.paidAt, start, end)).length;
@@ -232,6 +283,13 @@ export function metricValue(metric, { start, end }, data, today) {
     case 'content_published':
       return data.scripts.filter((s) => s.publicationStatus === 'published' && inRange(s.publishedAt, start, end)).length;
     case 'missions_completed': return data.missions.filter((m) => m.status === 'completed' && inRange(m.completedAt, start, end)).length;
+    case 'ig_followers_gain': return followersGain({ start, end }, data.instagram ?? EMPTY_INSTAGRAM, today).value;
+    case 'ig_posts': return igPostsIn(data.instagram ?? EMPTY_INSTAGRAM, start, end).length;
+    case 'ig_likes': case 'ig_comments': case 'ig_views': {
+      // Métrica ausente (curtidas ocultas, views indisponíveis) fica fora da soma, nunca vira 0 contado.
+      const key = IG_POST_KEY[metric];
+      return igPostsIn(data.instagram ?? EMPTY_INSTAGRAM, start, end).reduce((sum, p) => sum + (Number.isFinite(p[key]) ? p[key] : 0), 0);
+    }
     case 'task_streak': {
       // Só conta até o último dia do ciclo; em ciclo encerrado, "hoje" é o último dia dele (não o dia atual).
       const lastDay = dateKey(new Date(end.getTime() - 1));

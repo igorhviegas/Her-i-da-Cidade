@@ -35,3 +35,6 @@ Espelha no Firestore o perfil e as últimas 100 publicações da conta profissio
 Pendências adicionais: a classificação de erros de insights (permissão = códigos 10/200–299; "não existe" = HTTP 400 código 100) e o efeito da renovação sobre o token antigo vêm de suposições e precisam ser confirmados com respostas reais da Meta.
 
 A integração nunca foi executada contra a API real da Meta (sem credenciais): os testes usam `fetch`/Firestore simulados. Confirme nomes de campos/métrica e permissões com o primeiro sync real.
+
+## Retrato diário de seguidores (`instagramStats`)
+No mesmo batch da sincronização, a 1ª sincronização bem-sucedida de cada dia (Brasília) grava `instagramStats/{YYYY-MM-DD}` = `{ day, followers, baselineAt }` (a mesma referência do balanço diário), uma única vez por dia; repetições e falhas não alteram. Base das metas "ganho de seguidores" do módulo Missões (`docs/missoes.md`). Regras: leitura admin, escrita `false`.

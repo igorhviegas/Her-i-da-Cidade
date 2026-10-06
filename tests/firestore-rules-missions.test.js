@@ -141,3 +141,15 @@ test('roteiro: marcar como pronto grava readyAt e o registro script_ready na mes
   await assertSucceeds(deleteDoc(doc(firestore, 'contentScripts/s1')));
   await assertSucceeds(getDoc(doc(firestore, 'activityLog/script_ready_s1')));
 });
+
+test('instagramStats (retrato diário de seguidores): admin lê; ninguém escreve pelo cliente; não-admin e anônimo não leem', async () => {
+  await env.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'instagramStats/2026-10-08'), { day: '2026-10-08', followers: 1000 });
+  });
+  await assertSucceeds(getDoc(doc(admin(), 'instagramStats/2026-10-08')));
+  await assertFails(setDoc(doc(admin(), 'instagramStats/2026-10-09'), { day: '2026-10-09', followers: 1 }));
+  await assertFails(updateDoc(doc(admin(), 'instagramStats/2026-10-08'), { followers: 2 }));
+  await assertFails(deleteDoc(doc(admin(), 'instagramStats/2026-10-08')));
+  await assertFails(getDoc(doc(stranger(), 'instagramStats/2026-10-08')));
+  await assertFails(getDoc(doc(anonymous(), 'instagramStats/2026-10-08')));
+});

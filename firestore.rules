@@ -375,6 +375,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Retrato diário de seguidores (criado pelo servidor, 1 por dia): base das metas de ganho de seguidores.
+    match /instagramStats/{day} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     match /instagramPosts/{postId} {
       allow read: if isAdmin();
       allow write: if false;
