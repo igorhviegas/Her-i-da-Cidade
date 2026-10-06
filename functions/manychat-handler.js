@@ -29,6 +29,12 @@ function parseCatalogPrice(value) {
   return Number.isFinite(amount) && amount >= 0 ? amount : null;
 }
 
+/**
+ * Chave do pré-agendamento de Vídeo Chamada: DDI + DDD + os 8 últimos dígitos. O número digitado no site e o que o WhatsApp informa
+ * ao ManyChat podem diferir só pelo nono dígito; sem ele os dois caem na mesma chave.
+ */
+export const bookingKey = (normalizedWhatsApp) => `${normalizedWhatsApp.slice(0, 4)}${normalizedWhatsApp.slice(-8)}`;
+
 export function validateManyChatOrderInput(body) {
   const errors = [];
   if (!body || typeof body !== 'object' || Array.isArray(body)) return ['O corpo deve ser um objeto JSON.'];
@@ -249,7 +255,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
 
       // Vídeo Chamada: se este WhatsApp tem um pré-agendamento do site aguardando pagamento, o pagamento o confirma (sem pedido novo).
       if (profile.confirmsBooking) {
-        const pendingSnapshot = await transaction.get(database.collection('videoCallPending').doc(normalizedWhatsApp));
+        const pendingSnapshot = await transaction.get(database.collection('videoCallPending').doc(bookingKey(normalizedWhatsApp)));
         const bookedRef = pendingSnapshot.exists ? database.collection(ORDERS).doc(String(pendingSnapshot.get('orderId'))) : null;
         const bookedSnapshot = bookedRef ? await transaction.get(bookedRef) : null;
         if (bookedSnapshot?.exists && bookedSnapshot.get('paymentPending') === true) {

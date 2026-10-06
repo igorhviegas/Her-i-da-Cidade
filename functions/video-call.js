@@ -12,12 +12,12 @@
 
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { addDayKey, createCalendarEvent, deleteCalendarEvent, eventDateKey, eventTimes, listCalendarEvents, updateCalendarEvent } from './google-calendar.js';
-import { SERVICE_PROFILES, evaluateService } from './manychat-handler.js';
+import { SERVICE_PROFILES, bookingKey, evaluateService } from './manychat-handler.js';
 import { DEFAULT_VIDEO_CALL_CONFIG, VIDEO_CALL_CONFIG_PATH, fillText, formatPrice, normalizeVideoCallConfig } from './video-call-config.js';
 
 export const VIDEO_CALL_CONFIG = DEFAULT_VIDEO_CALL_CONFIG;
 export const SLOTS = 'videoCallSlots';
-/** Um pré-agendamento aberto por WhatsApp: freia spam no endpoint público e reserva repetida. */
+/** Um pré-agendamento aberto por WhatsApp (id = bookingKey do número de contato): é por ele que o pagamento do ManyChat acha o pedido; também freia spam e reserva repetida. */
 export const PENDING = 'videoCallPending';
 const ORDERS = 'orders';
 const CLIENTS = 'clients';
@@ -124,7 +124,14 @@ export function validateBookingInput(input) {
     childAge: text(input?.childAge, 20), theme: text(input?.theme, 200),
     details: input?.details == null || input.details === '' ? '' : text(input.details, 1000),
     date: typeof slot.date === 'string' ? slot.date : '', time: typeof slot.time === 'string' ? slot.time : '',
+    callWhatsapp: '',
   };
+  // Número que recebe a chamada, só quando é outro: o de contato (que paga pelo WhatsApp) continua sendo a chave do pedido.
+  if (input?.callWhatsapp != null && String(input.callWhatsapp).trim()) {
+    const other = normalizeWhatsApp(input.callWhatsapp);
+    if (!other) errors.push('Informe um WhatsApp válido (com DDD) para receber a chamada.');
+    else if (other !== form.whatsapp) form.callWhatsapp = other;
+  }
   if (!form.name) errors.push('Informe o nome do responsável.');
   if (!form.whatsapp) errors.push('Informe um WhatsApp válido com DDD.');
   if (!form.childName) errors.push('Informe o nome da criança.');
@@ -142,17 +149,18 @@ function orderContent(form) {
     `Criança: ${form.childName} (${form.childAge})`,
     `Tema: ${form.theme}`,
     ...(form.details ? [`Detalhes: ${form.details}`] : []),
+    ...(form.callWhatsapp ? [`Observação: a chamada será em outro número, +${form.callWhatsapp}`] : []),
   ].join('\n');
 }
 
 /** Evento da agenda. O título diz se já foi paga, para a agenda bastar sem abrir o CRM. */
-function eventInput({ date, time, durationMinutes, customerName, whatsapp, childName, childAge, theme, details, paid }) {
+function eventInput({ date, time, durationMinutes, customerName, whatsapp, callWhatsapp, childName, childAge, theme, details, paid }) {
   const { end } = eventTimes(date, time, durationMinutes);
   return {
     title: `Vídeo Chamada (${paid ? 'paga' : 'aguardando pagamento'}): ${customerName} - ${childName}`,
     date, startTime: time, endTime: end.slice(11, 16),
     description: [
-      `👤 Responsável: ${customerName}`, `📱 WhatsApp: ${whatsapp}`, `🧒 Criança: ${childName} (${childAge})`,
+      `👤 Responsável: ${customerName}`, `📱 WhatsApp: ${whatsapp}`, ...(callWhatsapp ? [`📞 Chamada em outro número: ${callWhatsapp}`] : []), `🧒 Criança: ${childName} (${childAge})`,
       `🎯 Tema: ${theme}`, `📝 Detalhes: ${details || '—'}`, '',
       paid ? 'Agendamento feito pelo site; pagamento confirmado.' : 'Pré-agendamento feito pelo site; pagamento ainda não confirmado.',
     ].join('\n'),
@@ -193,7 +201,7 @@ export async function createVideoCallBooking({ database, input, nowMs = Date.now
 
   const id = slotId(form.date, form.time);
   const slotRef = database.collection(SLOTS).doc(id);
-  const pendingRef = database.collection(PENDING).doc(form.whatsapp);
+  const pendingRef = database.collection(PENDING).doc(bookingKey(form.whatsapp));
   const indexRef = database.collection(CLIENTS).doc(`whatsapp_${form.whatsapp}`);
   const orderRef = database.collection(ORDERS).doc();
 
@@ -229,7 +237,7 @@ export async function createVideoCallBooking({ database, input, nowMs = Date.now
       eventDate: Timestamp.fromDate(new Date(`${form.date}T12:00:00-03:00`)),
       videoCall: {
         date: form.date, time: form.time, durationMinutes: settings.durationMinutes, slotId: id, bookedAtMs: nowMs,
-        whatsapp: form.whatsapp, childAge: form.childAge, theme: form.theme, details: form.details,
+        whatsapp: form.whatsapp, ...(form.callWhatsapp ? { callWhatsapp: form.callWhatsapp } : {}), childAge: form.childAge, theme: form.theme, details: form.details,
       },
       // O valor é o da configuração no momento da reserva; a confirmação do pagamento usa este valor.
       servicePrice: settings.price, rushFee: 0, totalPaid: 0, productionType: evaluation.productionType,
@@ -291,7 +299,7 @@ export async function expireUnpaidBookings({ database, nowMs = Date.now(), confi
       const [fresh, slot] = await Promise.all([transaction.get(document.ref), transaction.get(slotRef)]);
       if (!fresh.exists || fresh.get('paymentPending') !== true) return false;
       const ownsSlot = slot.exists && slot.get('orderId') === document.id;
-      const pendingRef = ownsSlot && slot.get('whatsappNormalized') ? database.collection(PENDING).doc(String(slot.get('whatsappNormalized'))) : null;
+      const pendingRef = ownsSlot && slot.get('whatsappNormalized') ? database.collection(PENDING).doc(bookingKey(String(slot.get('whatsappNormalized')))) : null;
       const pending = pendingRef ? await transaction.get(pendingRef) : null;
       transaction.delete(document.ref);
       if (ownsSlot) transaction.delete(slotRef);

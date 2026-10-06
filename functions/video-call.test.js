@@ -376,3 +376,49 @@ test('falha ao atualizar a agenda não desfaz a confirmação do pagamento', asy
   assert.equal(res.statusCode, 200);
   assert.ok(database.docs.get(`orders/${orderId}`).paidAt);
 });
+
+// ---- número de contato x número da chamada ----
+
+test('chamada em outro número: fica no pedido como observação e no evento; o de contato segue sendo a chave do pagamento', async () => {
+  const database = seeded();
+  let created;
+  const { orderId } = await book(database, form({ callWhatsapp: '(31) 98888-7777' }), { createEvent: async (args) => { created = args; return { id: 'evt1' }; } });
+  const order = database.docs.get(`orders/${orderId}`);
+  assert.equal(order.videoCall.whatsapp, '5531999990001');
+  assert.equal(order.videoCall.callWhatsapp, '5531988887777');
+  assert.match(order.content, /outro número, \+5531988887777/);
+  assert.match(created.input.description, /Chamada em outro número: 5531988887777/);
+  assert.equal(database.docs.get(`clients/${order.clientId}`).whatsappNormalized, '5531999990001');
+  const res = await payment(database, paid('31999990001')); // quem paga é o número de contato
+  assert.deepEqual([res.body.orderId, res.body.confirmedBooking], [orderId, true]);
+});
+
+test('mesmo número (ou campo vazio) não cria observação; número de chamada inválido é recusado', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form({ callWhatsapp: '31 99999-0001' }));
+  const order = database.docs.get(`orders/${orderId}`);
+  assert.equal('callWhatsapp' in order.videoCall, false);
+  assert.doesNotMatch(order.content, /outro número/);
+  await assert.rejects(book(seeded(), form({ callWhatsapp: '123' })), (e) => e.code === 'validation_error');
+});
+
+test('pagamento confirma a reserva mesmo se o WhatsApp vier sem o nono dígito (ou o cliente digitar sem ele)', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form({ whatsapp: '(31) 99999-0001' }));
+  const res = await payment(database, paid('+55 31 9999-0001'));
+  assert.deepEqual([res.body.orderId, res.body.confirmedBooking], [orderId, true]);
+  assert.equal(database.count('orders/'), 1);
+
+  const other = seeded();
+  const second = await book(other, form({ whatsapp: '31 9999-0001' }));
+  assert.equal((await payment(other, paid('5531999990001'))).body.orderId, second.orderId);
+});
+
+test('pagamento de outro WhatsApp não dá baixa na reserva de ninguém: cria pedido novo', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form());
+  const res = await payment(database, paid('31977776666'));
+  assert.notEqual(res.body.orderId, orderId);
+  assert.equal(database.docs.get(`orders/${orderId}`).paymentPending, true);
+  assert.equal(database.count('orders/'), 2);
+});

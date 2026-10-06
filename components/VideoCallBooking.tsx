@@ -35,7 +35,8 @@ export const VideoCallBooking: React.FC = () => {
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [step, setStep] = useState<Step>('slot');
-  const [values, setValues] = useState({ name: '', whatsapp: '', childName: '', childAge: '', theme: '', details: '' });
+  const [values, setValues] = useState({ name: '', whatsapp: '', callWhatsapp: '', childName: '', childAge: '', theme: '', details: '' });
+  const [sameNumber, setSameNumber] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [booked, setBooked] = useState<Booked | null>(null);
@@ -73,7 +74,7 @@ export const VideoCallBooking: React.FC = () => {
     setSubmitting(true);
     setError('');
     try {
-      const response = await fetch('/api/video-call', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...values, slot: { date, time } }) });
+      const response = await fetch('/api/video-call', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...values, callWhatsapp: sameNumber ? '' : values.callWhatsapp, slot: { date, time } }) });
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.ok) {
         setError(data?.error?.message || 'Não foi possível concluir o agendamento. Tente novamente.');
@@ -132,7 +133,18 @@ export const VideoCallBooking: React.FC = () => {
           <form onSubmit={submit} className="mt-6 space-y-4">
             <p className={heading}>Seus dados</p>
             <label className={label}>Nome do responsável<input required maxLength={120} autoComplete="name" value={values.name} onChange={(e) => setValues({ ...values, name: e.target.value })} className={field} /></label>
-            <label className={label}>WhatsApp (com DDD)<input required type="tel" inputMode="tel" autoComplete="tel" placeholder="(31) 99999-0000" value={values.whatsapp} onChange={(e) => setValues({ ...values, whatsapp: e.target.value })} className={field} /></label>
+            <label className={label}>Seu WhatsApp (com DDD)<input required type="tel" inputMode="tel" autoComplete="tel" placeholder="(31) 99999-0000" value={values.whatsapp} onChange={(e) => setValues({ ...values, whatsapp: e.target.value })} className={field} />
+              <span className="mt-1 block font-normal text-white/40">Use o mesmo número que vai falar com a gente no WhatsApp para fazer o pagamento.</span>
+            </label>
+            <fieldset>
+              <legend className={label}>A vídeo chamada será neste mesmo número?</legend>
+              <div className="mt-1.5 grid grid-cols-2 gap-2">
+                {[true, false].map((option) => (
+                  <button key={String(option)} type="button" aria-pressed={sameNumber === option} onClick={() => setSameNumber(option)} className={`min-h-11 rounded-xl text-sm font-bold ${sameNumber === option ? 'bg-blue-600 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>{option ? 'Sim' : 'Não, em outro'}</button>
+                ))}
+              </div>
+            </fieldset>
+            {!sameNumber && <label className={label}>WhatsApp que vai receber a chamada (com DDD)<input required type="tel" inputMode="tel" placeholder="(31) 99999-0000" value={values.callWhatsapp} onChange={(e) => setValues({ ...values, callWhatsapp: e.target.value })} className={field} /></label>}
             <div className="grid grid-cols-[1fr_7rem] gap-3">
               <label className={label}>Nome da criança<input required maxLength={100} value={values.childName} onChange={(e) => setValues({ ...values, childName: e.target.value })} className={field} /></label>
               <label className={label}>Idade<input required maxLength={20} placeholder="Ex.: 5 anos" value={values.childAge} onChange={(e) => setValues({ ...values, childAge: e.target.value })} className={field} /></label>

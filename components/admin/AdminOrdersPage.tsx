@@ -437,7 +437,8 @@ export const AdminOrdersPage: React.FC = () => {
                       const internalDate = formatDate(order.internalDueDate);
                       const eventDate = formatDate(order.eventDate);
                       const childName = extractBirthdayPerson(order);
-                      const deliveryUrl = buildDeliveryWhatsAppUrl(client?.whatsapp, order, service);
+                      // Vídeo Chamada agendada pelo site para outro número: a mensagem do dia vai para o número da chamada, não para o de contato.
+                      const deliveryUrl = buildDeliveryWhatsAppUrl(order.videoCall?.callWhatsapp ?? client?.whatsapp, order, service);
                       const serviceColor = getServiceColor(service);
                       const colorClasses = serviceColor ? SERVICE_COLOR_CLASSES[serviceColor] : null;
                       const completing = updatingOrderId === order.id;

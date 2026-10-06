@@ -19,6 +19,12 @@ Módulo admin **Agendamento de chamadas**: `/admin/agendamento-chamadas`, filho 
 5. **Agenda depois do pagamento:** `/api/manychat` (Vercel) troca o título do evento de "(aguardando pagamento)" para "(paga)". É melhor esforço: se o Google falhar, o pagamento continua confirmado. A Function do Firebase (`receiveManyChatOrder`) não faz essa troca; e ela só passa a confirmar pré-agendamentos depois de um `firebase deploy --only functions`.
 6. **Prazo de pagamento:** o cliente é informado de `paymentDeadlineHours` (padrão 24 h), mas o pré-agendamento sem pagamento só é **excluído** depois de `expireAfterHours` (padrão 72 h, para cobrir o fim de semana sem atendimento). A exclusão apaga pedido + trava + evento da agenda (`expireUnpaidBookings`) e roda antes de toda chamada ao endpoint e uma vez por dia pelo cron da Vercel (`vercel.json`, GET em `/api/video-call`). O pedido é conferido de novo dentro da transação: pagamento que chegue no mesmo instante vence. Se o evento não puder ser apagado, fica na agenda (e o log avisa).
 
+## WhatsApp de contato x número da chamada
+
+- O formulário pede o **WhatsApp de contato** (o que vai falar com o negócio e pagar) e pergunta se a chamada será nesse mesmo número. Se não, pede o **número da chamada**, gravado em `videoCall.callWhatsapp`, mostrado como observação no pedido e no evento.
+- A baixa do pagamento usa só o número de contato: o ManyChat informa o WhatsApp que conversou, e o pedido é achado por `videoCallPending/{bookingKey}` (DDI + DDD + 8 últimos dígitos, então o nono dígito não atrapalha). Se quem paga escreve de **outro** WhatsApp, não há como casar: o ManyChat cria um pedido novo e a baixa é manual (informar a data de pagamento em "Editar pedido").
+- No Kanban, o botão "Enviar pelo WhatsApp" do card (mensagem do dia da chamada) vai para o número da chamada quando ele existe; o contato do pedido continua sendo o cliente.
+
 ## Configurações (`siteConfig/videoCall`)
 
 Editáveis na aba **Configurações**; padrão e validação em `functions/video-call-config.js` (o que faltar ou vier inválido cai no padrão):
