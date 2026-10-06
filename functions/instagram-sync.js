@@ -1,6 +1,7 @@
 // Sincronização com a Instagram API (Instagram Login, graph.instagram.com). Só roda no servidor: o token nunca vai ao navegador.
 import { randomUUID } from 'node:crypto';
 import { applyDaily } from '../services/instagramDaily.js';
+import { importReelsAsVideos } from './instagram-video-import.js';
 import { metricOrNull, normalizeMedia } from '../services/instagramMetrics.js';
 
 const PAGE_SIZE = 50;
@@ -174,7 +175,9 @@ async function sync({ db, fetchImpl, env, now }) {
       insights, warning, daily: daily.summary, tokenExpiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
     });
     await batch.commit();
-    return { status: 'completed', posts: posts.length, warning: warning?.code ?? null };
+    // Importa Reels novos como vídeos inativos; uma falha aqui nunca derruba a sincronização.
+    const videos = await importReelsAsVideos({ db, posts, now, fetchImpl }).catch((e) => { console.error('[Instagram Sync] import de vídeos falhou:', e instanceof Error ? e.name : 'erro'); return null; });
+    return { status: 'completed', posts: posts.length, warning: warning?.code ?? null, ...(videos && (videos.imported || videos.failed) ? { videos } : {}) };
   } catch (error) {
     const code = error instanceof InstagramSyncError ? error.code : 'api_error';
     await profileRef.set({ lastAttemptAt: iso, lastError: { code, message: MESSAGES[code] } }, { merge: true }).catch(() => undefined);

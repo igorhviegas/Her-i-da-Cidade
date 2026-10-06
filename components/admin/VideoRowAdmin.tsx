@@ -71,6 +71,7 @@ export const VideoRowAdmin: React.FC<VideoRowAdminProps> = ({
             <h3 className="text-sm sm:text-base font-bold text-white truncate max-w-xs sm:max-w-md md:max-w-xs lg:max-w-md">
               {video.title}
             </h3>
+            {video.needsReview && <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-300 border border-sky-500/40 rounded font-black tracking-wide text-[9px] uppercase flex-shrink-0">Importado - revisar</span>}
             {isFeatured && (
               <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded font-black tracking-wide text-[9px] flex items-center gap-1 shadow-sm">
                 <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />

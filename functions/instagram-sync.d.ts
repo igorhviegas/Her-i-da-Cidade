@@ -6,7 +6,7 @@ export const LOCK_PATH: string;
 export const DAILY_PATH: string;
 export const POSTS_COLLECTION: string;
 export type SyncResult =
-  | { status: 'completed'; posts: number; warning: string | null }
+  | { status: 'completed'; posts: number; warning: string | null; videos?: { imported: number; failed: number } }
   | { status: 'running' }
   | { status: 'cooldown'; afterFailure: boolean };
 export function runInstagramSync(opts: { db: any; fetchImpl?: typeof fetch; env?: Record<string, string | undefined>; now?: number; manual?: boolean }): Promise<SyncResult>;

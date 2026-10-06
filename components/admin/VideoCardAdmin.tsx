@@ -68,6 +68,7 @@ export const VideoCardAdmin: React.FC<VideoCardAdminProps> = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-lg font-bold text-white truncate">{video.title}</h3>
+            {video.needsReview && <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-300 border border-sky-500/40 rounded font-black tracking-wide text-[9px] uppercase flex-shrink-0">Importado - revisar</span>}
           </div>
           <p className="text-sm text-white/60 line-clamp-2">{video.description}</p>
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
