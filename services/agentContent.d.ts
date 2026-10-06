@@ -4,7 +4,7 @@ export interface AgentStep {
   /** Alerta destacado no topo da etapa (ex.: voltagem). Vazio = sem alerta. */
   alert?: string; highlight?: boolean; startButton?: boolean; active: boolean; items: AgentItem[];
 }
-export interface AgentTrack { id: string; order: number; title: string; url: string; active: boolean }
+export interface AgentTrack { id: string; order: number; title: string; url: string; active: boolean; /** Música principal à qual esta é um "efeito" (só aparece ao abrir a principal). Vazio = principal. */ parentId?: string }
 export type AlertKey = 'm30' | 'm5';
 export interface FiredAlerts { m30?: boolean; m5?: boolean }
 
@@ -29,3 +29,4 @@ export const DEFAULT_AGENT_FAQ: AgentFaqCategory[];
 export function normalizeText(text: unknown): string;
 export function matchesQuery(query: string, ...texts: unknown[]): boolean;
 export function searchFaq(categories: AgentFaqCategory[], query: string): { category: AgentFaqCategory; item: AgentFaqItem }[];
+export function groupTracks<T extends { id: string; parentId?: string }>(tracks: T[]): { track: T; children: T[] }[];

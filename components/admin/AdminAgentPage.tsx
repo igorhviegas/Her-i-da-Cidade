@@ -210,13 +210,13 @@ const TracksTab: React.FC<{ run: Run }> = ({ run }) => {
 
       {tracks.length === 0 && <p className="py-6 text-center text-sm text-white/50">Nenhuma música ainda.</p>}
       {tracks.map((track, index) => (
-        <TrackRow key={track.id} track={track} canUp={index > 0} canDown={index < tracks.length - 1} onMove={(d) => move(index, d)} run={run} />
+        <TrackRow key={track.id} track={track} parentOptions={tracks.filter((t) => !t.parentId && t.id !== track.id)} hasChildren={tracks.some((t) => t.parentId === track.id)} canUp={index > 0} canDown={index < tracks.length - 1} onMove={(d) => move(index, d)} run={run} />
       ))}
     </div>
   );
 };
 
-const TrackRow: React.FC<{ track: AgentTrack; canUp: boolean; canDown: boolean; onMove: (d: -1 | 1) => void; run: Run }> = ({ track, canUp, canDown, onMove, run }) => {
+const TrackRow: React.FC<{ track: AgentTrack; parentOptions: AgentTrack[]; hasChildren: boolean; canUp: boolean; canDown: boolean; onMove: (d: -1 | 1) => void; run: Run }> = ({ track, parentOptions, hasChildren, canUp, canDown, onMove, run }) => {
   const [title, setTitle] = useState(track.title);
   const [busy, setBusy] = useState(false);
   const replaceRef = useRef<HTMLInputElement>(null);
@@ -240,6 +240,18 @@ const TrackRow: React.FC<{ track: AgentTrack; canUp: boolean; canDown: boolean; 
         <button className={iconBtn} disabled={!canDown} aria-label="Descer música" onClick={() => onMove(1)}><ArrowDown className="h-4 w-4" /></button>
       </div>
       <audio controls preload="none" src={track.url} className="h-9 w-full" />
+      <label className="flex flex-wrap items-center gap-2 text-xs text-white/60">
+        Efeito sonoro de:
+        <select
+          value={track.parentId ?? ''} onChange={(e) => patch({ parentId: e.target.value })} disabled={hasChildren}
+          title={hasChildren ? 'Esta música já tem efeitos; tire-os dela antes de torná-la efeito de outra.' : undefined}
+          className="rounded-lg border border-white/10 bg-[#070B14] px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500/60 disabled:opacity-40"
+        >
+          <option value="">— nenhuma (música principal) —</option>
+          {parentOptions.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+        </select>
+        <span className="text-white/40">{track.parentId ? 'só aparece ao abrir a música principal' : hasChildren ? 'tem efeitos vinculados' : ''}</span>
+      </label>
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <label className="flex items-center gap-2 text-white/70"><input type="checkbox" checked={track.active} onChange={(e) => patch({ active: e.target.checked })} />Ativa (aparece para os agentes)</label>
         <div className="flex items-center gap-1">
