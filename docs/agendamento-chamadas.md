@@ -1,19 +1,43 @@
 # Agendamento de Vídeo Chamadas (substitui o Calendly)
 
-Página pública `/agendar-chamada` (e a seção "Vídeo chamada" da home) → escolher dia → horário → dados → **reservar**.
-Módulo admin **Agendamento de chamadas** (menu lateral, logo abaixo de Calendário): `/admin/agendamento-chamadas`.
+Página pública `/agendar-chamada` (e a seção "Vídeo chamada" da home).
+Módulo admin **Agendamento de chamadas**: `/admin/agendamento-chamadas`, filho de **Calendário** no menu (aparece com o Calendário aberto), com as abas **Agendamentos** e **Configurações**.
 
-## Fluxo
+## Fluxo do cliente
 
-1. `GET /api/video-call` devolve os horários livres: regra fixa ∩ janela (≥ 24 h, até 30 dias) − eventos com hora marcada do Google Agenda − reservas do próprio sistema.
-2. `POST /api/video-call` **revalida tudo** (regra, Google, trava), grava numa transação do Firestore a trava do horário + pedido + cliente, e só então cria o evento (15 min) no Google Agenda. Se o Google falhar, a reserva é desfeita e o cliente vê o erro (nunca "reservado" sem evento).
-3. Pedido: serviço **Vídeo Chamada ao Vivo** (id 2), status inicial configurado no serviço, `paymentPending: true`, sem `paidAt`, `totalPaid: 0`, `source: 'booking'`, `eventDate` (meio-dia de Brasília) e `videoCall { date, time, durationMinutes, childAge, theme, details }`; nome da criança em `childName`; vínculo em `googleCalendar` (`eventId`, `calendarId`, `htmlLink`).
-4. A página leva o cliente ao `whatsappUrl` do serviço (o mesmo link/mensagem de hoje; nada novo é enviado ao ManyChat).
-5. **Pagamento (fluxo existente):** o `payment.paid` de `live-call` do ManyChat, se houver pré-agendamento pendente com o mesmo WhatsApp (`videoCallPending/{whatsapp}`), **confirma esse pedido** (`paidAt`, `totalPaid` = 75, prazos; remove `paymentPending`) e responde `confirmedBooking: true`. Sem pendente, o comportamento antigo é idêntico (cria pedido pago). O contrato do webhook não mudou.
+1. Escolhe o dia e o horário.
+2. Lê as **informações** (texto configurável) e clica em **Continuar**.
+3. Preenche os dados, lê o **aviso final** (valor e prazo) e clica em **Prosseguir para pagamento no WhatsApp**.
+4. A reserva é criada e o cliente vai para o WhatsApp do serviço com a **mensagem do agendamento** (data e horário). Essa mensagem é só dos agendamentos; os links dos serviços não mudam.
 
-## Regras (centralizadas em `VIDEO_CALL_CONFIG`, `functions/video-call.js`)
+## Servidor
 
-Duração 15 min · mínimo 24 h · máximo 30 dias (por data) · Seg e Qua 19:30/20:00/20:30 · Sáb 09:30/10:00/10:30. Horário local `America/Sao_Paulo` (deslocamento fixo −03:00; o Brasil não tem horário de verão desde 2019).
+1. `GET /api/video-call` devolve os horários livres (regra ∩ janela de antecedência − eventos com hora marcada das agendas − reservas do sistema) e os textos/valor para a página.
+2. `POST /api/video-call` **revalida tudo** (regra, Google, trava), grava numa transação do Firestore a trava do horário + pedido + cliente, e só então cria o evento no Google Agenda. Se o Google falhar, a reserva é desfeita e o cliente vê o erro (nunca "reservado" sem evento).
+3. Pedido: serviço **Vídeo Chamada ao Vivo** (id 2), status inicial configurado no serviço, `paymentPending: true`, sem `paidAt`, `totalPaid: 0`, `servicePrice` = valor configurado no momento da reserva, `source: 'booking'`, `eventDate` (meio-dia de Brasília) e `videoCall { date, time, durationMinutes, slotId, bookedAtMs, whatsapp, childAge, theme, details }`; nome da criança em `childName`; vínculo em `googleCalendar`.
+4. **Pagamento (fluxo existente):** o `payment.paid` de `live-call` do ManyChat, se houver pré-agendamento pendente com o mesmo WhatsApp (`videoCallPending/{whatsapp}`), **confirma esse pedido** (`paidAt`, `totalPaid` = valor da reserva, prazos; remove `paymentPending`) e responde `confirmedBooking: true`. Sem pendente, o comportamento antigo é idêntico (cria pedido pago de R$ 75). O contrato do webhook não mudou.
+5. **Agenda depois do pagamento:** `/api/manychat` (Vercel) troca o título do evento de "(aguardando pagamento)" para "(paga)". É melhor esforço: se o Google falhar, o pagamento continua confirmado. A Function do Firebase (`receiveManyChatOrder`) não faz essa troca; e ela só passa a confirmar pré-agendamentos depois de um `firebase deploy --only functions`.
+6. **Prazo de pagamento:** pré-agendamento sem pagamento depois de `paymentDeadlineHours` é **excluído** (pedido + trava + evento da agenda) por `expireUnpaidBookings`, que roda antes de toda chamada ao endpoint e uma vez por dia pelo cron da Vercel (`vercel.json`, GET em `/api/video-call`). O pedido é conferido de novo dentro da transação: pagamento que chegue no mesmo instante vence. Se o evento não puder ser apagado, fica na agenda (e o log avisa).
+
+## Configurações (`siteConfig/videoCall`)
+
+Editáveis na aba **Configurações**; padrão e validação em `functions/video-call-config.js` (o que faltar ou vier inválido cai no padrão):
+
+- Valor, duração, prazo de pagamento, antecedência mínima e máxima.
+- Dias e horários (por dia da semana).
+- Textos: informações, aviso final e mensagem do WhatsApp. Aceitam `**negrito**` e `{valor}`, `{duracao}`, `{prazo}`; a mensagem do WhatsApp aceita também `{data}` e `{horario}`.
+- Agendas extras para checar conflitos (`busyCalendarIds`).
+
+Padrão: R$ 75 · 15 min · 24 h para pagar · mínimo 24 h · máximo 30 dias · Seg e Qua 19:30/20:00/20:30 · Sáb 09:30/10:00/10:30. Horário local `America/Sao_Paulo` (deslocamento fixo −03:00; o Brasil não tem horário de verão desde 2019).
+
+O valor configurado vale para os agendamentos do site. O ManyChat continua com o seu próprio valor fixo para pedidos sem pré-agendamento.
+
+## Agendas consultadas
+
+- A agenda do sistema (`GOOGLE_CALENDAR_ID`, "Eventos Heroi da Cidade"): é onde os eventos das chamadas são criados.
+- As **agendas extras** configuradas: só leitura, só para conflito. O Calendly gravava na agenda pessoal, então ela precisa estar aqui enquanto houver reservas antigas. Cada agenda extra precisa ser **compartilhada com a conta de serviço** (Configurações da agenda no Google → Compartilhar com pessoas específicas → e-mail da conta de serviço → "Ver todos os detalhes dos eventos").
+- Se uma agenda extra não estiver acessível, a consulta falha e a página pública não mostra horários (de propósito: não oferece horário sem conferir). A aba Configurações mostra o resultado de uma consulta real.
+- Não bloqueiam: eventos de dia inteiro e eventos marcados como "Livre".
 
 ## Concorrência
 
@@ -22,17 +46,12 @@ Duração 15 min · mínimo 24 h · máximo 30 dias (por data) · Seg e Qua 19:3
 ## CRM
 
 - Kanban: selo "⏳ Aguardando pagamento · Chamada dd/mm às HH:mm"; o valor só aparece depois de pago.
-- Pedido pendente **não pode ser concluído**; informar a data de pagamento em "Editar pedido" também o confirma (manual, caso o ManyChat não case).
+- Pedido pendente **não pode ser concluído**; informar a data de pagamento em "Editar pedido" também o confirma (manual, caso o ManyChat não case). Nesse caso o título do evento na agenda não muda.
 - Financeiro, missões e "total gasto" do cliente dependem de conclusão/`paidAt`, então o pendente não conta.
-
-## Cancelar por falta de pagamento (manual por enquanto)
-
-Excluir o pedido (Pedidos) e o evento (Calendário). O horário volta a ficar livre. O que um futuro job precisa: pedidos com `paymentPending === true`, `createdAt` antigo, `googleCalendar.eventId` (para `deleteCalendarEvent`) e a trava `videoCall.slotId` já estão gravados.
 
 ## Pré-requisitos / observações
 
-- Mesmas variáveis da agenda de eventos (`GOOGLE_CALENDAR_ID`, conta de serviço) e Firebase Admin. Nada novo no Firestore Rules: as coleções `videoCallSlots` e `videoCallPending` só são acessadas pelo servidor (Admin SDK), e as regras atuais as negam ao cliente.
-- O serviço `2` precisa estar ativo, gerar pedido, ter tipo de produção e status inicial (≠ Concluído) e `whatsappUrl`.
-- Eventos de dia inteiro na agenda **não** bloqueiam horários (só eventos com hora marcada).
-- O título do evento marca "(aguardando pagamento)"; não é atualizado quando o pagamento chega.
+- Mesmas variáveis da agenda de eventos (`GOOGLE_CALENDAR_ID`, conta de serviço) e Firebase Admin, em Production e Preview. Nada novo no Firestore Rules: `siteConfig/videoCall` já é coberto por `siteConfig/{configId}` (só admin), e `videoCallSlots`/`videoCallPending` só são acessadas pelo servidor.
+- O serviço `2` precisa estar ativo, gerar pedido, ter tipo de produção e status inicial (≠ Concluído) e `whatsappUrl` (de onde sai o número do WhatsApp).
+- Pagamento que chegue **depois** de a reserva expirar não tem mais pré-agendamento para confirmar: o ManyChat cria um pedido pago comum, sem horário reservado.
 - Cliente legado duplicado por WhatsApp: usa o primeiro cadastro (o ManyChat, nesse caso, responde 409).

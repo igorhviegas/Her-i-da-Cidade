@@ -11,6 +11,7 @@ import {
 import { auth, db } from "../lib/firebase";
 import { PublicSiteConfig } from "../types";
 import { isValidWhatsAppUrl } from "./serviceWhatsApp.js";
+import { VIDEO_CALL_CONFIG_PATH, normalizeVideoCallConfig, type VideoCallConfig } from "../functions/video-call-config.js";
 
 export { isValidWhatsAppUrl };
 
@@ -254,4 +255,17 @@ export function useSiteConfig() {
     error,
     refetch: fetchConfig,
   };
+}
+
+/** Configuração do agendamento de Vídeo Chamada (siteConfig/videoCall), completada com o padrão. Só administradores leem/gravam. */
+export async function getVideoCallConfig(): Promise<VideoCallConfig> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  return normalizeVideoCallConfig((await getDoc(doc(db, ...VIDEO_CALL_CONFIG_PATH))).data());
+}
+
+/** Grava a configuração já normalizada (o servidor normaliza de novo ao ler). */
+export async function saveVideoCallConfig(config: VideoCallConfig): Promise<void> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  const { profile: _profile, ...editable } = normalizeVideoCallConfig(config);
+  await setDoc(doc(db, ...VIDEO_CALL_CONFIG_PATH), { ...editable, updatedAt: serverTimestamp() });
 }

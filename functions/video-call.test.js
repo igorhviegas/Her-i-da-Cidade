@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FieldValue } from 'firebase-admin/firestore';
-import { VIDEO_CALL_CONFIG, VideoCallError, candidateSlots, createVideoCallBooking, getAvailability, hasCalendarConflict } from './video-call.js';
+import { VIDEO_CALL_CONFIG, VideoCallError, candidateSlots, createVideoCallBooking, expireUnpaidBookings, getAvailability, hasCalendarConflict, markVideoCallEventPaid, publicConfig } from './video-call.js';
+import { DEFAULT_VIDEO_CALL_CONFIG, fillText, normalizeVideoCallConfig, parseTimes } from './video-call-config.js';
 import { handleManyChatOrderRequest } from './manychat-handler.js';
 
 const at = (iso) => Date.parse(`${iso}-03:00`);
@@ -135,7 +136,12 @@ test('reserva cria pedido aguardando pagamento com todos os dados, trava e vínc
   assert.match(created.input.description, /Davi/);
   const client = database.docs.get(`clients/${order.clientId}`);
   assert.deepEqual([client.name, client.whatsappNormalized], ['Maria', '5531999990001']);
-  assert.equal(result.whatsappUrl, SERVICE.whatsappUrl);
+  assert.equal(order.videoCall.bookedAtMs, NOW);
+  // mensagem exclusiva do agendamento, no número do serviço (o texto antigo do link é trocado)
+  const url = new URL(result.whatsappUrl);
+  assert.equal(url.origin + url.pathname, 'https://wa.me/5531999044206');
+  assert.equal(url.searchParams.get('text'), 'Olá, acabei de fazer a reserva no dia 12/10/2026 às 20:00 (horário de Brasília), gostaria de fazer o pagamento.');
+  assert.ok(!result.whatsappUrl.includes('+'));
 });
 
 test('cliente existente (índice de WhatsApp) é reaproveitado', async () => {
@@ -211,10 +217,10 @@ test('se o evento não for criado no Google, a reserva é desfeita e o erro é p
 // ---- pagamento pelo ManyChat ----
 
 const SECRET = 's3cret';
-async function payment(database, body) {
+async function payment(database, body, extra = {}) {
   const res = { headers: {}, set() { return this; }, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; } };
   const req = { method: 'POST', body, rawBody: Buffer.from('{}'), is: () => true, get: (h) => (h === 'authorization' ? `Bearer ${SECRET}` : undefined) };
-  await handleManyChatOrderRequest(req, res, { database, secret: SECRET, logger: quietLogger });
+  await handleManyChatOrderRequest(req, res, { database, secret: SECRET, logger: quietLogger, ...extra });
   return res;
 }
 const paid = (whatsapp) => ({ eventType: 'payment.paid', service: 'live-call', customer: { name: 'Maria', whatsapp }, childName: 'Davi' });
@@ -245,3 +251,124 @@ test('payment.paid sem pré-agendamento segue o fluxo antigo (cria o pedido já 
 });
 
 test('VideoCallError carrega o código', () => assert.equal(new VideoCallError('x', 'm').code, 'x'));
+
+// ---- configuração editável (siteConfig/videoCall) ----
+
+test('normalizeVideoCallConfig: valores inválidos caem no padrão, horários são limpos e ordenados', () => {
+  assert.deepEqual(normalizeVideoCallConfig(null), DEFAULT_VIDEO_CALL_CONFIG);
+  assert.deepEqual(parseTimes('20:00, 19:30;25:00 abc 19:30'), ['19:30', '20:00']);
+  const config = normalizeVideoCallConfig({ price: -5, durationMinutes: 20, minNoticeHours: 'x', weekly: { 2: '10:00, 09:00', 4: [] }, busyCalendarIds: [' a@x ', '', 'a@x'], texts: { info: '  ', whatsapp: 'Oi {data}' } });
+  assert.equal(config.price, 75);
+  assert.equal(config.durationMinutes, 20);
+  assert.equal(config.minNoticeHours, 24);
+  assert.deepEqual(config.weekly, { 2: ['09:00', '10:00'] });
+  assert.deepEqual(config.busyCalendarIds, ['a@x']);
+  assert.equal(config.texts.info, DEFAULT_VIDEO_CALL_CONFIG.texts.info);
+  assert.equal(config.texts.whatsapp, 'Oi {data}');
+});
+
+test('textos: {valor} {duracao} {prazo} {data} {horario} são preenchidos; a página pública recebe os textos prontos', () => {
+  const config = normalizeVideoCallConfig({ price: 89.9, paymentDeadlineHours: 12 });
+  assert.equal(fillText('{valor} | {duracao} | {prazo} | {data} | {horario} | {outra}', config, { date: '2026-10-12', time: '20:00' }), 'R$ 89,90 | 15 | 12 | 12/10/2026 | 20:00 | {outra}');
+  const shown = publicConfig(config);
+  assert.match(shown.texts.info, /R\$ 89,90/);
+  assert.match(shown.texts.confirm, /12h/);
+  assert.doesNotMatch(shown.texts.info + shown.texts.confirm, /\{valor\}|\{prazo\}|\{duracao\}/);
+});
+
+test('configuração salva muda dias, horários e valor (reserva e confirmação do ManyChat usam o valor da reserva)', async () => {
+  const database = fakeDatabase({ 'services/2': SERVICE, 'siteConfig/videoCall': { price: 90, weekly: { 2: ['10:00'] } } });
+  const { days, config } = await getAvailability({ database, nowMs: NOW, listEvents: noEvents });
+  assert.equal(config.price, 90);
+  assert.ok(days.length >= 4);
+  for (const day of days) { assert.equal(new Date(`${day.date}T12:00:00Z`).getUTCDay(), 2); assert.deepEqual(day.times, ['10:00']); }
+  await assert.rejects(book(database, form()), (e) => e.code === 'slot_unavailable'); // segunda 20:00 deixou de existir
+  const { orderId } = await book(database, form({ slot: { date: '2026-10-13', time: '10:00' } }));
+  assert.equal(database.docs.get(`orders/${orderId}`).servicePrice, 90);
+  await payment(database, paid('31999990001'));
+  assert.equal(database.docs.get(`orders/${orderId}`).totalPaid, 90);
+});
+
+// ---- agendas extras (ex.: a agenda pessoal, onde o Calendly gravava) ----
+
+test('agendas extras bloqueiam horários; evento marcado como "Livre" não bloqueia', async () => {
+  const database = fakeDatabase({ 'services/2': SERVICE, 'siteConfig/videoCall': { busyCalendarIds: ['pessoal@x'] } });
+  const asked = [];
+  const listEvents = async ({ env }) => {
+    asked.push(env?.GOOGLE_CALENDAR_ID ?? 'principal');
+    if (env?.GOOGLE_CALENDAR_ID !== 'pessoal@x') return { events: [] };
+    return { events: [
+      { allDay: false, startKey: '2026-10-12', startTime: '19:30', endKey: '2026-10-12', endTime: '19:45' }, // reserva antiga do Calendly
+      { allDay: false, transparent: true, startKey: '2026-10-12', startTime: '20:30', endKey: '2026-10-12', endTime: '21:00' },
+    ] };
+  };
+  const { days } = await getAvailability({ database, nowMs: NOW, listEvents });
+  assert.deepEqual(asked.sort(), ['pessoal@x', 'principal']);
+  assert.deepEqual(days.find((d) => d.date === '2026-10-12').times, ['20:00', '20:30']);
+  await assert.rejects(book(database, form({ slot: { date: '2026-10-12', time: '19:30' } }), { listEvents }), (e) => e.code === 'slot_unavailable');
+  assert.equal(database.count('orders/'), 0);
+});
+
+test('agenda extra inacessível derruba a consulta (não oferece horário sem conferir)', async () => {
+  const database = fakeDatabase({ 'services/2': SERVICE, 'siteConfig/videoCall': { busyCalendarIds: ['pessoal@x'] } });
+  const listEvents = async ({ env }) => { if (env?.GOOGLE_CALENDAR_ID === 'pessoal@x') throw new Error('sem acesso'); return { events: [] }; };
+  await assert.rejects(getAvailability({ database, nowMs: NOW, listEvents }), /sem acesso/);
+});
+
+// ---- prazo de pagamento ----
+
+const HOUR = 3_600_000;
+
+test('pré-agendamento sem pagamento no prazo é excluído: pedido, trava e evento; o horário volta a ficar livre', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form());
+  const deleted = [];
+  const expire = (nowMs) => expireUnpaidBookings({ database, nowMs, deleteEvent: async ({ id }) => { deleted.push(id); }, logger: quietLogger });
+  assert.equal(await expire(NOW + 23 * HOUR), 0); // ainda no prazo
+  assert.ok(database.docs.has(`orders/${orderId}`));
+  assert.equal(await expire(NOW + 24 * HOUR), 1);
+  assert.deepEqual(deleted, ['evt1']);
+  assert.equal(database.count('orders/'), 0);
+  assert.equal(database.count('videoCallSlots/'), 0);
+  assert.equal(database.count('videoCallPending/'), 0);
+  assert.equal(database.count('clients/'), 2); // cliente e índice ficam
+  await book(database, form()); // mesmo horário e mesmo WhatsApp podem reservar de novo
+});
+
+test('reserva paga nunca é excluída pelo prazo; falha ao apagar o evento não impede a exclusão', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form());
+  await payment(database, paid('31999990001'));
+  assert.equal(await expireUnpaidBookings({ database, nowMs: NOW + 100 * HOUR, deleteEvent: async () => { throw new Error('nunca chamado'); }, logger: quietLogger }), 0);
+  assert.ok(database.docs.has(`orders/${orderId}`));
+
+  const other = seeded();
+  await book(other, form());
+  assert.equal(await expireUnpaidBookings({ database: other, nowMs: NOW + 25 * HOUR, deleteEvent: async () => { throw new Error('google fora'); }, logger: quietLogger }), 1);
+  assert.equal(other.count('orders/'), 0);
+});
+
+// ---- evento da agenda depois do pagamento ----
+
+test('pagamento confirmado marca o evento da agenda como pago (gancho do ManyChat)', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form());
+  const updates = [];
+  const res = await payment(database, paid('31999990001'), { onBookingConfirmed: (id) => markVideoCallEventPaid({ database, orderId: id, updateEvent: async (args) => { updates.push(args); } }) });
+  assert.equal(res.body.confirmedBooking, true);
+  assert.equal(orderId, res.body.orderId);
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].id, 'evt1');
+  assert.equal(updates[0].input.title, 'Vídeo Chamada (paga): Maria - Davi');
+  assert.deepEqual([updates[0].input.date, updates[0].input.startTime, updates[0].input.endTime], ['2026-10-12', '20:00', '20:15']);
+  assert.match(updates[0].input.description, /5531999990001/);
+  assert.equal(await markVideoCallEventPaid({ database, orderId: 'nao-existe', updateEvent: async () => { throw new Error('x'); } }), false);
+});
+
+test('falha ao atualizar a agenda não desfaz a confirmação do pagamento', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form());
+  const res = await payment(database, paid('31999990001'), { onBookingConfirmed: async () => { throw new Error('google fora'); } });
+  assert.equal(res.statusCode, 200);
+  assert.ok(database.docs.get(`orders/${orderId}`).paidAt);
+});

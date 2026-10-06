@@ -261,7 +261,7 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const pinnedItems: NavItem<AdminTab>[] = [{ id: 'home', label: 'Principal', icon: House }, { id: 'calendar', label: 'Calendário', icon: CalendarDays }, { id: 'videocalls', label: 'Agendamento de chamadas', icon: CalendarCheck }];
+  const pinnedItems: NavItem<AdminTab>[] = [{ id: 'home', label: 'Principal', icon: House }, { id: 'calendar', label: 'Calendário', icon: CalendarDays, children: [{ id: 'videocalls', label: 'Agendamento de chamadas', icon: CalendarCheck }] }];
   const navItems: NavItem<AdminTab>[] = NAV_ITEMS;
   const { order: navOrder, setOrder: setNavOrder, reset: resetNavOrder, customized: navCustomized } = useNavOrder<AdminTab>(user?.uid, NAV_ORDER);
 

@@ -265,6 +265,8 @@ export function normalizeEvent(item) {
     endTime: allDay ? null : clockIn.format(endDate),
     htmlLink: item.htmlLink || null,
     crm: isCrmEventId(item.id),
+    /** Marcado como "Livre" na agenda: aparece, mas não ocupa o horário. */
+    transparent: item.transparency === 'transparent',
   };
 }
 
@@ -310,7 +312,7 @@ export async function listCalendarEvents({ from, to, q, ...ctx }) {
   const query = {
     singleEvents: 'true', orderBy: 'startTime', maxResults: '250', showDeleted: 'false',
     timeMin: startOfDay(from).toISOString(), timeMax: startOfDay(addDays(to, 1)).toISOString(), timeZone: TIME_ZONE,
-    fields: 'nextPageToken,items(id,status,summary,description,location,start,end,htmlLink)',
+    fields: 'nextPageToken,items(id,status,summary,description,location,start,end,htmlLink,transparency)',
     ...(q?.trim() ? { q: q.trim().slice(0, 200) } : {}),
   };
   const events = [];
