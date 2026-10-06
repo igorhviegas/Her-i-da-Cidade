@@ -13,7 +13,8 @@ test('colunas do Kanban: Entregar, Gravar, Editar, Agendado, Concluído', () => 
 
 test('botão de WhatsApp nos cards não move nem abre o card', () => {
   assert.match(source, /Enviar pelo WhatsApp/);
-  assert.match(source, /buildDeliveryWhatsAppUrl\(client\?\.whatsapp, order, service\)/);
+  // número da chamada (agendamento do site para outro número) tem prioridade; sem ele, o WhatsApp do cliente
+  assert.match(source, /buildDeliveryWhatsAppUrl\(order\.videoCall\?\.callWhatsapp \?\? client\?\.whatsapp, order, service\)/);
   assert.match(source, /draggable=\{false\}/);
   assert.match(source, /onClick=\{\(event\) => event\.stopPropagation\(\)\}/);
   assert.match(source, /WhatsApp indisponível<\/p>/);
