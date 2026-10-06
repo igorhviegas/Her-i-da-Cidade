@@ -173,16 +173,24 @@ export const VideoCatalog: React.FC = () => {
   }, [matchingVideos, selectedCategory]);
 
   return (
-    <main className="min-h-screen bg-[#07070b] text-white">
+    <main className="min-h-screen bg-[#070B14] text-white">
       {/* Header com botão Voltar evidente e campo de busca */}
       <header
         ref={headerRef}
-        className={`sticky top-0 z-30 border-b border-white/10 bg-[#07070b]/95 backdrop-blur-xl shadow-lg transition-transform duration-300 ease-in-out ${
+        className={`sticky top-0 z-30 border-b border-white/10 bg-[#070B14]/95 backdrop-blur-xl shadow-lg transition-transform duration-300 ease-in-out ${
           isNavbarVisible ? 'translate-y-0' : '-translate-y-full'
         }`}
       >
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-8">
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0 rounded-full bg-[#0072d2] flex items-center justify-center text-white font-black text-lg sm:text-xl shadow-lg shadow-blue-600/30 hover:brightness-110 active:scale-95 transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400"
+              aria-label="Herói da Cidade - ir para a página inicial"
+            >
+              H
+            </button>
             <button
               type="button"
               onClick={() => navigate('/')}
@@ -246,7 +254,7 @@ export const VideoCatalog: React.FC = () => {
       {/* Barra de Categorias estilo Plataforma de Streaming (Fixa abaixo da navbar durante rolagem) */}
       <section
         style={{ top: isNavbarVisible ? `${headerHeight}px` : '0px' }}
-        className="sticky z-20 border-b border-white/10 bg-[#07070b]/95 backdrop-blur-xl shadow-md transition-[top] duration-300 ease-in-out"
+        className="sticky z-20 border-b border-white/10 bg-[#070B14]/95 backdrop-blur-xl shadow-md transition-[top] duration-300 ease-in-out"
       >
         <div className="mx-auto max-w-7xl px-4 py-3 md:px-8">
           <div className="flex items-center gap-2.5 overflow-x-auto scroll-smooth py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -298,7 +306,7 @@ export const VideoCatalog: React.FC = () => {
             alt=""
             className="absolute inset-0 -z-20 h-full w-full object-cover opacity-60"
           />
-          <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#07070b] via-[#07070b]/55 to-black/20" />
+          <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#070B14] via-[#070B14]/55 to-black/20" />
           <div className="mx-auto w-full max-w-7xl px-4 pb-10 sm:pb-12 md:px-8 md:pb-16">
             <div className="flex flex-wrap items-center gap-2 mb-3">
               {featuredVideo.badgeText && (

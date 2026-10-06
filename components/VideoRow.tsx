@@ -24,7 +24,7 @@ export const VideoRow: React.FC<VideoRowProps> = ({ title, videos, onSelect }) =
         type="button"
         aria-label={`Ver vídeos anteriores de ${title}`}
         onClick={() => scroll(-1)}
-        className="absolute left-0 top-12 z-10 hidden h-[calc(100%-3rem)] w-12 items-center justify-center bg-gradient-to-r from-black/80 to-transparent text-white opacity-0 transition group-hover/row:opacity-100 md:flex"
+        className="absolute left-0 top-12 z-10 hidden h-[calc(100%-3rem)] w-12 items-center justify-center bg-gradient-to-r from-[#070B14]/90 to-transparent text-white opacity-0 transition group-hover/row:opacity-100 md:flex"
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>
@@ -35,7 +35,7 @@ export const VideoRow: React.FC<VideoRowProps> = ({ title, videos, onSelect }) =
         type="button"
         aria-label={`Ver mais vídeos de ${title}`}
         onClick={() => scroll(1)}
-        className="absolute right-0 top-12 z-10 hidden h-[calc(100%-3rem)] w-12 items-center justify-center bg-gradient-to-l from-black/80 to-transparent text-white opacity-0 transition group-hover/row:opacity-100 md:flex"
+        className="absolute right-0 top-12 z-10 hidden h-[calc(100%-3rem)] w-12 items-center justify-center bg-gradient-to-l from-[#070B14]/90 to-transparent text-white opacity-0 transition group-hover/row:opacity-100 md:flex"
       >
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </button>

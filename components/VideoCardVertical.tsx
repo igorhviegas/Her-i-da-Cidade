@@ -29,7 +29,7 @@ export const VideoCardVertical: React.FC<VideoCardVerticalProps> = ({ video, onS
           </span>
         </div>
       )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#070B14] via-[#070B14]/20 to-transparent" />
       <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-950 shadow-xl">
           <svg width="21" height="21" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
