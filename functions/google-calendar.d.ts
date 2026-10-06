@@ -1,6 +1,8 @@
 export const TIME_ZONE: string;
 export const EVENT_DURATION_MINUTES: number;
 export const TANGERINE_COLOR_ID: string;
+export const BANANA_COLOR_ID: string;
+export const BASIL_COLOR_ID: string;
 export class GoogleCalendarError extends Error { code: string; detail?: unknown; constructor(code: string, detail?: unknown); }
 export function eventDateKey(value: unknown): string | null;
 export function eventTimes(dateKey: string, time: string, minutes?: number): { start: string; end: string };
@@ -21,7 +23,7 @@ export interface CalendarEvent {
   id: string; title: string; description: string; location: string; allDay: boolean;
   startKey: string; startTime: string | null; endKey: string; endTime: string | null; htmlLink: string | null; crm: boolean; transparent: boolean;
 }
-export interface CalendarEventInput { title: string; date: string; allDay?: boolean; startTime?: string; endTime?: string; location?: string; description?: string }
+export interface CalendarEventInput { title: string; date: string; allDay?: boolean; startTime?: string; endTime?: string; location?: string; description?: string; /** ID da paleta de eventos do Google ('1' a '11'). */ colorId?: string }
 type CalendarCtx = { env?: Record<string, string | undefined>; fetchImpl?: typeof fetch; now?: number };
 export function isCrmEventId(id: string): boolean;
 export function normalizeEvent(item: any): CalendarEvent | null;

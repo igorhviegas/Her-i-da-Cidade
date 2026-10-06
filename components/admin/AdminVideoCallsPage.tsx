@@ -91,12 +91,12 @@ const BookingsList: React.FC = () => {
 
 // ---------- Configurações ----------
 
-interface Draft { price: string; durationMinutes: string; minNoticeHours: string; maxAdvanceDays: string; paymentDeadlineHours: string; expireAfterHours: string; weekly: string[]; busy: string; info: string; confirm: string; whatsapp: string }
+interface Draft { price: string; durationMinutes: string; minNoticeHours: string; maxAdvanceDays: string; paymentDeadlineHours: string; expireAfterHours: string; weekly: string[]; busy: string; info: string; confirm: string; whatsapp: string; security: string }
 
 const toDraft = (c: VideoCallConfig): Draft => ({
   price: String(c.price).replace('.', ','), durationMinutes: String(c.durationMinutes), minNoticeHours: String(c.minNoticeHours), maxAdvanceDays: String(c.maxAdvanceDays),
   paymentDeadlineHours: String(c.paymentDeadlineHours), expireAfterHours: String(c.expireAfterHours), weekly: WEEKDAYS.map((_, day) => (c.weekly[day] ?? []).join(', ')), busy: c.busyCalendarIds.join('\n'),
-  info: c.texts.info, confirm: c.texts.confirm, whatsapp: c.texts.whatsapp,
+  info: c.texts.info, confirm: c.texts.confirm, whatsapp: c.texts.whatsapp, security: c.texts.security,
 });
 
 const NUMBER_FIELDS: { key: 'price' | 'durationMinutes' | 'minNoticeHours' | 'maxAdvanceDays' | 'paymentDeadlineHours' | 'expireAfterHours'; label: string; hint: string }[] = [
@@ -115,7 +115,7 @@ function fromDraft(draft: Draft): { config?: VideoCallConfig; problem?: string }
     maxAdvanceDays: Number(draft.maxAdvanceDays), paymentDeadlineHours: Number(draft.paymentDeadlineHours), expireAfterHours: Number(draft.expireAfterHours),
     weekly: Object.fromEntries(draft.weekly.map((value, day) => [day, parseTimes(value)])),
     busyCalendarIds: draft.busy.split(/\s+/).filter(Boolean),
-    texts: { info: draft.info, confirm: draft.confirm, whatsapp: draft.whatsapp },
+    texts: { info: draft.info, confirm: draft.confirm, whatsapp: draft.whatsapp, security: draft.security },
   };
   if (raw.expireAfterHours < raw.paymentDeadlineHours) return { problem: 'A exclusão automática não pode acontecer antes do prazo informado ao cliente.' };
   const config = normalizeVideoCallConfig(raw);
@@ -125,7 +125,7 @@ function fromDraft(draft: Draft): { config?: VideoCallConfig; problem?: string }
   const badDay = typed.findIndex((count, day) => count !== (config.weekly[day] ?? []).length);
   if (badDay >= 0) return { problem: `Horários de ${WEEKDAYS[badDay]}: use o formato HH:MM separado por vírgula, sem repetir (ex.: 19:30, 20:00).` };
   if (!Object.keys(config.weekly).length) return { problem: 'Informe ao menos um horário em algum dia da semana.' };
-  for (const [key, label] of [['info', 'Informações'], ['confirm', 'Aviso final'], ['whatsapp', 'Mensagem do WhatsApp']] as const) if (!draft[key].trim()) return { problem: `O texto "${label}" não pode ficar vazio.` };
+  for (const [key, label] of [['info', 'Informações'], ['confirm', 'Aviso final'], ['whatsapp', 'Mensagem do WhatsApp'], ['security', 'Aviso de segurança']] as const) if (!draft[key].trim()) return { problem: `O texto "${label}" não pode ficar vazio.` };
   return { config };
 }
 
@@ -172,7 +172,7 @@ const Settings: React.FC = () => {
       setSaving(false);
     }
   };
-  const textArea = (key: 'info' | 'confirm' | 'whatsapp', title: string, hint: string, rows: number) => (
+  const textArea = (key: 'info' | 'confirm' | 'whatsapp' | 'security', title: string, hint: string, rows: number) => (
     <label className={labelClass}>{title}
       <textarea rows={rows} value={draft[key]} onChange={(e) => set({ [key]: e.target.value })} className={inputClass} />
       <span className="mt-1 block font-normal text-white/40">{hint}</span>
@@ -217,6 +217,7 @@ const Settings: React.FC = () => {
         {textArea('info', 'Informações (aparecem quando o cliente escolhe o horário)', 'Se mudar os dias de atendimento, lembre de ajustar a última frase.', 10)}
         {textArea('confirm', 'Aviso final (acima do botão de prosseguir)', 'Mostrado depois que o cliente preenche os dados.', 3)}
         {textArea('whatsapp', 'Mensagem enviada no WhatsApp', 'Só dos agendamentos; os links dos serviços não mudam. Aceita também {data} e {horario}.', 3)}
+        {textArea('security', 'Aviso de segurança (com cadeado, abaixo do agendamento)', 'Aparece em letras pequenas na página /agendar-chamada. Mantenha curto.', 3)}
       </section>
 
       <section className={`${cardClass} space-y-2`}>

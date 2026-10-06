@@ -12,6 +12,9 @@ export const TIME_ZONE = 'America/Sao_Paulo';
 export const EVENT_DURATION_MINUTES = 60;
 /** Cor "Tangerina" da paleta de eventos do Google Agenda. */
 export const TANGERINE_COLOR_ID = '6';
+/** "Banana" e "Manjericão": vídeo chamada aguardando pagamento e paga. A API só aceita as 11 cores de evento (IDs 1 a 11). */
+export const BANANA_COLOR_ID = '5';
+export const BASIL_COLOR_ID = '10';
 const SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const API = 'https://www.googleapis.com/calendar/v3/calendars';
@@ -278,6 +281,11 @@ export function buildStandaloneEvent(input, { patch = false } = {}) {
   if (!title || title.length > 250 || !parseDateKey(date ?? '')) throw bad();
   const text = (value, max) => { const s = typeof value === 'string' ? value.trim() : ''; if (s.length > max) throw bad(); return s || (patch ? null : undefined); };
   const body = { summary: title, location: text(input.location, 1024), description: text(input.description, 8000) };
+  // Cor opcional (ID da paleta de eventos). Ausente = não envia nada: na criação vale a cor da agenda e na edição a cor atual fica.
+  if (input.colorId !== undefined) {
+    if (!/^([1-9]|1[01])$/.test(String(input.colorId))) throw bad();
+    body.colorId = String(input.colorId);
+  }
   if (input.allDay) {
     body.start = { date, ...(patch ? { dateTime: null, timeZone: null } : {}) };
     body.end = { date: addDayKey(date, 1), ...(patch ? { dateTime: null, timeZone: null } : {}) };

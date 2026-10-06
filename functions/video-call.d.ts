@@ -1,7 +1,7 @@
 import type { VideoCallConfig } from './video-call-config.js';
 
 export type { VideoCallConfig };
-export interface PublicVideoCallConfig { price: number; priceLabel: string; durationMinutes: number; paymentDeadlineHours: number; texts: { info: string; confirm: string } }
+export interface PublicVideoCallConfig { price: number; priceLabel: string; durationMinutes: number; paymentDeadlineHours: number; texts: { info: string; confirm: string; security: string } }
 export const VIDEO_CALL_CONFIG: VideoCallConfig;
 export const SLOTS: string;
 export const PENDING: string;

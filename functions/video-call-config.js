@@ -32,6 +32,8 @@ export const DEFAULT_VIDEO_CALL_CONFIG = {
     ].join('\n\n'),
     confirm: '⏳ Ao prosseguir com a **pré-reserva**, você terá **{prazo}h** para efetuar o pagamento no valor de **{valor}**, ou sua reserva será **excluída automaticamente** do sistema.',
     whatsapp: 'Olá, acabei de fazer a reserva no dia {data} às {horario} (horário de Brasília), gostaria de fazer o pagamento.',
+    /** Aviso discreto abaixo do agendamento, na página /agendar-chamada. */
+    security: 'Seus dados são usados só para o agendamento. O pagamento é combinado direto no nosso WhatsApp oficial; nunca pedimos senha ou dados de cartão por aqui.',
   },
 };
 
@@ -71,7 +73,7 @@ export function normalizeVideoCallConfig(raw) {
     expireAfterHours: Math.max(paymentDeadlineHours, integer(source.expireAfterHours, d.expireAfterHours, 1, 720)),
     weekly,
     busyCalendarIds: [...new Set((Array.isArray(source.busyCalendarIds) ? source.busyCalendarIds : []).map((id) => String(id).trim()).filter((id) => id && id.length <= 200))].slice(0, 5),
-    texts: { info: text(texts.info, d.texts.info, 4000), confirm: text(texts.confirm, d.texts.confirm, 2000), whatsapp: text(texts.whatsapp, d.texts.whatsapp, 1000) },
+    texts: { info: text(texts.info, d.texts.info, 4000), confirm: text(texts.confirm, d.texts.confirm, 2000), whatsapp: text(texts.whatsapp, d.texts.whatsapp, 1000), security: text(texts.security, d.texts.security, 600) },
   };
 }
 
