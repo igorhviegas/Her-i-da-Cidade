@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { loadFitDaily, type FitDailyRow } from '../../services/fitService';
 import { average, dayKey, lastDays, movingAverage, series, summarize } from '../../services/fitDaily.js';
 import { DailyBars, WeightLine, shortDay } from './FitCharts';
+import { FitRides } from './FitRides';
 import { cardClass, ghostBtn } from './financeFormat';
 
 const RANGES = [7, 30, 90] as const;
@@ -109,6 +110,8 @@ export const AdminFitPage: React.FC = () => {
           <p className="text-xs text-white/40">Dia sem registro aparece apagado (não é zero). {lastSync && `Última sincronização: ${lastSync.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}.`}</p>
         </>
       )}
+
+      {user && <FitRides uid={user.uid} dates={view.dates} />}
     </div>
   );
 };
