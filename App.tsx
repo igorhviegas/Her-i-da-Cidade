@@ -1,9 +1,11 @@
-import React, { lazy, Suspense, useEffect } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { RouterProvider, useRouter } from './lib/router';
 import { AuthProvider } from './context/AuthContext';
 import { PublicSite } from './components/PublicSite';
 import { VideoCatalog } from './components/VideoCatalog';
 import { VideoCallPage } from './components/VideoCallPage';
+import { ServiceFaqPages } from './components/ServiceFaqPages';
+import type { Service } from './types';
 import { useHomeContent } from './services/homeContentService';
 
 const HOME_TITLE = 'Homem-Aranha Personagem Vivo em BH | Herói da Cidade';
@@ -14,6 +16,8 @@ const HOME_URL = 'https://www.heroidacidade.com/';
 const CALL_TITLE = 'Agendar Vídeo Chamada | Herói da Cidade';
 const CALL_DESCRIPTION = 'Escolha o dia e o horário da Vídeo Chamada ao Vivo com o Homem-Aranha.';
 const CALL_URL = 'https://www.heroidacidade.com/agendar-chamada';
+const FAQ_TITLE = 'Dúvidas sobre os serviços | Herói da Cidade';
+const FAQ_DESCRIPTION = 'Tire suas dúvidas sobre pagamento, prazos e como funcionam os serviços do Herói da Cidade.';
 const VIDEO_URL = 'https://www.heroidacidade.com/videos';
 const SOCIAL_IMAGE = 'https://www.heroidacidade.com/images/spider.PNG';
 const SITE_NAME = 'O Herói da Cidade';
@@ -47,7 +51,11 @@ const AppContent: React.FC = () => {
   const isVideos = path === '/videos' || path.startsWith('/videos/');
   const isAgent = path === '/agente-hdc' || path.startsWith('/agente-hdc/');
   const isCall = path === '/agendar-chamada';
-  const homeContent = useHomeContent(!isAdmin && !isVideos && !isAgent && !isCall);
+  const isFaq = path === '/duvidas' || path.startsWith('/duvidas/');
+  const faqSlug = isFaq ? decodeURIComponent(path.split('/').filter(Boolean)[1] ?? '') : '';
+  // Serviço aberto em /duvidas/{slug}: undefined = carregando, null = inexistente ou sem dúvidas (não indexar).
+  const [faqService, setFaqService] = useState<Service | null | undefined>(undefined);
+  const homeContent = useHomeContent(!isAdmin && !isVideos && !isAgent && !isCall && !isFaq);
 
   // Ícone do iOS ("Adicionar à Tela de Início") próprio da plataforma de streaming e da área do agente
   const iosIcon = isVideos ? '/images/modules/streaming.png' : isAgent ? '/images/modules/agente-hdc.png' : null;
@@ -73,13 +81,17 @@ const AppContent: React.FC = () => {
       return;
     }
 
-    const title = isCall ? CALL_TITLE : isVideos ? VIDEO_TITLE : homeContent.seoTitle || HOME_TITLE;
-    const description = isCall ? CALL_DESCRIPTION : isVideos ? VIDEO_DESCRIPTION : homeContent.seoDescription || HOME_DESCRIPTION;
-    const url = isCall ? CALL_URL : isVideos ? VIDEO_URL : HOME_URL;
+    const faqPageTitle = faqService ? `${faqService.title}: dúvidas frequentes | Herói da Cidade` : FAQ_TITLE;
+    const faqPageDescription = faqService?.faq
+      ? `Dúvidas sobre ${faqService.title}: ${faqService.faq.map((item) => item.title).join(', ')}.`.slice(0, 300)
+      : FAQ_DESCRIPTION;
+    const title = isCall ? CALL_TITLE : isVideos ? VIDEO_TITLE : isFaq ? faqPageTitle : homeContent.seoTitle || HOME_TITLE;
+    const description = isCall ? CALL_DESCRIPTION : isVideos ? VIDEO_DESCRIPTION : isFaq ? faqPageDescription : homeContent.seoDescription || HOME_DESCRIPTION;
+    const url = isCall ? CALL_URL : isVideos ? VIDEO_URL : isFaq ? `${HOME_URL}duvidas${faqSlug ? `/${encodeURIComponent(faqSlug)}` : ''}` : HOME_URL;
 
     document.title = title;
     setMeta('name', 'description', description);
-    setMeta('name', 'robots', 'index, follow');
+    setMeta('name', 'robots', isFaq && faqSlug && faqService === null ? 'noindex, follow' : 'index, follow');
     setCanonical(url);
 
     setMeta('property', 'og:title', title);
@@ -94,7 +106,7 @@ const AppContent: React.FC = () => {
     setMeta('name', 'twitter:description', description);
     setMeta('name', 'twitter:image', SOCIAL_IMAGE);
 
-    if (isVideos) {
+    if (isVideos || isFaq) {
       existingStructuredData?.remove();
       return;
     }
@@ -133,7 +145,7 @@ const AppContent: React.FC = () => {
       document.head.appendChild(script);
     }
     script.textContent = JSON.stringify(structuredData);
-  }, [isAdmin, isAgent, isVideos, isCall, homeContent.seoTitle, homeContent.seoDescription]);
+  }, [isAdmin, isAgent, isVideos, isCall, isFaq, faqSlug, faqService, homeContent.seoTitle, homeContent.seoDescription]);
 
   if (isAdmin) {
     return (
@@ -154,6 +166,9 @@ const AppContent: React.FC = () => {
 
   // Página pública de agendamento de Vídeo Chamada (link compartilhável; substitui o link do Calendly)
   if (isCall) return <VideoCallPage />;
+
+  // Dúvidas públicas por serviço: /duvidas e /duvidas/{slug}
+  if (isFaq) return <ServiceFaqPages slug={faqSlug || undefined} onResolved={setFaqService} />;
 
   // Rota dedicada para o catálogo de vídeos estilo Netflix
   if (isVideos) {

@@ -1,4 +1,11 @@
 
+/** Dúvida pública de um serviço (categoria + resposta), exibida em /duvidas/{slug}. */
+export interface ServiceFaqItem {
+  id: string;
+  title: string;
+  content: string;
+}
+
 export interface Service {
   id: string;
   title: string;
@@ -21,6 +28,8 @@ export interface Service {
   /** Mensagem de WhatsApp do botão de envio do Kanban; ausente/vazia = padrão do tipo de serviço. */
   deliveryMessage?: string;
   internalOnly?: boolean;
+  /** Dúvidas públicas, na ordem de exibição. */
+  faq?: ServiceFaqItem[];
 }
 
 export type ProductionType = 'scheduled' | 'recording' | 'editing' | 'immediate';
@@ -149,6 +158,7 @@ export interface FirestoreService {
   defaultDeliveryDays?: number;
   deliveryMessage?: string;
   internalOnly?: boolean;
+  faq?: ServiceFaqItem[];
 }
 
 /**

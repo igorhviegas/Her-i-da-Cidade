@@ -171,3 +171,31 @@ test('mensagem do Kanban: salva, recarrega, independe entre serviços, remove ao
   assert.equal((await read(b.id)).deliveryMessage, 'Só do B');
   assert.equal((await read(a.id)).whatsappUrl.startsWith('https://wa.me/5531999044206?text='), true, 'link do serviço intacto');
 });
+
+test('dúvidas: salva, reordena, edita, remove; descarta itens incompletos; leitura pública; serviços sem dúvidas intactos', async () => {
+  await setNumber('https://wa.me/5531999044206');
+  const faq = [
+    { id: 'a', title: 'Forma de pagamento', content: 'Pix ou cartão' },
+    { id: 'b', title: 'Prazo de entrega', content: '7 dias úteis' },
+    { id: 'c', title: 'Vazia', content: '  ' },
+  ];
+  const a = await svc.createService(input('Faq A', { faq }));
+  const b = await svc.createService(input('Faq B'));
+  assert.deepEqual((await read(a.id)).faq.map((i) => i.id), ['a', 'b'], 'item incompleto descartado');
+  assert.equal('faq' in (await read(b.id)), false, 'serviço sem dúvidas não ganha o campo');
+  assert.equal(svc.mapDocToService(b.id, await read(b.id)).faq, undefined);
+
+  const stored = svc.mapDocToService(a.id, await read(a.id)).faq;
+  await svc.updateService(a.id, { faq: [stored[1], { ...stored[0], title: 'Pagamento' }, { id: 'n', title: 'Roteiro', content: 'Novo' }] });
+  assert.deepEqual((await read(a.id)).faq.map((i) => i.title), ['Prazo de entrega', 'Pagamento', 'Roteiro']);
+
+  await svc.updateService(a.id, { price: 'R$ 12' }); // sem faq no update: não mexe
+  assert.equal((await read(a.id)).faq.length, 3);
+
+  const anonymous = env.unauthenticatedContext().firestore();
+  assert.equal((await getDoc(doc(anonymous, 'services', a.id))).data().faq.length, 3, 'leitura pública');
+  await assert.rejects(setDoc(doc(anonymous, 'services', a.id), { faq: [] }, { merge: true }), 'escrita pública negada');
+
+  await svc.updateService(a.id, { faq: [] });
+  assert.equal('faq' in (await read(a.id)), false, 'lista vazia remove o campo');
+});
