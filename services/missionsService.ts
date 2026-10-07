@@ -404,6 +404,24 @@ export async function dismissAllNotifications(items: AppNotification[]): Promise
   await batch.commit();
 }
 
+/** Avisos criados antes de hoje (America/Sao_Paulo). Aviso ainda sem createdAt (gravação pendente) conta como de hoje. */
+export const previousDaysNotifications = (items: AppNotification[], now = new Date()) => items.filter((n) => n.createdAt && dateKey(n.createdAt) < dateKey(now));
+
+/** Contador do menu "Missões": tarefas pendentes de hoje + to-dos pendentes com prazo hoje. Reavalia a virada do dia a cada minuto. */
+export function subscribeTodayMissionsCount(onChange: (count: number | null) => void): () => void {
+  let tasks = 0, todos: Mission[] = [], loaded = { tasks: false, todos: false }, today = dateKey(new Date()), stopTasks = () => {};
+  const emit = () => onChange(loaded.tasks && loaded.todos ? tasks + todos.filter((m) => m.dueAt && dateKey(m.dueAt) === today).length : null);
+  const fail = (error: Error) => { console.error('[missionsService] contador de missões indisponível', error); onChange(null); };
+  const watchTasks = () => {
+    stopTasks();
+    stopTasks = onSnapshot(query(collection(firestore(), OCCURRENCES_COLLECTION), where('date', '==', today), where('status', '==', 'pending')), (s) => { tasks = s.size; loaded.tasks = true; emit(); }, fail);
+  };
+  watchTasks();
+  const stopTodos = onSnapshot(query(collection(firestore(), MISSIONS_COLLECTION), where('status', '==', 'pending')), (s) => { todos = mapAll<Mission>(s); loaded.todos = true; emit(); }, fail);
+  const timer = window.setInterval(() => { const now = dateKey(new Date()); if (now !== today) { today = now; watchTasks(); emit(); } }, 60000);
+  return () => { window.clearInterval(timer); stopTasks(); stopTodos(); };
+}
+
 let syncing: Promise<void> | null = null;
 
 /** Sincroniza tarefas e cria avisos ausentes (ID determinístico; avisos descartados nunca reaparecem). Chamadas simultâneas compartilham a execução. */

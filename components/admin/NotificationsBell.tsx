@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, X } from 'lucide-react';
-import { dismissAllNotifications, dismissNotification, runClientSync, subscribeNotifications, type AppNotification } from '../../services/missionsService';
+import { dismissAllNotifications, dismissNotification, previousDaysNotifications, runClientSync, subscribeNotifications, type AppNotification } from '../../services/missionsService';
 
 const SYNC_INTERVAL_MS = 10 * 60 * 1000;
 
@@ -17,6 +17,8 @@ export const NotificationsBell: React.FC<{ onOpenMissions: () => void }> = ({ on
     return () => { window.clearInterval(timer); unsubscribe(); };
   }, []);
 
+  const previous = previousDaysNotifications(items);
+
   return (
     <div className="relative">
       <button type="button" onClick={() => setOpen((v) => !v)} title="Avisos" className="relative rounded-xl border border-white/10 bg-white/5 p-2 text-white/70 hover:text-white">
@@ -27,7 +29,12 @@ export const NotificationsBell: React.FC<{ onOpenMissions: () => void }> = ({ on
         <div className="absolute right-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-white/10 bg-[#0D1527] p-3 shadow-2xl">
           <div className="mb-2 flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-white/60">Avisos</span>
-            {items.length > 0 && <button type="button" onClick={() => void dismissAllNotifications(items)} className="text-[11px] font-semibold text-blue-400 hover:text-blue-300">Descartar todos</button>}
+            {items.length > 0 && (
+              <span className="flex items-center gap-3">
+                {previous.length > 0 && <button type="button" onClick={() => void dismissAllNotifications(previous)} className="text-[11px] font-semibold text-blue-400 hover:text-blue-300">Limpar anteriores</button>}
+                <button type="button" onClick={() => void dismissAllNotifications(items)} className="text-[11px] font-semibold text-blue-400 hover:text-blue-300">Descartar todos</button>
+              </span>
+            )}
           </div>
           {items.length === 0 ? <p className="py-4 text-center text-xs text-white/40">Nenhum aviso.</p> : (
             <ul className="max-h-80 space-y-1.5 overflow-y-auto">
