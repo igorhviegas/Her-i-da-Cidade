@@ -11,6 +11,7 @@ import { handleInstagramSync } from "./api/instagram-sync";
 import { handleGoogleCalendar } from "./api/google-calendar";
 import { handleCalendarEvents } from "./api/calendar-events";
 import { handleVideoCall } from "./api/video-call";
+import { handleTravelRoute } from "./api/travel-route";
 
 const PORT = 3000;
 
@@ -209,6 +210,11 @@ async function startServer() {
   // Agendamento público de Vídeo Chamada (sem login): horários livres e pré-reserva
   app.all("/api/video-call", (req, res) => {
     handleVideoCall(req, res);
+  });
+
+  // Deslocamento dos eventos (área do agente; exige código de acesso): km por trecho via Google Maps
+  app.all("/api/travel-route", (req, res) => {
+    handleTravelRoute(req, res);
   });
 
   app.all("/api/alexa", (req, res) => {
