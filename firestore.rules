@@ -341,6 +341,15 @@ service cloud.firestore {
     }
 
 
+    // Fit (docs/fit.md): dados pessoais de saúde em users/{uid}/..., fora do alcance dos demais administradores.
+    // Só o próprio dono (administrador) lê; ninguém grava pelo cliente: a escrita é do servidor (Admin SDK, /api/fit-ingest).
+    // Qualquer outro caminho sob users/ continua sem regra, ou seja, negado.
+    match /users/{uid}/fitDaily/{day} {
+      allow read: if isAdmin() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+
     // Área /agente-hdc (sem login): roteiro e playlist com leitura pública; só administradores editam.
     match /agentSteps/{stepId} {
       allow read: if true;
