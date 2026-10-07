@@ -1,4 +1,4 @@
-import type { TravelDefault, TravelInput, TravelSummary } from '../services/travelCost.js';
+import type { TravelDayKm, TravelDefault, TravelInput } from '../services/travelCost.js';
 
 export type TravelErrorCode = 'not_configured' | 'stop_not_configured' | 'address_not_found' | 'invalid_date' | 'events_unavailable' | 'no_route' | 'auth' | 'rate_limited' | 'unavailable' | 'api_error';
 export class TravelRouteError extends Error { code: TravelErrorCode; detail?: unknown; constructor(code: TravelErrorCode, opts?: { label?: string; detail?: unknown }); }
@@ -11,10 +11,14 @@ export function readTravelConfig(env?: Record<string, string | undefined>): Trav
 export function codeMatches(provided: unknown, expected: string): boolean;
 export function geocodeAddress(address: string, opts: { apiKey: string; fetchImpl?: typeof fetch; label?: string }): Promise<{ formatted: string; lat: number; lng: number; placeId: string; precise: boolean }>;
 export function computeLegsMeters(points: { lat: number; lng: number }[], opts: { apiKey: string; fetchImpl?: typeof fetch }): Promise<number[]>;
-export interface TravelResult {
-  summary: TravelSummary;
-  /** Endereço entendido pelo Google para cada ponto digitado pelo agente. */
+export interface TravelDayResult extends TravelDayKm {
+  /** Endereço entendido pelo Google para cada ponto digitado pelo agente neste dia. */
   resolved: { label: string; address: string; precise: boolean }[];
+}
+export interface TravelResult {
+  days: TravelDayResult[];
+  kmRate: number;
+  eventFee: number;
   needsConfirmation: boolean;
   /** Base do link wa.me do destinatário (sem texto); null se o número não estiver configurado. */
   whatsappBase: string | null;

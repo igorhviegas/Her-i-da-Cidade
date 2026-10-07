@@ -2,8 +2,10 @@ import type { TravelDayEvent, TravelResult } from '../functions/travel-route.js'
 
 export type { TravelDayEvent, TravelResult };
 
-/** Corpo do cálculo em /api/travel-route (ver validateTravelInput): start/end ausentes = padrão; stop null = sem parada, ausente = padrão. */
-export interface TravelRequest { events: string[]; start?: string; end?: string; stop?: string | null; kmRate: string; eventFee: string }
+/** Um dia do cálculo (ver validateTravelInput): start/end ausentes = padrão; stop null = sem parada, ausente = padrão. */
+export interface TravelDayRequest { date: string; events: string[]; start?: string; end?: string; stop?: string | null }
+/** Corpo do cálculo em /api/travel-route: um ou mais dias somados em um total só. */
+export interface TravelRequest { days: TravelDayRequest[]; kmRate: string; eventFee: string }
 
 /** `unauthorized` = o código de acesso foi recusado (a tela pede o código de novo). */
 export class TravelRequestError extends Error {

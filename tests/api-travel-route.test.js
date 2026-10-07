@@ -19,18 +19,22 @@ test('somente POST, servidor configurado e código correto; nada vai ao Google a
 });
 
 test('entrada inválida é recusada (400) sem chamar o Google', async () => {
-  for (const over of [{ events: [] }, { events: ['ab'] }, { kmRate: '' }, { eventFee: '-5' }]) {
+  const dia = { events: ['Rua das Flores 10, Betim'] };
+  for (const over of [{ events: [] }, { events: ['ab'] }, { kmRate: '' }, { eventFee: '-5' }, { days: [] }, { days: [dia, { events: [] }] }, { days: Array(8).fill(dia) }]) {
     const res = await call(post(over), { calculate: never });
     assert.deepEqual([res.statusCode, res.body.error.code], [400, 'invalid_request']);
   }
 });
 
-test('sucesso: usa a entrada validada e devolve o resultado', async () => {
+test('sucesso: usa a entrada validada e devolve o resultado (um dia no formato antigo e vários dias)', async () => {
   let received;
-  const calculate = async (args) => { received = args; return { summary: { total: 1 }, whatsapp: { text: 't', url: null } }; };
-  const res = await call(post({ stop: false }), { calculate });
-  assert.deepEqual(res.body, { ok: true, summary: { total: 1 }, whatsapp: { text: 't', url: null } });
-  assert.deepEqual([received.input.events, received.input.useStop, received.input.kmRate, received.input.eventFee], [['Rua das Flores 10, Betim'], false, 1.9, 115]);
+  const calculate = async (args) => { received = args; return { days: [], whatsappBase: null }; };
+  const um = await call(post({ stop: false }), { calculate });
+  assert.deepEqual(um.body, { ok: true, days: [], whatsappBase: null });
+  assert.deepEqual([received.input.days.length, received.input.days[0].events, received.input.days[0].useStop, received.input.kmRate, received.input.eventFee], [1, ['Rua das Flores 10, Betim'], false, 1.9, 115]);
+  const dias = await call({ method: 'POST', headers: { 'x-travel-code': 'codigo-secreto' }, body: { kmRate: '2', eventFee: '100', days: [{ date: '2026-10-10', events: ['Rua A 10, Betim'] }, { date: '2026-10-11', events: ['Rua B 20, Betim'], stop: false }] } }, { calculate });
+  assert.equal(dias.statusCode, 200);
+  assert.deepEqual(received.input.days.map((d) => [d.date, d.useStop]), [['2026-10-10', true], ['2026-10-11', false]]);
 });
 
 test('erros do Google viram status e mensagem próprios; falha inesperada não vaza detalhes', async () => {

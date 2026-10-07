@@ -6,7 +6,7 @@
 // agente digitou.
 
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { buildSequence, summarizeTravel, whatsAppBase } from '../services/travelCost.js';
+import { buildSequence, metersToKm, whatsAppBase } from '../services/travelCost.js';
 import { isValidDateInput } from '../services/eventForm.js';
 import { orderEventSlot } from './event-missions.js';
 import { endOfDay, startOfDay } from './missions-core.js';
@@ -124,48 +124,55 @@ export async function computeLegsMeters(points, { apiKey, fetchImpl = fetch }) {
 }
 
 /**
- * Calcula o deslocamento. `input` = resultado de validateTravelInput. Devolve o que a tela precisa:
- * trechos com km, resumo financeiro, endereços entendidos (só dos digitados), avisos e a base do link do WhatsApp
- * (o texto é montado na tela, que aplica a data e os ajustes de km do agente).
+ * Calcula o deslocamento de um ou mais dias (cada dia é uma viagem própria; uma consulta de rota por dia).
+ * `input` = resultado de validateTravelInput. Devolve o que a tela precisa: por dia, os trechos em km e os endereços
+ * entendidos (só dos digitados); e avisos e a base do link do WhatsApp. O total, os ajustes de km do agente e o texto
+ * são montados na tela (summarizeTrip).
  */
 export async function calculateTravel({ input, config, fetchImpl = fetch, now = new Date() }) {
-  const sequence = buildSequence(input, config.defaults);
-  if (!sequence) throw new TravelRouteError('stop_not_configured');
+  const sequences = input.days.map((day) => buildSequence(day, config.defaults));
+  if (sequences.some((sequence) => !sequence)) throw new TravelRouteError('stop_not_configured');
+  const many = input.days.length > 1;
   const creds = { apiKey: config.apiKey, fetchImpl };
 
-  // Cada endereço distinto é consultado uma vez (a parada aparece na ida e na volta).
-  const unique = [...new Set(sequence.map((p) => p.address))];
-  const geocoded = new Map();
-  await Promise.all(unique.map(async (address) => {
-    const label = sequence.find((p) => p.address === address).label;
-    geocoded.set(address, await geocodeAddress(address, { ...creds, label }));
+  // Cada endereço distinto é consultado uma vez em todos os dias (padrões, parada na ida e na volta, mesmo local em dois dias).
+  const firstUse = new Map(); // endereço -> rótulo do primeiro ponto que o usa (para a mensagem de erro)
+  sequences.forEach((sequence, d) => sequence.forEach((p) => {
+    if (!firstUse.has(p.address)) firstUse.set(p.address, many ? `${p.label} (dia ${d + 1})` : p.label);
   }));
+  const geocoded = new Map();
+  await Promise.all([...firstUse].map(async ([address, label]) => { geocoded.set(address, await geocodeAddress(address, { ...creds, label })); }));
   const placeOf = (point) => geocoded.get(point.address);
 
-  // Pontos consecutivos no mesmo lugar não vão para a rota: o trecho vale 0 km.
-  const sameSpot = (a, b) => a.lat === b.lat && a.lng === b.lng;
-  const routePoints = [placeOf(sequence[0])];
-  const legMeters = new Array(sequence.length - 1).fill(0);
-  const routeLegOf = []; // índice do trecho da sequência -> índice do trecho na rota
-  for (let i = 1; i < sequence.length; i += 1) {
-    const previous = routePoints[routePoints.length - 1];
-    const current = placeOf(sequence[i]);
-    if (!sameSpot(previous, current)) { routePoints.push(current); routeLegOf[i - 1] = routePoints.length - 2; }
-  }
-  if (routePoints.length > 1) {
-    const meters = await computeLegsMeters(routePoints, creds);
-    routeLegOf.forEach((routeLeg, i) => { legMeters[i] = meters[routeLeg]; });
-  }
-
-  const legs = legMeters.map((meters, i) => ({ from: sequence[i].label, to: sequence[i + 1].label, meters }));
-  const summary = summarizeTravel({ legs, kmRate: input.kmRate, eventFee: input.eventFee, eventCount: input.events.length });
-  const resolved = sequence
-    .filter((p, i) => p.custom && (p.role !== 'stop' || sequence.findIndex((q) => q.role === 'stop') === i)) // a parada repetida aparece uma vez
-    .map((p) => ({ label: p.label, address: placeOf(p).formatted, precise: placeOf(p).precise }));
+  const days = await Promise.all(sequences.map(async (sequence, d) => {
+    // Pontos consecutivos no mesmo lugar não vão para a rota: o trecho vale 0 km.
+    const sameSpot = (a, b) => a.lat === b.lat && a.lng === b.lng;
+    const routePoints = [placeOf(sequence[0])];
+    const legMeters = new Array(sequence.length - 1).fill(0);
+    const routeLegOf = []; // índice do trecho da sequência -> índice do trecho na rota
+    for (let i = 1; i < sequence.length; i += 1) {
+      const previous = routePoints[routePoints.length - 1];
+      const current = placeOf(sequence[i]);
+      if (!sameSpot(previous, current)) { routePoints.push(current); routeLegOf[i - 1] = routePoints.length - 2; }
+    }
+    if (routePoints.length > 1) {
+      const meters = await computeLegsMeters(routePoints, creds);
+      routeLegOf.forEach((routeLeg, i) => { legMeters[i] = meters[routeLeg]; });
+    }
+    return {
+      date: input.days[d].date,
+      eventCount: input.days[d].events.length,
+      legs: legMeters.map((meters, i) => ({ from: sequence[i].label, to: sequence[i + 1].label, km: metersToKm(meters) })),
+      resolved: sequence
+        .filter((p, i) => p.custom && (p.role !== 'stop' || sequence.findIndex((q) => q.role === 'stop') === i)) // a parada repetida aparece uma vez
+        .map((p) => ({ label: p.label, address: placeOf(p).formatted, precise: placeOf(p).precise })),
+    };
+  }));
   return {
-    summary,
-    resolved,
-    needsConfirmation: resolved.some((p) => !p.precise),
+    days,
+    kmRate: input.kmRate,
+    eventFee: input.eventFee,
+    needsConfirmation: days.some((day) => day.resolved.some((p) => !p.precise)),
     whatsappBase: whatsAppBase(config.whatsappNumber),
     calculatedAt: now.toISOString(),
   };

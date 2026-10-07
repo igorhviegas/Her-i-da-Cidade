@@ -83,10 +83,12 @@ test('cálculo completo: trechos na ordem, parada consultada uma vez, endereços
   const result = await calculateTravel({ input: input(), config, fetchImpl, now: new Date('2026-10-07T12:00:00Z') });
   assert.equal(calls.routes.length, 1);
   assert.deepEqual([...calls.geocode].sort(), ['Evento dois 20', 'Evento um 10', 'SECRETO-INICIO', 'SECRETO-PARADA']); // 4 consultas para 6 pontos
-  assert.deepEqual(result.summary.legs.map((l) => `${l.from}>${l.to}`), ['Casa A>Casa B', 'Casa B>Evento 1', 'Evento 1>Evento 2', 'Evento 2>Casa B', 'Casa B>Casa A']);
-  assert.deepEqual(result.summary.legs.map((l) => l.km), [1, 2, 3, 4, 5]);
-  assert.deepEqual([result.summary.totalKm, result.summary.travelCost, result.summary.feesTotal, result.summary.total], [15, 30, 200, 230]);
-  assert.deepEqual(result.resolved.map((p) => p.label), ['Evento 1', 'Evento 2']);
+  assert.equal(result.days.length, 1);
+  const [dia] = result.days;
+  assert.deepEqual(dia.legs.map((l) => `${l.from}>${l.to}`), ['Casa A>Casa B', 'Casa B>Evento 1', 'Evento 1>Evento 2', 'Evento 2>Casa B', 'Casa B>Casa A']);
+  assert.deepEqual(dia.legs.map((l) => l.km), [1, 2, 3, 4, 5]);
+  assert.deepEqual([dia.eventCount, result.kmRate, result.eventFee], [2, 2, 100]);
+  assert.deepEqual(dia.resolved.map((p) => p.label), ['Evento 1', 'Evento 2']);
   assert.equal(result.needsConfirmation, false);
   assert.equal(result.whatsappBase, 'https://wa.me/5531912345678');
   assert.equal(result.calculatedAt, '2026-10-07T12:00:00.000Z');
@@ -97,26 +99,58 @@ test('cálculo completo: trechos na ordem, parada consultada uma vez, endereços
 
 test('cálculo sem parada, com endereço digitado impreciso e com outra parada', async () => {
   const semParada = await calculateTravel({ input: input({ stop: false }), config, fetchImpl: fakeGoogle().fetchImpl });
-  assert.deepEqual(semParada.summary.legs.map((l) => `${l.from}>${l.to}`), ['Casa A>Evento 1', 'Evento 1>Evento 2', 'Evento 2>Casa A']);
+  assert.deepEqual(semParada.days[0].legs.map((l) => `${l.from}>${l.to}`), ['Casa A>Evento 1', 'Evento 1>Evento 2', 'Evento 2>Casa A']);
 
   const vago = fakeGoogle({ geocode: { 'Evento dois 20': [4, 4, 'APPROXIMATE'] } });
   const impreciso = await calculateTravel({ input: input(), config, fetchImpl: vago.fetchImpl });
   assert.equal(impreciso.needsConfirmation, true);
-  assert.deepEqual(impreciso.resolved.map((p) => p.precise), [true, false]);
+  assert.deepEqual(impreciso.days[0].resolved.map((p) => p.precise), [true, false]);
 
   const outra = await calculateTravel({ input: input({ stop: 'Rua Outra 99' }), config, fetchImpl: fakeGoogle({ geocode: { 'Rua Outra 99': [9, 9] } }).fetchImpl });
-  assert.deepEqual(outra.resolved.map((p) => p.label), ['Parada', 'Evento 1', 'Evento 2']);
+  assert.deepEqual(outra.days[0].resolved.map((p) => p.label), ['Parada', 'Evento 1', 'Evento 2']);
+});
+
+test('vários dias: uma rota por dia, endereços repetidos consultados uma vez, cada dia parte do ponto de partida', async () => {
+  const { fetchImpl, calls } = fakeGoogle({ geocode: { 'Evento três 30': [5, 5], 'Evento quatro 40': [6, 6] } });
+  const dias = validateTravelInput({
+    days: [
+      { date: '2026-10-10', events: ['Evento um 10', 'Evento dois 20'] },
+      { date: '2026-10-11', events: ['Evento dois 20', 'Evento três 30'], stop: false }, // repete o endereço do dia anterior, sem parada
+      { date: '2026-10-12', events: ['Evento quatro 40'], start: 'Evento um 10' },
+    ],
+    kmRate: '2', eventFee: '100',
+  }).value;
+  const result = await calculateTravel({ input: dias, config, fetchImpl });
+  assert.equal(calls.routes.length, 3);
+  assert.deepEqual([...calls.geocode].sort(), ['Evento dois 20', 'Evento quatro 40', 'Evento três 30', 'Evento um 10', 'SECRETO-INICIO', 'SECRETO-PARADA']); // 6 consultas, sem repetir
+  assert.deepEqual(result.days.map((d) => [d.date, d.eventCount, d.legs.length]), [['2026-10-10', 2, 5], ['2026-10-11', 2, 3], ['2026-10-12', 1, 4]]);
+  assert.deepEqual(result.days[1].legs.map((l) => `${l.from}>${l.to}`), ['Casa A>Evento 1', 'Evento 1>Evento 2', 'Evento 2>Casa A']);
+  assert.deepEqual(result.days.map((d) => d.legs[0].from), ['Casa A', 'Casa A', 'Ponto de partida']); // o dia 3 partiu de outro endereço
+  assert.equal(/SECRETO/.test(JSON.stringify(result)), false);
+});
+
+test('vários dias: erro de endereço diz de qual dia; um dia impreciso pede conferência de tudo', async () => {
+  const dias = (extra = {}) => validateTravelInput({ days: [{ events: ['Evento um 10'] }, { events: ['Evento dois 20'] }], kmRate: '2', eventFee: '100', ...extra }).value;
+  const g = fakeGoogle({ geocode: { 'Evento dois 20': null } });
+  await assert.rejects(() => calculateTravel({ input: dias(), config, fetchImpl: g.fetchImpl }), (e) => e.code === 'address_not_found' && /Evento 1 \(dia 2\)/.test(e.message));
+  assert.equal(g.calls.routes.length, 0);
+  const vago = fakeGoogle({ geocode: { 'Evento dois 20': [4, 4, 'APPROXIMATE'] } });
+  const result = await calculateTravel({ input: dias(), config, fetchImpl: vago.fetchImpl });
+  assert.equal(result.needsConfirmation, true);
+  assert.deepEqual(result.days.map((d) => d.resolved.every((p) => p.precise)), [true, false]);
+  const semParadaPadrao = readTravelConfig({ ...ENV, TRAVEL_STOP_ADDRESS: '' });
+  await assert.rejects(() => calculateTravel({ input: dias({ days: [{ events: ['Evento um 10'], stop: false }, { events: ['Evento dois 20'] }] }), config: semParadaPadrao, fetchImpl: fakeGoogle().fetchImpl }), { code: 'stop_not_configured' });
 });
 
 test('pontos no mesmo lugar não vão para a rota e valem 0 km; tudo no mesmo lugar nem chama a rota', async () => {
   const mesmo = fakeGoogle({ geocode: { 'Evento um 10': [1, 1] } }); // evento 1 = partida
   const noMesmoLugar = await calculateTravel({ input: input({ stop: false, events: ['Evento um 10'] }), config, fetchImpl: mesmo.fetchImpl });
   assert.equal(mesmo.calls.routes.length, 0);
-  assert.equal(noMesmoLugar.summary.totalKm, 0);
+  assert.deepEqual(noMesmoLugar.days[0].legs.map((l) => l.km), [0, 0]);
 
   const parcial = fakeGoogle({ geocode: { 'Evento um 10': [2, 2] } }); // evento 1 = parada
   const result = await calculateTravel({ input: input(), config, fetchImpl: parcial.fetchImpl });
-  assert.deepEqual(result.summary.legs.map((l) => l.km), [1, 0, 2, 3, 4]); // Casa B → Evento 1 = 0 km; a rota teve 4 trechos
+  assert.deepEqual(result.days[0].legs.map((l) => l.km), [1, 0, 2, 3, 4]); // Casa B → Evento 1 = 0 km; a rota teve 4 trechos
   assert.equal(parcial.calls.routes[0].body.intermediates.length, 3);
 });
 
