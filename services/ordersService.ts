@@ -11,7 +11,7 @@ import { activityRefs, prepareActivityLog } from "./activityLog";
 import { StockError, isPresentialService, type ConsumptionLine } from "./stockCalculations.js";
 import { prepareOrderConsumption, prepareOrderReversal } from "./stockTransactions.js";
 import { currentActor } from "./stockService";
-import { editingCostFields } from "./financeCalculations.js";
+import { editingCostFields, orderValue } from "./financeCalculations.js";
 import { LEDGER_COLLECTION, ledgerId, ledgerIdsFor, planAdjustments, planCompletion, planEntry } from "./eventFinance.js";
 
 export const ORDERS_COLLECTION = "orders";
@@ -221,7 +221,7 @@ async function setCompletedOrder(reference: ReturnType<typeof doc>, payload: Rec
   await runTransaction(firestore, async (transaction) => {
     const refs = activityRefs(firestore, 'order_completed', reference.id);
     const record = await prepareActivityLog(transaction, refs, {
-      type: 'order_completed', refId: reference.id, occurredAt, difficultyKey: `service_${payload.serviceId}`, meta: { serviceId: payload.serviceId, value: payload.totalPaid },
+      type: 'order_completed', refId: reference.id, occurredAt, difficultyKey: `service_${payload.serviceId}`, meta: { serviceId: payload.serviceId, value: payload.totalPaid, revenue: payload.totalPaid, cost: 0 },
     });
     transaction.set(reference, payload);
     if (record) transaction.set(refs.logRef, record);
@@ -413,11 +413,17 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     // Primeira conclusão do pedido vira registro permanente (ID por pedido): reabrir e concluir de novo, editar ou excluir o
     // pedido não altera nem apaga o histórico, e a dificuldade fica congelada com a configuração vigente neste instante.
     const serviceId = updates.serviceId ?? currentData.serviceId;
+    // O que esta conclusão lança no Financeiro (para o aviso de XP/faturamento): evento = 2ª parcela e despesa do livro; demais = valor do pedido e custo de edição.
+    const booked = (kind: string) => ledgerWrites.filter((write) => write.record.kind === kind).reduce((sum, write) => sum + (Number(write.record.amount) || 0), 0);
+    const viaLedger = Boolean(currentData.eventLedger && currentData.eventForm);
+    const completionValue = orderValue({ ...currentData, ...updates }); // sempre um número (Firestore recusa undefined)
+    const completionRevenue = viaLedger ? booked('final') : completionValue;
+    const completionCost = viaLedger ? booked('cost') : editingCostFields(serviceId, currentData).editingCost ?? 0;
     const activityRefsForOrder = updates.status === 'completed' && currentData.status !== 'completed' ? activityRefs(firestore, 'order_completed', id) : null;
     const activityRecord = activityRefsForOrder
       ? await prepareActivityLog(transaction, activityRefsForOrder, {
         type: 'order_completed', refId: id, occurredAt: updates.completedAt instanceof Date ? updates.completedAt : new Date(),
-        difficultyKey: `service_${serviceId}`, meta: { serviceId, value: updates.totalPaid ?? currentData.totalPaid, ...(currentData.scriptId ? { scriptId: currentData.scriptId } : {}) },
+        difficultyKey: `service_${serviceId}`, meta: { serviceId, value: completionValue, revenue: completionRevenue, cost: completionCost, ...(currentData.scriptId ? { scriptId: currentData.scriptId } : {}) },
       })
       : null;
 

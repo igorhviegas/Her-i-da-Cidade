@@ -1,6 +1,6 @@
 import { collection, doc, getCountFromServer, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { BASELINE_PATH, buildBaseline, levelInfo, totalXp, type XpBaseline } from '../functions/xp.js';
+import { BASELINE_PATH, buildBaseline } from '../functions/xp.js';
 import { ACTIVITY_LOG_COLLECTION } from './activityLog';
 import { ORDERS_COLLECTION } from './ordersService';
 import { CONTENT_SCRIPTS_COLLECTION } from './contentScriptsService';
@@ -13,17 +13,6 @@ function firestore() {
 
 const rows = async (name: string, ...constraints: ReturnType<typeof where>[]) =>
   (await getDocs(query(collection(firestore(), name), ...constraints))).docs.map((d) => ({ ...d.data(), id: d.id }) as Record<string, any>);
-
-export type XpState = { baseline: XpBaseline | null; total: number; fromEvents: number; level: ReturnType<typeof levelInfo> | null };
-
-/** Linha de base + eventos do activityLog posteriores a ela (functions/xp.js). Sem linha de base o XP ainda não foi ativado. */
-export async function loadXp(): Promise<XpState> {
-  const snapshot = await getDoc(doc(firestore(), ...BASELINE_PATH));
-  const baseline = snapshot.exists() ? (snapshot.data() as XpBaseline) : null;
-  if (!baseline) return { baseline: null, total: 0, fromEvents: 0, level: null };
-  const result = totalXp(baseline, await rows(ACTIVITY_LOG_COLLECTION))!;
-  return { baseline, total: result.total, fromEvents: result.events, level: levelInfo(result.total) };
-}
 
 /** XP retroativo calculado com os dados que existem agora (somente leitura; não grava nada). */
 export async function previewBaseline() {

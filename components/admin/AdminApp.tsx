@@ -3,6 +3,7 @@ import { useRouter } from '../../lib/router';
 import { AdminLogin } from './AdminLogin';
 import { AdminDashboard } from './AdminDashboard';
 import { ProtectedAdminRoute } from './ProtectedAdminRoute';
+import { XpProvider } from '../../context/XpContext';
 import { AdminVideosPage } from './AdminVideosPage';
 
 export const AdminApp: React.FC = () => {
@@ -16,7 +17,9 @@ export const AdminApp: React.FC = () => {
   // Todas as demais rotas /admin e /admin/dashboard são protegidas
   return (
     <ProtectedAdminRoute>
-      <AdminDashboard />
+      <XpProvider>
+        <AdminDashboard />
+      </XpProvider>
     </ProtectedAdminRoute>
   );
 };

@@ -26,3 +26,8 @@ Nível: o nível 1 custa 500 XP e cada nível custa 25% a mais que o anterior (`
 3. Abrir `/admin/perfil` e confirmar "Ativar com este XP".
 
 Limites conhecidos: o histórico de missões, tarefas e metas só existe desde 02/10/2026; o histórico do Instagram é o último valor por publicação (não há série temporal); falha ao calcular o XP numa sincronização do Instagram não derruba a sincronização e aquela rodada de XP se perde.
+
+## Janelinhas de ganho e menu do perfil
+- `context/XpContext.tsx` acompanha ao vivo `xpBaseline/main` e o `activityLog`. Cada evento **novo** (pedido, missão, tarefa, meta, roteiro pronto, conteúdo publicado) abre uma janelinha por 7 s com o XP e, quando mexe no Financeiro, o **faturado em verde** e o **custo em vermelho** (valores reais do Financeiro, sem moeda fictícia). Missões, tarefas e metas só têm XP. O Instagram é automático e não abre janelinha; o histórico carregado ao abrir o painel também não. Respeita "ocultar valores".
+- O que cada conclusão lança vem no evento (`meta.revenue` e `meta.cost`): pedido comum = valor do pedido e custo de edição (Vídeo Personalizado); evento presencial = 2ª parcela e despesa do livro (a entrada já foi faturada na criação). Pedido sem valor ou já contado na linha de base não avisa.
+- O topo mostra o **nível** (e uma barra) ao lado do avatar. Nome, e-mail, "Meu perfil" e "Sair" ficam no menu aberto pelo avatar (`ProfileMenu.tsx`); o "Sair" do menu lateral do celular continua.

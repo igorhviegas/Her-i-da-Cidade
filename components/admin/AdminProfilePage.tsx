@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Camera, CheckCircle2, Coins, Eye, EyeOff, Flag, Loader2, Pencil, ShoppingBag, Sparkles, Swords, TrendingDown, Zap } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { subscribeCompletedOrders, listFixedExpenses } from '../../services/financeService';
-import { activateXp, loadProfileCounts, loadXp, previewBaseline, type XpState } from '../../services/xpService';
+import { useXp } from '../../context/XpContext';
+import { activateXp, loadProfileCounts, previewBaseline } from '../../services/xpService';
 import {
   buildRevenueEntries, editingCostForMonth, eventCostForMonth, expensesForMonth, monthKeyOf, shiftMonth, type FixedExpense,
 } from '../../services/financeCalculations.js';
@@ -44,7 +45,7 @@ export const AdminProfilePage: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
-  const [xp, setXp] = useState<XpState | null>(null);
+  const xp = useXp(); // ao vivo: ativar o XP ou ganhar uma atividade atualiza a tela sozinho
   const [counts, setCounts] = useState<Awaited<ReturnType<typeof loadProfileCounts>> | null>(null);
   const [orders, setOrders] = useState<any[] | null>(null);
   const [fixed, setFixed] = useState<FixedExpense[] | null>(null);
@@ -53,9 +54,7 @@ export const AdminProfilePage: React.FC = () => {
   const [preview, setPreview] = useState<Awaited<ReturnType<typeof previewBaseline>> | null>(null);
   const [activating, setActivating] = useState(false);
 
-  const reloadXp = () => loadXp().then(setXp).catch((e) => setLoadError(e?.message ?? 'Falha ao carregar o XP.'));
   useEffect(() => {
-    void reloadXp();
     loadProfileCounts().then(setCounts).catch((e) => setLoadError(e?.message ?? 'Falha ao carregar o perfil.'));
     listFixedExpenses().then(setFixed).catch((e) => setLoadError(e?.message ?? 'Falha ao carregar os gastos.'));
     return subscribeCompletedOrders(setOrders, (e) => setLoadError(e.message));
@@ -91,11 +90,11 @@ export const AdminProfilePage: React.FC = () => {
   const confirmActivation = async () => {
     if (!preview) return;
     setActivating(true); setLoadError(null);
-    try { await activateXp(preview); setPreview(null); await reloadXp(); } catch (e: any) { setLoadError(e?.message ?? 'Falha ao gravar o XP inicial (as regras do Firestore já foram publicadas?).'); } finally { setActivating(false); }
+    try { await activateXp(preview); setPreview(null); } catch (e: any) { setLoadError(e?.message ?? 'Falha ao gravar o XP inicial (as regras do Firestore já foram publicadas?).'); } finally { setActivating(false); }
   };
 
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'Administrador';
-  const level = xp?.level;
+  const level = xp.level;
   const previewLevel = preview ? levelInfo(preview.total) : null;
 
   return (
@@ -139,7 +138,7 @@ export const AdminProfilePage: React.FC = () => {
         {/* Progressão */}
         <section className={cardClass}>
           <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-amber-300"><Zap className="h-4 w-4" aria-hidden />Experiência</div>
-          {!xp ? (
+          {!xp.ready ? (
             <p className="mt-4 text-sm text-white/50">Carregando…</p>
           ) : !level ? (
             <div className="mt-3 space-y-3">
