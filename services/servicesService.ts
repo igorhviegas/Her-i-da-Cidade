@@ -15,7 +15,8 @@ import {
   writeBatch
 } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
-import { Service, FirestoreService, OrderStatus, ProductionType } from "../types";
+import { Service, ServiceFaqItem, FirestoreService, OrderStatus, ProductionType } from "../types";
+import { normalizeFaq } from "./serviceFaq.js";
 import { SERVICES as FALLBACK_SERVICES } from "../constants";
 import { getConfiguredWhatsAppUrl } from "./siteConfigService";
 import { isValidWhatsAppUrl, planCreateWhatsApp, planUpdateWhatsApp, planAutoLinkSync } from "./serviceWhatsApp.js";
@@ -97,6 +98,7 @@ export interface CreateServiceInput {
   autoComplete?: boolean;
   defaultDeliveryDays?: number;
   deliveryMessage?: string;
+  faq?: ServiceFaqItem[];
 }
 
 export interface UpdateServiceInput {
@@ -116,6 +118,8 @@ export interface UpdateServiceInput {
   defaultDeliveryDays?: number | null;
   /** Vazio/null remove a personalização (volta ao padrão do tipo de serviço). */
   deliveryMessage?: string | null;
+  /** Substitui a lista inteira; lista vazia (ou só com itens incompletos) remove o campo. */
+  faq?: ServiceFaqItem[];
 }
 
 /**
@@ -162,6 +166,7 @@ export function mapDocToService(docId: string, data: any): Service {
     ...(data.defaultDeliveryDays !== undefined ? { defaultDeliveryDays: data.defaultDeliveryDays } : {}),
     ...(typeof data.deliveryMessage === 'string' && data.deliveryMessage.trim() ? { deliveryMessage: data.deliveryMessage } : {}),
     ...(data.internalOnly === true ? { internalOnly: true } : {}),
+    ...(normalizeFaq(data.faq).length ? { faq: normalizeFaq(data.faq) } : {}),
   };
 }
 
@@ -526,6 +531,7 @@ export async function createService(input: CreateServiceInput): Promise<Service>
     ...(input.autoComplete !== undefined ? { autoComplete: input.autoComplete } : {}),
     ...(input.defaultDeliveryDays !== undefined ? { defaultDeliveryDays: input.defaultDeliveryDays } : {}),
     ...(input.deliveryMessage?.trim() ? { deliveryMessage: input.deliveryMessage.trim() } : {}),
+    ...(normalizeFaq(input.faq).length ? { faq: normalizeFaq(input.faq) } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -579,6 +585,11 @@ export async function updateService(id: string, updates: UpdateServiceInput): Pr
   if (updates.deliveryMessage !== undefined) {
     const message = updates.deliveryMessage?.trim();
     payload.deliveryMessage = message ? message : deleteField();
+  }
+
+  if (updates.faq !== undefined) {
+    const faq = normalizeFaq(updates.faq);
+    payload.faq = faq.length ? faq : deleteField();
   }
 
   for (const field of ["generateOrder", "productionType", "initialStatus", "autoComplete", "defaultDeliveryDays"] as const) {

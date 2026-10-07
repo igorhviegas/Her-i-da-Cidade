@@ -16,6 +16,7 @@ const MENU_ITEMS: MenuItem[] = [
   { label: "Sobre nós", href: "#about", type: "anchor" },
   { label: "Vídeo chamada", href: "#booking", type: "anchor" },
   { label: "Depoimentos", href: "#feedbacks", type: "anchor" },
+  { label: "Dúvidas", href: "/duvidas", type: "route" },
   { label: "Contatos", href: "#contact", type: "anchor" },
 ];
 
@@ -114,6 +115,16 @@ export const Navbar: React.FC = () => {
             </a>
             <a href="#about" className="hover:text-white transition-colors">
               Sobre
+            </a>
+            <a
+              href="/duvidas"
+              onClick={(e) => {
+                e.preventDefault();
+                navigate('/duvidas');
+              }}
+              className="hover:text-white transition-colors"
+            >
+              Dúvidas
             </a>
             <a
               href="/videos"
