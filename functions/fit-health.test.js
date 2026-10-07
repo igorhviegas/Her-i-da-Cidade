@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseHealthExport, writeFitDaily } from './fit-health.js';
+import { describeInvalidPayload, parseHealthExport, writeFitDaily } from './fit-health.js';
 
 // Mesma forma do export real do Health Auto Export (v2, resumo diário, só iPhone), com valores fictícios.
 const m = (name, units, data) => ({ name, units, data: data.map(([date, qty]) => ({ date: `${date} 00:00:00 -0300`, qty, source: 'iPhone' })) });
@@ -106,4 +106,17 @@ test('writeFitDaily: um doc por dia em users/{uid}/fitDaily, merge, em lotes; re
   assert.equal(writes[0].ref.path, 'users/uid123/fitDaily/d0');
   assert.deepEqual(writes[0].data, { steps: 0, day: 'd0', source: 'health-auto-export', updatedAt: now });
   assert.deepEqual(writes[0].options, { merge: true });
+});
+
+test('describeInvalidPayload: diz só nome e tipo dos campos, nunca o valor, e aponta o day no tipo errado', () => {
+  const wrongType = describeInvalidPayload({ day: 20261007, steps: 2431, weightKg: '72 kg' });
+  assert.match(wrongType.message, /"day" precisa ser texto.*recebido: número/);
+  assert.deepEqual(wrongType.received, { day: 'número', steps: 'número', weightKg: 'texto' });
+  assert.doesNotMatch(JSON.stringify(wrongType), /20261007|2431|72 kg/); // nenhum valor de saúde na resposta
+  assert.match(describeInvalidPayload({ day: '07/10/2026' }).message, /recebido: texto fora do formato/);
+  assert.match(describeInvalidPayload({ steps: 1 }).message, /Faltou o campo "day"/);
+  assert.match(describeInvalidPayload({ data: {} }).message, /data\.metrics/);
+  assert.deepEqual(describeInvalidPayload(null), { message: 'O corpo precisa ser um JSON (objeto).', received: 'nulo' });
+  assert.equal(describeInvalidPayload([1]).received, 'lista');
+  assert.equal(Object.keys(describeInvalidPayload(Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`k${i}`, i]))).received).length, 20); // limita o tamanho
 });

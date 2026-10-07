@@ -96,3 +96,19 @@ export async function writeFitDaily(database, uid, days, now = new Date()) {
   }
   return entries.length;
 }
+
+const typeName = (v) => (v === null ? 'nulo' : Array.isArray(v) ? 'lista' : { number: 'número', string: 'texto', boolean: 'booleano', object: 'objeto' }[typeof v] ?? typeof v);
+
+/**
+ * Explica por que um corpo não foi aceito, dizendo só o NOME e o TIPO de cada campo recebido, nunca o valor (é dado de saúde
+ * e o token vai no cabeçalho). Serve para depurar o Atalho do iPhone, onde um campo no tipo errado é o erro mais comum.
+ */
+export function describeInvalidPayload(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { message: 'O corpo precisa ser um JSON (objeto).', received: typeName(body) };
+  const received = Object.fromEntries(Object.entries(body).slice(0, 20).map(([name, value]) => [name.slice(0, 40), typeName(value)]));
+  const message = 'day' in body
+    ? `O campo "day" precisa ser texto no formato AAAA-MM-DD (recebido: ${typeName(body.day)}${typeof body.day === 'string' ? ' fora do formato ou data inexistente' : ''}). No Atalhos, crie o campo como Texto.`
+    : body.data ? 'Esperado o JSON do Health Auto Export (data.metrics).'
+      : 'Faltou o campo "day" (texto AAAA-MM-DD) do envio simples ou o JSON do Health Auto Export (data.metrics).';
+  return { message, received };
+}

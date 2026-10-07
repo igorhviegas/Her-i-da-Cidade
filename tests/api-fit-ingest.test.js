@@ -63,3 +63,11 @@ test('fit-ingest: falha ao gravar devolve 500 genérico, sem vazar a mensagem do
   assert.equal(res.statusCode, 500);
   assert.doesNotMatch(JSON.stringify(res.body), /xyz|detalhe interno/);
 });
+
+test('fit-ingest: payload inválido devolve 400 com nome e tipo dos campos, sem os valores', async () => {
+  const res = await call(request({ body: { day: 20261007, steps: 2431 } }), { database: fakeDatabase() });
+  assert.equal(res.statusCode, 400);
+  assert.equal(res.body.error.code, 'invalid_payload');
+  assert.deepEqual(res.body.error.received, { day: 'número', steps: 'número' });
+  assert.doesNotMatch(JSON.stringify(res.body), /20261007|2431/);
+});
