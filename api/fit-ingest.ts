@@ -45,8 +45,8 @@ export async function handleFitIngest(
   }
   const parsed = parseHealthExport(payload);
   if (!parsed) {
-    const { message, received } = describeInvalidPayload(payload); // só nomes e tipos dos campos, nunca os valores
-    return send(400, { ok: false, error: { code: 'invalid_payload', message, received } });
+    const { message, received, dayShape } = describeInvalidPayload(payload); // só nomes, tipos e a forma do `day`, nunca os valores
+    return send(400, { ok: false, error: { code: 'invalid_payload', message, received, ...(dayShape ? { dayShape } : {}) } });
   }
 
   try {

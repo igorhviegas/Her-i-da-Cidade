@@ -87,7 +87,7 @@ test('envio simples de um dia (Atalho do iPhone): mesmos campos e limites; texto
 });
 
 test('envio simples: dia inválido ou ausente não é um payload (null); o formato do app continua valendo', () => {
-  for (const day of ['2026-02-31', '07/10/2026', '2026-10-07T00:00:00Z', '', 20261007, undefined]) assert.equal(parseHealthExport({ day, steps: 1 }), null);
+  for (const day of ['2026-02-31', '', 20261007, undefined]) assert.equal(parseHealthExport({ day, steps: 1 }), null);
   assert.equal(parseHealthExport([]), null);
   assert.equal(parseHealthExport({ day: '2026-10-07' }).stats.accepted, 0); // só o dia: nada a gravar
   assert.equal(parseHealthExport(sample).stats.accepted, 6); // export do app inalterado
@@ -119,4 +119,21 @@ test('describeInvalidPayload: diz só nome e tipo dos campos, nunca o valor, e a
   assert.deepEqual(describeInvalidPayload(null), { message: 'O corpo precisa ser um JSON (objeto).', received: 'nulo' });
   assert.equal(describeInvalidPayload([1]).received, 'lista');
   assert.equal(Object.keys(describeInvalidPayload(Object.fromEntries(Array.from({ length: 50 }, (_, i) => [`k${i}`, i]))).received).length, 20); // limita o tamanho
+});
+
+test('day tolerante: ignora marcas invisíveis do iOS e espaços, aceita hora e DD/MM/AAAA; o que não é data continua recusado', () => {
+  const ok = (day) => parseHealthExport({ day, steps: 5 })?.days;
+  const expected = { '2026-10-07': { steps: 5 } };
+  for (const day of ['2026-10-07', '2026-10-07\n', ' 2026-10-07 ', '‎2026-10-07‏', '⁦2026-10-07⁩', '﻿2026-10-07', '2026-10-07 19:06', '2026-10-07T19:06:00-03:00', '07/10/2026', '07/10/2026 19:06', '07/10/2026, 19:06']) {
+    assert.deepEqual(ok(day), expected, JSON.stringify(day));
+  }
+  for (const day of ['31/02/2026', '2026-13-01', '2026-02-30', 'abc', '2026-10-0', '7/10/2026', '2026/10/07', '12026-10-07', '2026-10-07x']) assert.equal(ok(day), undefined, JSON.stringify(day));
+});
+
+test('describeInvalidPayload: dayShape mostra a forma do texto (e caracteres invisíveis), não o valor', () => {
+  const d = describeInvalidPayload({ day: '2031/11/09‎', steps: 1 });
+  assert.equal(d.dayShape, '9999/99/99<U+200E>');
+  assert.doesNotMatch(JSON.stringify(d), /2031|11\/09/);
+  assert.equal('dayShape' in describeInvalidPayload({ day: 5 }), false); // só para texto
+  assert.equal(describeInvalidPayload({ day: 'x'.repeat(100) }).dayShape.length, 40);
 });
