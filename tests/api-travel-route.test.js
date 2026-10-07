@@ -45,3 +45,25 @@ test('erros do Google viram status e mensagem próprios; falha inesperada não v
   assert.deepEqual([inesperado.statusCode, inesperado.body.error.code], [500, 'internal_error']);
   assert.equal(JSON.stringify(inesperado.body).includes('vazou'), false);
 });
+
+const eventsReq = (body = { action: 'events', date: '2026-10-10' }, code = 'codigo-secreto') => ({ method: 'POST', headers: code === null ? {} : { 'x-travel-code': code }, body });
+const dayOrder = { id: 'o1', childName: 'Pedro', eventDate: new Date('2026-10-10T15:00:00Z'), eventForm: { eventTime: '14:00', location: 'Rua A 10, Betim', formType: 'Aniversário' } };
+
+test('eventos do dia: exige o código e valida a data antes de consultar o Firestore', async () => {
+  const listOrdersBetween = never;
+  assert.equal((await call(eventsReq(undefined, null), { listOrdersBetween })).statusCode, 401);
+  assert.equal((await call(eventsReq(undefined, 'outro'), { listOrdersBetween })).statusCode, 401);
+  const semData = await call(eventsReq({ action: 'events' }), { listOrdersBetween });
+  assert.deepEqual([semData.statusCode, semData.body.error.code], [400, 'invalid_date']);
+  assert.equal((await call(eventsReq({ action: 'events', date: '2026-02-31' }), { listOrdersBetween })).statusCode, 400);
+  assert.equal((await call(eventsReq({ action: 'apagar' }), { listOrdersBetween })).statusCode, 400);
+});
+
+test('eventos do dia: devolve só horário, local e tipo; falha do Firestore vira erro genérico', async () => {
+  const ok = await call(eventsReq(), { listOrdersBetween: async () => [dayOrder] });
+  assert.deepEqual(ok.body, { ok: true, date: '2026-10-10', events: [{ time: '14:00', location: 'Rua A 10, Betim', formType: 'Aniversário' }] });
+  assert.equal(ok.headers['cache-control'], 'no-store');
+  const falha = await call(eventsReq(), { listOrdersBetween: async () => { throw new Error('PERMISSION_DENIED projects/segredo'); } });
+  assert.deepEqual([falha.statusCode, falha.body.error.code], [503, 'events_unavailable']);
+  assert.equal(JSON.stringify(falha.body).includes('segredo'), false);
+});

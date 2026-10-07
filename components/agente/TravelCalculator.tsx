@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Copy, KeyRound, Loader2, MessageCircle, Pencil, Plus, TriangleAlert, Undo2, X } from 'lucide-react';
-import { calculateTravelRoute, TravelRequestError, type TravelResult } from '../../services/travelService';
-import { DEFAULT_EVENT_FEE, DEFAULT_KM_RATE, MAX_EVENTS, applyKmOverrides, formatBRL, formatKm, parseKm, travelWhatsAppText, whatsAppLink } from '../../services/travelCost.js';
+import { ArrowDown, ArrowUp, CalendarDays, Copy, KeyRound, Loader2, MessageCircle, Pencil, Plus, TriangleAlert, Undo2, X } from 'lucide-react';
+import { calculateTravelRoute, fetchDayEvents, TravelRequestError, type TravelResult } from '../../services/travelService';
+import { DEFAULT_EVENT_FEE, DEFAULT_KM_RATE, MAX_EVENTS, applyKmOverrides, formatBRL, formatDateKey, formatKm, parseKm, travelWhatsAppText, whatsAppLink } from '../../services/travelCost.js';
 import { moveItem } from '../../services/agentContent.js';
 
 // Cálculo de deslocamento dos eventos (docs/deslocamento.md). Os endereços padrão ficam só no servidor: aqui aparecem como "padrão".
@@ -51,6 +51,9 @@ export const TravelCalculator: React.FC = () => {
   // Km corrigidos à mão (índice do trecho -> km) e o trecho em edição.
   const [overrides, setOverrides] = useState<Record<number, number>>({});
   const [editing, setEditing] = useState<{ index: number; value: string } | null>(null);
+  // Importação dos eventos cadastrados no dia (resultado em `notice`).
+  const [importing, setImporting] = useState(false);
+  const [notice, setNotice] = useState('');
 
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(draft)); } catch { /* sem armazenamento: vale só nesta sessão */ } }, [draft]);
 
@@ -59,7 +62,7 @@ export const TravelCalculator: React.FC = () => {
   const text = useMemo(() => (summary ? travelWhatsAppText(summary, { date }) : ''), [summary, date]);
 
   /** Qualquer alteração invalida o resultado anterior (o valor mostrado sempre corresponde ao que está na tela). */
-  const patch = (changes: Partial<Draft>) => { setDraft((d) => ({ ...d, ...changes })); setResult(null); setAcked(false); setError(''); setOverrides({}); setEditing(null); };
+  const patch = (changes: Partial<Draft>) => { setDraft((d) => ({ ...d, ...changes })); setResult(null); setAcked(false); setError(''); setOverrides({}); setEditing(null); setNotice(''); };
 
   const saveKm = () => {
     if (!editing) return;
@@ -88,6 +91,23 @@ export const TravelCalculator: React.FC = () => {
       if (e instanceof TravelRequestError && e.unauthorized) setDraft((d) => ({ ...d, code: '' })); // código recusado: pede de novo
       setError(e instanceof Error ? e.message : 'Não foi possível calcular agora.');
     } finally { setBusy(false); }
+  };
+
+  /** Preenche os eventos com os cadastrados na data escolhida (ordem de horário). Só traz horário, local e tipo. */
+  const importEvents = async () => {
+    setImporting(true); setError(''); setNotice('');
+    try {
+      const found = await fetchDayEvents(draft.code, date);
+      const day = formatDateKey(date);
+      if (found.length === 0) { setNotice(`Nenhum evento cadastrado em ${day}.`); return; }
+      if (draft.events.some((e) => e.trim()) && !window.confirm(`Substituir os eventos digitados pelos ${found.length} cadastrados em ${day}?`)) return;
+      const used = found.slice(0, MAX_EVENTS);
+      patch({ events: used.map((event) => event.location) });
+      setNotice(`${used.length === 1 ? '1 evento importado' : `${used.length} eventos importados`} de ${day}, em ordem de horário: ${used.map((event) => `${event.time}${event.formType ? ` ${event.formType}` : ''}`).join(' · ')}.${found.length > used.length ? ` Havia ${found.length}; o limite é ${MAX_EVENTS} por cálculo.` : ''} Confira a ordem e os endereços.`);
+    } catch (e) {
+      if (e instanceof TravelRequestError && e.unauthorized) setDraft((d) => ({ ...d, code: '' }));
+      setError(e instanceof Error ? e.message : 'Não foi possível consultar os eventos agora.');
+    } finally { setImporting(false); }
   };
 
   const copy = async () => {
@@ -142,6 +162,14 @@ export const TravelCalculator: React.FC = () => {
         </div>
 
         <div>
+          <label className="block"><span className={heading}>Data dos eventos (importação e início do texto)</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={field} /></label>
+          <button disabled={!date || importing} onClick={importEvents} className={`${btn} mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-blue-400/40 bg-blue-600/15 text-sm font-bold text-blue-100 disabled:opacity-40`}>
+            {importing ? <><Loader2 className="h-4 w-4 animate-spin" />Buscando...</> : <><CalendarDays className="h-4 w-4" />Importar eventos do dia</>}
+          </button>
+          {notice && <p role="status" className="mt-2 rounded-xl bg-white/5 px-3 py-2.5 text-[13px] leading-snug text-white/70">{notice}</p>}
+        </div>
+
+        <div>
           <span className={heading}>Eventos (na ordem do trajeto)</span>
           <ol className="space-y-2">
             {draft.events.map((address, i) => (
@@ -164,8 +192,6 @@ export const TravelCalculator: React.FC = () => {
           <label><span className={heading}>Valor por km (R$)</span><input value={draft.kmRate} onChange={(e) => patch({ kmRate: e.target.value })} inputMode="decimal" className={field} /></label>
           <label><span className={heading}>Cachê por evento (R$)</span><input value={draft.eventFee} onChange={(e) => patch({ eventFee: e.target.value })} inputMode="decimal" className={field} /></label>
         </div>
-
-        <label className="block"><span className={heading}>Data dos eventos (vai no início do texto)</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={field} /></label>
       </div>
 
       {error && <div role="alert" className="flex items-start gap-3 rounded-2xl border border-red-400/50 bg-red-600/20 px-4 py-3 text-[15px] font-semibold text-red-100"><TriangleAlert className="mt-0.5 h-5 w-5 shrink-0" />{error}</div>}
