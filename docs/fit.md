@@ -7,8 +7,17 @@ O servidor grava os totais diários (abaixo) e a tela **Fit** (`/admin/fit`, men
 - Dia sem registro aparece apagado e fica fora das médias: **ausente não é zero**. As séries e médias são puras e testadas (`services/fitDaily.js`).
 - Somente leitura; os dados vêm de `users/{uid}/fitDaily` (`services/fitService.ts`).
 
+## Ciclismo: importar o FIT do MyWhoosh (`components/admin/FitRides.tsx`)
+Botão **Importar FIT** na tela do Fit (aceita vários arquivos). O arquivo é lido **no navegador** (`fit-file-parser`, MIT, carregado só ao importar) e só o **resumo** vai para `users/{uid}/fitRides/{id}`: início (UTC), duração, tempo em movimento, distância, velocidade média (em movimento) e máxima, cadência média (só pedalando). Mostra treinos, km, tempo, velocidade média, km por dia e a lista do período, com opção de apagar.
+- **Onde baixar:** site do MyWhoosh → Perfil → Activity Files (`.fit`). O formato do app pode mudar (um relato diz que a versão 5.3 passou a exportar GPX); GPX não é lido.
+- **Identidade:** `fabricante_série_time_created` (ex.: `mywhoosh_3313379353_20261007T200427Z`) é o id do documento: importar o mesmo arquivo de novo não duplica (a série é do aparelho e se repete; o `time_created` muda por treino).
+- **Recalculado dos registros** (o resumo do arquivo não é confiável: um treino veio com `avg_speed` 0 e não existe `max_speed`).
+- **Não usado:** frequência cardíaca, potência e calorias (zero = sem dado; a potência é estimada pelo QZ e veio 0 num treino com velocidade de 27 km/h), GPS e altitude (do mundo virtual) e cadência máxima (picos de ruído).
+- Só pedaladas (`sport = cycling`); outro esporte é recusado com mensagem.
+- **Ainda não feito:** juntar com o mesmo treino vindo do Apple Saúde (o QZ já grava treinos lá). Plano: início ± 3 min, duração ± 5% e distância ± 5%, mantendo um único registro com as fontes ligadas.
+
 ## Privacidade (`firestore.rules`)
-`match /users/{uid}/fitDaily/{day}`: lê só quem é administrador **e** dono do caminho (`request.auth.uid == uid`); nenhum cliente grava. Outro administrador não lê os dados do dono. Qualquer outro caminho sob `users/` segue negado. Verificado no emulador (14 casos: dono, outro admin, usuário comum, visitante, escrita e outros caminhos); o teste versionado é `tests/firestore-rules-fit.test.js` (`npm run test:rules`). **É preciso publicar o `firestore.rules`** para a tela conseguir ler.
+`match /users/{uid}/fitDaily/{day}`: lê só quem é administrador **e** dono do caminho (`request.auth.uid == uid`); nenhum cliente grava. `fitRides/{id}`: o dono lê, cria (só com os campos do resumo, tipos e limites plausíveis, `createdAt` = horário do servidor e id = `sourceKey`) e apaga; sem edição. O `firestore.rules.txt` é uma cópia exata do `firestore.rules` (há teste que exige isso): atualize os dois juntos. Outro administrador não lê os dados do dono. Qualquer outro caminho sob `users/` segue negado. Verificado no emulador (14 casos: dono, outro admin, usuário comum, visitante, escrita e outros caminhos); o teste versionado é `tests/firestore-rules-fit.test.js` (`npm run test:rules`). **É preciso publicar o `firestore.rules`** para a tela conseguir ler.
 
 ## Fluxo
 Apple Saúde → app **Health Auto Export** (automação REST) → `POST /api/fit-ingest` → `users/{FIT_OWNER_UID}/fitDaily/{AAAA-MM-DD}`.
@@ -49,4 +58,4 @@ Qualquer outra métrica (marcha, velocidade, lances de escada…) é descartada.
 - Na Vercel, `api/` agora tem 11 funções (o plano Hobby limita o total; confirmar o limite vigente).
 
 ## Próximos passos
-Check-ins de academia e funcional, peso manual, upload do FIT do MyWhoosh (histórico de ciclismo), formato de treinos quando houver um real, deduplicação entre fontes (mesma atividade vinda de FIT, Strava e Saúde: chave por fonte + id; entre fontes, esporte + início em UTC + duração).
+Check-ins de academia e funcional, peso manual, ligação do treino do Saúde com o FIT, formato de treinos quando houver um real, deduplicação entre fontes (mesma atividade vinda de FIT, Strava e Saúde: chave por fonte + id; entre fontes, esporte + início em UTC + duração).

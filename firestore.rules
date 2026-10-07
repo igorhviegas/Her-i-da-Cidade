@@ -100,6 +100,24 @@ service cloud.firestore {
         && existsAfter(orderDocumentPath(data.orderId));
     }
 
+    // Resumo de pedalada do Fit (services/fitRide.js): só estes campos, com tipos e limites plausíveis.
+    function validFitRide(rideId, d) {
+      return d.keys().hasAll(['source', 'sourceKey', 'sport', 'virtual', 'startedAt', 'durationSec', 'movingSec', 'distanceKm', 'avgSpeedKmh', 'maxSpeedKmh', 'createdAt'])
+        && d.keys().hasOnly(['source', 'sourceKey', 'sport', 'virtual', 'startedAt', 'durationSec', 'movingSec', 'distanceKm', 'avgSpeedKmh', 'maxSpeedKmh', 'avgCadenceRpm', 'createdAt'])
+        && d.source is string && d.source.size() > 0 && d.source.size() <= 40
+        && d.sourceKey is string && d.sourceKey == rideId && d.sourceKey.size() <= 120
+        && d.sport == 'cycling'
+        && d.virtual is bool
+        && d.startedAt is timestamp
+        && d.durationSec is number && d.durationSec > 0 && d.durationSec <= 86400
+        && d.movingSec is number && d.movingSec > 0 && d.movingSec <= 86400
+        && d.distanceKm is number && d.distanceKm > 0 && d.distanceKm <= 1000
+        && d.avgSpeedKmh is number && d.avgSpeedKmh > 0 && d.avgSpeedKmh <= 120
+        && d.maxSpeedKmh is number && d.maxSpeedKmh > 0 && d.maxSpeedKmh <= 200
+        && (!d.keys().hasAny(['avgCadenceRpm']) || (d.avgCadenceRpm is number && d.avgCadenceRpm > 0 && d.avgCadenceRpm <= 250))
+        && d.createdAt == request.time;
+    }
+
     function consumptionPath(orderId) {
       return /databases/$(database)/documents/stockConsumptions/$(orderId);
     }
@@ -347,6 +365,14 @@ service cloud.firestore {
     match /users/{uid}/fitDaily/{day} {
       allow read: if isAdmin() && request.auth.uid == uid;
       allow write: if false;
+    }
+
+    // Pedaladas importadas de arquivos FIT (só o resumo, sem GPS nem série por segundo). O dono cria e apaga os próprios treinos;
+    // não há edição (reimportar o mesmo arquivo cai no mesmo id e é recusado pela app antes de gravar).
+    match /users/{uid}/fitRides/{rideId} {
+      allow read, delete: if isAdmin() && request.auth.uid == uid;
+      allow create: if isAdmin() && request.auth.uid == uid && validFitRide(rideId, request.resource.data);
+      allow update: if false;
     }
 
 
