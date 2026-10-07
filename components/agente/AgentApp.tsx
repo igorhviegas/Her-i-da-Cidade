@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ChevronLeft, ChevronRight, CircleHelp, ClipboardList, Info, MessageCircle, Minus, Music, Pause, Play, Plus, Repeat1, RotateCcw, Search, SkipBack, SkipForward, Timer, TriangleAlert, ChevronDown, X,
+  ChevronLeft, ChevronRight, CircleHelp, ClipboardList, Info, MessageCircle, Minus, Music, Pause, Play, Plus, Repeat1, RotateCcw, Route, Search, SkipBack, SkipForward, Timer, TriangleAlert, ChevronDown, X,
 } from 'lucide-react';
 import { useAgentContent, type AgentFaqCategory, type AgentFaqItem, type AgentStep } from '../../services/agentService';
 import {
   SUPPORT_WHATSAPP_URL, TIMER_ALERTS, computeTimer, dueAlert, formatClock, groupTracks, markFired, matchesQuery, resetFired, searchFaq, type AlertKey, type FiredAlerts,
 } from '../../services/agentContent.js';
 import { useAgentPlayer } from './useAgentPlayer';
+import { TravelCalculator } from './TravelCalculator';
 
 // Rota pública sem login. Para proteger depois, envolva <AgentApp /> em App.tsx (como o AdminApp com ProtectedAdminRoute)
 // e restrinja a leitura de agentSteps/agentTracks em firestore.rules.
@@ -38,7 +39,7 @@ export const AgentApp: React.FC = () => {
   const { steps, tracks, tracksLoading, faq } = useAgentContent();
   const player = useAgentPlayer(tracks);
   const [saved, update] = useSaved();
-  const [view, rawSetView] = useState('home'); // home | steps | music | support | support:info | support:<categoria> | step:<id>
+  const [view, rawSetView] = useState('home'); // home | steps | music | travel | support | support:info | support:<categoria> | step:<id>
   // Histórico de telas: a seta de voltar retorna à tela de onde o agente veio (ex.: Início → Chegada → Início).
   const [trail, setTrail] = useState<string[]>([]);
   const setView = (next: string) => { setTrail((t) => [...t, view]); rawSetView(next); };
@@ -107,7 +108,7 @@ export const AgentApp: React.FC = () => {
   const showMini = !!player.current && view !== 'music';
   const faqCategory = view.startsWith('support:') && view !== 'support:info' ? faq.find((c) => c.id === view.slice(8)) : undefined;
 
-  const title = view === 'home' ? 'Agente HDC' : view === 'steps' ? 'Passo a passo' : view === 'music' ? 'Músicas' : view === 'support' ? 'Suporte' : view === 'support:info' ? 'Informações importantes' : faqCategory?.title ?? activeStep?.kicker ?? 'Etapa';
+  const title = view === 'home' ? 'Agente HDC' : view === 'steps' ? 'Passo a passo' : view === 'music' ? 'Músicas' : view === 'travel' ? 'Deslocamento' : view === 'support' ? 'Suporte' : view === 'support:info' ? 'Informações importantes' : faqCategory?.title ?? activeStep?.kicker ?? 'Etapa';
 
   return (
     <div className={`min-h-screen bg-[#070B14] text-white antialiased ${showMini ? 'pb-44' : 'pb-28'}`} style={{ WebkitTapHighlightColor: 'transparent' }}>
@@ -150,6 +151,11 @@ export const AgentApp: React.FC = () => {
               <span className="min-w-0 flex-1"><span className="block text-lg font-bold">Passo a passo</span><span className="block text-sm text-white/50">{done} de {total} itens concluídos</span></span>
               <ChevronRight className="h-5 w-5 text-white/40" />
             </button>
+            <button onClick={() => setView('travel')} className={bigBtn}>
+              <Route className="h-7 w-7 shrink-0 text-emerald-300" />
+              <span className="min-w-0 flex-1"><span className="block text-lg font-bold">Deslocamento</span><span className="block text-sm text-white/50">Km da rota, cachês e texto do WhatsApp</span></span>
+              <ChevronRight className="h-5 w-5 text-white/40" />
+            </button>
             <button onClick={() => setView('support')} className={bigBtn}>
               <CircleHelp className="h-7 w-7 shrink-0 text-amber-300" />
               <span className="min-w-0 flex-1"><span className="block text-lg font-bold">Suporte</span><span className="block text-sm text-white/50">Dúvidas, informações e ajuda</span></span>
@@ -184,6 +190,8 @@ export const AgentApp: React.FC = () => {
             go={(id) => { rawSetView(`step:${id}`); window.scrollTo(0, 0); }}
           />
         )}
+
+        {view === 'travel' && <TravelCalculator />}
 
         {view === 'music' && <MusicView player={player} tracks={tracks} loading={tracksLoading} query={query} onQuery={setQuery} />}
 

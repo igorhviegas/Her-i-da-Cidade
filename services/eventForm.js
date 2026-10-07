@@ -7,7 +7,7 @@ export const roundMoney = (value) => Math.round((Number(value) + Number.EPSILON)
 /** Entrada sugerida: metade do valor total (arredondada em centavos). */
 export const defaultEntry = (total) => (Number.isFinite(total) && total >= 0 ? roundMoney(total / 2) : 0);
 
-const money = (text) => {
+export const money = (text) => {
   if (typeof text === 'number') return Number.isFinite(text) && text >= 0 ? roundMoney(text) : null;
   const clean = String(text ?? '').trim();
   if (!clean) return null;

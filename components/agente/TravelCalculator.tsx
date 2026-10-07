@@ -1,0 +1,208 @@
+import React, { useEffect, useState } from 'react';
+import { ArrowDown, ArrowUp, Copy, KeyRound, Loader2, MessageCircle, Plus, TriangleAlert, X } from 'lucide-react';
+import { calculateTravelRoute, TravelRequestError, type TravelResult } from '../../services/travelService';
+import { DEFAULT_EVENT_FEE, DEFAULT_KM_RATE, MAX_EVENTS, formatBRL, formatKm } from '../../services/travelCost.js';
+import { moveItem } from '../../services/agentContent.js';
+
+// Cálculo de deslocamento dos eventos (docs/deslocamento.md). Os endereços padrão ficam só no servidor: aqui aparecem como "padrão".
+// Rascunho (código, eventos, valores) fica no aparelho, como o resto da área do agente.
+
+interface Draft {
+  code: string;
+  events: string[];
+  /** Parada: padrão do servidor, sem parada ou outro endereço. */
+  stopMode: 'default' | 'none' | 'custom';
+  stopAddress: string;
+  /** null = endereço padrão; string = outro endereço só neste cálculo. */
+  start: string | null;
+  end: string | null;
+  kmRate: string;
+  eventFee: string;
+}
+const STORAGE_KEY = 'hdc.agente.deslocamento.v1';
+const EMPTY: Draft = { code: '', events: [''], stopMode: 'default', stopAddress: '', start: null, end: null, kmRate: String(DEFAULT_KM_RATE).replace('.', ','), eventFee: String(DEFAULT_EVENT_FEE) };
+
+function load(): Draft {
+  try { return { ...EMPTY, ...JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') }; } catch { return EMPTY; }
+}
+
+const btn = 'touch-manipulation select-none active:scale-[0.98] transition-transform';
+const field = 'h-14 w-full rounded-2xl border border-white/10 bg-[#0D1527] px-4 text-base text-white placeholder:text-white/35 focus:border-blue-400 focus:outline-none';
+const card = 'rounded-2xl border border-white/10 bg-[#0D1527] px-4 py-4';
+const heading = 'mb-2 block text-[11px] font-bold uppercase tracking-widest text-white/40';
+const smallBtn = `${btn} rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-white/70`;
+
+export const TravelCalculator: React.FC = () => {
+  const [draft, setDraft] = useState<Draft>(load);
+  const [result, setResult] = useState<TravelResult | null>(null);
+  const [acked, setAcked] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [codeInput, setCodeInput] = useState('');
+
+  useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(draft)); } catch { /* sem armazenamento: vale só nesta sessão */ } }, [draft]);
+
+  /** Qualquer alteração invalida o resultado anterior (o valor mostrado sempre corresponde ao que está na tela). */
+  const patch = (changes: Partial<Draft>) => { setDraft((d) => ({ ...d, ...changes })); setResult(null); setAcked(false); setError(''); };
+  const setEvent = (i: number, value: string) => patch({ events: draft.events.map((e, n) => (n === i ? value : e)) });
+  const ready = draft.events.length > 0 && draft.events.every((e) => e.trim()) && (draft.stopMode !== 'custom' || draft.stopAddress.trim())
+    && (draft.start === null || draft.start.trim()) && (draft.end === null || draft.end.trim());
+
+  const calculate = async () => {
+    setBusy(true); setError(''); setResult(null); setAcked(false);
+    try {
+      setResult(await calculateTravelRoute(draft.code, {
+        events: draft.events,
+        ...(draft.start !== null ? { start: draft.start } : {}),
+        ...(draft.end !== null ? { end: draft.end } : {}),
+        stop: draft.stopMode === 'none' ? null : draft.stopMode === 'custom' ? draft.stopAddress : undefined,
+        kmRate: draft.kmRate,
+        eventFee: draft.eventFee,
+      }));
+    } catch (e) {
+      if (e instanceof TravelRequestError && e.unauthorized) setDraft((d) => ({ ...d, code: '' })); // código recusado: pede de novo
+      setError(e instanceof Error ? e.message : 'Não foi possível calcular agora.');
+    } finally { setBusy(false); }
+  };
+
+  const copy = async () => {
+    if (!result) return;
+    try { await navigator.clipboard.writeText(result.whatsapp.text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* sem área de transferência: o texto está visível abaixo */ }
+  };
+
+  if (!draft.code) {
+    return (
+      <div className={`${card} space-y-3`}>
+        <p className="flex items-center gap-2 text-lg font-bold"><KeyRound className="h-5 w-5 text-blue-300" />Código de acesso</p>
+        <p className="text-sm text-white/60">Digite o código do cálculo de deslocamento. Ele fica salvo neste aparelho.</p>
+        {error && <p role="alert" className="text-sm font-semibold text-red-300">{error}</p>}
+        <input type="password" value={codeInput} onChange={(e) => setCodeInput(e.target.value)} placeholder="Código" aria-label="Código de acesso" autoComplete="off" className={field} />
+        <button disabled={!codeInput.trim()} onClick={() => { patch({ code: codeInput.trim() }); setCodeInput(''); }} className={`${btn} h-14 w-full rounded-2xl bg-blue-600 text-base font-bold disabled:opacity-40`}>Salvar código</button>
+      </div>
+    );
+  }
+
+  const addressChoice = (label: string, value: string | null, onChange: (v: string | null) => void) => (
+    <div>
+      <span className={heading}>{label}</span>
+      {value === null ? (
+        <div className="flex items-center gap-2">
+          <p className={`${card} flex-1 py-3.5 text-[15px] text-white/70`}>Endereço padrão</p>
+          <button onClick={() => onChange('')} className={smallBtn}>Usar outro</button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <input value={value} onChange={(e) => onChange(e.target.value)} placeholder="Rua, número, bairro e cidade" aria-label={label} className={field} />
+          <button onClick={() => onChange(null)} className={smallBtn}>Voltar ao padrão</button>
+        </div>
+      )}
+    </div>
+  );
+
+  const stopChoices: [Draft['stopMode'], string][] = [['default', 'Padrão'], ['none', 'Sem parada'], ['custom', 'Outra']];
+
+  return (
+    <div className="space-y-4">
+      <div className={`${card} space-y-4`}>
+        {addressChoice('Ponto de partida', draft.start, (start) => patch({ start }))}
+
+        <div>
+          <span className={heading}>Parada (ida e volta)</span>
+          <div className="flex gap-2" role="group" aria-label="Parada">
+            {stopChoices.map(([mode, label]) => (
+              <button key={mode} onClick={() => patch({ stopMode: mode })} aria-pressed={draft.stopMode === mode} className={`${btn} h-12 flex-1 rounded-xl border text-sm font-bold ${draft.stopMode === mode ? 'border-blue-400 bg-blue-600/25 text-white' : 'border-white/10 text-white/60'}`}>{label}</button>
+            ))}
+          </div>
+          {draft.stopMode === 'custom' && <input value={draft.stopAddress} onChange={(e) => patch({ stopAddress: e.target.value })} placeholder="Rua, número, bairro e cidade" aria-label="Endereço da parada" className={`${field} mt-2`} />}
+        </div>
+
+        <div>
+          <span className={heading}>Eventos (na ordem do trajeto)</span>
+          <ol className="space-y-2">
+            {draft.events.map((address, i) => (
+              <li key={i} className="flex items-center gap-1.5">
+                <input value={address} onChange={(e) => setEvent(i, e.target.value)} placeholder={`Evento ${i + 1}: rua, número, bairro e cidade`} aria-label={`Endereço do evento ${i + 1}`} className={`${field} min-w-0 flex-1`} />
+                <div className="flex shrink-0 flex-col">
+                  <button disabled={i === 0} onClick={() => patch({ events: moveItem(draft.events, i, -1) })} aria-label={`Subir evento ${i + 1}`} className={`${btn} flex h-7 w-9 items-center justify-center rounded-t-lg bg-white/10 disabled:opacity-25`}><ArrowUp className="h-4 w-4" /></button>
+                  <button disabled={i === draft.events.length - 1} onClick={() => patch({ events: moveItem(draft.events, i, 1) })} aria-label={`Descer evento ${i + 1}`} className={`${btn} flex h-7 w-9 items-center justify-center rounded-b-lg bg-white/10 disabled:opacity-25`}><ArrowDown className="h-4 w-4" /></button>
+                </div>
+                <button disabled={draft.events.length === 1} onClick={() => patch({ events: draft.events.filter((_, n) => n !== i) })} aria-label={`Remover evento ${i + 1}`} className={`${btn} flex h-12 w-10 shrink-0 items-center justify-center rounded-xl text-white/50 disabled:opacity-25`}><X className="h-5 w-5" /></button>
+              </li>
+            ))}
+          </ol>
+          <button disabled={draft.events.length >= MAX_EVENTS} onClick={() => patch({ events: [...draft.events, ''] })} className={`${btn} mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 text-sm font-bold text-white/70 disabled:opacity-30`}><Plus className="h-4 w-4" />Adicionar evento</button>
+        </div>
+
+        {addressChoice('Destino final', draft.end, (end) => patch({ end }))}
+
+        <div className="grid grid-cols-2 gap-3">
+          <label><span className={heading}>Valor por km (R$)</span><input value={draft.kmRate} onChange={(e) => patch({ kmRate: e.target.value })} inputMode="decimal" className={field} /></label>
+          <label><span className={heading}>Cachê por evento (R$)</span><input value={draft.eventFee} onChange={(e) => patch({ eventFee: e.target.value })} inputMode="decimal" className={field} /></label>
+        </div>
+      </div>
+
+      {error && <div role="alert" className="flex items-start gap-3 rounded-2xl border border-red-400/50 bg-red-600/20 px-4 py-3 text-[15px] font-semibold text-red-100"><TriangleAlert className="mt-0.5 h-5 w-5 shrink-0" />{error}</div>}
+
+      <button disabled={!ready || busy} onClick={calculate} className={`${btn} flex h-16 w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 text-lg font-black uppercase tracking-wide shadow-lg shadow-blue-600/30 disabled:opacity-40`}>
+        {busy ? <><Loader2 className="h-5 w-5 animate-spin" />Calculando...</> : 'Calcular'}
+      </button>
+
+      {result && (
+        <>
+          <div className={card}>
+            <span className={heading}>Trechos usados</span>
+            <ul className="divide-y divide-white/10">
+              {result.summary.legs.map((leg, i) => (
+                <li key={i} className="flex items-baseline justify-between gap-3 py-2.5 text-[15px]">
+                  <span className="min-w-0">{leg.from} → {leg.to}</span>
+                  <span className="shrink-0 font-bold tabular-nums">{formatKm(leg.km)}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 border-t border-white/10 pt-3 text-right text-lg font-black tabular-nums">Total: {formatKm(result.summary.totalKm)}</p>
+          </div>
+
+          {result.resolved.length > 0 && (
+            <div className={card}>
+              <span className={heading}>Endereços entendidos pelo mapa</span>
+              <ul className="space-y-3">
+                {result.resolved.map((point) => (
+                  <li key={point.label} className="text-[15px]">
+                    <p className="font-bold">{point.label}{!point.precise && <span className="ml-2 text-amber-300">⚠ confira</span>}</p>
+                    <p className="text-white/70">{point.address}</p>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-white/40">Se algum estiver diferente do evento, corrija o endereço (inclua bairro e cidade) e calcule de novo.</p>
+            </div>
+          )}
+
+          {result.needsConfirmation && !acked ? (
+            <div role="alert" className="space-y-3 rounded-2xl border-2 border-amber-400 bg-amber-500/15 px-4 py-4">
+              <p className="flex items-start gap-3 text-[15px] font-bold text-amber-100"><TriangleAlert className="mt-0.5 h-5 w-5 shrink-0" />O mapa não achou o número exato de algum endereço. A distância pode estar aproximada.</p>
+              <button onClick={() => setAcked(true)} className={`${btn} h-12 w-full rounded-xl bg-amber-400 text-sm font-black uppercase text-black`}>Conferi, mostrar valor</button>
+            </div>
+          ) : (
+            <div className={`${card} space-y-1 text-[15px]`}>
+              <p>Deslocamento: {formatKm(result.summary.totalKm)} × {formatBRL(result.summary.kmRate)} = <b>{formatBRL(result.summary.travelCost)}</b></p>
+              <p>Cachês: {result.summary.eventCount} × {formatBRL(result.summary.eventFee)} = <b>{formatBRL(result.summary.feesTotal)}</b></p>
+              <p className="pt-2 text-xl font-black text-emerald-300">TOTAL A RECEBER: {formatBRL(result.summary.total)}</p>
+              <div className="flex gap-2 pt-3">
+                <button onClick={copy} className={`${btn} flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-white/10 text-sm font-bold`}><Copy className="h-5 w-5" />{copied ? 'Copiado!' : 'Copiar texto'}</button>
+                {result.whatsapp.url && <a href={result.whatsapp.url} target="_blank" rel="noopener noreferrer" className={`${btn} flex h-14 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#25D366] text-sm font-black text-[#04210F]`}><MessageCircle className="h-5 w-5" />WhatsApp</a>}
+              </div>
+              <pre className="mt-3 whitespace-pre-wrap rounded-xl bg-[#070B14] p-3 font-sans text-sm text-white/70">{result.whatsapp.text}</pre>
+            </div>
+          )}
+          <p className="px-1 text-center text-xs text-white/40">Calculado em {new Date(result.calculatedAt).toLocaleString('pt-BR')}. O mapa pode sugerir um trajeto diferente do seu aplicativo; confira os trechos.</p>
+        </>
+      )}
+
+      <div className="flex justify-center gap-3 pt-2">
+        <button onClick={() => { if (window.confirm('Limpar os eventos para um novo cálculo?')) patch({ events: [''], stopMode: 'default', stopAddress: '', start: null, end: null }); }} className={smallBtn}>Novo cálculo</button>
+        <button onClick={() => patch({ code: '' })} className={smallBtn}>Trocar código</button>
+      </div>
+    </div>
+  );
+};
