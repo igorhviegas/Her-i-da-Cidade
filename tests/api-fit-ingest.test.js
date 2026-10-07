@@ -50,6 +50,14 @@ test('fit-ingest: grava só sob users/{uid do servidor}, mesmo que o payload ten
   assert.doesNotMatch(JSON.stringify(res.body), /5000|2026-10-01/); // a resposta não devolve dado de saúde
 });
 
+test('fit-ingest: envio simples de um dia (Atalho do iPhone) grava no mesmo caminho e responde só contagens', async () => {
+  const database = fakeDatabase();
+  const res = await call(request({ body: { day: '2026-10-07', steps: '2431', walkRunKm: '1,8', weightKg: 72, uid: 'outroUsuario' } }), { database });
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(database.paths, [`users/${UID}/fitDaily/2026-10-07`]);
+  assert.deepEqual(res.body, { ok: true, days: 1, accepted: 3, ignoredMetrics: 1, invalid: 0, workoutsIgnored: 0 });
+});
+
 test('fit-ingest: falha ao gravar devolve 500 genérico, sem vazar a mensagem do erro', async () => {
   const res = await call(request(), { database: fakeDatabase('detalhe interno xyz') });
   assert.equal(res.statusCode, 500);

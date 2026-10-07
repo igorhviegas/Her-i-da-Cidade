@@ -18,15 +18,42 @@ const METRICS = {
 
 const round = (value, decimals) => Number(value.toFixed(decimals));
 
+const FIELD_SPECS = Object.fromEntries(Object.values(METRICS).map((spec) => [spec.field, spec]));
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
- * Retorna { days: { 'AAAA-MM-DD': { steps, walkRunKm, ... } }, stats, workouts } ou null se o corpo não for um export do app.
+ * Envio simples de um dia, para o Atalho do iPhone (sem o Health Auto Export): { day: 'AAAA-MM-DD', steps, walkRunKm, weightKg, ... }.
+ * Mesmos campos, unidades (km, kcal, kg, min) e limites do export do app. Aceita número ou texto numérico ("1,8" ou "1.8", como o
+ * Atalhos às vezes formata). Campo desconhecido é descartado e contado; o que estiver fora do plausível, também (invalid).
+ */
+function parseDailyPush(body) {
+  const day = typeof body.day === 'string' ? body.day : '';
+  const real = DAY_RE.test(day) && new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) === day; // rejeita 2026-02-31
+  if (!real) return null;
+  const stats = { accepted: 0, ignoredMetrics: 0, invalid: 0 };
+  const doc = {};
+  for (const [field, raw] of Object.entries(body)) {
+    if (field === 'day') continue;
+    const spec = FIELD_SPECS[field];
+    if (!spec) { stats.ignoredMetrics += 1; continue; }
+    const value = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw.trim().replace(',', '.')) : NaN;
+    if (!Number.isFinite(value) || value < (spec.min ?? 0) || value > spec.max) { stats.invalid += 1; continue; }
+    doc[spec.field] = round(value, spec.decimals);
+    stats.accepted += 1;
+  }
+  return { days: Object.keys(doc).length ? { [day]: doc } : {}, stats, workouts: 0 };
+}
+
+/**
+ * Retorna { days: { 'AAAA-MM-DD': { steps, walkRunKm, ... } }, stats, workouts } ou null se o corpo não for um export do app
+ * (nem o envio simples de um dia do Atalho, tratado em parseDailyPush).
  * Dia sem dado fica sem o campo (ausente é diferente de zero). Registro inválido (data, unidade, valor fora do plausível ou
  * métrica diária não resumida) é descartado e contado em stats.invalid; nada é adivinhado.
  * ponytail: duas entradas somáveis no mesmo dia (ex.: iPhone e Watch separados) ficam com a maior, para não contar passos duas vezes.
  */
 export function parseHealthExport(body) {
   const metrics = body?.data?.metrics;
-  if (!Array.isArray(metrics)) return null;
+  if (!Array.isArray(metrics)) return body && typeof body === 'object' && !Array.isArray(body) ? parseDailyPush(body) : null;
   const days = {};
   const weightDate = {};
   const stats = { accepted: 0, ignoredMetrics: 0, invalid: 0 };

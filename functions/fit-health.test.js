@@ -75,6 +75,24 @@ test('corpo que não é export do app devolve null; treinos são só contados (f
   assert.equal(parseHealthExport({ data: { metrics: [], workouts: [{ id: 'a' }, { id: 'b' }] } }).workouts, 2);
 });
 
+test('envio simples de um dia (Atalho do iPhone): mesmos campos e limites; texto numérico com vírgula vale; o resto é descartado e contado', () => {
+  const { days, stats } = parseHealthExport({ day: '2026-10-07', steps: 2431, walkRunKm: '1,8', weightKg: '72.0', cadence: 90, heartRate: 70 });
+  assert.deepEqual(days, { '2026-10-07': { steps: 2431, walkRunKm: 1.8, weightKg: 72 } });
+  assert.deepEqual(stats, { accepted: 3, ignoredMetrics: 2, invalid: 0 });
+  // inválidos: fora do plausível, texto não numérico, vazio, nulo, negativo, peso absurdo
+  const bad = parseHealthExport({ day: '2026-10-07', steps: 999999, walkRunKm: 'abc', cyclingKm: '', weightKg: 5, activeKcal: null, exerciseMin: -1 });
+  assert.deepEqual(bad.days, {});
+  assert.equal(bad.stats.invalid, 6);
+  assert.deepEqual(parseHealthExport({ day: '2026-10-07', steps: 0 }).days, { '2026-10-07': { steps: 0 } }); // zero é dado
+});
+
+test('envio simples: dia inválido ou ausente não é um payload (null); o formato do app continua valendo', () => {
+  for (const day of ['2026-02-31', '07/10/2026', '2026-10-07T00:00:00Z', '', 20261007, undefined]) assert.equal(parseHealthExport({ day, steps: 1 }), null);
+  assert.equal(parseHealthExport([]), null);
+  assert.equal(parseHealthExport({ day: '2026-10-07' }).stats.accepted, 0); // só o dia: nada a gravar
+  assert.equal(parseHealthExport(sample).stats.accepted, 6); // export do app inalterado
+});
+
 test('writeFitDaily: um doc por dia em users/{uid}/fitDaily, merge, em lotes; reenvio cai no mesmo caminho', async () => {
   const writes = []; let commits = 0;
   const database = {
