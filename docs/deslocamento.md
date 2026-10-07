@@ -5,13 +5,16 @@ multiplica pelo valor por km, soma o cachê de cada evento e gera um texto pront
 
 ## Como funciona
 
-Rota: `partida → [parada] → evento 1 → … → evento N → [parada] → destino final`. A parada é opcional (padrão / sem parada / outra).
+Rota de cada dia: `partida → [parada] → evento 1 → … → evento N → [parada] → destino final`. A parada é opcional (padrão / sem parada / outra).
 Partida, parada e destino padrão ficam **só no servidor** (variáveis de ambiente); o navegador só vê rótulos. O agente pode trocar qualquer um
-deles para um cálculo específico sem alterar o padrão.
+deles para um dia específico sem alterar o padrão.
 
+- **Vários dias:** **Adicionar outro dia (soma no total)** cria um novo formulário, com a data do dia seguinte, que parte de novo do ponto de partida
+  (importando os eventos da data ou digitando os endereços). Cada dia é uma rota própria; o cálculo soma os km e os cachês de todos os dias em um total só.
+  Limites: 7 dias, 8 eventos por dia e 24 no total por cálculo. Uma consulta de rota por dia; endereços repetidos (padrões, mesmo local em dois dias) são consultados uma vez.
 - `Custo de deslocamento = km total × valor por km` (padrão R$ 1,90, editável na tela e lembrado no aparelho).
 - `Total = deslocamento + (eventos × cachê)` (cachê padrão R$ 115,00, também editável).
-- O total de km é a **soma dos trechos como aparecem na tela** (cada trecho arredondado a 0,1 km), então a conta confere de cabeça.
+- O total de km é a **soma dos trechos como aparecem na tela** (cada trecho arredondado a 0,1 km; subtotal por dia e total geral), então a conta confere de cabeça.
 - Os trechos e os endereços entendidos pelo mapa aparecem **antes** do valor. Se o Google não achou o número exato de algum endereço
   (correspondência parcial ou aproximada), o valor só aparece depois de o agente tocar em "Conferi, mostrar valor".
 - **Ajuste manual:** tocar no km de um trecho permite corrigi-lo (trajeto real diferente do mapa). O total, os valores e o texto são refeitos na tela, o trecho
@@ -22,12 +25,13 @@ deles para um cálculo específico sem alterar o padrão.
   Não há "agente responsável" no pedido, então vêm **todos** os eventos do dia. O servidor consulta o Firestore (Admin SDK, a mesma credencial das outras rotas)
   e devolve **só horário, local e tipo**: nunca nome da criança, cliente, telefone ou ID do pedido. Exige o mesmo código de acesso (`{ action: 'events', date }`).
   O local é texto livre do formulário do pedido: a conferência dos endereços entendidos pelo mapa continua valendo.
-- **Data:** o campo "Data dos eventos" (hoje por padrão, não é lembrado; também define o dia da importação) abre o texto do WhatsApp com `*Data:* DD/MM/AAAA`. Vazio = o texto sai sem a linha.
+- **Data de cada dia:** o campo "Data dos eventos" (hoje por padrão; fica salva com o rascunho; também define o dia da importação) abre o texto do WhatsApp com
+  `*Data:* DD/MM/AAAA` (vários dias: `*Datas:* 10/10/2026, 11/10/2026`, e cada dia vem com o seu subtotal antes do total geral). Sem data, o texto sai sem a linha e os dias aparecem como "Dia 1", "Dia 2".
 - O texto é montado na tela (o servidor só devolve a base do link `wa.me`, e só depois de validar o código de acesso).
 - Endereço não encontrado ou rota indisponível: erro apontando o ponto, sem valor.
-- A ordem dos eventos é a digitada (setas de subir/descer); o Google nunca reordena. Limite de 8 eventos por cálculo.
+- A ordem dos eventos é a digitada (setas de subir/descer); o Google nunca reordena.
 - Qualquer alteração na tela apaga o resultado anterior; o valor mostrado sempre corresponde ao que está preenchido.
-- Nada é gravado no Firestore. O rascunho (código, eventos, valores) fica no `localStorage` do aparelho (`hdc.agente.deslocamento.v1`).
+- Nada é gravado no Firestore. O rascunho (código, dias, eventos, valores) fica no `localStorage` do aparelho (`hdc.agente.deslocamento.v1`); "Novo cálculo" limpa os dias e eventos.
 - O Google pode sugerir um trajeto diferente do aplicativo do agente; a tela avisa e mostra todos os trechos usados.
 
 ## Segurança
@@ -43,7 +47,7 @@ deles para um cálculo específico sem alterar o padrão.
 | Arquivo | Papel |
 |---|---|
 | `services/travelCost.js` | Regras puras: validação, sequência da rota, soma, valores, texto do WhatsApp |
-| `functions/travel-route.js` | Geocoding API + Routes API (uma chamada de rota por cálculo), erros, resolução dos padrões |
+| `functions/travel-route.js` | Geocoding API + Routes API (uma chamada de rota por dia), erros, resolução dos padrões |
 | `api/travel-route.ts` | Endpoint (código de acesso, validação, mapeamento de erros); registrado em `server.ts` |
 | `services/travelService.ts` | Chamada do navegador ao endpoint |
 | `components/agente/TravelCalculator.tsx` | Tela (botão "Deslocamento" na Home do agente) |
