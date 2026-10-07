@@ -13,6 +13,7 @@ export const MIN_ADDRESS_LENGTH = 5;
 export const MAX_ADDRESS_LENGTH = 200;
 export const MAX_KM_RATE = 100;
 export const MAX_EVENT_FEE = 100000;
+export const MAX_LEG_KM = 2000;
 
 const clean = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
 // eslint-disable-next-line no-control-regex
@@ -80,29 +81,58 @@ export function buildSequence(input, defaults) {
 /** Metros -> km com 1 casa (é o que o agente vê, e o total soma exatamente o que está na tela). */
 export const metersToKm = (meters) => Math.round((Number(meters) || 0) / 100) / 10;
 
+/** Km digitado pelo agente ("12,5") -> número com 1 casa; null se vazio, negativo ou absurdo. */
+export function parseKm(text) {
+  const clean = String(text ?? '').trim().replace(',', '.');
+  if (!clean) return null;
+  const value = Number(clean);
+  return Number.isFinite(value) && value >= 0 && value <= MAX_LEG_KM ? Math.round(value * 10) / 10 : null;
+}
+
 /**
- * Resumo do cálculo. `legs` = [{ from, to, meters }] na ordem da rota.
+ * Resumo do cálculo. `legs` = [{ from, to, meters, adjusted? }] na ordem da rota (`adjusted` = km corrigido à mão).
  * Total de km = soma dos trechos já arredondados (fecha com a conta que o agente faz de cabeça).
  */
 export function summarizeTravel({ legs, kmRate, eventFee, eventCount }) {
-  const rows = legs.map((leg) => ({ from: leg.from, to: leg.to, km: metersToKm(leg.meters) }));
+  const rows = legs.map((leg) => ({ from: leg.from, to: leg.to, km: metersToKm(leg.meters), ...(leg.adjusted ? { adjusted: true } : {}) }));
   const totalKm = Math.round(rows.reduce((sum, row) => sum + row.km * 10, 0)) / 10;
   const travelCost = roundMoney(totalKm * kmRate);
   const feesTotal = roundMoney(eventCount * eventFee);
   return { legs: rows, totalKm, kmRate, travelCost, eventCount, eventFee, feesTotal, total: roundMoney(travelCost + feesTotal) };
 }
 
+/** Refaz o resumo com km corrigidos à mão: `overrides` = { índice do trecho: km }. Trechos sem correção ficam como o mapa calculou. */
+export function applyKmOverrides(summary, overrides = {}) {
+  const legs = summary.legs.map((leg, i) => {
+    const km = overrides[i];
+    const adjusted = Number.isFinite(km) && km >= 0;
+    return { from: leg.from, to: leg.to, meters: (adjusted ? km : leg.km) * 1000, adjusted };
+  });
+  return summarizeTravel({ legs, kmRate: summary.kmRate, eventFee: summary.eventFee, eventCount: summary.eventCount });
+}
+
 const nbspToSpace = (text) => text.replace(/ /g, ' ');
 export const formatKm = (km) => `${nbspToSpace(new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(km))} km`;
 export const formatBRL = (value) => nbspToSpace(new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0));
 
-/** Texto pronto para colar no WhatsApp (negrito com *). Só rótulos dos pontos, nunca endereços. */
-export function travelWhatsAppText(summary) {
+/** 'YYYY-MM-DD' -> 'DD/MM/AAAA' (sem passar por Date, que mudaria o dia conforme o fuso); '' se inválida. */
+export function formatDateKey(key) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key ?? '');
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : '';
+}
+
+/**
+ * Texto pronto para colar no WhatsApp (negrito com *). Só rótulos dos pontos, nunca endereços.
+ * `date` ('YYYY-MM-DD', opcional) abre o texto; trechos corrigidos à mão levam "(ajustado)".
+ */
+export function travelWhatsAppText(summary, { date } = {}) {
+  const day = formatDateKey(date);
   return [
+    ...(day ? [`*Data:* ${day}`] : []),
     '*Deslocamento e cachês*',
     '',
     '*Trechos*',
-    ...summary.legs.map((leg) => `• ${leg.from} → ${leg.to}: ${formatKm(leg.km)}`),
+    ...summary.legs.map((leg) => `• ${leg.from} → ${leg.to}: ${formatKm(leg.km)}${leg.adjusted ? ' (ajustado)' : ''}`),
     '',
     `*Total:* ${formatKm(summary.totalKm)}`,
     `*Deslocamento:* ${formatKm(summary.totalKm)} × ${formatBRL(summary.kmRate)} = ${formatBRL(summary.travelCost)}`,
@@ -112,10 +142,12 @@ export function travelWhatsAppText(summary) {
   ].join('\n');
 }
 
-/** Número de WhatsApp (só dígitos, com 55) -> link wa.me com o texto; null se o número for inválido. */
-export function whatsAppLink(number, text) {
+/** Número de WhatsApp (com ou sem 55) -> base do link wa.me, sem texto; null se o número for inválido. */
+export function whatsAppBase(number) {
   let digits = String(number ?? '').replace(/\D/g, '');
   if (digits.length === 10 || digits.length === 11) digits = `55${digits}`;
-  if (!/^55\d{10,11}$/.test(digits)) return null;
-  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+  return /^55\d{10,11}$/.test(digits) ? `https://wa.me/${digits}` : null;
 }
+
+/** Base do link + texto pré-preenchido (o texto é montado na tela, depois dos ajustes e da data). */
+export const whatsAppLink = (base, text) => `${base}?text=${encodeURIComponent(text)}`;

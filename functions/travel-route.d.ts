@@ -16,7 +16,8 @@ export interface TravelResult {
   /** Endereço entendido pelo Google para cada ponto digitado pelo agente. */
   resolved: { label: string; address: string; precise: boolean }[];
   needsConfirmation: boolean;
-  whatsapp: { text: string; url: string | null };
+  /** Base do link wa.me do destinatário (sem texto); null se o número não estiver configurado. */
+  whatsappBase: string | null;
   calculatedAt: string;
 }
 export function calculateTravel(opts: { input: TravelInput; config: TravelConfig; fetchImpl?: typeof fetch; now?: Date }): Promise<TravelResult>;

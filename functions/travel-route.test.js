@@ -88,10 +88,11 @@ test('cálculo completo: trechos na ordem, parada consultada uma vez, endereços
   assert.deepEqual([result.summary.totalKm, result.summary.travelCost, result.summary.feesTotal, result.summary.total], [15, 30, 200, 230]);
   assert.deepEqual(result.resolved.map((p) => p.label), ['Evento 1', 'Evento 2']);
   assert.equal(result.needsConfirmation, false);
-  assert.equal(result.whatsapp.url.startsWith('https://wa.me/5531912345678?text='), true);
+  assert.equal(result.whatsappBase, 'https://wa.me/5531912345678');
   assert.equal(result.calculatedAt, '2026-10-07T12:00:00.000Z');
-  const everything = JSON.stringify(result) + decodeURIComponent(result.whatsapp.url);
-  assert.equal(/SECRETO/.test(everything), false);
+  assert.equal(/SECRETO/.test(JSON.stringify(result)), false);
+  const semNumero = readTravelConfig({ ...ENV, TRAVEL_WHATSAPP_NUMBER: '' });
+  assert.equal((await calculateTravel({ input: input(), config: semNumero, fetchImpl: fakeGoogle().fetchImpl })).whatsappBase, null);
 });
 
 test('cálculo sem parada, com endereço digitado impreciso e com outra parada', async () => {
