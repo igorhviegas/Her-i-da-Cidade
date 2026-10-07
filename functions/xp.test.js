@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBaseline, igXpDelta, levelCost, levelInfo, levelStart, orderXp, totalXp, xpOfEvent } from './xp.js';
+import { buildBaseline, eventReward, igXpDelta, levelCost, levelInfo, levelStart, orderXp, totalXp, xpOfEvent } from './xp.js';
 
 test('curva ×1,25: nível 1 custa 500, cada nível custa 25% a mais; acumulado bate com a soma', () => {
   assert.equal(levelCost(1), 500);
@@ -91,4 +91,17 @@ test('Instagram: queda não tira XP, seguidor que cai e volta não paga duas vez
   assert.equal(igXpDelta({ prev, posts: [], followers: 678720, followersHigh: drop.followersHigh }).xp, 100);
   assert.deepEqual(igXpDelta({ prev: {}, posts: [], followers: 5, followersHigh: null }), { xp: 0, followersHigh: 5 }); // 1ª vez: só fixa a referência
   assert.equal(igXpDelta({ prev: { p1: { views: null } }, posts: [{ id: 'p1', views: 7 }], followers: null, followersHigh: null }).xp, 7);
+});
+
+test('aviso de ganho: XP e valores reais do Financeiro; Instagram, eventos antigos e já contados não avisam', () => {
+  const baseline = { at: new Date('2026-10-10T12:00:00Z'), total: 0, counted: { orders: ['old'] } };
+  const after = new Date('2026-10-11T00:00:00Z');
+  assert.deepEqual(eventReward(baseline, { type: 'order_completed', refId: 'a', occurredAt: after, meta: { value: 60, revenue: 60, cost: 25 } }), { xp: 600, revenue: 60, cost: 25 });
+  assert.deepEqual(eventReward(baseline, { type: 'mission', refId: 'm', occurredAt: after, difficulty: 2 }), { xp: 250, revenue: 0, cost: 0 }); // missão não mexe no Financeiro
+  assert.deepEqual(eventReward(baseline, { type: 'order_completed', refId: 'b', occurredAt: after, meta: { value: 300, revenue: 150, cost: 40 } }), { xp: 3000, revenue: 150, cost: 40 }); // evento: só a 2ª parcela e a despesa
+  assert.equal(eventReward(baseline, { type: 'instagram', refId: 'd', occurredAt: after, xp: 999 }), null);
+  assert.equal(eventReward(baseline, { type: 'order_completed', refId: 'old', occurredAt: after, meta: { value: 60 } }), null);
+  assert.equal(eventReward(baseline, { type: 'mission', refId: 'm0', occurredAt: new Date('2026-10-09T00:00:00Z'), difficulty: 2 }), null);
+  assert.equal(eventReward(baseline, { type: 'order_completed', refId: 'z', occurredAt: after, meta: { value: 0 } }), null); // pedido interno sem valor
+  assert.equal(eventReward(null, { type: 'mission', difficulty: 2, occurredAt: after }), null);
 });

@@ -49,20 +49,32 @@ export function xpOfEvent(event) {
 
 const millis = (v) => (v instanceof Date ? v.getTime() : typeof v?.toDate === 'function' ? v.toDate().getTime() : v ? new Date(v).getTime() : NaN);
 
+/** O evento vale XP agora? Só se for posterior ao baseline e não de um pedido/conteúdo que o baseline já contou. */
+const countedSets = new WeakMap(); // conjuntos por baseline (a lista pode ter milhares de IDs)
+const countsAfterBaseline = (baseline, event) => {
+  if (!(millis(event.occurredAt) >= millis(baseline.at))) return false;
+  if (!countedSets.has(baseline)) countedSets.set(baseline, { order_completed: new Set(baseline.counted?.orders ?? []), content_published: new Set(baseline.counted?.scripts ?? []) });
+  return !countedSets.get(baseline)[event.type]?.has(event.refId);
+};
+
+/**
+ * Aviso de ganho (janelinha) de um evento recém-registrado: { xp, revenue, cost } ou null. revenue/cost são o que a conclusão lançou
+ * no Financeiro (valor real, não moeda fictícia): missões, tarefas e metas só têm XP. O Instagram é automático e não gera aviso.
+ */
+export function eventReward(baseline, event) {
+  if (!baseline || event?.type === 'instagram' || !countsAfterBaseline(baseline, event)) return null;
+  const reward = { xp: xpOfEvent(event), revenue: finiteOr0(event.meta?.revenue), cost: finiteOr0(event.meta?.cost) };
+  return reward.xp || reward.revenue || reward.cost ? reward : null;
+}
+
 /**
  * XP total = baseline + eventos posteriores à criação dele. Eventos de pedidos/conteúdos que o baseline já contou (baseline.counted)
  * são ignorados: reabrir e concluir de novo um pedido antigo não paga duas vezes.
  */
 export function totalXp(baseline, events) {
   if (!baseline) return null; // sem baseline o sistema de XP ainda não foi ativado
-  const since = millis(baseline.at);
-  const counted = { order_completed: new Set(baseline.counted?.orders ?? []), content_published: new Set(baseline.counted?.scripts ?? []) };
   let fromEvents = 0;
-  for (const event of events) {
-    if (!(millis(event.occurredAt) >= since)) continue;
-    if (counted[event.type]?.has(event.refId)) continue;
-    fromEvents += xpOfEvent(event);
-  }
+  for (const event of events) if (countsAfterBaseline(baseline, event)) fromEvents += xpOfEvent(event);
   return { baseline: baseline.total ?? 0, events: fromEvents, total: (baseline.total ?? 0) + fromEvents };
 }
 

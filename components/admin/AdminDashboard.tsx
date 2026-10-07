@@ -20,6 +20,7 @@ import { AdminVideoCallsPage } from './AdminVideoCallsPage';
 import { AdminInstagramPage } from './AdminInstagramPage';
 import { AdminAgentPage } from './AdminAgentPage';
 import { AdminProfilePage } from './AdminProfilePage';
+import { ProfileMenu } from './ProfileMenu';
 import { AdminNav, useNavOrder, type NavItem, type NavGroup, type NavBadge } from './AdminNav';
 import { subscribeActiveOrders } from '../../services/ordersService';
 import { subscribeTodayMissionsCount } from '../../services/missionsService';
@@ -452,30 +453,7 @@ export const AdminDashboard: React.FC = () => {
           <div className="flex shrink-0 items-center gap-2 sm:gap-4">
             <FinanceRevenueBadge />
             <NotificationsBell onOpenMissions={() => handleTabChange('missions')} />
-            <button type="button" onClick={() => handleTabChange('profile')} title="Abrir meu perfil" aria-label="Abrir meu perfil" aria-current={currentTab === 'profile' ? 'page' : undefined} className="flex items-center gap-2.5 pl-3 border-l border-white/10 text-right rounded-xl hover:bg-white/5 transition-colors">
-              <div className="hidden md:block">
-                <p className="text-xs font-semibold text-white leading-none">
-                  {user?.displayName || adminData?.displayName || user?.email?.split('@')[0] || 'Administrador'}
-                </p>
-                <p className="text-[11px] text-white/40 mt-1 font-mono leading-none truncate max-w-[180px]">
-                  {user?.email}
-                </p>
-              </div>
-
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-inner ring-2 ring-white/10">
-                {(user?.displayName?.[0] || user?.email?.[0] || 'A').toUpperCase()}
-              </div>
-            </button>
-
-            <button
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              title="Sair do painel"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white/70 hover:text-white bg-white/5 hover:bg-red-500/20 hover:border-red-500/30 border border-white/10 transition-all active:scale-95"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Sair</span>
-            </button>
+            <ProfileMenu onOpenProfile={() => handleTabChange('profile')} onLogout={handleLogout} loggingOut={isLoggingOut} />
           </div>
         </header>
 
