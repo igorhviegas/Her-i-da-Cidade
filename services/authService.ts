@@ -2,6 +2,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
+  updateProfile,
   onAuthStateChanged,
   User,
   Unsubscribe
@@ -78,6 +79,15 @@ export async function loginWithEmail(email: string, password: string): Promise<U
     }
     throw err;
   }
+}
+
+/** Nome de exibição do usuário (Firebase Auth): usado na saudação da Principal e no topo do painel. */
+export async function updateDisplayName(name: string): Promise<void> {
+  const user = auth?.currentUser;
+  if (!user) throw new Error("Usuário não autenticado.");
+  const displayName = name.trim();
+  if (!displayName || displayName.length > 40) throw new Error("Informe um nome de até 40 caracteres.");
+  await updateProfile(user, { displayName });
 }
 
 /**

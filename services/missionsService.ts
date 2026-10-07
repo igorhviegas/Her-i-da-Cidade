@@ -375,7 +375,7 @@ export async function loadGoals(now = new Date()): Promise<GoalView[]> {
       const cycleId = `${goal.id}_${goal.cycleKey}`;
       await runTransaction(firestore(), async (transaction) => {
         const refs = activityRefs(firestore(), 'goal_completed', cycleId);
-        const record = await prepareActivityLog(transaction, refs, { type: 'goal_completed', refId: cycleId, occurredAt: now, meta: { goalId: goal.id } });
+        const record = await prepareActivityLog(transaction, refs, { type: 'goal_completed', refId: cycleId, occurredAt: now, meta: { goalId: goal.id, period: goal.period } });
         transaction.update(goalRef, { completedAt: now });
         if (record) transaction.set(refs.logRef, record);
       });

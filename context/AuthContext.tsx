@@ -6,6 +6,7 @@ import {
   AuthState, 
   loginWithEmail, 
   logoutUser, 
+  updateDisplayName, 
   subscribeToAuth 
 } from '../services/authService';
 
@@ -17,6 +18,7 @@ export interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  setDisplayName: (name: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -46,6 +48,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await logoutUser();
   }, []);
 
+  // updateProfile altera o objeto User no lugar (sem novo evento de auth): um novo estado força a releitura do nome.
+  const setDisplayName = useCallback(async (name: string) => {
+    await updateDisplayName(name);
+    setAuthState((state) => ({ ...state }));
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -56,6 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading: authState.loading,
         login,
         logout,
+        setDisplayName,
       }}
     >
       {children}
