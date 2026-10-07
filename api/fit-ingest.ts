@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { getAdminFirestore } from '../functions/firebase-admin.js';
-import { parseHealthExport, writeFitDaily } from '../functions/fit-health.js';
+import { describeInvalidPayload, parseHealthExport, writeFitDaily } from '../functions/fit-health.js';
 
 const OWNER_UID = /^[A-Za-z0-9_-]{6,128}$/; // vira parte do caminho no Firestore: nada de "/" nem espaços
 
@@ -44,7 +44,10 @@ export async function handleFitIngest(
     try { payload = JSON.parse(payload.toString()); } catch { payload = null; }
   }
   const parsed = parseHealthExport(payload);
-  if (!parsed) return send(400, { ok: false, error: { code: 'invalid_payload', message: 'Esperado o JSON do Health Auto Export (data.metrics).' } });
+  if (!parsed) {
+    const { message, received } = describeInvalidPayload(payload); // só nomes e tipos dos campos, nunca os valores
+    return send(400, { ok: false, error: { code: 'invalid_payload', message, received } });
+  }
 
   try {
     const days = await writeFitDaily(deps.database ?? getAdminFirestore(), ownerUid, parsed.days);

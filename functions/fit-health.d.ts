@@ -3,3 +3,4 @@ export interface HealthExportResult { days: Record<string, FitDailyFields>; stat
 export const FIT_DAILY_SOURCE: 'health-auto-export';
 export function parseHealthExport(body: unknown): HealthExportResult | null;
 export function writeFitDaily(database: any, uid: string, days: Record<string, FitDailyFields>, now?: Date): Promise<number>;
+export function describeInvalidPayload(body: unknown): { message: string; received: string | Record<string, string> };
