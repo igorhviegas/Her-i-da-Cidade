@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TravelRouteError, calculateTravel, codeMatches, computeLegsMeters, geocodeAddress, readTravelConfig } from './travel-route.js';
+import { TravelRouteError, calculateTravel, codeMatches, computeLegsMeters, geocodeAddress, listDayEvents, readTravelConfig } from './travel-route.js';
 import { validateTravelInput } from '../services/travelCost.js';
 
 const ENV = {
@@ -126,4 +126,33 @@ test('parada padrão sem configuração e endereço não encontrado interrompem 
   const g = fakeGoogle({ geocode: { 'Evento dois 20': null } });
   await assert.rejects(() => calculateTravel({ input: input(), config, fetchImpl: g.fetchImpl }), (e) => e.code === 'address_not_found' && /Evento 2/.test(e.message));
   assert.equal(g.calls.routes.length, 0);
+});
+
+const at = (iso) => new Date(iso); // eventDate é gravado ao meio-dia
+const evento = (over = {}, form = {}) => ({ id: 'o1', childName: 'Pedro', clientId: 'c1', eventDate: at('2026-10-10T15:00:00Z'), eventForm: { eventTime: '14:00', location: 'Rua A 10, Betim', formType: 'Aniversário', ...form }, ...over });
+
+test('eventos do dia: só pedidos de evento completos do dia, em ordem de horário e sem dados pessoais', async () => {
+  let bounds;
+  const orders = [
+    evento({ id: 'tarde' }, { eventTime: '16:30', location: '  Rua  B   20,\nContagem ' }),
+    evento({ id: 'manha' }, { eventTime: '09:00', location: 'Rua C 30, BH', formType: '' }),
+    evento({ id: 'rascunho', eventDraft: true }),
+    evento({ id: 'outro-dia', eventDate: at('2026-10-11T15:00:00Z') }),
+    evento({ id: 'sem-local' }, { location: '   ' }),
+    evento({ id: 'sem-horario' }, { eventTime: '' }),
+    { id: 'video', eventDate: at('2026-10-10T15:00:00Z'), childName: 'Ana' }, // pedido comum, sem formulário de evento
+  ];
+  const events = await listDayEvents({ date: '2026-10-10', listOrdersBetween: async (start, end) => { bounds = [start.toISOString(), end.toISOString()]; return orders; } });
+  assert.deepEqual(events, [
+    { time: '09:00', location: 'Rua C 30, BH', formType: '' },
+    { time: '16:30', location: 'Rua B 20, Contagem', formType: 'Aniversário' },
+  ]);
+  assert.deepEqual(bounds, ['2026-10-10T03:00:00.000Z', '2026-10-11T02:59:59.999Z']); // o dia inteiro em Brasília (UTC-3)
+  assert.equal(/Pedro|Ana|c1|tarde|manha/.test(JSON.stringify(events)), false);
+});
+
+test('eventos do dia: data inválida é recusada antes de consultar; sem eventos devolve lista vazia', async () => {
+  const never = async () => { throw new Error('não deveria consultar'); };
+  for (const date of ['', '2026-02-31', '10/10/2026', undefined]) await assert.rejects(() => listDayEvents({ date, listOrdersBetween: never }), { code: 'invalid_date' });
+  assert.deepEqual(await listDayEvents({ date: '2026-10-10', listOrdersBetween: async () => [] }), []);
 });

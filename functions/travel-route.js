@@ -7,6 +7,9 @@
 
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { buildSequence, summarizeTravel, whatsAppBase } from '../services/travelCost.js';
+import { isValidDateInput } from '../services/eventForm.js';
+import { orderEventSlot } from './event-missions.js';
+import { endOfDay, startOfDay } from './missions-core.js';
 
 const GEOCODE_URL = 'https://maps.googleapis.com/maps/api/geocode/json';
 const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
@@ -16,6 +19,8 @@ const MESSAGES = {
   not_configured: 'O cálculo de deslocamento ainda não foi configurado no servidor.',
   stop_not_configured: 'A parada padrão não está configurada no servidor. Remova a parada ou informe outro endereço.',
   address_not_found: 'Não encontrei o endereço de {label}. Confira rua, número, bairro e cidade.',
+  invalid_date: 'Informe uma data válida.',
+  events_unavailable: 'Não foi possível consultar os eventos cadastrados agora. Tente novamente.',
   no_route: 'O Google não encontrou uma rota entre os pontos informados. Confira os endereços.',
   auth: 'O Google recusou a chave configurada no servidor.',
   rate_limited: 'O limite diário de consultas foi atingido ou o Google limitou as requisições. Tente novamente mais tarde.',
@@ -164,4 +169,19 @@ export async function calculateTravel({ input, config, fetchImpl = fetch, now = 
     whatsappBase: whatsAppBase(config.whatsappNumber),
     calculatedAt: now.toISOString(),
   };
+}
+
+/**
+ * Eventos cadastrados num dia (Brasília), para o agente importar os endereços. Mesma regra do check list do evento:
+ * pedido com formulário de evento completo (rascunhos do ManyChat ficam de fora), data e horário válidos.
+ * Devolve só horário, local e tipo, em ordem de horário: nunca nome da criança, cliente, telefone ou ID do pedido.
+ * `listOrdersBetween(inicio, fim)` devolve os pedidos com eventDate no intervalo (Firestore no servidor, falso nos testes).
+ */
+export async function listDayEvents({ date, listOrdersBetween }) {
+  if (!isValidDateInput(date)) throw new TravelRouteError('invalid_date');
+  const orders = await listOrdersBetween(startOfDay(date), endOfDay(date));
+  return orders
+    .filter((order) => orderEventSlot(order)?.key === date && String(order.eventForm.location ?? '').trim())
+    .map((order) => ({ time: order.eventForm.eventTime, location: String(order.eventForm.location).trim().replace(/\s+/g, ' '), formType: String(order.eventForm.formType ?? '').trim() }))
+    .sort((a, b) => a.time.localeCompare(b.time) || a.location.localeCompare(b.location));
 }

@@ -16,7 +16,13 @@ deles para um cálculo específico sem alterar o padrão.
   (correspondência parcial ou aproximada), o valor só aparece depois de o agente tocar em "Conferi, mostrar valor".
 - **Ajuste manual:** tocar no km de um trecho permite corrigi-lo (trajeto real diferente do mapa). O total, os valores e o texto são refeitos na tela, o trecho
   fica destacado mostrando o km do mapa (com "Restaurar") e o texto do WhatsApp marca o trecho com "(ajustado)". Os ajustes são descartados ao recalcular ou alterar o formulário.
-- **Data:** o campo "Data dos eventos" (hoje por padrão, não é lembrado) abre o texto do WhatsApp com `*Data:* DD/MM/AAAA`. Vazio = o texto sai sem a linha.
+- **Importar eventos do dia:** o botão busca os eventos cadastrados na data escolhida e preenche os endereços na ordem de horário (o agente ainda pode
+  editar, reordenar ou remover). Se já houver endereços digitados, pede confirmação antes de substituir; acima de 8 eventos importa os 8 primeiros e avisa.
+  A regra é a mesma do check list do evento: pedido com formulário de evento completo (rascunhos do ManyChat ficam de fora) com data, horário e local.
+  Não há "agente responsável" no pedido, então vêm **todos** os eventos do dia. O servidor consulta o Firestore (Admin SDK, a mesma credencial das outras rotas)
+  e devolve **só horário, local e tipo**: nunca nome da criança, cliente, telefone ou ID do pedido. Exige o mesmo código de acesso (`{ action: 'events', date }`).
+  O local é texto livre do formulário do pedido: a conferência dos endereços entendidos pelo mapa continua valendo.
+- **Data:** o campo "Data dos eventos" (hoje por padrão, não é lembrado; também define o dia da importação) abre o texto do WhatsApp com `*Data:* DD/MM/AAAA`. Vazio = o texto sai sem a linha.
 - O texto é montado na tela (o servidor só devolve a base do link `wa.me`, e só depois de validar o código de acesso).
 - Endereço não encontrado ou rota indisponível: erro apontando o ponto, sem valor.
 - A ordem dos eventos é a digitada (setas de subir/descer); o Google nunca reordena. Limite de 8 eventos por cálculo.

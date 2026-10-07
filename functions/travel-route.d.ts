@@ -1,6 +1,6 @@
 import type { TravelDefault, TravelInput, TravelSummary } from '../services/travelCost.js';
 
-export type TravelErrorCode = 'not_configured' | 'stop_not_configured' | 'address_not_found' | 'no_route' | 'auth' | 'rate_limited' | 'unavailable' | 'api_error';
+export type TravelErrorCode = 'not_configured' | 'stop_not_configured' | 'address_not_found' | 'invalid_date' | 'events_unavailable' | 'no_route' | 'auth' | 'rate_limited' | 'unavailable' | 'api_error';
 export class TravelRouteError extends Error { code: TravelErrorCode; detail?: unknown; constructor(code: TravelErrorCode, opts?: { label?: string; detail?: unknown }); }
 
 export interface TravelConfig {
@@ -21,3 +21,6 @@ export interface TravelResult {
   calculatedAt: string;
 }
 export function calculateTravel(opts: { input: TravelInput; config: TravelConfig; fetchImpl?: typeof fetch; now?: Date }): Promise<TravelResult>;
+
+export interface TravelDayEvent { time: string; location: string; formType: string }
+export function listDayEvents(opts: { date: string; listOrdersBetween: (start: Date, end: Date) => Promise<any[]> }): Promise<TravelDayEvent[]>;
