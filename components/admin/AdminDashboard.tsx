@@ -20,8 +20,10 @@ import { AdminVideoCallsPage } from './AdminVideoCallsPage';
 import { AdminInstagramPage } from './AdminInstagramPage';
 import { AdminAgentPage } from './AdminAgentPage';
 import { AdminProfilePage } from './AdminProfilePage';
-import { AdminNav, useNavOrder, type NavItem, type NavGroup } from './AdminNav';
+import { AdminNav, useNavOrder, type NavItem, type NavGroup, type NavBadge } from './AdminNav';
 import { subscribeActiveOrders } from '../../services/ordersService';
+import { subscribeTodayMissionsCount } from '../../services/missionsService';
+import { subscribeToVideos } from '../../services/videosService';
 import { 
   Shield, 
   LayoutDashboard, 
@@ -281,6 +283,26 @@ export const AdminDashboard: React.FC = () => {
     () => { setActiveOrdersCount(null); setOrdersCountFailed(true); },
   ), []);
 
+  // Contador "Missões": tarefas e to-dos com prazo para hoje ainda pendentes.
+  const [todayMissionsCount, setTodayMissionsCount] = useState<number | null>(null);
+  useEffect(() => subscribeTodayMissionsCount(setTodayMissionsCount), []);
+
+  // Contador "Vídeos": importados do Instagram aguardando revisão (mesmo critério do filtro "Aguardando revisão").
+  const [reviewVideosCount, setReviewVideosCount] = useState<number | null>(null);
+  const [reviewVideosFailed, setReviewVideosFailed] = useState(false);
+  useEffect(() => subscribeToVideos(
+    (videos) => { setReviewVideosCount(videos.filter((v) => v.needsReview).length); setReviewVideosFailed(false); },
+    () => { setReviewVideosCount(null); setReviewVideosFailed(true); },
+    false,
+  ), []);
+
+  const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
+  const navBadges: Partial<Record<AdminTab, NavBadge>> = {
+    orders: { count: activeOrdersCount, failed: ordersCountFailed, label: (n) => `${plural(n, 'pedido', 'pedidos')} em andamento`, failedLabel: 'Não foi possível contar os pedidos em andamento' },
+    missions: { count: todayMissionsCount, failed: false, label: (n) => `${plural(n, 'tarefa ou to-do', 'tarefas e to-dos')} para hoje`, failedLabel: '' },
+    videos: { count: reviewVideosCount, failed: reviewVideosFailed, label: (n) => `${plural(n, 'vídeo', 'vídeos')} aguardando revisão`, failedLabel: 'Não foi possível contar os vídeos aguardando revisão' },
+  };
+
   const renderNav = (variant: 'desktop' | 'mobile', afterSelect?: () => void) => (
     <AdminNav<AdminTab>
       pinned={pinnedItems}
@@ -292,8 +314,7 @@ export const AdminDashboard: React.FC = () => {
       customized={navCustomized}
       current={currentTab}
       onSelect={(id) => { handleTabChange(id); afterSelect?.(); }}
-      ordersCount={activeOrdersCount}
-      ordersCountFailed={ordersCountFailed}
+      badges={navBadges}
       variant={variant}
     />
   );
@@ -318,16 +339,8 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Navigation Items */}
-        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-          <div className="px-3 py-2 text-[10px] font-semibold text-white/40 uppercase tracking-widest">
-            Navegação Principal
-          </div>
-          {renderNav('desktop')}
-        </nav>
-
-        {/* Sidebar Footer Link to Public Site */}
-        <div className="p-4 border-t border-white/10">
+        {/* Link to Public Site */}
+        <div className="p-4 pb-0">
           <button
             onClick={() => navigate('/')}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-white/60 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-colors border border-white/5"
@@ -336,6 +349,14 @@ export const AdminDashboard: React.FC = () => {
             <span>Ver Site Público</span>
           </button>
         </div>
+
+        {/* Navigation Items */}
+        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
+          <div className="px-3 py-2 text-[10px] font-semibold text-white/40 uppercase tracking-widest">
+            Navegação Principal
+          </div>
+          {renderNav('desktop')}
+        </nav>
       </aside>
 
       {/* 2. SIDEBAR MOBILE (DRAWER) */}
@@ -371,11 +392,7 @@ export const AdminDashboard: React.FC = () => {
               </button>
             </div>
 
-            <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-              {renderNav('mobile', () => setMobileMenuOpen(false))}
-            </nav>
-
-            <div className="p-4 border-t border-white/10 space-y-2">
+            <div className="p-4 pb-0">
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
@@ -386,6 +403,13 @@ export const AdminDashboard: React.FC = () => {
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>Ver Site Público</span>
               </button>
+            </div>
+
+            <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
+              {renderNav('mobile', () => setMobileMenuOpen(false))}
+            </nav>
+
+            <div className="p-4 border-t border-white/10 space-y-2">
               <button
                 onClick={handleLogout}
                 disabled={isLoggingOut}

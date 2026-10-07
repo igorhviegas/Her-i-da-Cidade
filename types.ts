@@ -226,6 +226,8 @@ export interface Video {
   active: boolean;
   featured?: boolean;
   badgeText?: string;
+  /** Importado do Instagram e ainda não revisado (mapDocToVideo só preenche quando true). */
+  needsReview?: boolean;
   order?: number;
   createdAt?: string;
   updatedAt?: string;

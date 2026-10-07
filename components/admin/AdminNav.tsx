@@ -27,6 +27,8 @@ export function useNavOrder<Id extends string>(uid: string | undefined, defaultI
   return { order, setOrder, reset, customized: saved !== null && order.join() !== defaultIds.join() };
 }
 
+export interface NavBadge { count: number | null; failed: boolean; label: (count: number) => string; failedLabel: string }
+
 interface Props<Id extends string> {
   pinned: NavItem<Id>[];
   items: NavItem<Id>[];
@@ -37,9 +39,8 @@ interface Props<Id extends string> {
   customized: boolean;
   current: Id;
   onSelect: (id: Id) => void;
-  /** null = ainda carregando ou indisponível; nunca é exibido como zero. */
-  ordersCount: number | null;
-  ordersCountFailed: boolean;
+  /** Bolinha de contagem por módulo. count null = ainda carregando; failed = indisponível (exibe "!"); nunca é exibido como zero. */
+  badges: Partial<Record<Id, NavBadge>>;
   variant: 'desktop' | 'mobile';
 }
 
@@ -49,7 +50,7 @@ const smallBtn = 'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg t
  * Navegação lateral: "pinned" fica fixo no topo; os demais módulos podem ser arrastados (mouse), movidos com Alt + ↑/↓
  * ou, no modo "Reordenar" (alternativa por toque), com os botões ▲ ▼.
  */
-export function AdminNav<Id extends string>({ pinned, items, groups, order, onReorder, onReset, customized, current, onSelect, ordersCount, ordersCountFailed, variant }: Props<Id>) {
+export function AdminNav<Id extends string>({ pinned, items, groups, order, onReorder, onReset, customized, current, onSelect, badges, variant }: Props<Id>) {
   const [dragging, setDragging] = useState<Id | null>(null);
   const [over, setOver] = useState<{ id: Id; position: 'before' | 'after' } | null>(null);
   const [announce, setAnnounce] = useState('');
@@ -80,8 +81,9 @@ export function AdminNav<Id extends string>({ pinned, items, groups, order, onRe
   const renderButton = (item: NavItem<Id>, extra?: Partial<React.ButtonHTMLAttributes<HTMLButtonElement>>) => {
     const Icon = item.icon;
     const active = current === item.id;
-    const showCount = item.id === ('orders' as Id);
-    const label = ordersCountFailed ? 'Não foi possível contar os pedidos em andamento' : ordersCount === 1 ? '1 pedido em andamento' : `${ordersCount} pedidos em andamento`;
+    const badge = badges[item.id];
+    const showCount = !!badge && (badge.failed || (badge.count !== null && badge.count > 0));
+    const label = badge ? (badge.failed ? badge.failedLabel : badge.label(badge.count ?? 0)) : '';
     return (
       <button
         type="button"
@@ -96,15 +98,15 @@ export function AdminNav<Id extends string>({ pinned, items, groups, order, onRe
           <Icon className={`w-4 h-4 shrink-0 ${active || variant === 'mobile' ? 'text-white' : 'text-white/50'}`} />
           <span className="truncate">{item.label}</span>
         </span>
-        {showCount && (ordersCountFailed || (ordersCount !== null && ordersCount > 0)) && (
+        {showCount && (
           <span
             className={`flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none tabular-nums ${
-              ordersCountFailed ? 'bg-white/15 text-white/70' : 'bg-amber-400 text-[#0B1120]'
+              badge!.failed ? 'bg-white/15 text-white/70' : 'bg-amber-400 text-[#0B1120]'
             }`}
             aria-label={label}
             title={label}
           >
-            {ordersCountFailed ? '!' : ordersCount! > 99 ? '99+' : ordersCount}
+            {badge!.failed ? '!' : badge!.count! > 99 ? '99+' : badge!.count}
           </span>
         )}
       </button>
