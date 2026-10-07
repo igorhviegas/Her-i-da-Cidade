@@ -221,7 +221,7 @@ async function setCompletedOrder(reference: ReturnType<typeof doc>, payload: Rec
   await runTransaction(firestore, async (transaction) => {
     const refs = activityRefs(firestore, 'order_completed', reference.id);
     const record = await prepareActivityLog(transaction, refs, {
-      type: 'order_completed', refId: reference.id, occurredAt, difficultyKey: `service_${payload.serviceId}`, meta: { serviceId: payload.serviceId },
+      type: 'order_completed', refId: reference.id, occurredAt, difficultyKey: `service_${payload.serviceId}`, meta: { serviceId: payload.serviceId, value: payload.totalPaid },
     });
     transaction.set(reference, payload);
     if (record) transaction.set(refs.logRef, record);
@@ -417,8 +417,14 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     const activityRecord = activityRefsForOrder
       ? await prepareActivityLog(transaction, activityRefsForOrder, {
         type: 'order_completed', refId: id, occurredAt: updates.completedAt instanceof Date ? updates.completedAt : new Date(),
-        difficultyKey: `service_${serviceId}`, meta: { serviceId, ...(currentData.scriptId ? { scriptId: currentData.scriptId } : {}) },
+        difficultyKey: `service_${serviceId}`, meta: { serviceId, value: updates.totalPaid ?? currentData.totalPaid, ...(currentData.scriptId ? { scriptId: currentData.scriptId } : {}) },
       })
+      : null;
+
+    // Roteiro que passa a Publicado com a conclusão do pedido: evento permanente (2.000 XP), uma vez por roteiro.
+    const publishRefs = linkedScriptRef && linkedScript && linkedScript.publicationStatus !== 'published' ? activityRefs(firestore, 'content_published', linkedScriptRef.id) : null;
+    const publishRecord = publishRefs && linkedScriptRef
+      ? await prepareActivityLog(transaction, publishRefs, { type: 'content_published', refId: linkedScriptRef.id, occurredAt: updates.completedAt instanceof Date ? updates.completedAt : new Date(), meta: { orderId: id } })
       : null;
 
     if (updates.status === 'completed' && currentData.status !== 'completed') Object.assign(payload, editingCostFields(serviceId, currentData));
@@ -428,6 +434,7 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     ledgerWrites.forEach(({ id: entryId, record }) => transaction.set(doc(firestore, LEDGER_COLLECTION, entryId), record));
     if (draftEntry) transaction.set(doc(firestore, LEDGER_COLLECTION, draftEntry.id), draftEntry.record);
     if (activityRefsForOrder && activityRecord) transaction.set(activityRefsForOrder.logRef, activityRecord);
+    if (publishRefs && publishRecord) transaction.set(publishRefs.logRef, publishRecord);
     if (linkedScriptRef && linkedScript) {
       transaction.update(linkedScriptRef, {
         productionStatus: 'produced',

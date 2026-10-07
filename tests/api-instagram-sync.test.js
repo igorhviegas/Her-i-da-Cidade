@@ -344,3 +344,29 @@ test('página: calendário e filtro de período (padrão 30 dias) ligados; saldo
   assert.match(page, /subscribeInstagramDays\(setDays, \(\) => setDaysError\(true\)\)/);
   assert.match(page, /filterByPeriod\(current, period/);
 });
+
+test('XP: sem baseline não grava nada; com baseline premia só o que subiu e não repete na sincronização seguinte', async () => {
+  const none = fakeDb();
+  await run(none, fakeFetch().impl);
+  assert.equal([...none.store.keys()].some((key) => key.startsWith('activityLog/') || key === 'instagramPrivate/xp'), false);
+
+  const db = fakeDb({
+    'xpBaseline/main': { total: 0, ig: { followers: 1500 } },
+    'instagramPosts/1': { id: '1', views: 100, likes: 10, comments: 2 },
+    'instagramPosts/2': { id: '2', views: null, likes: null, comments: 1 },
+  });
+  await run(db, fakeFetch({ followers: 1600 }).impl);
+  // post 1: views 100→123 = 23; post 2: views null→123 = 123 (o baseline contou 0); curtidas/comentários iguais; seguidores +100 × 10
+  const event = db.store.get('activityLog/instagram_2026-02-01');
+  assert.equal(event.xp, 23 + 123 + 1000);
+  assert.equal(event.type, 'instagram');
+  assert.equal(db.store.get('instagramPrivate/xp').followersHigh, 1600);
+
+  await run(db, fakeFetch({ followers: 1600 }).impl, { now: T0 + 1000 }); // nada mudou
+  assert.equal(db.store.get('activityLog/instagram_2026-02-01').xp, 1146);
+  await run(db, fakeFetch({ followers: 1650 }).impl, { now: T0 + 2000 }); // +50 seguidores no mesmo dia: acumula no mesmo evento
+  assert.equal(db.store.get('activityLog/instagram_2026-02-01').xp, 1146 + 500);
+  await run(db, fakeFetch({ followers: 1000 }).impl, { now: T0 + 3000 }); // queda não tira XP
+  await run(db, fakeFetch({ followers: 1650 }).impl, { now: T0 + 4000 }); // e voltar ao valor anterior não paga de novo
+  assert.equal(db.store.get('activityLog/instagram_2026-02-01').xp, 1646);
+});

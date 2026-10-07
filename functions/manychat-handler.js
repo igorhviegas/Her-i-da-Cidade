@@ -354,7 +354,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
         orderData.completedAt = paidAt;
         // Pedido que já nasce concluído: registro permanente na mesma transação, com a dificuldade vigente.
         activity = await prepareActivityLog(transaction, { logRef, configRef: database.collection(GAMIFICATION_CONFIG_PATH[0]).doc(GAMIFICATION_CONFIG_PATH[1]) }, {
-          type: 'order_completed', refId: orderRef.id, occurredAt: paidAt.toDate(), difficultyKey: `service_${profile.serviceId}`, meta: { serviceId: profile.serviceId },
+          type: 'order_completed', refId: orderRef.id, occurredAt: paidAt.toDate(), difficultyKey: `service_${profile.serviceId}`, meta: { serviceId: profile.serviceId, value: evaluation.price },
         });
       }
 

@@ -110,13 +110,16 @@ export async function createContentScript(input: ContentScriptInput): Promise<Co
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
-  if (fields.productionStatus === 'ready') {
+  if (fields.productionStatus === 'ready' || fields.publicationStatus === 'published') {
     const firestore = db;
     await runTransaction(firestore, async (transaction) => {
       const refs = activityRefs(firestore, 'script_ready', reference.id);
-      const record = await prepareActivityLog(transaction, refs, { type: 'script_ready', refId: reference.id, occurredAt: new Date(), difficultyKey: 'script_created' });
+      const record = fields.productionStatus === 'ready' ? await prepareActivityLog(transaction, refs, { type: 'script_ready', refId: reference.id, occurredAt: new Date(), difficultyKey: 'script_created' }) : null;
+      const publishRefs = activityRefs(firestore, 'content_published', reference.id);
+      const publishRecord = fields.publicationStatus === 'published' ? await prepareActivityLog(transaction, publishRefs, { type: 'content_published', refId: reference.id, occurredAt: new Date() }) : null;
       transaction.set(reference, payload);
       if (record) transaction.set(refs.logRef, record);
+      if (publishRecord) transaction.set(publishRefs.logRef, publishRecord);
     });
   } else {
     await setDoc(reference, payload);
@@ -140,6 +143,11 @@ export async function updateContentScript(id: string, input: ContentScriptInput)
     const becomesReady = fields.productionStatus === 'ready' && !current.data().readyAt;
     const refs = becomesReady ? activityRefs(firestore, 'script_ready', id) : null;
     const record = refs ? await prepareActivityLog(transaction, refs, { type: 'script_ready', refId: id, occurredAt: new Date(), difficultyKey: 'script_created' }) : null;
+    // Conteúdo publicado: evento permanente (2.000 XP) na 1ª vez que o roteiro vira Publicado (ID por roteiro, então republicar não paga de novo).
+    // Roteiros já publicados na criação do baseline ficam em xpBaseline.counted.scripts e não pagam de novo (ver functions/xp.js).
+    const becomesPublished = fields.publicationStatus === 'published' && current.data().publicationStatus !== 'published';
+    const publishRefs = becomesPublished ? activityRefs(firestore, 'content_published', id) : null;
+    const publishRecord = publishRefs ? await prepareActivityLog(transaction, publishRefs, { type: 'content_published', refId: id, occurredAt: new Date() }) : null;
     transaction.update(scriptRef, {
       ...fields,
       publishedAt: publishedAt || deleteField(),
@@ -148,6 +156,7 @@ export async function updateContentScript(id: string, input: ContentScriptInput)
       updatedAt: serverTimestamp(),
     });
     if (refs && record) transaction.set(refs.logRef, record);
+    if (publishRefs && publishRecord) transaction.set(publishRefs.logRef, publishRecord);
   });
 }
 

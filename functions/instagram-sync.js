@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { applyDaily } from '../services/instagramDaily.js';
 import { importReelsAsVideos } from './instagram-video-import.js';
 import { metricOrNull, normalizeMedia } from '../services/instagramMetrics.js';
+import { BASELINE_PATH, igXpDelta } from './xp.js';
 
 const PAGE_SIZE = 50;
 const MAX_PAGES = 2; // ponytail: só as 100 publicações mais recentes (cabe nos limites de tempo/requisições); aumentar com paginação em lotes.
@@ -17,6 +18,8 @@ export const LOCK_PATH = 'instagramPrivate/lock';
 export const DAILY_PATH = 'instagramPrivate/daily'; // referências do balanço diário (estado interno; o saldo exibido vai em profile.daily)
 export const POSTS_COLLECTION = 'instagramPosts';
 export const DAY_PREFIX = 'instagramMeta/day-'; // saldo diário (calendário); coberto pela regra de instagramMeta (leitura admin, escrita negada)
+export const XP_CURSOR_PATH = 'instagramPrivate/xp'; // maior nº de seguidores já premiado (estado interno do XP)
+export const ACTIVITY_LOG_COLLECTION = 'activityLog';
 export const STATS_COLLECTION = 'instagramStats'; // retrato diário de seguidores (metas de ganho de seguidores); id = dia em Brasília
 
 const MESSAGES = {
@@ -126,6 +129,36 @@ function insightsWarning(s) {
   return null;
 }
 
+/**
+ * XP do Instagram (functions/xp.js): só depois que o baseline existe (xpBaseline/main), e só pelo que subiu desde a sincronização anterior.
+ * Lê o estado ANTES de o batch sobrescrever as publicações. Devolve as escritas a juntar ao batch ({ ref, data }), ou [] sem baseline.
+ * Evento diário activityLog/instagram_AAAA-MM-DD acumula o XP do dia (as sincronizações do dia são serializadas pela reserva).
+ * ponytail: falha aqui é registrada e o XP daquela rodada se perde (não derruba a sincronização do painel).
+ */
+async function planInstagramXp({ db, posts, followers, now, day }) {
+  try {
+    const baseline = await db.doc(BASELINE_PATH.join('/')).get();
+    if (!baseline.exists) return [];
+    const [cursor, ...before] = await Promise.all([db.doc(XP_CURSOR_PATH).get(), ...posts.map((p) => db.doc(`${POSTS_COLLECTION}/${p.id}`).get())]);
+    const prev = {};
+    before.forEach((snap, i) => { if (snap.exists) prev[posts[i].id] = snap.data(); });
+    const followersHigh = cursor.exists ? cursor.data().followersHigh : baseline.data().ig?.followers ?? null;
+    const { xp, followersHigh: high } = igXpDelta({ prev, posts, followers, followersHigh });
+    const writes = [];
+    if (high !== null && high !== followersHigh) writes.push({ ref: db.doc(XP_CURSOR_PATH), data: { followersHigh: high, updatedAt: new Date(now).toISOString() } });
+    if (xp > 0) {
+      const eventRef = db.doc(`${ACTIVITY_LOG_COLLECTION}/instagram_${day}`);
+      const existing = await eventRef.get();
+      const old = existing.exists ? existing.data() : null;
+      writes.push({ ref: eventRef, data: { type: 'instagram', refId: day, difficulty: null, difficultyKey: null, occurredAt: old?.occurredAt ?? new Date(now), xp: (old?.xp ?? 0) + xp } });
+    }
+    return writes;
+  } catch (error) {
+    console.error('[Instagram Sync] XP não calculado nesta rodada:', error instanceof Error ? error.name : 'erro');
+    return [];
+  }
+}
+
 async function sync({ db, fetchImpl, env, now }) {
   const profileRef = db.doc(PROFILE_PATH);
   const iso = new Date(now).toISOString();
@@ -171,6 +204,7 @@ async function sync({ db, fetchImpl, env, now }) {
     const prevDaily = await dailyRef.get();
     const daily = applyDaily({ prev: prevDaily.exists ? prevDaily.data() : null, nowMs: now, followers: me.followers_count, posts });
     batch.set(dailyRef, daily.state);
+    for (const { ref, data } of await planInstagramXp({ db, posts, followers: me.followers_count, now, day: daily.state.day })) batch.set(ref, data);
     // Saldo do dia no histórico do calendário (um documento por dia, regravado a cada sincronização; o dia anterior fica como estava).
     batch.set(db.doc(`${DAY_PREFIX}${daily.summary.day}`), daily.summary);
     // Retrato diário: a referência de seguidores do dia (a mesma do balanço, fixada na 1ª sincronização do dia). É regravado a cada

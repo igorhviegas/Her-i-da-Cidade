@@ -334,6 +334,12 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Linha de base do XP (functions/xp.js): XP retroativo gravado uma única vez; nunca mais alterado nem apagado.
+    match /xpBaseline/{id} {
+      allow read, create: if isAdmin();
+      allow update, delete: if false;
+    }
+
 
     // Área /agente-hdc (sem login): roteiro e playlist com leitura pública; só administradores editam.
     match /agentSteps/{stepId} {

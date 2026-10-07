@@ -19,6 +19,7 @@ import { AdminCalendarPage } from './AdminCalendarPage';
 import { AdminVideoCallsPage } from './AdminVideoCallsPage';
 import { AdminInstagramPage } from './AdminInstagramPage';
 import { AdminAgentPage } from './AdminAgentPage';
+import { AdminProfilePage } from './AdminProfilePage';
 import { AdminNav, useNavOrder, type NavItem, type NavGroup } from './AdminNav';
 import { subscribeActiveOrders } from '../../services/ordersService';
 import { 
@@ -54,7 +55,7 @@ import {
   Headset
 } from 'lucide-react';
 
-type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram' | 'calendar' | 'videocalls' | 'agent';
+type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram' | 'calendar' | 'videocalls' | 'agent' | 'profile';
 
 // Módulos reorganizáveis (ordem padrão). "Principal" é fixo no topo e fica fora desta lista.
 const NAV_ITEMS: NavItem<AdminTab>[] = [
@@ -115,6 +116,8 @@ export const AdminDashboard: React.FC = () => {
       ? 'agent'
       : path === '/admin/dashboard'
       ? 'dashboard'
+      : path === '/admin/perfil'
+      ? 'profile'
       : 'home';
 
   const [currentTab, setCurrentTab] = useState<AdminTab>(initialTab);
@@ -126,7 +129,7 @@ export const AdminDashboard: React.FC = () => {
     const link = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
     if (!link) return;
     const original = link.getAttribute('href') ?? '';
-    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes', '/admin/agendamento-chamadas': 'calendario' } as Record<string, string>)[path] ?? path.split('/')[2];
+    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes', '/admin/agendamento-chamadas': 'calendario', '/admin/perfil': 'principal' } as Record<string, string>)[path] ?? path.split('/')[2];
     if (slug) link.setAttribute('href', `/images/modules/${slug}.png`);
     return () => link.setAttribute('href', original);
   }, [path]);
@@ -163,6 +166,8 @@ export const AdminDashboard: React.FC = () => {
       setCurrentTab('agent');
     } else if (path === '/admin/dashboard') {
       setCurrentTab('dashboard');
+    } else if (path === '/admin/perfil') {
+      setCurrentTab('profile');
     } else if (path === '/admin') {
       setCurrentTab('home');
     }
@@ -200,6 +205,8 @@ export const AdminDashboard: React.FC = () => {
       navigate('/admin/agente');
     } else if (tabId === 'dashboard') {
       navigate('/admin/dashboard');
+    } else if (tabId === 'profile') {
+      navigate('/admin/perfil');
     } else if (tabId === 'home') {
       navigate('/admin');
     }
@@ -421,10 +428,10 @@ export const AdminDashboard: React.FC = () => {
           <div className="flex shrink-0 items-center gap-2 sm:gap-4">
             <FinanceRevenueBadge />
             <NotificationsBell onOpenMissions={() => handleTabChange('missions')} />
-            <div className="flex items-center gap-2.5 pl-3 border-l border-white/10 text-right">
+            <button type="button" onClick={() => handleTabChange('profile')} title="Abrir meu perfil" aria-label="Abrir meu perfil" aria-current={currentTab === 'profile' ? 'page' : undefined} className="flex items-center gap-2.5 pl-3 border-l border-white/10 text-right rounded-xl hover:bg-white/5 transition-colors">
               <div className="hidden md:block">
                 <p className="text-xs font-semibold text-white leading-none">
-                  {adminData?.displayName || user?.displayName || user?.email?.split('@')[0] || 'Administrador'}
+                  {user?.displayName || adminData?.displayName || user?.email?.split('@')[0] || 'Administrador'}
                 </p>
                 <p className="text-[11px] text-white/40 mt-1 font-mono leading-none truncate max-w-[180px]">
                   {user?.email}
@@ -432,9 +439,9 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-inner ring-2 ring-white/10">
-                {(user?.email?.[0] || 'A').toUpperCase()}
+                {(user?.displayName?.[0] || user?.email?.[0] || 'A').toUpperCase()}
               </div>
-            </div>
+            </button>
 
             <button
               onClick={handleLogout}
@@ -454,6 +461,7 @@ export const AdminDashboard: React.FC = () => {
           {currentTab === 'home' && <AdminHomePage onNavigate={handleTabChange} />}
           {currentTab === 'calendar' && <AdminCalendarPage />}
           {currentTab === 'videocalls' && <AdminVideoCallsPage />}
+          {currentTab === 'profile' && <AdminProfilePage />}
 
           {/* TAB: DASHBOARD */}
           {currentTab === 'dashboard' && (
