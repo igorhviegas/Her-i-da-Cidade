@@ -14,5 +14,6 @@ export function orderXp(value: unknown): number;
 export function xpOfEvent(event: { type?: string; xp?: number; difficulty?: number | null; meta?: Record<string, any> }): number;
 export interface XpBaseline { at: any; total: number; categories?: Record<string, { count: number; xp: number }>; counted?: { orders?: string[]; scripts?: string[] }; ig?: { followers: number } }
 export function totalXp(baseline: XpBaseline | null | undefined, events: any[]): { baseline: number; events: number; total: number } | null;
+export function eventReward(baseline: XpBaseline | null | undefined, event: any): { xp: number; revenue: number; cost: number } | null;
 export function buildBaseline(input: Record<string, any>): { categories: Record<string, { count: number; xp: number }>; total: number; counted: { orders: string[]; scripts: string[] }; ig: { followers: number } };
 export function igXpDelta(input: { prev: Record<string, any>; posts: any[]; followers: unknown; followersHigh: unknown }): { xp: number; followersHigh: number | null };
