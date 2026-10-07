@@ -61,7 +61,7 @@ Montagem do atalho (app Atalhos → "Enviar Fit"):
 5. **Obter Conteúdo do URL**: URL do endpoint, método **POST**, cabeçalho `Authorization` = `Bearer <token>`, corpo **JSON** com os campos `day` (texto), `steps`, `walkRunKm` e `weightKg` (números).
 6. Automação pessoal: *Abrir app* (QZ e/ou Saúde) → executar o atalho, com "Perguntar antes de executar" desligado. Também dá para rodá-lo pela tela de início.
 
-Se o servidor responder 400 `invalid_payload`, a resposta traz o **nome e o tipo** de cada campo recebido (nunca o valor), por exemplo `{"day":"número"}`: no Atalhos, `day` precisa ser do tipo **Texto**.
+O `day` aceita `2026-10-07`, com hora (`2026-10-07 19:06`) ou `07/10/2026`; espaços e marcas invisíveis do iOS em volta são ignorados. Se o servidor responder 400 `invalid_payload`, a resposta traz o **nome e o tipo** de cada campo recebido e a **forma** do `day` (`9999-99-99`; caractere invisível aparece como `<U+200E>`), nunca os valores. No Atalhos, `day` precisa ser do tipo **Texto**.
 
 Cuidados: o atalho guarda o token, então **não compartilhe o atalho**. O iOS bloqueia o Saúde com o telefone bloqueado (a automação "Abrir app" funciona porque o aparelho está desbloqueado). Só o dia de hoje é enviado: o dia que passar sem abrir o app fica sem registro. **Não validado em aparelho**: o nome exato das ações e como o Atalhos devolve distância e peso.
 

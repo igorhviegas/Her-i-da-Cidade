@@ -22,13 +22,28 @@ const FIELD_SPECS = Object.fromEntries(Object.values(METRICS).map((spec) => [spe
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
+ * Extrai AAAA-MM-DD do texto que o Atalhos manda: ignora marcas invisíveis do iOS (U+200E, U+2066…), espaços e quebras de linha em volta,
+ * aceita data seguida de hora ("2026-10-07 19:06", "2026-10-07T19:06:00-03:00") e DD/MM/AAAA (o padrão do iPhone no Brasil).
+ * Qualquer outra coisa volta limpa e segue para a validação, que a recusa.
+ */
+function normalizeDay(raw) {
+  const text = raw.normalize('NFKC').replace(/\p{Cf}/gu, '').trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T\s])/.exec(text);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const br = /^(\d{2})\/(\d{2})\/(\d{4})(?:$|[\s,])/.exec(text);
+  if (br) return `${br[3]}-${br[2]}-${br[1]}`;
+  return text;
+}
+
+/**
  * Envio simples de um dia, para o Atalho do iPhone (sem o Health Auto Export): { day: 'AAAA-MM-DD', steps, walkRunKm, weightKg, ... }.
  * Mesmos campos, unidades (km, kcal, kg, min) e limites do export do app. Aceita número ou texto numérico ("1,8" ou "1.8", como o
  * Atalhos às vezes formata). Campo desconhecido é descartado e contado; o que estiver fora do plausível, também (invalid).
  */
 function parseDailyPush(body) {
-  const day = typeof body.day === 'string' ? body.day : '';
-  const real = DAY_RE.test(day) && new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) === day; // rejeita 2026-02-31
+  const day = typeof body.day === 'string' ? normalizeDay(body.day) : '';
+  const parsed = new Date(`${day}T00:00:00Z`);
+  const real = DAY_RE.test(day) && !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === day; // rejeita 2026-02-31 e 2026-13-01 (esta lança em toISOString)
   if (!real) return null;
   const stats = { accepted: 0, ignoredMetrics: 0, invalid: 0 };
   const doc = {};
@@ -103,12 +118,15 @@ const typeName = (v) => (v === null ? 'nulo' : Array.isArray(v) ? 'lista' : { nu
  * Explica por que um corpo não foi aceito, dizendo só o NOME e o TIPO de cada campo recebido, nunca o valor (é dado de saúde
  * e o token vai no cabeçalho). Serve para depurar o Atalho do iPhone, onde um campo no tipo errado é o erro mais comum.
  */
+/** "2026-10-07" -> "9999-99-99"; caractere invisível ou fora do ASCII aparece como <U+200E>. Mostra a forma do texto, não o valor. */
+const shapeOf = (text) => [...text].slice(0, 40).map((ch) => (/[0-9]/.test(ch) ? '9' : /[A-Za-z]/.test(ch) ? 'a' : ch.charCodeAt(0) > 32 && ch.charCodeAt(0) < 127 ? ch : `<U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}>`)).join('');
+
 export function describeInvalidPayload(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { message: 'O corpo precisa ser um JSON (objeto).', received: typeName(body) };
   const received = Object.fromEntries(Object.entries(body).slice(0, 20).map(([name, value]) => [name.slice(0, 40), typeName(value)]));
   const message = 'day' in body
-    ? `O campo "day" precisa ser texto no formato AAAA-MM-DD (recebido: ${typeName(body.day)}${typeof body.day === 'string' ? ' fora do formato ou data inexistente' : ''}). No Atalhos, crie o campo como Texto.`
+    ? `O campo "day" precisa ser texto no formato AAAA-MM-DD (recebido: ${typeName(body.day)}${typeof body.day === 'string' ? ' fora do formato ou data inexistente' : ''}). Aceito: 2026-10-07, 2026-10-07 com hora ou 07/10/2026. No Atalhos, crie o campo como Texto.`
     : body.data ? 'Esperado o JSON do Health Auto Export (data.metrics).'
       : 'Faltou o campo "day" (texto AAAA-MM-DD) do envio simples ou o JSON do Health Auto Export (data.metrics).';
-  return { message, received };
+  return { message, received, ...(typeof body.day === 'string' ? { dayShape: shapeOf(body.day) } : {}) };
 }

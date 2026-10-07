@@ -71,3 +71,16 @@ test('fit-ingest: payload inválido devolve 400 com nome e tipo dos campos, sem 
   assert.deepEqual(res.body.error.received, { day: 'número', steps: 'número' });
   assert.doesNotMatch(JSON.stringify(res.body), /20261007|2431/);
 });
+
+test('fit-ingest: o atalho com data "suja" (marca invisível, hora, DD/MM/AAAA) grava no dia certo; texto inválido mostra a forma do day', async () => {
+  for (const day of ['‎2026-10-07\n', '07/10/2026 19:06']) {
+    const database = fakeDatabase();
+    const res = await call(request({ body: { day, steps: '2431' } }), { database });
+    assert.equal(res.statusCode, 200, JSON.stringify(day));
+    assert.deepEqual(database.paths, [`users/${UID}/fitDaily/2026-10-07`]);
+  }
+  const bad = await call(request({ body: { day: 'ontem', steps: 5 } }), { database: fakeDatabase() });
+  assert.equal(bad.statusCode, 400);
+  assert.equal(bad.body.error.dayShape, 'aaaaa');
+  assert.doesNotMatch(JSON.stringify(bad.body), /ontem/);
+});
