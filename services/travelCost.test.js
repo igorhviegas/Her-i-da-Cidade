@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MAX_EVENTS, buildSequence, formatBRL, metersToKm, summarizeTravel, travelWhatsAppText, validateTravelInput, whatsAppLink } from './travelCost.js';
+import { MAX_EVENTS, applyKmOverrides, buildSequence, formatBRL, formatDateKey, metersToKm, parseKm, summarizeTravel, travelWhatsAppText, validateTravelInput, whatsAppBase, whatsAppLink } from './travelCost.js';
 
 const defaults = { start: { label: 'Casa A', address: 'addr-start' }, stop: { label: 'Casa B', address: 'addr-stop' }, end: { label: 'Casa A', address: 'addr-start' } };
 const base = { events: ['Rua das Flores 10, Betim', 'Av. Brasil 200, Contagem'], kmRate: '1,90', eventFee: '115' };
@@ -70,9 +70,47 @@ test('texto do WhatsApp: trechos, totais e valor final, sem endereços', () => {
   assert.equal(formatBRL(1234.5), 'R$ 1.234,50');
 });
 
-test('link do WhatsApp: aceita número com ou sem DDI, recusa inválido', () => {
-  assert.equal(whatsAppLink('(31) 91234-5678', 'oi mundo'), 'https://wa.me/5531912345678?text=oi%20mundo');
-  assert.equal(whatsAppLink('5531912345678', 'x'), 'https://wa.me/5531912345678?text=x');
-  assert.equal(whatsAppLink('', 'x'), null);
-  assert.equal(whatsAppLink('123', 'x'), null);
+test('data abre o texto do WhatsApp; sem data (ou inválida) o texto não tem a linha', () => {
+  const summary = summarizeTravel({ legs: [{ from: 'Casa A', to: 'Evento 1', meters: 10000 }], kmRate: 1.9, eventFee: 115, eventCount: 1 });
+  const lines = travelWhatsAppText(summary, { date: '2026-10-07' }).split('\n');
+  assert.deepEqual(lines.slice(0, 3), ['*Data:* 07/10/2026', '*Deslocamento e cachês*', '']);
+  assert.equal(travelWhatsAppText(summary).split('\n')[0], '*Deslocamento e cachês*');
+  assert.equal(travelWhatsAppText(summary, { date: '' }).split('\n')[0], '*Deslocamento e cachês*');
+  assert.equal(formatDateKey('2026-02-03'), '03/02/2026');
+  assert.equal(formatDateKey('07/10/2026'), '');
+  assert.equal(formatDateKey(undefined), '');
+});
+
+test('km digitado: vírgula ou ponto, 1 casa, recusa vazio, negativo, texto e absurdo', () => {
+  assert.equal(parseKm('12,5'), 12.5);
+  assert.equal(parseKm(' 7.25 '), 7.3);
+  assert.equal(parseKm('0'), 0);
+  for (const bad of ['', '  ', '-1', 'abc', '3001', null, undefined]) assert.equal(parseKm(bad), null, String(bad));
+});
+
+test('ajuste manual de km: refaz total, valores e texto; só os trechos corrigidos levam "(ajustado)"', () => {
+  const base = summarizeTravel({
+    legs: [{ from: 'A', to: 'B', meters: 12340 }, { from: 'B', to: 'C', meters: 5040 }, { from: 'C', to: 'A', meters: 17640 }],
+    kmRate: 1.9, eventFee: 115, eventCount: 3,
+  });
+  assert.deepEqual(applyKmOverrides(base, {}), base); // sem ajustes: idêntico ao calculado
+  const adjusted = applyKmOverrides(base, { 1: 8.2, 2: 0 });
+  assert.deepEqual(adjusted.legs.map((l) => l.km), [12.3, 8.2, 0]);
+  assert.deepEqual(adjusted.legs.map((l) => !!l.adjusted), [false, true, true]);
+  assert.equal(adjusted.totalKm, 20.5);
+  assert.equal(adjusted.travelCost, 38.95); // 20,5 × 1,90
+  assert.equal(adjusted.total, 383.95);
+  assert.equal(base.totalKm, 34.9); // o resumo original não é alterado
+  const text = travelWhatsAppText(adjusted);
+  assert.ok(text.includes('• B → C: 8,2 km (ajustado)'));
+  assert.ok(text.includes('• A → B: 12,3 km\n'));
+  assert.equal(applyKmOverrides(base, { 0: 12.3 }).legs[0].adjusted, true); // mesmo valor, mas marcado como ajustado pelo agente
+});
+
+test('link do WhatsApp: base aceita número com ou sem DDI e recusa inválido; texto vai codificado', () => {
+  assert.equal(whatsAppBase('(31) 91234-5678'), 'https://wa.me/5531912345678');
+  assert.equal(whatsAppBase('5531912345678'), 'https://wa.me/5531912345678');
+  assert.equal(whatsAppBase(''), null);
+  assert.equal(whatsAppBase('123'), null);
+  assert.equal(whatsAppLink('https://wa.me/5531912345678', 'oi mundo'), 'https://wa.me/5531912345678?text=oi%20mundo');
 });

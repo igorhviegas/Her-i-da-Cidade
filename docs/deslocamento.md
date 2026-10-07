@@ -14,6 +14,10 @@ deles para um cálculo específico sem alterar o padrão.
 - O total de km é a **soma dos trechos como aparecem na tela** (cada trecho arredondado a 0,1 km), então a conta confere de cabeça.
 - Os trechos e os endereços entendidos pelo mapa aparecem **antes** do valor. Se o Google não achou o número exato de algum endereço
   (correspondência parcial ou aproximada), o valor só aparece depois de o agente tocar em "Conferi, mostrar valor".
+- **Ajuste manual:** tocar no km de um trecho permite corrigi-lo (trajeto real diferente do mapa). O total, os valores e o texto são refeitos na tela, o trecho
+  fica destacado mostrando o km do mapa (com "Restaurar") e o texto do WhatsApp marca o trecho com "(ajustado)". Os ajustes são descartados ao recalcular ou alterar o formulário.
+- **Data:** o campo "Data dos eventos" (hoje por padrão, não é lembrado) abre o texto do WhatsApp com `*Data:* DD/MM/AAAA`. Vazio = o texto sai sem a linha.
+- O texto é montado na tela (o servidor só devolve a base do link `wa.me`, e só depois de validar o código de acesso).
 - Endereço não encontrado ou rota indisponível: erro apontando o ponto, sem valor.
 - A ordem dos eventos é a digitada (setas de subir/descer); o Google nunca reordena. Limite de 8 eventos por cálculo.
 - Qualquer alteração na tela apaga o resultado anterior; o valor mostrado sempre corresponde ao que está preenchido.

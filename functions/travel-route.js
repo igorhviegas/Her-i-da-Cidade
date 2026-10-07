@@ -6,7 +6,7 @@
 // agente digitou.
 
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { buildSequence, summarizeTravel, travelWhatsAppText, whatsAppLink } from '../services/travelCost.js';
+import { buildSequence, summarizeTravel, whatsAppBase } from '../services/travelCost.js';
 
 const GEOCODE_URL = 'https://maps.googleapis.com/maps/api/geocode/json';
 const ROUTES_URL = 'https://routes.googleapis.com/directions/v2:computeRoutes';
@@ -120,7 +120,8 @@ export async function computeLegsMeters(points, { apiKey, fetchImpl = fetch }) {
 
 /**
  * Calcula o deslocamento. `input` = resultado de validateTravelInput. Devolve o que a tela precisa:
- * trechos com km, resumo financeiro, endereços entendidos (só dos digitados), avisos e o texto/link do WhatsApp.
+ * trechos com km, resumo financeiro, endereços entendidos (só dos digitados), avisos e a base do link do WhatsApp
+ * (o texto é montado na tela, que aplica a data e os ajustes de km do agente).
  */
 export async function calculateTravel({ input, config, fetchImpl = fetch, now = new Date() }) {
   const sequence = buildSequence(input, config.defaults);
@@ -153,7 +154,6 @@ export async function calculateTravel({ input, config, fetchImpl = fetch, now = 
 
   const legs = legMeters.map((meters, i) => ({ from: sequence[i].label, to: sequence[i + 1].label, meters }));
   const summary = summarizeTravel({ legs, kmRate: input.kmRate, eventFee: input.eventFee, eventCount: input.events.length });
-  const text = travelWhatsAppText(summary);
   const resolved = sequence
     .filter((p, i) => p.custom && (p.role !== 'stop' || sequence.findIndex((q) => q.role === 'stop') === i)) // a parada repetida aparece uma vez
     .map((p) => ({ label: p.label, address: placeOf(p).formatted, precise: placeOf(p).precise }));
@@ -161,7 +161,7 @@ export async function calculateTravel({ input, config, fetchImpl = fetch, now = 
     summary,
     resolved,
     needsConfirmation: resolved.some((p) => !p.precise),
-    whatsapp: { text, url: whatsAppLink(config.whatsappNumber, text) },
+    whatsappBase: whatsAppBase(config.whatsappNumber),
     calculatedAt: now.toISOString(),
   };
 }
