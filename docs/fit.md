@@ -50,6 +50,19 @@ Qualquer outra métrica (marcha, velocidade, lances de escada…) é descartada.
    - Métricas: as da tabela. Período: "Previous 7 Days" ou "Default".
 3. Rodar manualmente pelo widget e conferir a resposta (`ok: true`, `days > 0`) e o Firestore.
 
+## Alternativa gratuita: Atalho do iPhone (sem Health Auto Export)
+O mesmo endpoint aceita o envio simples de **um dia**: `POST /api/fit-ingest` com `Authorization: Bearer <FIT_INGEST_TOKEN>` e o corpo JSON `{ "day": "AAAA-MM-DD", "steps": 2431, "walkRunKm": 1.8, "weightKg": 72 }` (todos opcionais menos `day`; mesmos campos, unidades e limites da tabela acima; aceita texto numérico com vírgula). Só o que vier é gravado (merge); campo desconhecido ou fora do plausível é descartado e contado.
+
+Montagem do atalho (app Atalhos → "Enviar Fit"):
+1. **Data Atual** → **Formatar Data** (formato personalizado `yyyy-MM-dd`) = dia.
+2. **Encontrar Amostras de Saúde**: tipo *Passos*, data de início *é hoje* → **Calcular Estatísticas** (*Soma*) = passos.
+3. **Encontrar Amostras de Saúde**: tipo *Distância de caminhada e corrida*, data de início *é hoje* → **Calcular Estatísticas** (*Soma*) = km (a unidade segue o app Saúde).
+4. **Encontrar Amostras de Saúde**: tipo *Peso*, data de início *é hoje*, limite 1 → valor = peso (vazio se não houve pesagem hoje; é descartado).
+5. **Obter Conteúdo do URL**: URL do endpoint, método **POST**, cabeçalho `Authorization` = `Bearer <token>`, corpo **JSON** com os campos `day` (texto), `steps`, `walkRunKm` e `weightKg` (números).
+6. Automação pessoal: *Abrir app* (QZ e/ou Saúde) → executar o atalho, com "Perguntar antes de executar" desligado. Também dá para rodá-lo pela tela de início.
+
+Cuidados: o atalho guarda o token, então **não compartilhe o atalho**. O iOS bloqueia o Saúde com o telefone bloqueado (a automação "Abrir app" funciona porque o aparelho está desbloqueado). Só o dia de hoje é enviado: o dia que passar sem abrir o app fica sem registro. **Não validado em aparelho**: o nome exato das ações e como o Atalhos devolve distância e peso.
+
 ## Limites conhecidos
 - O iOS só deixa o app ler o Saúde com o iPhone **desbloqueado** e não garante o horário: o envio é eventual, não em tempo real.
 - Dois envios fora de ordem: vale o último a chegar (não há carimbo de envio no payload).
