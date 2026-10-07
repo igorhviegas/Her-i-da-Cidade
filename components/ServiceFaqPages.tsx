@@ -5,6 +5,7 @@ import { Footer } from './Footer';
 import { Link } from '../lib/router';
 import { renderBold } from './VideoCallBooking';
 import { useServices } from '../services/servicesService';
+import { useSiteConfig, buildWhatsAppLink } from '../services/siteConfigService';
 import { slugify, findServiceBySlug } from '../services/serviceFaq.js';
 import type { Service } from '../types';
 
@@ -49,6 +50,7 @@ const Loading: React.FC = () => <p className="py-20 text-center text-sm text-whi
  */
 export const ServiceFaqPages: React.FC<{ slug?: string; onResolved?: (service: Service | null | undefined) => void }> = ({ slug, onResolved }) => {
   const { services, loading } = useServices({ onlyActive: true, realTime: false });
+  const { whatsappUrl } = useSiteConfig();
   const withFaq = useMemo(() => services.filter((s) => s.faq?.length), [services]);
   const service = slug ? findServiceBySlug<Service>(services, slug) : null;
   const resolved = loading ? undefined : service?.faq?.length ? service : null;
@@ -112,7 +114,7 @@ export const ServiceFaqPages: React.FC<{ slug?: string; onResolved?: (service: S
         ))}
       </div>
       <a
-        href={service.whatsappUrl}
+        href={buildWhatsAppLink(whatsappUrl, 'Preciso de suporte!')}
         target="_blank"
         rel="noopener noreferrer"
         className="mt-8 inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#25D366] px-5 text-sm font-bold text-black hover:brightness-110"
