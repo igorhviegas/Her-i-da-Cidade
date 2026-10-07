@@ -20,6 +20,7 @@ import { AdminVideoCallsPage } from './AdminVideoCallsPage';
 import { AdminInstagramPage } from './AdminInstagramPage';
 import { AdminAgentPage } from './AdminAgentPage';
 import { AdminProfilePage } from './AdminProfilePage';
+import { AdminFitPage } from './AdminFitPage';
 import { ProfileMenu } from './ProfileMenu';
 import { AdminNav, useNavOrder, type NavItem, type NavGroup, type NavBadge } from './AdminNav';
 import { subscribeActiveOrders } from '../../services/ordersService';
@@ -55,10 +56,12 @@ import {
   Briefcase,
   Tv,
   SlidersHorizontal,
-  Headset
+  Headset,
+  HeartPulse,
+  Activity
 } from 'lucide-react';
 
-type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram' | 'calendar' | 'videocalls' | 'agent' | 'profile';
+type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram' | 'calendar' | 'videocalls' | 'agent' | 'profile' | 'fit';
 
 // Módulos reorganizáveis (ordem padrão). "Principal" é fixo no topo e fica fora desta lista.
 const NAV_ITEMS: NavItem<AdminTab>[] = [
@@ -75,10 +78,12 @@ const NAV_ITEMS: NavItem<AdminTab>[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'settings', label: 'Configurações', icon: Settings },
   { id: 'agent', label: 'Agente', icon: Headset },
+  { id: 'fit', label: 'Fit', icon: HeartPulse },
 ];
 const NAV_GROUPS: NavGroup<AdminTab>[] = [
   { key: 'crm', label: 'CRM', icon: Briefcase, ids: ['orders', 'missions', 'finance', 'instagram', 'scripts', 'clients'] },
   { key: 'streaming', label: 'Streaming', icon: Tv, ids: ['videos', 'categories'] },
+  { key: 'pessoal', label: 'Pessoal', icon: Activity, ids: ['fit'] },
   { key: 'ajustes', label: 'Ajustes', icon: SlidersHorizontal, ids: ['services', 'content', 'dashboard', 'settings', 'agent'] },
 ];
 const NAV_ORDER = NAV_ITEMS.map((item) => item.id);
@@ -117,6 +122,8 @@ export const AdminDashboard: React.FC = () => {
       ? 'videocalls'
       : path === '/admin/agente'
       ? 'agent'
+      : path === '/admin/fit'
+      ? 'fit'
       : path === '/admin/dashboard'
       ? 'dashboard'
       : path === '/admin/perfil'
@@ -132,7 +139,7 @@ export const AdminDashboard: React.FC = () => {
     const link = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
     if (!link) return;
     const original = link.getAttribute('href') ?? '';
-    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes', '/admin/agendamento-chamadas': 'calendario', '/admin/perfil': 'principal' } as Record<string, string>)[path] ?? path.split('/')[2];
+    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes', '/admin/agendamento-chamadas': 'calendario', '/admin/perfil': 'principal', '/admin/fit': 'principal' } as Record<string, string>)[path] ?? path.split('/')[2];
     if (slug) link.setAttribute('href', `/images/modules/${slug}.png`);
     return () => link.setAttribute('href', original);
   }, [path]);
@@ -167,6 +174,8 @@ export const AdminDashboard: React.FC = () => {
       setCurrentTab('videocalls');
     } else if (path === '/admin/agente') {
       setCurrentTab('agent');
+    } else if (path === '/admin/fit') {
+      setCurrentTab('fit');
     } else if (path === '/admin/dashboard') {
       setCurrentTab('dashboard');
     } else if (path === '/admin/perfil') {
@@ -206,6 +215,8 @@ export const AdminDashboard: React.FC = () => {
       navigate('/admin/agendamento-chamadas');
     } else if (tabId === 'agent') {
       navigate('/admin/agente');
+    } else if (tabId === 'fit') {
+      navigate('/admin/fit');
     } else if (tabId === 'dashboard') {
       navigate('/admin/dashboard');
     } else if (tabId === 'profile') {
@@ -715,6 +726,7 @@ export const AdminDashboard: React.FC = () => {
           {currentTab === 'finance' && <AdminFinancePage />}
           {currentTab === 'instagram' && <AdminInstagramPage />}
           {currentTab === 'agent' && <AdminAgentPage />}
+          {currentTab === 'fit' && <AdminFitPage />}
 
         </main>
       </div>

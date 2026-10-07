@@ -1,6 +1,14 @@
-# Fit — Apple Saúde (passo 1: recebimento dos totais diários)
+# Fit — Apple Saúde (recebimento dos totais diários + tela)
 
-Só o recebimento por enquanto: ainda não há tela nem regra de leitura no `firestore.rules` (o cliente não lê estes dados; tudo é gravado pelo servidor).
+O servidor grava os totais diários (abaixo) e a tela **Fit** (`/admin/fit`, menu Pessoal → Fit) os lê: passos, distância e peso em 7, 30 ou 90 dias.
+
+## Tela (`components/admin/AdminFitPage.tsx`)
+- Indicadores: último dia com passos (o de hoje é parcial), média de passos, distância total e peso com a variação do período. Gráficos de passos e distância por dia (barras) e de peso (pontos + média móvel de 7 dias), em SVG, sem biblioteca.
+- Dia sem registro aparece apagado e fica fora das médias: **ausente não é zero**. As séries e médias são puras e testadas (`services/fitDaily.js`).
+- Somente leitura; os dados vêm de `users/{uid}/fitDaily` (`services/fitService.ts`).
+
+## Privacidade (`firestore.rules`)
+`match /users/{uid}/fitDaily/{day}`: lê só quem é administrador **e** dono do caminho (`request.auth.uid == uid`); nenhum cliente grava. Outro administrador não lê os dados do dono. Qualquer outro caminho sob `users/` segue negado. Verificado no emulador (14 casos: dono, outro admin, usuário comum, visitante, escrita e outros caminhos); o teste versionado é `tests/firestore-rules-fit.test.js` (`npm run test:rules`). **É preciso publicar o `firestore.rules`** para a tela conseguir ler.
 
 ## Fluxo
 Apple Saúde → app **Health Auto Export** (automação REST) → `POST /api/fit-ingest` → `users/{FIT_OWNER_UID}/fitDaily/{AAAA-MM-DD}`.
@@ -41,4 +49,4 @@ Qualquer outra métrica (marcha, velocidade, lances de escada…) é descartada.
 - Na Vercel, `api/` agora tem 11 funções (o plano Hobby limita o total; confirmar o limite vigente).
 
 ## Próximos passos
-Regras de leitura `users/{uid}/…` (só o dono) + testes, tela do Fit, formato de treinos quando houver um real, deduplicação entre fontes (mesma atividade vinda de FIT, Strava e Saúde: chave por fonte + id; entre fontes, esporte + início em UTC + duração).
+Check-ins de academia e funcional, peso manual, upload do FIT do MyWhoosh (histórico de ciclismo), formato de treinos quando houver um real, deduplicação entre fontes (mesma atividade vinda de FIT, Strava e Saúde: chave por fonte + id; entre fontes, esporte + início em UTC + duração).
