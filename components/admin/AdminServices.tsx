@@ -1,67 +1,32 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { 
-  Sparkles, 
-  Plus, 
-  Search, 
-  Pencil, 
-  Trash2, 
-  Eye, 
-  EyeOff, 
-  ArrowUpDown, 
-  Check, 
-  X, 
-  AlertTriangle, 
-  RefreshCw, 
-  ExternalLink,
-  ChevronUp,
-  ChevronDown,
-  Image as ImageIcon,
-  Tag,
-  DollarSign,
-  Layers,
-  Info,
-  Upload
-} from 'lucide-react';
-import { 
-  useServices, 
-  createService, 
-  updateService, 
-  deleteService, 
-  toggleServiceStatus, 
+import React, { useState, useMemo } from 'react';
+import {
+  useServices,
+  createService,
+  updateService,
+  deleteService,
+  toggleServiceStatus,
   updateServiceOrder,
-  CreateServiceInput,
-  UpdateServiceInput
 } from '../../services/servicesService';
 import { Service } from '../../types';
-import type { OrderStatus, ProductionType, ServiceFaqItem } from '../../types';
-import { defaultInitialStatus } from '../../services/orderInitialStatus.js';
-import { buildDeliveryMessage } from '../../services/digitalDelivery.js';
-import { uploadServiceImageToVercelBlob } from '../../services/blobUploadService';
-
-interface ServiceFormData {
-  title: string;
-  price: string;
-  description: string;
-  imageUrl: string;
-  category: string;
-  order: number;
-  active: boolean;
-  badgeText: string;
-  generateOrder: boolean;
-  productionType: ProductionType | '';
-  initialStatus: OrderStatus | '';
-  autoComplete: boolean;
-  defaultDeliveryDays: string;
-  deliveryMessage: string;
-  faq: ServiceFaqItem[];
-}
-
-const DEFAULT_CATEGORIES = [
-  'Pronta entrega',
-  'Ao Vivo',
-  'Exclusivo',
-  'Presencial'
-];
+import {
+  type ServiceFormData,
+  type ServiceFormErrors,
+  emptyServiceForm,
+  serviceToFormData,
+  validateServiceForm,
+  getOrderConfigError,
+  buildCreatePayload,
+  buildUpdatePayload,
+  describeSaveError,
+  DEFAULT_CATEGORIES,
+} from './services/serviceForm';
+import { useServiceImageUpload } from './services/useServiceImageUpload';
+import { ServicesToolbar, type ServiceFeedback, type ServiceStatusFilter } from './services/ServicesToolbar';
+import { ServicesError, ServicesLoading, ServicesEmpty } from './services/ServicesListStates';
+import { ServicesTable } from './services/ServicesTable';
+import { ServiceCards } from './services/ServiceCards';
+import { ServiceFormModal } from './services/ServiceFormModal';
+import { DeleteServiceModal } from './services/DeleteServiceModal';
 
 export const AdminServices: React.FC = () => {
   // Busca todos os serviços (ativos e inativos) com sincronização em tempo real
@@ -72,40 +37,28 @@ export const AdminServices: React.FC = () => {
 
   // Estados de busca e filtros
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  const [filterStatus, setFilterStatus] = useState<ServiceStatusFilter>('all');
 
   // Modal de Criação / Edição
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [isCustomCategory, setIsCustomCategory] = useState(false);
-  const [formData, setFormData] = useState<ServiceFormData>({
-    title: '',
-    price: '',
-    description: '',
-    imageUrl: '',
-    category: 'Pronta entrega',
-    order: 1,
-    active: true,
-    badgeText: '',
-    faq: [],
-  });
-  const [formErrors, setFormErrors] = useState<Partial<Record<keyof ServiceFormData, string>>>({});
+  const [formData, setFormData] = useState<ServiceFormData>(emptyServiceForm(1));
+  const [formErrors, setFormErrors] = useState<ServiceFormErrors>({});
   const [orderConfigTouched, setOrderConfigTouched] = useState(false);
   const [orderConfigError, setOrderConfigError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const serviceImageInputRef = useRef<HTMLInputElement | null>(null);
-  const [selectedServiceImage, setSelectedServiceImage] = useState<File | null>(null);
-  const [serviceImagePreviewUrl, setServiceImagePreviewUrl] = useState<string | null>(null);
-  const [isServiceImageUploading, setIsServiceImageUploading] = useState(false);
-  const [serviceImageUploadError, setServiceImageUploadError] = useState<string | null>(null);
-  const [serviceImageUploadComplete, setServiceImageUploadComplete] = useState(false);
+  const image = useServiceImageUpload((imageUrl) => {
+    setFormData((current) => ({ ...current, imageUrl }));
+    setFormErrors((current) => ({ ...current, imageUrl: undefined }));
+  });
 
   // Modal de Confirmação de Exclusão
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Estado de feedback / notificação
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [feedback, setFeedback] = useState<ServiceFeedback>(null);
 
   const showFeedback = (type: 'success' | 'error', message: string) => {
     setFeedback({ type, message });
@@ -114,66 +67,10 @@ export const AdminServices: React.FC = () => {
     }, 4500);
   };
 
-  useEffect(() => {
-    return () => {
-      if (serviceImagePreviewUrl) URL.revokeObjectURL(serviceImagePreviewUrl);
-    };
-  }, [serviceImagePreviewUrl]);
-
-  const clearSelectedServiceImage = () => {
-    setSelectedServiceImage(null);
-    setServiceImagePreviewUrl(null);
-    setServiceImageUploadError(null);
-    if (serviceImageInputRef.current) serviceImageInputRef.current.value = '';
-  };
-
-  const handleServiceImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setServiceImageUploadError(null);
-    setServiceImageUploadComplete(false);
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
-    const extension = file.name.split('.').pop()?.toLowerCase() || '';
-    if (!allowedMimeTypes.includes(file.type) && !allowedExtensions.includes(extension)) {
-      setServiceImageUploadError('Formato não permitido. Utilize arquivos JPG, PNG ou WEBP.');
-      event.target.value = '';
-      return;
-    }
-    if (file.size > 4 * 1024 * 1024) {
-      setServiceImageUploadError('O arquivo selecionado excede o limite máximo permitido de 4 MB.');
-      event.target.value = '';
-      return;
-    }
-
-    setSelectedServiceImage(file);
-    setServiceImagePreviewUrl(URL.createObjectURL(file));
-  };
-
-  const handleUploadServiceImage = async () => {
-    if (!selectedServiceImage || isServiceImageUploading) return;
-    setIsServiceImageUploading(true);
-    setServiceImageUploadError(null);
-    try {
-      const imageUrl = await uploadServiceImageToVercelBlob(selectedServiceImage);
-      setFormData((current) => ({ ...current, imageUrl }));
-      setSelectedServiceImage(null);
-      setServiceImagePreviewUrl(null);
-      setServiceImageUploadComplete(true);
-      setFormErrors((current) => ({ ...current, imageUrl: undefined }));
-      if (serviceImageInputRef.current) serviceImageInputRef.current.value = '';
-    } catch (error: any) {
-      setServiceImageUploadError(error?.message || 'Não foi possível enviar a imagem. Tente novamente.');
-    } finally {
-      setIsServiceImageUploading(false);
-    }
-  };
-
   // Filtragem e busca no frontend
   const filteredServices = useMemo(() => {
     return services.filter((service) => {
-      const matchesSearch = 
+      const matchesSearch =
         service.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         service.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
         service.price.toLowerCase().includes(searchTerm.toLowerCase());
@@ -190,170 +87,60 @@ export const AdminServices: React.FC = () => {
   const activeCount = useMemo(() => services.filter((s) => s.active !== false).length, [services]);
   const inactiveCount = useMemo(() => services.filter((s) => s.active === false).length, [services]);
 
-  // Abertura do formulário para criação
-  const handleOpenCreateModal = () => {
-    const nextOrder = services.reduce((max, s) => Math.max(max, s.order ?? 0), 0) + 1;
-    setEditingServiceId(null);
-    setIsCustomCategory(false);
-    setFormData({
-      title: '',
-      price: '',
-      description: '',
-      imageUrl: '',
-      category: 'Pronta entrega',
-      order: nextOrder,
-      active: true,
-      badgeText: '',
-      generateOrder: false,
-      productionType: '',
-      initialStatus: '',
-      autoComplete: false,
-      defaultDeliveryDays: '',
-      deliveryMessage: '',
-      faq: [],
-    });
+  // Abertura do formulário (criação ou edição)
+  const openFormModal = (data: ServiceFormData, serviceId: string | null, customCategory: boolean) => {
+    setEditingServiceId(serviceId);
+    setIsCustomCategory(customCategory);
+    setFormData(data);
     setFormErrors({});
     setOrderConfigTouched(false);
     setOrderConfigError('');
-    clearSelectedServiceImage();
-    setServiceImageUploadComplete(false);
+    image.clear();
+    image.setComplete(false);
     setIsFormModalOpen(true);
   };
 
-  // Abertura do formulário para edição
+  const handleOpenCreateModal = () => {
+    const nextOrder = services.reduce((max, s) => Math.max(max, s.order ?? 0), 0) + 1;
+    openFormModal(emptyServiceForm(nextOrder), null, false);
+  };
+
   const handleOpenEditModal = (service: Service) => {
-    setEditingServiceId(service.id);
-    const isStandardCategory = DEFAULT_CATEGORIES.includes(service.category);
-    setIsCustomCategory(!isStandardCategory);
-    setFormData({
-      title: service.title,
-      price: service.price,
-      description: service.description,
-      imageUrl: service.imageUrl,
-      category: service.category,
-      order: service.order ?? 1,
-      active: service.active !== false,
-      badgeText: service.badgeText ?? '',
-      generateOrder: service.generateOrder ?? false,
-      productionType: service.productionType ?? '',
-      initialStatus: service.initialStatus ?? '',
-      autoComplete: service.autoComplete ?? false,
-      defaultDeliveryDays: service.defaultDeliveryDays !== undefined ? String(service.defaultDeliveryDays) : '',
-      deliveryMessage: service.deliveryMessage ?? '',
-      faq: service.faq ?? [],
-    });
-    setFormErrors({});
-    setOrderConfigTouched(false);
+    openFormModal(serviceToFormData(service), service.id, !DEFAULT_CATEGORIES.includes(service.category));
+  };
+
+  // Qualquer edição da configuração de pedido marca o bloco como "tocado" e limpa o erro
+  const handleOrderConfigChange = (patch: Partial<ServiceFormData>) => {
+    setOrderConfigTouched(true);
     setOrderConfigError('');
-    clearSelectedServiceImage();
-    setServiceImageUploadComplete(false);
-    setIsFormModalOpen(true);
+    setFormData({ ...formData, ...patch });
   };
 
   // Validação do formulário
   const validateForm = (): boolean => {
-    const errors: Partial<Record<keyof ServiceFormData, string>> = {};
-
-    if (!formData.title.trim()) {
-      errors.title = 'O nome do serviço é obrigatório.';
-    }
-    if (!formData.price.trim()) {
-      errors.price = 'O preço do serviço é obrigatório (ex: Apenas R$ 35, Sob Consulta).';
-    }
-    if (!formData.description.trim()) {
-      errors.description = 'A descrição do serviço é obrigatória.';
-    }
-    if (!formData.category.trim()) {
-      errors.category = 'A categoria é obrigatória.';
-    }
-    if (selectedServiceImage) {
-      errors.imageUrl = 'Envie a imagem selecionada antes de salvar o serviço.';
-    } else if (!formData.imageUrl.trim()) {
-      errors.imageUrl = 'A URL da imagem é obrigatória.';
-    } else if (!formData.imageUrl.startsWith('http://') && !formData.imageUrl.startsWith('https://')) {
-      errors.imageUrl = 'Informe uma URL válida iniciada por https:// ou http://';
-    }
-    if (typeof formData.order !== 'number' || isNaN(formData.order) || formData.order < 1) {
-      errors.order = 'A ordem de exibição deve ser um número maior que zero.';
-    }
-    // Categoria de dúvida pela metade seria descartada em silêncio ao salvar; itens totalmente vazios são ignorados.
-    if (formData.faq.some((item) => Boolean(item.title.trim()) !== Boolean(item.content.trim()))) {
-      errors.faq = 'Preencha o título e o conteúdo de cada categoria de dúvida (ou remova a categoria vazia).';
-    }
-
+    const errors = validateServiceForm(formData, Boolean(image.selectedImage));
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const validateOrderConfiguration = (): boolean => {
-    if (!formData.generateOrder) {
-      setOrderConfigError('');
-      return true;
-    }
-    if (!formData.productionType || !formData.initialStatus) {
-      setOrderConfigError('Selecione o tipo de produção e o status inicial para habilitar pedidos no CRM.');
-      return false;
-    }
-    if (formData.defaultDeliveryDays && (!/^\d+$/.test(formData.defaultDeliveryDays) || Number(formData.defaultDeliveryDays) < 1)) {
-      setOrderConfigError('O prazo deve ser um número inteiro positivo de dias corridos ou ficar vazio.');
-      return false;
-    }
-    setOrderConfigError('');
-    return true;
+    const message = getOrderConfigError(formData);
+    setOrderConfigError(message);
+    return message === '';
   };
 
   // Salvar serviço (Criação ou Edição)
   const handleSubmitService = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isServiceImageUploading || !validateForm() || !validateOrderConfiguration()) return;
+    if (image.isUploading || !validateForm() || !validateOrderConfiguration()) return;
 
     setIsSubmitting(true);
     try {
       if (editingServiceId) {
-        // Atualização
-        const updates: UpdateServiceInput = {
-          title: formData.title,
-          price: formData.price,
-          description: formData.description,
-          imageUrl: formData.imageUrl,
-          category: formData.category,
-          order: formData.order,
-          active: formData.active,
-          badgeText: formData.badgeText,
-          deliveryMessage: formData.deliveryMessage,
-          faq: formData.faq,
-          ...(orderConfigTouched ? {
-            generateOrder: formData.generateOrder,
-            productionType: formData.productionType || null,
-            initialStatus: formData.initialStatus || null,
-            autoComplete: formData.autoComplete,
-            defaultDeliveryDays: formData.defaultDeliveryDays ? Number(formData.defaultDeliveryDays) : null,
-          } : {}),
-        };
-        await updateService(editingServiceId, updates);
+        await updateService(editingServiceId, buildUpdatePayload(formData, orderConfigTouched));
         showFeedback('success', `Serviço "${formData.title}" atualizado com sucesso! Alterações já visíveis no site.`);
       } else {
-        // Criação
-        const newServicePayload: CreateServiceInput = {
-          title: formData.title,
-          price: formData.price,
-          description: formData.description,
-          imageUrl: formData.imageUrl,
-          category: formData.category,
-          order: formData.order,
-          active: formData.active,
-          badgeText: formData.badgeText,
-          deliveryMessage: formData.deliveryMessage,
-          faq: formData.faq,
-          ...(orderConfigTouched ? {
-            generateOrder: formData.generateOrder,
-            ...(formData.productionType ? { productionType: formData.productionType } : {}),
-            ...(formData.initialStatus ? { initialStatus: formData.initialStatus } : {}),
-            autoComplete: formData.autoComplete,
-            ...(formData.defaultDeliveryDays ? { defaultDeliveryDays: Number(formData.defaultDeliveryDays) } : {}),
-          } : {}),
-        };
-        await createService(newServicePayload);
+        await createService(buildCreatePayload(formData, orderConfigTouched));
         showFeedback('success', `Novo serviço "${formData.title}" cadastrado com sucesso!`);
       }
 
@@ -361,18 +148,7 @@ export const AdminServices: React.FC = () => {
       setEditingServiceId(null);
     } catch (err: any) {
       console.error('[AdminServices] Erro ao salvar serviço:', err);
-      let errorMsg = 'Falha ao salvar o serviço. Verifique suas permissões de administrador.';
-      if (err?.message) {
-        try {
-          const parsed = JSON.parse(err.message);
-          if (parsed?.error) {
-            errorMsg = `Falha de permissão (${parsed.operationType}): ${parsed.error}`;
-          }
-        } catch {
-          errorMsg = err.message;
-        }
-      }
-      showFeedback('error', errorMsg);
+      showFeedback('error', describeSaveError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -384,7 +160,7 @@ export const AdminServices: React.FC = () => {
     try {
       await toggleServiceStatus(service.id, service.active !== false);
       showFeedback(
-        'success', 
+        'success',
         `Serviço "${service.title}" ${newStatus ? 'ativado e publicado no site' : 'desativado (ocultado do site público)'}.`
       );
     } catch (err: any) {
@@ -426,1006 +202,77 @@ export const AdminServices: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      
-      {/* 1. CABEÇALHO DA SEÇÃO COM AÇÕES */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[#0D1527] border border-white/10 p-6 rounded-2xl shadow-xl">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              <Sparkles className="w-4 h-4" />
-            </span>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
-              Gerenciamento de Serviços
-            </h2>
-          </div>
-          <p className="text-xs sm:text-sm text-white/60 font-light max-w-xl">
-            Edite nomes, preços, descrições, imagens e reordene os serviços exibidos no site público em tempo real.
-          </p>
-        </div>
+      <ServicesToolbar
+        services={services}
+        activeCount={activeCount}
+        inactiveCount={inactiveCount}
+        feedback={feedback}
+        setFeedback={setFeedback}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        filterStatus={filterStatus}
+        setFilterStatus={setFilterStatus}
+        handleOpenCreateModal={handleOpenCreateModal}
+      />
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleOpenCreateModal}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-blue-600/30 transition-all active:scale-95 shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Novo serviço</span>
-          </button>
-        </div>
-      </div>
+      {error && <ServicesError error={error} refetch={refetch} />}
 
-      {/* 2. NOTIFICAÇÃO / FEEDBACK BANNER */}
-      {feedback && (
-        <div 
-          className={`p-4 rounded-xl border text-sm flex items-center justify-between gap-3 shadow-lg animate-in slide-in-from-top-2 duration-200 ${
-            feedback.type === 'success'
-              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200'
-              : 'bg-red-500/15 border-red-500/40 text-red-200'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            {feedback.type === 'success' ? (
-              <Check className="w-5 h-5 text-emerald-400 shrink-0" />
-            ) : (
-              <AlertTriangle className="w-5 h-5 text-red-400 shrink-0" />
-            )}
-            <span className="font-medium">{feedback.message}</span>
-          </div>
-          <button 
-            onClick={() => setFeedback(null)}
-            className="p-1 text-white/50 hover:text-white rounded-lg transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+      {loading && !error && <ServicesLoading />}
 
-      {/* 3. BARRA DE BUSCA E FILTROS */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-[#0D1527] border border-white/10 p-4 rounded-xl">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-white/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar serviços por nome, categoria ou preço..."
-            className="w-full pl-10 pr-10 py-2 bg-[#070B14] border border-white/10 rounded-xl text-sm text-white placeholder-white/40 focus:outline-none focus:border-blue-500 transition-colors"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white text-xs p-1"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* Filtros de Status */}
-        <div className="flex items-center gap-1.5 p-1 bg-[#070B14] border border-white/10 rounded-xl shrink-0">
-          <button
-            onClick={() => setFilterStatus('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              filterStatus === 'all'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-white/60 hover:text-white'
-            }`}
-          >
-            Todos ({services.length})
-          </button>
-          <button
-            onClick={() => setFilterStatus('active')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              filterStatus === 'active'
-                ? 'bg-emerald-600 text-white shadow-sm'
-                : 'text-emerald-400/80 hover:text-emerald-300'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            Ativos ({activeCount})
-          </button>
-          <button
-            onClick={() => setFilterStatus('inactive')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
-              filterStatus === 'inactive'
-                ? 'bg-slate-700 text-white shadow-sm'
-                : 'text-white/50 hover:text-white'
-            }`}
-          >
-            <span className="w-2 h-2 rounded-full bg-slate-500" />
-            Inativos ({inactiveCount})
-          </button>
-        </div>
-      </div>
-
-      {/* 4. ESTADO DE ERRO */}
-      {error && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 text-center">
-          <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-          <h3 className="text-base font-bold text-white mb-1">Não foi possível carregar os serviços</h3>
-          <p className="text-xs text-white/60 mb-4 font-light max-w-md mx-auto">{error}</p>
-          <button
-            onClick={() => refetch()}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-xl shadow transition-all"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Tentar novamente</span>
-          </button>
-        </div>
-      )}
-
-      {/* 5. ESTADO DE CARREGAMENTO */}
-      {loading && !error && (
-        <div className="space-y-3">
-          {[1, 2, 3, 4].map((n) => (
-            <div key={n} className="bg-[#0D1527] border border-white/10 rounded-2xl p-4 animate-pulse flex items-center gap-4">
-              <div className="w-16 h-16 bg-white/10 rounded-xl shrink-0" />
-              <div className="flex-1 space-y-2">
-                <div className="w-1/3 h-4 bg-white/10 rounded" />
-                <div className="w-1/4 h-3 bg-white/5 rounded" />
-              </div>
-              <div className="w-20 h-6 bg-white/10 rounded-full" />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* 6. ESTADO VAZIO */}
       {!loading && !error && filteredServices.length === 0 && (
-        <div className="bg-[#0D1527] border border-white/10 rounded-2xl p-12 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-blue-400 mx-auto mb-4">
-            <Layers className="w-8 h-8" />
-          </div>
-          <h3 className="text-lg font-bold text-white mb-1">
-            {searchTerm || filterStatus !== 'all' ? 'Nenhum serviço corresponde ao filtro' : 'Você ainda não possui serviços cadastrados'}
-          </h3>
-          <p className="text-xs text-white/60 font-light max-w-sm mx-auto mb-6">
-            {searchTerm || filterStatus !== 'all'
-              ? 'Tente ajustar os termos da pesquisa ou alterar os filtros de status.'
-              : 'Clique no botão abaixo para adicionar seu primeiro serviço ao catálogo.'}
-          </p>
-          {searchTerm || filterStatus !== 'all' ? (
-            <button
-              onClick={() => {
-                setSearchTerm('');
-                setFilterStatus('all');
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold rounded-xl transition-all"
-            >
-              <span>Limpar filtros de busca</span>
-            </button>
-          ) : (
-            <button
-              onClick={handleOpenCreateModal}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-blue-600/30 transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Criar primeiro serviço</span>
-            </button>
-          )}
-        </div>
+        <ServicesEmpty
+          searchTerm={searchTerm}
+          filterStatus={filterStatus}
+          setSearchTerm={setSearchTerm}
+          setFilterStatus={setFilterStatus}
+          handleOpenCreateModal={handleOpenCreateModal}
+        />
       )}
 
-      {/* 7. TABELA DESKTOP (lg+) */}
       {!loading && !error && filteredServices.length > 0 && (
         <>
-          <div className="hidden lg:block bg-[#0D1527] border border-white/10 rounded-2xl overflow-hidden shadow-xl">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-white/10 bg-white/[0.02] text-[11px] font-semibold text-white/50 uppercase tracking-wider">
-                  <th className="py-3.5 px-4 w-16 text-center">Ordem</th>
-                  <th className="py-3.5 px-4 w-20">Imagem</th>
-                  <th className="py-3.5 px-4">Nome & Descrição</th>
-                  <th className="py-3.5 px-4 w-36">Categoria</th>
-                  <th className="py-3.5 px-4 w-36">Preço</th>
-                  <th className="py-3.5 px-4 w-32 text-center">Status</th>
-                  <th className="py-3.5 px-4 w-32 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5 text-sm">
-                {filteredServices.map((service) => {
-                  const isActive = service.active !== false;
-                  return (
-                    <tr 
-                      key={service.id} 
-                      className={`hover:bg-white/[0.02] transition-colors ${!isActive ? 'opacity-70 bg-black/20' : ''}`}
-                    >
-                      {/* Ordem com botões rápidos */}
-                      <td className="py-4 px-4 text-center">
-                        <div className="flex flex-col items-center justify-center gap-0.5">
-                          <button
-                            onClick={() => handleQuickOrderChange(service, -1)}
-                            title="Mover para cima"
-                            className="p-1 hover:bg-white/10 rounded text-white/40 hover:text-white transition-colors"
-                          >
-                            <ChevronUp className="w-3.5 h-3.5" />
-                          </button>
-                          <span className="font-mono font-bold text-sm text-blue-400 px-2 py-0.5 bg-blue-500/10 rounded-md">
-                            {service.order ?? 0}
-                          </span>
-                          <button
-                            onClick={() => handleQuickOrderChange(service, 1)}
-                            title="Mover para baixo"
-                            className="p-1 hover:bg-white/10 rounded text-white/40 hover:text-white transition-colors"
-                          >
-                            <ChevronDown className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-
-                      {/* Imagem */}
-                      <td className="py-4 px-4">
-                        <div className="w-14 h-20 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0 relative group">
-                          {service.imageUrl ? (
-                            <img
-                              src={service.imageUrl}
-                              alt={service.title}
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-white/20">
-                              <ImageIcon className="w-5 h-5" />
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Nome e Descrição */}
-                      <td className="py-4 px-4">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-white text-base tracking-tight">
-                              {service.title}
-                            </span>
-                            {!isActive && (
-                              <span className="text-[10px] font-semibold px-2 py-0.5 bg-white/10 text-white/50 rounded-full">
-                                Oculto no site
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-white/60 font-light line-clamp-2 leading-relaxed max-w-xl">
-                            {service.description}
-                          </p>
-                          <div className="text-[10px] text-white/30 font-mono">
-                            ID: {service.id}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Categoria */}
-                      <td className="py-4 px-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/5 text-white/80 border border-white/10">
-                          <Tag className="w-3 h-3 text-blue-400" />
-                          {service.category}
-                        </span>
-                      </td>
-
-                      {/* Preço (String livre) */}
-                      <td className="py-4 px-4">
-                        <span className="inline-flex items-center gap-1 font-bold text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg">
-                          {service.price}
-                        </span>
-                      </td>
-
-                      {/* Status Toggle */}
-                      <td className="py-4 px-4 text-center">
-                        <button
-                          onClick={() => handleToggleStatus(service)}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
-                            isActive
-                              ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
-                              : 'bg-white/5 border-white/15 text-white/40 hover:bg-white/10'
-                          }`}
-                        >
-                          <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-white/40'}`} />
-                          <span>{isActive ? 'Ativo' : 'Inativo'}</span>
-                        </button>
-                      </td>
-
-                      {/* Ações */}
-                      <td className="py-4 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleOpenEditModal(service)}
-                            title="Editar serviço"
-                            className="p-2 text-white/70 hover:text-white bg-white/5 hover:bg-blue-600 rounded-xl transition-colors border border-white/5"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => setServiceToDelete(service)}
-                            title="Excluir serviço"
-                            className="p-2 text-red-400 hover:text-red-200 bg-red-500/10 hover:bg-red-600 rounded-xl transition-colors border border-red-500/20"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* 8. CARDS RESPONSIVOS MOBILE E TABLET (<lg) */}
-          <div className="lg:hidden space-y-4">
-            {filteredServices.map((service) => {
-              const isActive = service.active !== false;
-              return (
-                <div
-                  key={service.id}
-                  className={`bg-[#0D1527] border border-white/10 rounded-2xl p-5 space-y-4 shadow-lg transition-all ${
-                    !isActive ? 'opacity-75 bg-[#090E1B]' : ''
-                  }`}
-                >
-                  {/* Topo do card com miniatura e dados principais */}
-                  <div className="flex items-start gap-3.5">
-                    <div className="w-16 h-24 rounded-xl overflow-hidden bg-black/40 border border-white/10 shrink-0">
-                      {service.imageUrl ? (
-                        <img
-                          src={service.imageUrl}
-                          alt={service.title}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-white/20">
-                          <ImageIcon className="w-6 h-6" />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="text-base font-bold text-white tracking-tight leading-snug">
-                          {service.title}
-                        </h4>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2 pt-1">
-                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white/5 text-white/70 border border-white/10">
-                          {service.category}
-                        </span>
-                        <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
-                          {service.price}
-                        </span>
-                      </div>
-
-                      <p className="text-xs text-white/60 font-light line-clamp-2 pt-1">
-                        {service.description}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Barra de controle inferior: Ordem, Status e Botões de Ação */}
-                  <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-2">
-                    {/* Controle de Ordem */}
-                    <div className="flex items-center gap-1.5 bg-[#070B14] border border-white/10 px-2 py-1 rounded-xl">
-                      <span className="text-[11px] text-white/40 font-medium">Ordem:</span>
-                      <button
-                        onClick={() => handleQuickOrderChange(service, -1)}
-                        className="p-0.5 text-white/60 hover:text-white"
-                        title="Diminuir ordem"
-                      >
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="text-xs font-mono font-bold text-blue-400 px-1">
-                        {service.order ?? 0}
-                      </span>
-                      <button
-                        onClick={() => handleQuickOrderChange(service, 1)}
-                        className="p-0.5 text-white/60 hover:text-white"
-                        title="Aumentar ordem"
-                      >
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Botão de Toggle Status */}
-                    <button
-                      onClick={() => handleToggleStatus(service)}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
-                        isActive
-                          ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                          : 'bg-white/5 border-white/15 text-white/50'
-                      }`}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-400' : 'bg-white/40'}`} />
-                      <span>{isActive ? 'Ativo' : 'Inativo'}</span>
-                    </button>
-
-                    {/* Ações Editar e Excluir */}
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => handleOpenEditModal(service)}
-                        className="p-2 text-white/80 bg-white/5 hover:bg-blue-600 rounded-xl border border-white/5 transition-colors"
-                        title="Editar"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setServiceToDelete(service)}
-                        className="p-2 text-red-400 bg-red-500/10 hover:bg-red-600 rounded-xl border border-red-500/20 transition-colors"
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <ServicesTable
+            filteredServices={filteredServices}
+            handleQuickOrderChange={handleQuickOrderChange}
+            handleToggleStatus={handleToggleStatus}
+            handleOpenEditModal={handleOpenEditModal}
+            setServiceToDelete={setServiceToDelete}
+          />
+          <ServiceCards
+            filteredServices={filteredServices}
+            handleQuickOrderChange={handleQuickOrderChange}
+            handleToggleStatus={handleToggleStatus}
+            handleOpenEditModal={handleOpenEditModal}
+            setServiceToDelete={setServiceToDelete}
+          />
         </>
       )}
 
-      {/* 9. MODAL DE FORMULÁRIO: NOVO / EDITAR SERVIÇO */}
       {isFormModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
-            onClick={() => !isSubmitting && !isServiceImageUploading && setIsFormModalOpen(false)}
-          />
-
-          {/* Dialog Container */}
-          <div className="relative w-full max-w-2xl bg-[#0D1527] border border-white/15 rounded-2xl shadow-2xl overflow-hidden z-10 my-8 animate-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white tracking-tight">
-                    {editingServiceId ? 'Editar Serviço' : 'Novo Serviço'}
-                  </h3>
-                  <p className="text-xs text-white/50 font-light">
-                    {editingServiceId ? 'Atualize as informações do serviço existente' : 'Preencha os dados para adicionar ao Firestore'}
-                  </p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => !isSubmitting && !isServiceImageUploading && setIsFormModalOpen(false)}
-                disabled={isSubmitting || isServiceImageUploading}
-                className="p-2 text-white/50 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Form */}
-            <form onSubmit={handleSubmitService} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
-              
-              {/* Nome / Título */}
-              <div>
-                <label className="block text-xs font-semibold text-white/80 uppercase tracking-wider mb-1.5">
-                  Nome do Serviço <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="ex: Vídeo Especial de Aniversário"
-                  className={`w-full px-3.5 py-2.5 bg-[#070B14] border rounded-xl text-sm text-white placeholder-white/40 focus:outline-none transition-colors ${
-                    formErrors.title ? 'border-red-500 focus:border-red-400' : 'border-white/10 focus:border-blue-500'
-                  }`}
-                />
-                {formErrors.title && (
-                  <p className="text-xs text-red-400 mt-1">{formErrors.title}</p>
-                )}
-              </div>
-
-              {/* Grid 2 colunas: Preço e Categoria */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
-                {/* Preço (String Livre) */}
-                <div>
-                  <label className="block text-xs font-semibold text-white/80 uppercase tracking-wider mb-1.5">
-                    Preço (Formato Textual) <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    placeholder="ex: Apenas R$ 35 ou Sob Consulta"
-                    className={`w-full px-3.5 py-2.5 bg-[#070B14] border rounded-xl text-sm text-white placeholder-white/40 focus:outline-none transition-colors ${
-                      formErrors.price ? 'border-red-500 focus:border-red-400' : 'border-white/10 focus:border-blue-500'
-                    }`}
-                  />
-                  <p className="text-[11px] text-white/40 mt-1">
-                    Mantenha o texto livre (ex: "Apenas R$ 30", "15 minutos R$ 75").
-                  </p>
-                  {formErrors.price && (
-                    <p className="text-xs text-red-400 mt-1">{formErrors.price}</p>
-                  )}
-                </div>
-
-                {/* Categoria */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-white/80 uppercase tracking-wider">
-                      Categoria <span className="text-red-400">*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomCategory(!isCustomCategory)}
-                      className="text-[11px] text-blue-400 hover:text-blue-300 font-medium"
-                    >
-                      {isCustomCategory ? 'Escolher pré-definida' : '+ Nova categoria'}
-                    </button>
-                  </div>
-
-                  {isCustomCategory ? (
-                    <input
-                      type="text"
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      placeholder="Nome da nova categoria..."
-                      className={`w-full px-3.5 py-2.5 bg-[#070B14] border rounded-xl text-sm text-white placeholder-white/40 focus:outline-none transition-colors ${
-                        formErrors.category ? 'border-red-500' : 'border-white/10 focus:border-blue-500'
-                      }`}
-                    />
-                  ) : (
-                    <select
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-[#070B14] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500"
-                    >
-                      {DEFAULT_CATEGORIES.map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {formErrors.category && (
-                    <p className="text-xs text-red-400 mt-1">{formErrors.category}</p>
-                  )}
-                </div>
-
-              </div>
-
-              {/* Selo opcional */}
-              <div>
-                <label className="block text-xs font-semibold text-white/80 uppercase tracking-wider mb-1.5">
-                  Selo
-                </label>
-                <input
-                  type="text"
-                  value={formData.badgeText}
-                  onChange={(e) => setFormData({ ...formData, badgeText: e.target.value })}
-                  placeholder="Ex: Mais pedido, Novidade, Exclusivo"
-                  className="w-full px-3.5 py-2.5 bg-[#070B14] border border-white/10 rounded-xl text-sm text-white placeholder-white/40 focus:outline-none focus:border-blue-500"
-                />
-              </div>
-
-              {/* Descrição */}
-              <div>
-                <label className="block text-xs font-semibold text-white/80 uppercase tracking-wider mb-1.5">
-                  Descrição do Serviço <span className="text-red-400">*</span>
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Descreva o que o cliente recebe neste serviço..."
-                  className={`w-full px-3.5 py-2.5 bg-[#070B14] border rounded-xl text-sm text-white placeholder-white/40 focus:outline-none transition-colors ${
-                    formErrors.description ? 'border-red-500 focus:border-red-400' : 'border-white/10 focus:border-blue-500'
-                  }`}
-                />
-                {formErrors.description && (
-                  <p className="text-xs text-red-400 mt-1">{formErrors.description}</p>
-                )}
-              </div>
-
-              {/* URL ou upload da Imagem & Preview */}
-              <div>
-                <label className="block text-xs font-semibold text-white/80 uppercase tracking-wider mb-1.5">
-                  Imagem do Serviço <span className="text-red-400">*</span>
-                </label>
-                <div className="flex gap-3 items-start">
-                  <div className="flex-1">
-                    <input
-                      type="url"
-                      value={formData.imageUrl}
-                      onChange={(e) => {
-                        if (selectedServiceImage) clearSelectedServiceImage();
-                        setServiceImageUploadComplete(false);
-                        setFormData({ ...formData, imageUrl: e.target.value });
-                      }}
-                      disabled={isServiceImageUploading}
-                      placeholder="https://exemplo.com/imagem.jpeg"
-                      className={`w-full px-3.5 py-2.5 bg-[#070B14] border rounded-xl text-sm text-white placeholder-white/40 focus:outline-none transition-colors ${
-                        formErrors.imageUrl ? 'border-red-500 focus:border-red-400' : 'border-white/10 focus:border-blue-500'
-                      }`}
-                    />
-                    <p className="text-[11px] text-white/40 mt-1">
-                      URL externa existente ou imagem enviada ao Vercel Blob. JPG, PNG ou WEBP (máx. 4 MB).
-                    </p>
-                    <input
-                      ref={serviceImageInputRef}
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                      onChange={handleServiceImageFileChange}
-                      className="hidden"
-                      disabled={isSubmitting || isServiceImageUploading}
-                    />
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => serviceImageInputRef.current?.click()}
-                        disabled={isSubmitting || isServiceImageUploading}
-                        className="inline-flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-300 transition hover:bg-blue-500/20 disabled:opacity-50"
-                      >
-                        <ImageIcon className="h-3.5 w-3.5" />
-                        {selectedServiceImage ? 'Escolher outra imagem' : formData.imageUrl ? 'Substituir por upload' : 'Escolher imagem'}
-                      </button>
-                      {selectedServiceImage && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={handleUploadServiceImage}
-                            disabled={isSubmitting || isServiceImageUploading}
-                            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
-                          >
-                            {isServiceImageUploading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                            {isServiceImageUploading ? 'Enviando imagem...' : 'Enviar imagem'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={clearSelectedServiceImage}
-                            disabled={isSubmitting || isServiceImageUploading}
-                            className="rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
-                          >
-                            Cancelar seleção
-                          </button>
-                        </>
-                      )}
-                    </div>
-                    {selectedServiceImage && (
-                      <p className="mt-2 truncate text-[11px] text-amber-300">
-                        {selectedServiceImage.name} · {(selectedServiceImage.size / (1024 * 1024)).toFixed(2)} MB — envie antes de salvar.
-                      </p>
-                    )}
-                    {isServiceImageUploading && <p className="mt-2 text-[11px] text-blue-300">Enviando a imagem com segurança para o Vercel Blob…</p>}
-                    {serviceImageUploadComplete && <p className="mt-2 text-[11px] text-emerald-300">Imagem carregada no Vercel Blob e pronta para salvar o serviço.</p>}
-                    {serviceImageUploadError && <p className="mt-2 text-xs text-red-400">{serviceImageUploadError}</p>}
-                  </div>
-
-                  {/* Preview Container */}
-                  <div className="w-16 h-24 rounded-xl overflow-hidden bg-black/40 border border-white/10 shrink-0 flex items-center justify-center">
-                    {serviceImagePreviewUrl || formData.imageUrl ? (
-                      <img
-                        src={serviceImagePreviewUrl || formData.imageUrl}
-                        alt="Preview"
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                    ) : (
-                      <ImageIcon className="w-6 h-6 text-white/20" />
-                    )}
-                  </div>
-                </div>
-                {formErrors.imageUrl && (
-                  <p className="text-xs text-red-400 mt-1">{formErrors.imageUrl}</p>
-                )}
-              </div>
-
-              {/* Grid 2 colunas: Ordem e Status Inicial */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-white/10">
-                
-                {/* Ordem */}
-                <div>
-                  <label className="block text-xs font-semibold text-white/80 uppercase tracking-wider mb-1.5">
-                    Ordem de Exibição <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={formData.order}
-                    onChange={(e) => setFormData({ ...formData, order: parseInt(e.target.value, 10) || 1 })}
-                    className="w-full px-3.5 py-2.5 bg-[#070B14] border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
-                  />
-                  <p className="text-[11px] text-white/40 mt-1">
-                    1 = primeiro card do carrossel no site.
-                  </p>
-                  {formErrors.order && (
-                    <p className="text-xs text-red-400 mt-1">{formErrors.order}</p>
-                  )}
-                </div>
-
-                {/* Status Ativo/Inativo */}
-                <div>
-                  <label className="block text-xs font-semibold text-white/80 uppercase tracking-wider mb-1.5">
-                    Status de Publicação
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, active: !formData.active })}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
-                      formData.active
-                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                        : 'bg-white/5 border-white/15 text-white/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${formData.active ? 'bg-emerald-400 animate-pulse' : 'bg-white/30'}`} />
-                      <span>{formData.active ? 'Ativo (Publicado no site)' : 'Inativo (Oculto do site)'}</span>
-                    </div>
-                    {formData.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  </button>
-                  <p className="text-[11px] text-white/40 mt-1">
-                    Serviços inativos não são mostrados ao público.
-                  </p>
-                </div>
-
-              </div>
-
-              {/* Configuração de Pedido para o CRM */}
-              <section className="space-y-4 rounded-2xl border border-blue-500/20 bg-blue-500/[0.04] p-4 sm:p-5">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h4 className="text-sm font-bold text-white">Configuração de Pedido</h4>
-                    <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-white/45">
-                      Defina como pedidos deste serviço serão iniciados na Central do Herói. Serviços antigos sem configuração continuam funcionando normalmente.
-                    </p>
-                  </div>
-                  <label className="inline-flex shrink-0 cursor-pointer items-center gap-2.5 rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-xs font-semibold text-white/80">
-                    <input
-                      type="checkbox"
-                      checked={formData.generateOrder}
-                      onChange={(event) => {
-                        setOrderConfigTouched(true);
-                        setOrderConfigError('');
-                        setFormData({ ...formData, generateOrder: event.target.checked });
-                      }}
-                      className="h-4 w-4 accent-blue-500"
-                    />
-                    Gerar pedido no CRM
-                  </label>
-                </div>
-                <p className="-mt-2 text-[11px] text-white/40">Quando ativado, uma compra deste serviço poderá gerar um pedido na Central do Herói.</p>
-
-                <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${!formData.generateOrder ? 'opacity-45' : ''}`}>
-                  <label className="block text-xs font-semibold text-white/70">
-                    Tipo de produção
-                    <select
-                      value={formData.productionType}
-                      disabled={!formData.generateOrder}
-                      onChange={(event) => {
-                        setOrderConfigTouched(true);
-                        setOrderConfigError('');
-                        const productionType = event.target.value as ProductionType | '';
-                        setFormData({ ...formData, productionType, initialStatus: formData.initialStatus || defaultInitialStatus(productionType) });
-                      }}
-                      className="mt-1.5 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/60 disabled:cursor-not-allowed"
-                    >
-                      <option value="">Selecione</option>
-                      <option value="scheduled">Agendado</option>
-                      <option value="recording">Gravação</option>
-                      <option value="editing">Edição</option>
-                      <option value="immediate">Imediato</option>
-                    </select>
-                  </label>
-                  <label className="block text-xs font-semibold text-white/70">
-                    Status inicial
-                    <select
-                      value={formData.initialStatus}
-                      disabled={!formData.generateOrder}
-                      onChange={(event) => {
-                        setOrderConfigTouched(true);
-                        setOrderConfigError('');
-                        setFormData({ ...formData, initialStatus: event.target.value as OrderStatus | '' });
-                      }}
-                      className="mt-1.5 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/60 disabled:cursor-not-allowed"
-                    >
-                      <option value="">Selecione</option>
-                      <option value="scheduled">Agendado</option>
-                      <option value="recording">Gravar</option>
-                      <option value="editing">Editar</option>
-                      <option value="delivery">Entregar</option>
-                      <option value="completed">Concluído</option>
-                    </select>
-                  </label>
-                  <label className="flex min-h-12 items-center gap-2.5 rounded-xl border border-white/10 bg-[#070B14] px-3 text-xs font-semibold text-white/75 sm:col-span-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.autoComplete}
-                      disabled={!formData.generateOrder}
-                      onChange={(event) => {
-                        setOrderConfigTouched(true);
-                        setOrderConfigError('');
-                        setFormData({ ...formData, autoComplete: event.target.checked });
-                      }}
-                      className="h-4 w-4 accent-blue-500"
-                    />
-                    Concluir automaticamente
-                    <span className="ml-auto text-[10px] font-normal text-white/35">Usado principalmente em serviços imediatos</span>
-                  </label>
-                  <label className="block text-xs font-semibold text-white/70 sm:max-w-xs">
-                    Prazo de entrega (dias corridos)
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      inputMode="numeric"
-                      value={formData.defaultDeliveryDays}
-                      disabled={!formData.generateOrder}
-                      onChange={(event) => {
-                        setOrderConfigTouched(true);
-                        setOrderConfigError('');
-                        setFormData({ ...formData, defaultDeliveryDays: event.target.value });
-                      }}
-                      placeholder="Sem prazo"
-                      className="mt-1.5 w-full rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm text-white outline-none placeholder:text-white/30 focus:border-blue-500/60 disabled:cursor-not-allowed"
-                    />
-                  </label>
-                </div>
-                {orderConfigError && <p role="alert" className="text-xs text-red-300">{orderConfigError}</p>}
-              </section>
-
-              {/* Mensagem padrão do botão de WhatsApp do Kanban */}
-              <section className="space-y-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.04] p-4 sm:p-5">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Mensagem do WhatsApp (Kanban)</h4>
-                  <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-white/45">
-                    Texto pré-preenchido no botão de envio dos cards deste serviço. Deixe vazio para usar a mensagem padrão (exibida abaixo como sugestão). O número e o destino do link não mudam.
-                  </p>
-                </div>
-                <textarea
-                  rows={7}
-                  value={formData.deliveryMessage}
-                  onChange={(event) => setFormData({ ...formData, deliveryMessage: event.target.value })}
-                  placeholder={buildDeliveryMessage({}, { id: editingServiceId ?? undefined, title: formData.title })}
-                  aria-label="Mensagem do WhatsApp do Kanban"
-                  className="w-full resize-y rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm leading-relaxed text-white outline-none placeholder:text-white/30 focus:border-emerald-500/60"
-                />
-              </section>
-
-              {/* Dúvidas públicas do serviço (/duvidas/{slug}) */}
-              <section className="space-y-3 rounded-2xl border border-purple-500/20 bg-purple-500/[0.04] p-4 sm:p-5">
-                <div>
-                  <h4 className="text-sm font-bold text-white">Dúvidas (site público)</h4>
-                  <p className="mt-1 max-w-xl text-[11px] leading-relaxed text-white/45">
-                    Categorias exibidas em /duvidas para este serviço (ex.: Forma de pagamento, Prazo de entrega). Sem nenhuma categoria, o serviço não aparece na área de Dúvidas. Use **texto** para negrito e linha em branco para novo parágrafo.
-                  </p>
-                </div>
-                {formData.faq.map((item, index) => {
-                  const updateFaq = (patch: Partial<ServiceFaqItem>) =>
-                    setFormData({ ...formData, faq: formData.faq.map((f, i) => (i === index ? { ...f, ...patch } : f)) });
-                  const moveFaq = (to: number) => {
-                    const next = [...formData.faq];
-                    [next[index], next[to]] = [next[to], next[index]];
-                    setFormData({ ...formData, faq: next });
-                  };
-                  return (
-                    <div key={item.id} className="space-y-2 rounded-xl border border-white/10 bg-[#070B14] p-3">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={item.title}
-                          onChange={(event) => updateFaq({ title: event.target.value })}
-                          placeholder="Título da categoria (ex.: Forma de pagamento)"
-                          aria-label={`Título da categoria de dúvida ${index + 1}`}
-                          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#0D1527] px-3 py-2 text-sm text-white outline-none placeholder:text-white/30 focus:border-purple-500/60"
-                        />
-                        <button type="button" disabled={index === 0} onClick={() => moveFaq(index - 1)} aria-label="Mover categoria para cima" className="rounded-lg p-2 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-25">
-                          <ChevronUp className="h-4 w-4" />
-                        </button>
-                        <button type="button" disabled={index === formData.faq.length - 1} onClick={() => moveFaq(index + 1)} aria-label="Mover categoria para baixo" className="rounded-lg p-2 text-white/60 hover:bg-white/10 hover:text-white disabled:opacity-25">
-                          <ChevronDown className="h-4 w-4" />
-                        </button>
-                        <button type="button" onClick={() => setFormData({ ...formData, faq: formData.faq.filter((_, i) => i !== index) })} aria-label="Excluir categoria" className="rounded-lg p-2 text-red-400 hover:bg-red-500/10">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                      <textarea
-                        rows={4}
-                        value={item.content}
-                        onChange={(event) => updateFaq({ content: event.target.value })}
-                        placeholder="Conteúdo / resposta"
-                        aria-label={`Conteúdo da categoria de dúvida ${index + 1}`}
-                        className="w-full resize-y rounded-lg border border-white/10 bg-[#0D1527] px-3 py-2 text-sm leading-relaxed text-white outline-none placeholder:text-white/30 focus:border-purple-500/60"
-                      />
-                    </div>
-                  );
-                })}
-                {formErrors.faq && <p role="alert" className="text-xs text-red-300">{formErrors.faq}</p>}
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, faq: [...formData.faq, { id: `faq-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, title: '', content: '' }] })}
-                  className="flex items-center gap-2 rounded-xl border border-dashed border-purple-500/40 px-3 py-2 text-xs font-semibold text-purple-200 hover:bg-purple-500/10"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Adicionar categoria
-                </button>
-              </section>
-
-              {/* Botões do Modal */}
-              <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  disabled={isSubmitting || isServiceImageUploading}
-                  onClick={() => setIsFormModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-semibold text-white/70 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || isServiceImageUploading || Boolean(selectedServiceImage)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-blue-600/30 transition-all disabled:opacity-50"
-                >
-                  {isSubmitting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{editingServiceId ? 'Salvar Alterações' : 'Criar Serviço'}</span>
-                </button>
-              </div>
-
-            </form>
-          </div>
-        </div>
+        <ServiceFormModal
+          formData={formData}
+          setFormData={setFormData}
+          formErrors={formErrors}
+          editingServiceId={editingServiceId}
+          isCustomCategory={isCustomCategory}
+          setIsCustomCategory={setIsCustomCategory}
+          isSubmitting={isSubmitting}
+          image={image}
+          orderConfigError={orderConfigError}
+          handleOrderConfigChange={handleOrderConfigChange}
+          setIsFormModalOpen={setIsFormModalOpen}
+          handleSubmitService={handleSubmitService}
+        />
       )}
 
-      {/* 10. MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
       {serviceToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
-            onClick={() => !isDeleting && setServiceToDelete(null)}
-          />
-
-          {/* Dialog */}
-          <div className="relative w-full max-w-md bg-[#0D1527] border border-red-500/30 rounded-2xl p-6 shadow-2xl z-10 animate-in zoom-in-95 duration-150">
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-4">
-              <Trash2 className="w-6 h-6" />
-            </div>
-
-            <h3 className="text-lg font-bold text-white mb-2">
-              Excluir Serviço Permanentemente?
-            </h3>
-            <p className="text-xs text-white/70 font-light leading-relaxed mb-4">
-              Tem certeza que deseja excluir o serviço <strong className="text-white font-semibold">"{serviceToDelete.title}"</strong>? 
-              O documento correspondente será removido da base do Firestore e deixará de existir no site público.
-            </p>
-
-            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[11px] text-blue-300 mb-6 flex items-start gap-2">
-              <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-              <span>
-                <strong>Dica:</strong> Em vez de excluir, você pode apenas <strong>Desativar</strong> o serviço para ocultá-lo do público sem perder suas informações.
-              </span>
-            </div>
-
-            <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={() => setServiceToDelete(null)}
-                className="px-4 py-2.5 text-xs font-semibold text-white/70 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={handleConfirmDelete}
-                className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-red-600/30 transition-all disabled:opacity-50"
-              >
-                {isDeleting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                <span>Sim, Excluir Serviço</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeleteServiceModal
+          serviceToDelete={serviceToDelete}
+          isDeleting={isDeleting}
+          setServiceToDelete={setServiceToDelete}
+          handleConfirmDelete={handleConfirmDelete}
+        />
       )}
-
     </div>
   );
 };
