@@ -1,5 +1,6 @@
 // Calendário de publicações do Instagram (puro): monta o mês com os dias de publicação (feed e Reels) e o saldo diário de seguidores/visualizações.
 import { dateKey, weekdayOf } from '../functions/missions-core.js';
+import { campaignsOnDay } from './instagramPlanning.js';
 
 /** Dias em Brasília. "Feed" = tudo que não é Reel (imagem, carrossel e vídeo de feed); o dia fica marcado com feed ou Reel (total). */
 const isFeed = (post) => post.kind !== 'reel';
@@ -21,9 +22,10 @@ export const postDay = (post) => {
 /**
  * monthKey: 'YYYY-MM'; posts: publicações salvas (histórico, não só as da última sincronização); days: saldos diários
  * ({ day, followers, views, ... }); today: dia de hoje em Brasília. Semanas começam no domingo.
+ * planning: saída de calendarEntries (planejamentos e etapas de campanha); só é anexada às células, nada é copiado/duplicado.
  * coverageStart: dia da publicação mais antiga conhecida; antes dele não dá para afirmar que não houve publicação.
  */
-export function buildMonth({ monthKey, posts, days, today }) {
+export function buildMonth({ monthKey, posts, days, today, planning }) {
   const byDay = new Map();
   let coverageStart = null;
   for (const post of posts) {
@@ -46,6 +48,7 @@ export function buildMonth({ monthKey, posts, days, today }) {
     const balance = balances.get(key);
     cells.push({
       key, day: n, feed: posted.feed, reels: posted.reels, total: posted.feed + posted.reels,
+      plans: planning?.byDay.get(key)?.plans ?? [], steps: planning?.byDay.get(key)?.steps ?? [], campaigns: planning ? campaignsOnDay(planning.spans, key) : [],
       followers: balance && typeof balance.followers === 'number' ? balance.followers : null,
       views: balance && typeof balance.views === 'number' ? balance.views : null,
       isToday: key === today, future: key > today, beforeCoverage: Boolean(coverageStart) && key < coverageStart,
