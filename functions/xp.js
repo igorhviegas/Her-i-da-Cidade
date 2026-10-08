@@ -12,6 +12,11 @@ export const DIFFICULTY_XP = { 1: 100, 2: 250, 3: 500, 4: 750, 5: 1000 };
 export const GOAL_XP = { monthly: 5000, weekly: 1000, daily: 100 };
 export const INSTAGRAM_XP = { views: 1, likes: 2, comments: 3, followers: 10 };
 
+// ---- Fit (docs/fit.md): o XP é calculado UMA vez, na hora de coletar, e gravado no evento (campo `xp`); mudar um peso depois não reescreve o histórico ----
+// Calibrado com as missões (100–1.000 XP) e os pedidos (R$ × 10): 8.000 passos = 800 XP, 20 km de bike = 1.000 XP, um treino = uma missão média.
+export const FIT_XP = { stepsPerXp: 10, stepsDailyCap: 20000, kmCycled: 50, checkin: 500 };
+export const FIT_EVENT_TYPES = ['fit_ride', 'fit_steps', 'fit_checkin'];
+
 // ---- Níveis: o nível N custa BASE * GROWTH^(N-1) XP para ser concluído (nível 1 = 500, depois ×1,25 a cada nível) ----
 export const LEVEL_BASE = 500;
 export const LEVEL_GROWTH = 1.25;
@@ -32,6 +37,13 @@ export function levelInfo(totalXp) {
 
 // ---- XP de cada evento do activityLog ----
 const finiteOr0 = (n) => (Number.isFinite(n) && n > 0 ? n : 0);
+
+/** Passos de um dia FECHADO: 1 XP a cada 10 passos, até 20.000 passos (máx. 2.000 XP). */
+export const stepsXp = (steps) => Math.floor(Math.min(finiteOr0(steps), FIT_XP.stepsDailyCap) / FIT_XP.stepsPerXp);
+/** Pedalada: 50 XP por km (arredondado para baixo). */
+export const rideXp = (distanceKm) => Math.floor(finiteOr0(distanceKm) * FIT_XP.kmCycled);
+/** Check-in de academia ou funcional (um por tipo e dia). */
+export const checkinXp = () => FIT_XP.checkin;
 
 /** Pedido: valor do pedido (totalPaid, o mesmo do Financeiro) × 10. Pedido interno de roteiro vale 0. */
 export const orderXp = (value) => Math.round(finiteOr0(value) * ORDER_XP_PER_REAL);

@@ -24,6 +24,7 @@ const readHidden = () => { try { return localStorage.getItem(HIDDEN_KEY) === '1'
 const LABELS: Record<string, string> = {
   order_completed: 'Pedido concluído', mission: 'Missão concluída', task_occurrence: 'Tarefa concluída',
   goal_completed: 'Meta atingida', script_ready: 'Roteiro pronto', content_published: 'Conteúdo publicado',
+  fit_ride: 'Pedalada', fit_steps: 'Passos do dia', fit_checkin: 'Check-in de treino',
 };
 
 interface Toast { id: string; label: string; xp: number; revenue: number; cost: number }

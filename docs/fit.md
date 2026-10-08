@@ -1,76 +1,69 @@
-# Fit — Apple Saúde (recebimento dos totais diários + tela)
+# Fit
 
-O servidor grava os totais diários (abaixo) e a tela **Fit** (`/admin/fit`, menu Pessoal → Fit) os lê: passos, distância e peso em 7, 30 ou 90 dias.
+Menu **Pessoal**: **Fit** (`/admin/fit`), **Check-ins** (`/admin/fit/checkins`) e **Treinos** (`/admin/fit/treinos`). Tudo é do dono e fica em `users/{uid}/...` (regras abaixo).
 
-## Tela (`components/admin/AdminFitPage.tsx`)
-- Indicadores: último dia com passos (o de hoje é parcial), média de passos, distância total e peso com a variação do período. Gráficos de passos e distância por dia (barras) e de peso (pontos + média móvel de 7 dias), em SVG, sem biblioteca.
-- Dia sem registro aparece apagado e fica fora das médias: **ausente não é zero**. As séries e médias são puras e testadas (`services/fitDaily.js`).
-- Somente leitura; os dados vêm de `users/{uid}/fitDaily` (`services/fitService.ts`).
-
-## Ciclismo: importar o FIT do MyWhoosh (`components/admin/FitRides.tsx`)
-Botão **Importar FIT** na tela do Fit (aceita vários arquivos). O arquivo é lido **no navegador** (`fit-file-parser`, MIT, carregado só ao importar) e só o **resumo** vai para `users/{uid}/fitRides/{id}`: início (UTC), duração, tempo em movimento, distância, velocidade média (em movimento) e máxima, cadência média (só pedalando). Mostra treinos, km, tempo, velocidade média, km por dia e a lista do período, com opção de apagar.
-- **Onde baixar:** site do MyWhoosh → Perfil → Activity Files (`.fit`). O formato do app pode mudar (um relato diz que a versão 5.3 passou a exportar GPX); GPX não é lido.
-- **Identidade:** `fabricante_série_time_created` (ex.: `mywhoosh_3313379353_20261007T200427Z`) é o id do documento: importar o mesmo arquivo de novo não duplica (a série é do aparelho e se repete; o `time_created` muda por treino).
-- **Recalculado dos registros** (o resumo do arquivo não é confiável: um treino veio com `avg_speed` 0 e não existe `max_speed`).
-- **Não usado:** frequência cardíaca, potência e calorias (zero = sem dado; a potência é estimada pelo QZ e veio 0 num treino com velocidade de 27 km/h), GPS e altitude (do mundo virtual) e cadência máxima (picos de ruído).
-- Só pedaladas (`sport = cycling`); outro esporte é recusado com mensagem.
-- **Ainda não feito:** juntar com o mesmo treino vindo do Apple Saúde (o QZ já grava treinos lá). Plano: início ± 3 min, duração ± 5% e distância ± 5%, mantendo um único registro com as fontes ligadas.
-
-## Privacidade (`firestore.rules`)
-`match /users/{uid}/fitDaily/{day}`: lê só quem é administrador **e** dono do caminho (`request.auth.uid == uid`); nenhum cliente grava. `fitRides/{id}`: o dono lê, cria (só com os campos do resumo, tipos e limites plausíveis, `createdAt` = horário do servidor e id = `sourceKey`) e apaga; sem edição. O `firestore.rules.txt` é uma cópia exata do `firestore.rules` (há teste que exige isso): atualize os dois juntos. Outro administrador não lê os dados do dono. Qualquer outro caminho sob `users/` segue negado. Verificado no emulador (14 casos: dono, outro admin, usuário comum, visitante, escrita e outros caminhos); o teste versionado é `tests/firestore-rules-fit.test.js` (`npm run test:rules`). **É preciso publicar o `firestore.rules`** para a tela conseguir ler.
-
-## Fluxo
-Apple Saúde → app **Health Auto Export** (automação REST) → `POST /api/fit-ingest` → `users/{FIT_OWNER_UID}/fitDaily/{AAAA-MM-DD}`.
-
-- Autenticação: `Authorization: Bearer $FIT_INGEST_TOKEN` (comparação em tempo constante). O token só **escreve**; não lê nada.
-- O dono vem de `FIT_OWNER_UID` (UID do Firebase Auth), nunca do payload: um payload com outro `uid` ou caminho é ignorado.
-- Upsert por dia com `merge`: o que veio sobrescreve (o dia de hoje chega parcial e depois completo; nunca soma), o que não veio é preservado. Reenviar o mesmo período é seguro.
-- A resposta traz só contagens (`days`, `accepted`, `ignoredMetrics`, `invalid`, `workoutsIgnored`); nem a resposta nem os logs trazem dado de saúde.
-
-## O que é guardado (`functions/fit-health.js`)
-| Métrica do app | Campo | Unidades aceitas |
+| Fonte | Como entra | Onde fica |
 |---|---|---|
-| `step_count` | `steps` | count |
-| `walking_running_distance` | `walkRunKm` | km, m, mi |
-| `cycling_distance` | `cyclingKm` | km, m, mi |
-| `active_energy` / `basal_energy_burned` | `activeKcal` / `basalKcal` | kcal, kJ |
-| `apple_exercise_time` | `exerciseMin` | min |
-| `weight_body_mass` | `weightKg` | kg, lb (última pesagem do dia) |
+| Passos, distância e peso (Apple Saúde) | **Atalho do iPhone** → `POST /api/fit-ingest` | `users/{uid}/fitDaily/{dia}` (gravado pelo servidor) |
+| Pedaladas | botão **Importar FIT** (arquivo do MyWhoosh) | `users/{uid}/fitRides/{id}` |
+| Peso manual | aba Check-ins | `users/{uid}/fitWeight/{dia}` |
+| Academia e funcional | aba Check-ins, ou **Finalizar treino** na aba Treinos | `users/{uid}/fitCheckins/{tipo_dia}` |
+| Exercícios e treinos (A, B…) | aba Treinos | `fitExercises/{id}`, `fitWorkouts/{id}` |
 
-Qualquer outra métrica (marcha, velocidade, lances de escada…) é descartada. Dia sem registro fica sem o campo (ausente ≠ zero). O dia é o **local** do texto da data (`2026-10-07 00:00:00 -0300` → `2026-10-07`), sem converter para UTC. Valores fora do plausível, unidade desconhecida ou métrica diária não resumida são descartados e contados em `invalid`.
+Não há mais integração com o Health Auto Export (removida): o app Saúde só chega ao CRM pelo atalho.
 
-**Treinos (`workouts`) não são gravados**: o formato real ainda não foi validado (o export de teste não tinha nenhum). Só são contados em `workoutsIgnored`.
+## Tela Fit (`AdminFitPage.tsx`)
+Indicadores (último dia com passos, média, distância, peso e variação), gráficos de passos, distância e peso (pontos + média móvel de 7 dias), **XP dos passos** e a seção **Ciclismo**. Dia sem registro aparece apagado e fica fora das médias: **ausente não é zero** (`services/fitDaily.js`, testado). O peso manual vale mais que o do atalho no mesmo dia.
 
-## Ativar
-1. Gerar um segredo aleatório de 32+ caracteres e definir na Vercel `FIT_INGEST_TOKEN` e `FIT_OWNER_UID` (UID do seu usuário no Firebase Auth, o mesmo de `admins/{uid}`). Republicar.
-2. No Health Auto Export: *Automations → REST API* (Premium ou teste de 7 dias):
-   - URL: `https://<seu-domínio>/api/fit-ingest`
-   - Cabeçalho: `Authorization` = `Bearer <FIT_INGEST_TOKEN>`
-   - Formato JSON, **versão 2**, **Summarize Data ligado** (totais por dia; sem isso as métricas diárias são descartadas), agrupamento por dia.
-   - Métricas: as da tabela. Período: "Previous 7 Days" ou "Default".
-3. Rodar manualmente pelo widget e conferir a resposta (`ok: true`, `days > 0`) e o Firestore.
+## Atalho do iPhone → `/api/fit-ingest`
+`POST` com `Authorization: Bearer <FIT_INGEST_TOKEN>` e JSON `{ "day": "AAAA-MM-DD", "steps": 2431, "walkRunKm": 1.8, "weightKg": 72 }` (só `day` é obrigatório). Campos aceitos, em unidades fixas: `steps`, `walkRunKm` (km), `cyclingKm`, `activeKcal`, `basalKcal`, `exerciseMin`, `weightKg` (kg); outro campo é descartado e contado (`ignoredFields`), valor implausível também (`invalid`). Aceita número ou texto numérico (`"1,8"`). O `day` aceita `2026-10-07`, com hora ou `07/10/2026`; espaços e marcas invisíveis do iOS em volta são ignorados. O dono vem de `FIT_OWNER_UID` (nunca do payload); o token só **escreve**. Upsert por dia com `merge` (o dia chega parcial e depois completo; nunca soma). A resposta e os logs trazem só contagens; no 400, só o nome e o tipo de cada campo e a forma do `day` (`9999-99-99`), nunca valores.
 
-## Alternativa gratuita: Atalho do iPhone (sem Health Auto Export)
-O mesmo endpoint aceita o envio simples de **um dia**: `POST /api/fit-ingest` com `Authorization: Bearer <FIT_INGEST_TOKEN>` e o corpo JSON `{ "day": "AAAA-MM-DD", "steps": 2431, "walkRunKm": 1.8, "weightKg": 72 }` (todos opcionais menos `day`; mesmos campos, unidades e limites da tabela acima; aceita texto numérico com vírgula). Só o que vier é gravado (merge); campo desconhecido ou fora do plausível é descartado e contado.
+Ativar: defina `FIT_INGEST_TOKEN` (32+ caracteres aleatórios) e `FIT_OWNER_UID` (UID do Firebase Auth) na Vercel e republique. Montagem do atalho (app Atalhos → "Enviar Fit"):
+1. **Data Atual** → **Formatar Data** (personalizado `yyyy-MM-dd`).
+2. **Encontrar Amostras de Saúde**: *Passos*, data de início *é hoje* → **Calcular Estatísticas** (*Soma*).
+3. O mesmo para *Distância de caminhada e corrida* (unidade quilômetros) e *Peso* (limite 1, valor).
+4. **Obter Conteúdo do URL**: `POST`, cabeçalho `Authorization`, corpo JSON com `day` (**Texto**) e os números.
+5. Automação pessoal *Abrir app* (QZ e/ou Saúde) com "Perguntar antes de executar" desligado.
 
-Montagem do atalho (app Atalhos → "Enviar Fit"):
-1. **Data Atual** → **Formatar Data** (formato personalizado `yyyy-MM-dd`) = dia.
-2. **Encontrar Amostras de Saúde**: tipo *Passos*, data de início *é hoje* → **Calcular Estatísticas** (*Soma*) = passos.
-3. **Encontrar Amostras de Saúde**: tipo *Distância de caminhada e corrida*, data de início *é hoje* → **Calcular Estatísticas** (*Soma*) = km (a unidade segue o app Saúde).
-4. **Encontrar Amostras de Saúde**: tipo *Peso*, data de início *é hoje*, limite 1 → valor = peso (vazio se não houve pesagem hoje; é descartado).
-5. **Obter Conteúdo do URL**: URL do endpoint, método **POST**, cabeçalho `Authorization` = `Bearer <token>`, corpo **JSON** com os campos `day` (texto), `steps`, `walkRunKm` e `weightKg` (números).
-6. Automação pessoal: *Abrir app* (QZ e/ou Saúde) → executar o atalho, com "Perguntar antes de executar" desligado. Também dá para rodá-lo pela tela de início.
+Cuidados: o atalho guarda o token (não o compartilhe); o iOS bloqueia o Saúde com o telefone bloqueado; só o dia de hoje é enviado, então o dia sem abrir o app fica sem registro.
 
-O `day` aceita `2026-10-07`, com hora (`2026-10-07 19:06`) ou `07/10/2026`; espaços e marcas invisíveis do iOS em volta são ignorados. Se o servidor responder 400 `invalid_payload`, a resposta traz o **nome e o tipo** de cada campo recebido e a **forma** do `day` (`9999-99-99`; caractere invisível aparece como `<U+200E>`), nunca os valores. No Atalhos, `day` precisa ser do tipo **Texto**.
+## Ciclismo: importar o FIT do MyWhoosh (`FitRides.tsx`)
+O arquivo é lido **no navegador** (`fit-file-parser`, MIT, carregado só ao importar) e só o **resumo** é gravado: início (UTC), duração, tempo em movimento, distância, velocidade média (em movimento) e máxima, cadência média (só pedalando). Baixe em mywhoosh.com → Perfil → Activity Files.
+- **Identidade:** `fabricante_série_time_created` é o id: importar o mesmo arquivo de novo não duplica.
+- **Recalculado dos registros** (o resumo do arquivo não é confiável: `avg_speed` veio 0 e não há `max_speed`). **Não usado:** FC, potência, calorias (zero = sem dado), GPS e altitude (do mundo virtual) e cadência máxima (ruído).
+- Só `sport = cycling`. Use **uma** fonte de pedaladas (MyWhoosh): o FIT do QZ cobre a sessão inteira do app e contaria a mesma distância duas vezes.
 
-Cuidados: o atalho guarda o token, então **não compartilhe o atalho**. O iOS bloqueia o Saúde com o telefone bloqueado (a automação "Abrir app" funciona porque o aparelho está desbloqueado). Só o dia de hoje é enviado: o dia que passar sem abrir o app fica sem registro. **Não validado em aparelho**: o nome exato das ações e como o Atalhos devolve distância e peso.
+## Check-ins e peso (`AdminFitCheckinsPage.tsx`)
+Um check-in por **tipo e dia** (`gym_AAAA-MM-DD`, `functional_…`): registrar de novo corrige o do dia. Campos: data, duração (min), observação. Indicadores da semana e do mês e gráfico de treinos por semana. O peso manual (um por dia) alimenta o gráfico da aba Fit.
+
+## Treinos (`AdminFitWorkoutsPage.tsx`)
+- **Exercícios:** nome, **categoria** livre (Perna, Costas, Abdômen…) e **timer opcional** (5 a 3.600 s).
+- **Planos:** "Treino A", "Treino B"… com os exercícios escolhidos e a **ordem** (subir/descer).
+- **Treinar:** *Iniciar treino* liga o **cronômetro** e abre o checklist. Exercício com timer só conclui quando o timer termina (toca e vibra; se a tela bloquear, conclui ao voltar). Dá para **trocar a ordem** durante o treino. *Finalizar* grava o check-in de academia do dia (duração, nome do treino, feitos/total; observação anterior do dia é substituída) e oferece coletar o XP. A sessão fica no `localStorage` e sobrevive a recarregar a página.
+- Lógica pura e testada em `services/fitWorkout.js`.
+
+## XP (gamificação)
+Ver `docs/xp.md`. Cada XP é **coletado** por um botão e vira **um** evento no `activityLog` (criado uma vez; o XP fica congelado no evento), que abre a janelinha de ganho.
+
+| Origem | XP | Regra |
+|---|---|---|
+| Passos de um dia **fechado** | 1 por 10 passos, teto de 20.000 (máx. 2.000) | uma coleta por dia; o dia de hoje só amanhã |
+| Pedalada importada | 50 por km (arredondado para baixo) | uma coleta por treino |
+| Check-in de academia ou funcional | 500 | uma coleta por tipo e dia |
+
+Calibrado com missões (100 a 1.000 XP) e pedidos (R$ × 10): 8.000 passos = 800 XP; 20 km de bike = 1.000 XP. Os valores ficam em `FIT_XP` (`functions/xp.js`) e as regras do Firestore repetem os tetos; mudar um exige mudar o outro (e publicar as regras). Mudar o valor não reescreve o que já foi coletado.
+
+## Privacidade e segurança (`firestore.rules`)
+- Tudo sob `users/{uid}/...`: só administrador **e** dono do caminho lê e escreve; outro administrador não acessa. `fitDaily` é só do servidor (cliente não grava). Outro caminho sob `users/` segue negado.
+- `fitRides`, `fitWeight`, `fitCheckins`, `fitExercises`, `fitWorkouts`: o dono cria, corrige (exceto `fitRides`) e apaga, com campos, tipos e limites validados e `updatedAt` = horário do servidor.
+- **XP:** `fit_ride`, `fit_steps`, `fit_checkin` no `activityLog` são validados: id = tipo_refId, hora do servidor, XP inteiro, no máximo o que a origem vale e a origem precisa existir no seu caminho. Ninguém edita nem apaga eventos.
+- `firestore.rules.txt` é cópia exata de `firestore.rules` (há teste): atualize os dois. Testes: `tests/firestore-rules-fit.test.js` e `tests/firestore-rules-fit-data.test.js` (`npm run test:rules`).
 
 ## Limites conhecidos
-- O iOS só deixa o app ler o Saúde com o iPhone **desbloqueado** e não garante o horário: o envio é eventual, não em tempo real.
-- Dois envios fora de ordem: vale o último a chegar (não há carimbo de envio no payload).
-- Duas fontes separadas no mesmo dia (ex.: iPhone e Watch): fica a maior para não contar passos duas vezes. **Não validado** com dados reais (só há iPhone).
-- No `npm run dev` o Express limita o corpo a 100 KB (`express.json`); na Vercel o limite é maior.
-- Na Vercel, `api/` agora tem 11 funções (o plano Hobby limita o total; confirmar o limite vigente).
+- O envio do atalho depende do iPhone desbloqueado e não é em tempo real.
+- Treinos do QZ no Apple Saúde não são lidos (o FIT do MyWhoosh é a fonte das pedaladas).
+- O timer sonoro no iOS só toca se o toque que o iniciou liberou o áudio da página; com a tela bloqueada o aviso é visto ao voltar.
+- No `npm run dev` o Express limita o corpo a 100 KB; na Vercel `api/` tem 11 funções (o plano Hobby limita o total).
 
-## Próximos passos
-Check-ins de academia e funcional, peso manual, ligação do treino do Saúde com o FIT, formato de treinos quando houver um real, deduplicação entre fontes (mesma atividade vinda de FIT, Strava e Saúde: chave por fonte + id; entre fontes, esporte + início em UTC + duração).
+## Próximos passos possíveis
+Nutrição (base TACO + USDA, ver relatório de viabilidade), metas semanais de treino no módulo Missões, histórico de cargas por exercício.

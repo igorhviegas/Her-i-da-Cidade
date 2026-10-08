@@ -2,9 +2,12 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { loadFitDaily, type FitDailyRow } from '../../services/fitService';
+import { loadWeights, type WeightEntry } from '../../services/fitDataService';
+import { stepsXp } from '../../functions/xp.js';
 import { average, dayKey, lastDays, movingAverage, series, summarize } from '../../services/fitDaily.js';
 import { DailyBars, WeightLine, shortDay } from './FitCharts';
 import { FitRides } from './FitRides';
+import { ClaimButton, useFitClaims } from './FitXp';
 import { cardClass, ghostBtn } from './financeFormat';
 
 const RANGES = [7, 30, 90] as const;
@@ -19,10 +22,12 @@ const Kpi: React.FC<{ label: string; value: string; hint?: string }> = ({ label,
   </div>
 );
 
-/** Fit: passos, distância e peso vindos do Apple Saúde (docs/fit.md). Somente leitura. */
+/** Fit: passos, distância e peso (Apple Saúde pelo Atalho do iPhone + peso manual), pedaladas do MyWhoosh e coleta de XP (docs/fit.md). */
 export const AdminFitPage: React.FC = () => {
   const { user } = useAuth();
   const [rows, setRows] = useState<FitDailyRow[] | null>(null);
+  const [weights, setWeights] = useState<WeightEntry[]>([]);
+  const claims = useFitClaims();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<(typeof RANGES)[number]>(30);
@@ -30,13 +35,28 @@ export const AdminFitPage: React.FC = () => {
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true); setError(null);
-    try { setRows(await loadFitDaily(user.uid, MAX_DAYS)); }
+    try {
+      const [daily, manual] = await Promise.all([loadFitDaily(user.uid, MAX_DAYS), loadWeights(user.uid, 400)]);
+      setRows(daily); setWeights(manual);
+    }
     catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível carregar os dados do Fit.'); }
     finally { setLoading(false); }
   }, [user]);
   useEffect(() => { void load(); }, [load]);
 
-  const days = useMemo(() => lastDays(rows ?? [], dayKey(new Date()), range), [rows, range]);
+  // Peso manual vale mais que o do atalho no mesmo dia (você corrigiu à mão); dia só com peso manual também entra.
+  const merged = useMemo(() => {
+    const byDay = new Map<string, FitDailyRow>((rows ?? []).map((r) => [r.day, { ...r }]));
+    for (const w of weights) byDay.set(w.day, { ...(byDay.get(w.day) ?? ({ day: w.day } as FitDailyRow)), weightKg: w.kg });
+    return [...byDay.values()];
+  }, [rows, weights]);
+  const today = dayKey(new Date());
+  const days = useMemo(() => lastDays(merged, today, range), [merged, today, range]);
+
+  // XP dos passos: só de dias já fechados (o de hoje ainda muda). Cada dia é coletado uma vez.
+  const pendingSteps = useMemo(() => (rows ?? []).filter((r) => r.day < today && stepsXp(r.steps) > 0 && !claims.isClaimed('fit_steps', r.day)).sort((a, b) => (a.day < b.day ? 1 : -1)).slice(0, 14), [rows, today, claims]);
+  const pendingTotal = pendingSteps.reduce((sum, r) => sum + stepsXp(r.steps), 0);
+  const claimAllSteps = async () => { for (const r of pendingSteps) await claims.claim('fit_steps', r.day, stepsXp(r.steps), { steps: r.steps }); };
   const view = useMemo(() => {
     const weights = series(days, 'weightKg');
     return { dates: days.map((d) => d.day), steps: series(days, 'steps'), km: series(days, 'walkRunKm'), weights, trend: movingAverage(weights, 7), summary: summarize(days) };
@@ -50,7 +70,7 @@ export const AdminFitPage: React.FC = () => {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-2xl font-extrabold tracking-tight text-white">Fit</h2>
-          <p className="text-sm text-white/55">Passos, distância e peso do Apple Saúde (iPhone), enviados pelo Health Auto Export.</p>
+          <p className="text-sm text-white/55">Passos, distância e peso do Apple Saúde (enviados pelo Atalho do iPhone), peso manual e pedaladas do MyWhoosh.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-xl border border-white/10 bg-white/5 p-0.5" role="group" aria-label="Período">
@@ -75,14 +95,14 @@ export const AdminFitPage: React.FC = () => {
         </div>
       )}
 
-      {rows && rows.length === 0 && !error && (
+      {rows && merged.length === 0 && !error && (
         <div className={cardClass}>
           <p className="font-semibold text-white">Nenhum dado recebido ainda.</p>
-          <p className="mt-1 text-sm text-white/60">Configure a automação REST API do Health Auto Export (passo a passo em docs/fit.md), com "Summarize Data" ligado, e rode uma vez.</p>
+          <p className="mt-1 text-sm text-white/60">Monte o Atalho do iPhone que envia passos, distância e peso (passo a passo em docs/fit.md) e rode uma vez, ou registre o peso na aba Check-ins.</p>
         </div>
       )}
 
-      {rows && rows.length > 0 && (
+      {rows && merged.length > 0 && (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Kpi label="Passos" value={summary.latestSteps ? number(summary.latestSteps.value) : '—'} hint={summary.latestSteps ? `${shortDay(summary.latestSteps.day)}${summary.latestSteps.day === view.dates[view.dates.length - 1] ? ' · hoje, parcial' : ''}` : 'sem registro'} />
@@ -107,11 +127,31 @@ export const AdminFitPage: React.FC = () => {
               <WeightLine days={view.dates} values={view.weights} average={view.trend} />
             </section>
           </div>
+          <section className={cardClass}>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-white">XP dos passos</h3>
+                <p className="text-xs text-white/50">1 XP a cada 10 passos de um dia já fechado (teto de 20.000 passos por dia). O de hoje fica disponível amanhã.</p>
+              </div>
+              {pendingSteps.length > 1 && <ClaimButton xp={pendingTotal} claimed={false} busy={claims.busy !== null} onClick={() => void claimAllSteps()} />}
+            </div>
+            {claims.error && <p role="alert" className="mb-2 text-xs text-red-300">{claims.error}</p>}
+            {pendingSteps.length === 0 ? <p className="text-sm text-white/50">Nenhum XP de passos pendente.</p> : (
+              <ul className="divide-y divide-white/5">
+                {pendingSteps.map((r) => (
+                  <li key={r.day} className="flex items-center justify-between gap-3 py-2 text-sm">
+                    <span className="tabular-nums text-white/85">{shortDay(r.day)} · {number(r.steps ?? 0)} passos</span>
+                    <ClaimButton xp={stepsXp(r.steps)} claimed={false} busy={claims.busy !== null} onClick={() => void claims.claim('fit_steps', r.day, stepsXp(r.steps), { steps: r.steps })} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
           <p className="text-xs text-white/40">Dia sem registro aparece apagado (não é zero). {lastSync && `Última sincronização: ${lastSync.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}.`}</p>
         </>
       )}
 
-      {user && <FitRides uid={user.uid} dates={view.dates} />}
+      {user && <FitRides uid={user.uid} dates={view.dates} claims={claims} />}
     </div>
   );
 };
