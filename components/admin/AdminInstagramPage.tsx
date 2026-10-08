@@ -6,6 +6,8 @@ import type { DailySummary } from '../../services/instagramDaily.js';
 import { dateKey } from '../../functions/missions-core.js';
 import { cardClass } from './financeFormat';
 import { InstagramCalendar } from './InstagramCalendar';
+import { InstagramCampaigns } from './instagramPlanning/InstagramCampaigns';
+import { useInstagramPlanning } from './instagramPlanning/planningUi';
 import { InstagramAlerts, InstagramHeader, InstagramHighlights, InstagramKpis, InstagramPostsList, useInstagramSync } from './adminPages/InstagramSections';
 import { CaptionLab, InstagramAudit } from './adminPages/InstagramAudit';
 import type { Period, SortKey } from './adminPages/instagramParts';
@@ -24,6 +26,9 @@ export const AdminInstagramPage: React.FC = () => {
   const [period, setPeriod] = useState<Period>('30d'); // período dos cards "Mais curtidas/visualizações/comentários"
   const [days, setDays] = useState<DailySummary[] | undefined>(undefined);
   const [daysError, setDaysError] = useState(false);
+  const [view, setView] = useState<'analytics' | 'campaigns'>('analytics');
+  const [campaignId, setCampaignId] = useState<string | null>(null);
+  const planning = useInstagramPlanning();
 
   useEffect(() => {
     const onError = () => setLoadError(true);
@@ -41,6 +46,8 @@ export const AdminInstagramPage: React.FC = () => {
   const loading = profile === undefined || posts === undefined;
   const today = dateKey(new Date()); // dia em Brasília, recalculado a cada render
 
+  const openCampaign = (id: string) => { setCampaignId(id); setView('campaigns'); };
+
   return (
     <div className="space-y-6">
       <InstagramHeader profile={profile} syncing={syncing} onSync={sync} />
@@ -48,20 +55,31 @@ export const AdminInstagramPage: React.FC = () => {
       {feedback && <p role="status" className={`text-xs ${feedback.ok ? 'text-emerald-300' : 'text-red-300'}`}>{feedback.text}</p>}
       <InstagramAlerts profile={profile} />
 
-      {loadError && <p role="alert" className="flex items-center gap-2 text-sm text-red-300"><AlertCircle className="h-4 w-4" aria-hidden />Não foi possível carregar os dados do Instagram.</p>}
-      {loading && !loadError && <p className="flex items-center gap-2 text-sm text-white/50"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Carregando…</p>}
+      <div role="tablist" aria-label="Seções do Instagram" className="flex gap-1 border-b border-white/10">
+        {([['analytics', 'Análises'], ['campaigns', 'Campanhas']] as const).map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold transition ${view === id ? 'border-purple-400 text-white' : 'border-transparent text-white/50 hover:text-white/80'}`}>{label}</button>
+        ))}
+      </div>
 
-      {!loading && profile === null && (
+      {view === 'campaigns' && (
+        <InstagramCampaigns campaigns={planning.campaigns} templates={planning.templates} error={planning.error} today={today} selectedId={campaignId} onSelect={setCampaignId} />
+      )}
+
+      {view === 'analytics' && loadError && <p role="alert" className="flex items-center gap-2 text-sm text-red-300"><AlertCircle className="h-4 w-4" aria-hidden />Não foi possível carregar os dados do Instagram.</p>}
+      {view === 'analytics' && loading && !loadError && <p className="flex items-center gap-2 text-sm text-white/50"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Carregando…</p>}
+
+      {view === 'analytics' && !loading && profile === null && (
         <p className={`${cardClass} text-sm text-white/60`}>Nenhum dado ainda. Configure a integração (docs/instagram.md) e clique em “Sincronizar agora”.</p>
       )}
 
-      {profile && posts && (
+      {view === 'analytics' && profile && posts && (
         <>
           <InstagramKpis profile={profile} totals={totals} current={current} today={today} />
 
           <InstagramHighlights period={period} onPeriod={setPeriod} periodPosts={periodPosts} />
 
-          <InstagramCalendar posts={posts} days={days} daysError={daysError} today={today} />
+          <InstagramCalendar posts={posts} days={days} daysError={daysError} today={today} plans={planning.plans} campaigns={planning.campaigns} planningError={planning.error} onOpenCampaign={openCampaign} />
 
           <InstagramAudit current={current} />
 

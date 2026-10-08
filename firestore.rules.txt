@@ -517,6 +517,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Planejamento editorial e campanhas do Instagram: dados do próprio painel, somente administradores (mesmo padrão de missions).
+    match /instagramPlans/{id} { allow read, write: if isAdmin(); }
+    match /instagramCampaigns/{id} { allow read, write: if isAdmin(); }
+    match /instagramCampaignTemplates/{category} { allow read, write: if isAdmin(); }
+
     match /instagramPrivate/{docId} {
       allow read, write: if false;
     }

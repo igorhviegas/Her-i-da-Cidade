@@ -57,3 +57,16 @@ test('o arquivo de regras não ficou com coleções do Instagram abertas', async
   const rules = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8');
   assert.match(rules, /match \/instagramPrivate\/\{docId\}\s*\{\s*allow read, write: if false;/);
 });
+
+test('planejamento e campanhas (instagramPlans/Campaigns/CampaignTemplates): só administrador lê e escreve', async () => {
+  for (const path of ['instagramPlans/p1', 'instagramCampaigns/c1', 'instagramCampaignTemplates/new_service']) {
+    await assertSucceeds(setDoc(doc(admin(), path), { title: 'x' }));
+    await assertSucceeds(getDoc(doc(admin(), path)));
+    await assertSucceeds(updateDoc(doc(admin(), path), { title: 'y' }));
+    await assertFails(getDoc(doc(stranger(), path)));
+    await assertFails(setDoc(doc(stranger(), path), { title: 'z' }));
+    await assertFails(getDoc(doc(anonymous(), path)));
+    await assertFails(deleteDoc(doc(anonymous(), path)));
+    await assertSucceeds(deleteDoc(doc(admin(), path)));
+  }
+});
