@@ -7,6 +7,7 @@ import { dateKey } from '../../functions/missions-core.js';
 import { cardClass } from './financeFormat';
 import { InstagramCalendar } from './InstagramCalendar';
 import { InstagramAlerts, InstagramHeader, InstagramHighlights, InstagramKpis, InstagramPostsList, useInstagramSync } from './adminPages/InstagramSections';
+import { CaptionLab, InstagramAudit } from './adminPages/InstagramAudit';
 import type { Period, SortKey } from './adminPages/instagramParts';
 
 export { DeltaText } from './adminPages/instagramParts';
@@ -61,6 +62,10 @@ export const AdminInstagramPage: React.FC = () => {
           <InstagramHighlights period={period} onPeriod={setPeriod} periodPosts={periodPosts} />
 
           <InstagramCalendar posts={posts} days={days} daysError={daysError} today={today} />
+
+          <InstagramAudit current={current} />
+
+          <CaptionLab />
 
           <InstagramPostsList current={current} sorted={sorted} sort={sort} visible={visible} onSort={(next) => { setSort(next); setVisible(PAGE_SIZE); }} onMore={() => setVisible((v) => v + PAGE_SIZE)} />
         </>
