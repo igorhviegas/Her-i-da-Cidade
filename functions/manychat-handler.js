@@ -215,6 +215,11 @@ function secretsMatch(providedHeader, expectedSecret) {
   return supplied.length === expected.length && timingSafeEqual(supplied, expected);
 }
 
+/**
+ * @param {any} req
+ * @param {any} res
+ * @param {{ database?: unknown, secret?: string, logger?: Console, onBookingConfirmed?: (orderId: string) => unknown }} [options]
+ */
 export async function handleManyChatOrderRequest(req, res, { database, secret, logger: customLogger = console, onBookingConfirmed } = {}) {
   res.set('Cache-Control', 'no-store');
   if (req.method !== 'POST') return jsonError(res, 405, 'method_not_allowed', 'Use POST.', { allowedMethods: ['POST'] });
