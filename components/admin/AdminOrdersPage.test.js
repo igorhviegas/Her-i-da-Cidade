@@ -2,9 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const source = await readFile(new URL('./AdminOrdersPage.tsx', import.meta.url), 'utf8');
-const columns = source.slice(source.indexOf('const COLUMNS'), source.indexOf('] as const'));
-const completed = source.slice(source.indexOf('Pedidos concluídos ('));
+// A página foi dividida em ./orders/*: as verificações de texto leem o conjunto de arquivos.
+const read = (path) => readFile(new URL(path, import.meta.url), 'utf8');
+const orderView = await read('./orders/orderView.ts');
+const completedSource = await read('./orders/CompletedOrders.tsx');
+const source = (await Promise.all([
+  './AdminOrdersPage.tsx', './orders/OrderCard.tsx', './orders/OrdersKanban.tsx', './orders/OrdersToolbar.tsx', './orders/CompletedOrders.tsx', './orders/orderView.ts',
+].map(read))).join('\n');
+const columns = orderView.slice(orderView.indexOf('const COLUMNS'), orderView.indexOf('] as const'));
+const completed = completedSource.slice(completedSource.indexOf('Pedidos concluídos ('));
 
 test('colunas do Kanban: Entregar, Gravar, Editar, Agendado, Concluído', () => {
   const order = [...columns.matchAll(/status: '(\w+)'/g)].map((m) => m[1]);
