@@ -61,5 +61,5 @@ export function deadlineState(value: unknown): 'overdue' | 'soon' | 'normal' {
 }
 
 export function dueTime(order: Order): number {
-  return toDate(order.internalDueDate)?.getTime() ?? Number.POSITIVE_INFINITY;
+  return (toDate(order.internalDueDate) ?? toDate(order.eventDate))?.getTime() ?? Number.POSITIVE_INFINITY;
 }
