@@ -30,12 +30,13 @@ export const AdminOrdersPage: React.FC = () => {
   const { search, setSearch, filteredOrders, filteredCompletedOrders } = useOrdersFilters(orders, completedOrders);
   const { createOpen, setCreateOpen, setDuplicateSource, duplicateInitialValues, handleOrderCreated } = useOrderCreation(loadOrders, setSuccess);
   const { selectedOrder, setSelectedOrder, editOrderOpen, setEditOrderOpen, orderActionError, setOrderActionError } = useOrderSelection(orders, completedOrders, loading);
-  const allOrderRecords = useMemo(() => [...orders, ...completedOrders].map(({ order }) => order), [orders, completedOrders]);
+  const allOrderViews = useMemo(() => [...orders, ...completedOrders], [orders, completedOrders]);
+  const allOrderRecords = useMemo(() => allOrderViews.map(({ order }) => order), [allOrderViews]);
   const { calendarState, handleSendToCalendar } = useOrderCalendar(setSelectedOrder);
   const { deletingOrderId, handleDeleteOrder } = useOrderDelete({ setOrders, setCompletedOrders, setTotalOrderCount, setSelectedOrder, setOrderActionError, setSuccess });
   const { handleOrderSaved } = useOrderSaved({ orders, completedOrders, setOrders, setCompletedOrders, setSelectedOrder, setEditOrderOpen, setSuccess });
   const { updatingOrderId, consumptionView, setConsumptionView, requireEventCost, handleStatusChange } = useOrderStatus({ orders, completedOrders, loadOrders, setSelectedOrder, setEditOrderOpen, setOrderActionError, setSuccess });
-  const { teleprompterView, setTeleprompterView, handleSendToEditing } = useTeleprompterFlow(handleStatusChange);
+  const { teleprompterView, setTeleprompterView, handleSendToEditing, handleSaveTeleprompterText } = useTeleprompterFlow(handleStatusChange, loadOrders);
   const { draggingOrderId, setDraggingOrderId, dragOverStatus, setDragOverStatus, handleDropOrder } = useOrderDrag(handleStatusChange);
 
   const confirmConsumption = async (lines: ConsumptionLine[], { allowShortage }: { allowShortage: boolean }) => {
@@ -109,6 +110,7 @@ export const AdminOrdersPage: React.FC = () => {
 
       <OrdersModals
         orders={orders}
+        allOrderViews={allOrderViews}
         allOrderRecords={allOrderRecords}
         calendarState={calendarState}
         canOverrideStock={canOverrideStock}
@@ -134,6 +136,7 @@ export const AdminOrdersPage: React.FC = () => {
         handleSendToCalendar={handleSendToCalendar}
         handleDeleteOrder={handleDeleteOrder}
         handleSendToEditing={handleSendToEditing}
+        handleSaveTeleprompterText={handleSaveTeleprompterText}
         confirmConsumption={confirmConsumption}
       />
     </section>

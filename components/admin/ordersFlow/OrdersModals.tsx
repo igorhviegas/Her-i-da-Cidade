@@ -9,12 +9,15 @@ import { StockConsumptionModal } from '../StockConsumptionModal';
 import { TeleprompterModal } from '../TeleprompterModal';
 import { OrderDetailsModal } from '../orders/OrderDetailsModal';
 import type { CalendarState } from '../orders/useOrderCalendar';
+import { clientHistory } from '../orders/orderView';
 import type { OrderView } from '../orders/orderView';
 
 type CreateInitialValues = React.ComponentProps<typeof CreateOrderModal>['initialValues'];
 
 interface OrdersModalsProps {
   orders: OrderView[];
+  /** Todos os pedidos (Kanban + concluídos): base do histórico do cliente. */
+  allOrderViews: OrderView[];
   allOrderRecords: Order[];
   calendarState: CalendarState;
   canOverrideStock: boolean;
@@ -40,13 +43,14 @@ interface OrdersModalsProps {
   handleSendToCalendar: (orderId: string) => Promise<void>;
   handleDeleteOrder: (view: OrderView) => Promise<void>;
   handleSendToEditing: () => Promise<void>;
+  handleSaveTeleprompterText: (text: string) => Promise<void>;
   confirmConsumption: (lines: ConsumptionLine[], options: { allowShortage: boolean }) => Promise<void>;
 }
 
-type PostOrderModalsProps = Pick<OrdersModalsProps, 'orders' | 'canOverrideStock' | 'updatingOrderId' | 'orderActionError' | 'consumptionView' | 'teleprompterView' | 'setTeleprompterView' | 'setConsumptionView' | 'handleSendToEditing' | 'confirmConsumption'>;
+type PostOrderModalsProps = Pick<OrdersModalsProps, 'orders' | 'canOverrideStock' | 'updatingOrderId' | 'orderActionError' | 'consumptionView' | 'teleprompterView' | 'setTeleprompterView' | 'setConsumptionView' | 'handleSendToEditing' | 'confirmConsumption' | 'handleSaveTeleprompterText'> & { history: OrderView[] };
 
 /** Conferência de materiais (eventos presenciais) e teleprompter. */
-const PostOrderModals: React.FC<PostOrderModalsProps> = ({ orders, canOverrideStock, updatingOrderId, orderActionError, consumptionView, teleprompterView, setTeleprompterView, setConsumptionView, handleSendToEditing, confirmConsumption }) => (
+const PostOrderModals: React.FC<PostOrderModalsProps> = ({ history, handleSaveTeleprompterText, orders, canOverrideStock, updatingOrderId, orderActionError, consumptionView, teleprompterView, setTeleprompterView, setConsumptionView, handleSendToEditing, confirmConsumption }) => (
   <>
     {consumptionView && (
       <StockConsumptionModal
@@ -60,6 +64,8 @@ const PostOrderModals: React.FC<PostOrderModalsProps> = ({ orders, canOverrideSt
       <TeleprompterModal
         title={[teleprompterView.client?.name, teleprompterView.service?.title].filter(Boolean).join(' · ')}
         text={getTeleprompterText(teleprompterView) || ''}
+        history={history}
+        onSaveText={handleSaveTeleprompterText}
         canSendToEditing={(orders.find(({ order }) => order.id === teleprompterView.order.id)?.order.status ?? teleprompterView.order.status) !== 'editing'}
         sending={updatingOrderId === teleprompterView.order.id}
         error={orderActionError}
@@ -72,6 +78,7 @@ const PostOrderModals: React.FC<PostOrderModalsProps> = ({ orders, canOverrideSt
 
 export const OrdersModals: React.FC<OrdersModalsProps> = ({
   orders,
+  allOrderViews,
   allOrderRecords,
   calendarState,
   canOverrideStock,
@@ -97,6 +104,7 @@ export const OrdersModals: React.FC<OrdersModalsProps> = ({
   handleSendToCalendar,
   handleDeleteOrder,
   handleSendToEditing,
+  handleSaveTeleprompterText,
   confirmConsumption,
 }) => (
   <>
@@ -106,6 +114,7 @@ export const OrdersModals: React.FC<OrdersModalsProps> = ({
       <OrderDetailsModal
         selectedOrder={selectedOrder}
         allOrderRecords={allOrderRecords}
+        clientHistoryViews={clientHistory(allOrderViews, selectedOrder)}
         updatingOrderId={updatingOrderId}
         deletingOrderId={deletingOrderId}
         orderActionError={orderActionError}
@@ -121,6 +130,8 @@ export const OrdersModals: React.FC<OrdersModalsProps> = ({
       />
     )}
     <PostOrderModals
+      history={teleprompterView ? clientHistory(allOrderViews, teleprompterView) : []}
+      handleSaveTeleprompterText={handleSaveTeleprompterText}
       orders={orders}
       canOverrideStock={canOverrideStock}
       updatingOrderId={updatingOrderId}

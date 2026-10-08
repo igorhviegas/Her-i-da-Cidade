@@ -6,11 +6,14 @@ import type { Order, OrderStatus } from '../../../types';
 import { SERVICE_COLOR_CLASSES, STATUS_FLOW, STATUS_LABELS, toDate } from './orderView';
 import type { OrderView } from './orderView';
 import { buildContactWhatsappUrl, buildOrderRows } from './orderDetails';
+import { ClientHistoryList } from './ClientHistoryList';
 import type { CalendarState } from './useOrderCalendar';
 
 interface OrderDetailsModalProps {
   selectedOrder: OrderView;
   allOrderRecords: Order[];
+  /** Outros pedidos do mesmo cliente. */
+  clientHistoryViews: OrderView[];
   updatingOrderId: string | null;
   deletingOrderId: string | null;
   orderActionError: string;
@@ -149,6 +152,7 @@ const OrderDetailsFooter: React.FC<OrderDetailsFooterProps> = ({ selectedOrder, 
 export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   selectedOrder,
   allOrderRecords,
+  clientHistoryViews,
   updatingOrderId,
   deletingOrderId,
   orderActionError,
@@ -199,6 +203,11 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             </div>
           )}
           {event && <OrderCalendarPanel order={order} calendar={calendar} syncedAt={syncedAt} updatingOrderId={updatingOrderId} deletingOrderId={deletingOrderId} handleSendToCalendar={handleSendToCalendar} />}
+
+          <details open className="border-b border-white/[0.07] pb-3">
+            <summary className="cursor-pointer select-none text-[10px] font-bold uppercase tracking-[0.12em] text-white/40 hover:text-white/60">Histórico do cliente ({clientHistoryViews.length})</summary>
+            <div className="mt-2 max-h-72 overflow-y-auto pr-1"><ClientHistoryList views={clientHistoryViews} /></div>
+          </details>
 
           <OrderDetailsFooter selectedOrder={selectedOrder} whatsappUrl={whatsappUrl} updatingOrderId={updatingOrderId} deletingOrderId={deletingOrderId} setOrderActionError={setOrderActionError} setTeleprompterView={setTeleprompterView} handleDeleteOrder={handleDeleteOrder} />
 

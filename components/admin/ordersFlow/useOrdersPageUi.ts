@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import type React from 'react';
 import type { OrderStatus } from '../../../types';
+import { updateOrder } from '../../../services/ordersService';
+import { setTeleprompterText } from '../../../services/teleprompter.js';
 import type { OrderView } from '../orders/orderView';
 
 /** Mensagem de sucesso que some sozinha depois de alguns segundos. */
@@ -32,7 +34,7 @@ export const useManualRefresh = (loading: boolean, loadOrders: (options?: { sile
 
 type StatusChangeHandler = (orderId: string, status: OrderStatus) => Promise<boolean>;
 
-export const useTeleprompterFlow = (handleStatusChange: StatusChangeHandler) => {
+export const useTeleprompterFlow = (handleStatusChange: StatusChangeHandler, loadOrders: (options?: { silent?: boolean }) => Promise<void>) => {
   const [teleprompterView, setTeleprompterView] = useState<OrderView | null>(null);
 
   const handleSendToEditing = async () => {
@@ -40,7 +42,17 @@ export const useTeleprompterFlow = (handleStatusChange: StatusChangeHandler) => 
     if (await handleStatusChange(teleprompterView.order.id, 'editing')) setTeleprompterView(null);
   };
 
-  return { teleprompterView, setTeleprompterView, handleSendToEditing };
+  /** Grava o texto editado no teleprompter em `order.content` (erros sobem para o modal mostrar). */
+  const handleSaveTeleprompterText = async (text: string) => {
+    if (!teleprompterView) return;
+    const { order } = teleprompterView;
+    const content = setTeleprompterText(teleprompterView, text);
+    await updateOrder(order.id, { content });
+    setTeleprompterView((current) => (current?.order.id === order.id ? { ...current, order: { ...current.order, content } } : current));
+    await loadOrders({ silent: true });
+  };
+
+  return { teleprompterView, setTeleprompterView, handleSendToEditing, handleSaveTeleprompterText };
 };
 
 export const useOrderDrag = (handleStatusChange: StatusChangeHandler) => {

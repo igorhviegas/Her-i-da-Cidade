@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getTeleprompterText } from './teleprompter.js';
+import { getTeleprompterText, setTeleprompterText } from './teleprompter.js';
 
 
 test('Convite/Personalizado: texto após "Detalhes:" incluindo linhas seguintes', () => {
@@ -22,4 +22,16 @@ test('roteiro usa o conteúdo do pedido, com fallback no roteiro vinculado', () 
 test('pedido incompatível retorna null, mesmo com "convite" no título (usa o id do serviço)', () => {
   assert.equal(getTeleprompterText({ order: { serviceId: '9', content: 'x' }, service: { title: 'Vídeo Convite' } }), null);
   assert.equal(getTeleprompterText({ order: { serviceId: '5', content: 'x' } }), null);
+});
+
+test('setTeleprompterText: preserva o que vem antes de "Detalhes:" e é o inverso de getTeleprompterText', () => {
+  const order = { serviceId: '3', content: 'Aniversariante: Ana\nDetalhes: Olá!\n\nSegundo parágrafo' };
+  const content = setTeleprompterText({ order }, ' Novo texto\n\nOutro ');
+  assert.equal(content, 'Aniversariante: Ana\nDetalhes: Novo texto\n\nOutro');
+  assert.equal(getTeleprompterText({ order: { ...order, content } }), 'Novo texto\n\nOutro');
+});
+
+test('setTeleprompterText: sem marcador ou com roteiro, o texto vira o conteúdo', () => {
+  assert.equal(setTeleprompterText({ order: { serviceId: '3', content: 'antigo' } }, ' novo '), 'novo');
+  assert.equal(setTeleprompterText({ order: { scriptId: 's', content: 'antigo' } }, 'novo'), 'novo');
 });
