@@ -16,11 +16,12 @@ import { FinanceLeaderboard } from './FinanceLeaderboard';
 import { FinanceExpenses } from './FinanceExpenses';
 import { FinanceAssets } from './FinanceAssets';
 import { FinanceStock } from './FinanceStock';
+import { FinanceManychat } from './FinanceManychat';
 import { cardClass, formatDate, formatMoney, ghostBtn, inputClass, labelClass, MONTH_NAMES, monthLabel } from './financeFormat';
 
-type FinanceTab = 'summary' | 'statement' | 'expenses' | 'assets' | 'stock' | 'leaderboard';
+type FinanceTab = 'summary' | 'statement' | 'expenses' | 'assets' | 'stock' | 'leaderboard' | 'manychat';
 const TABS: { id: FinanceTab; label: string }[] = [
-  { id: 'summary', label: 'Resumo' }, { id: 'statement', label: 'Extrato' }, { id: 'expenses', label: 'Despesas' }, { id: 'assets', label: 'Patrimônio' }, { id: 'stock', label: 'Estoque' }, { id: 'leaderboard', label: 'Leaderboard' },
+  { id: 'summary', label: 'Resumo' }, { id: 'statement', label: 'Extrato' }, { id: 'expenses', label: 'Despesas' }, { id: 'assets', label: 'Patrimônio' }, { id: 'stock', label: 'Estoque' }, { id: 'leaderboard', label: 'Leaderboard' }, { id: 'manychat', label: 'WhatsApp API' },
 ];
 
 interface Loaded { expenses: FixedExpense[]; assets: Asset[] }
@@ -265,6 +266,7 @@ export const AdminFinancePage: React.FC = () => {
           {tab === 'assets' && <FinanceAssets assets={data.assets} onChanged={reloadCollections} />}
           {tab === 'stock' && <FinanceStock />}
           {tab === 'leaderboard' && <FinanceLeaderboard entries={entries} nameOf={serviceName} />}
+          {tab === 'manychat' && <FinanceManychat entries={entries} monthKey={monthKey} serviceName={serviceName} />}
         </>
       )}
     </div>

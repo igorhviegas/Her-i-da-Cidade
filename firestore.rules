@@ -304,6 +304,12 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Gasto da carteira do ManyChat (importado do CSV): acompanhamento interno, não é despesa. Sem exclusão.
+    match /manychatWalletDays/{id} {
+      allow read, create, update: if isAdmin();
+      allow delete: if false;
+    }
+
     match /assets/{assetId} {
       allow read, create, update: if isAdmin();
       allow delete: if false;
