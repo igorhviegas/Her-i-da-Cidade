@@ -63,3 +63,10 @@ export function deadlineState(value: unknown): 'overdue' | 'soon' | 'normal' {
 export function dueTime(order: Order): number {
   return (toDate(order.internalDueDate) ?? toDate(order.eventDate))?.getTime() ?? Number.POSITIVE_INFINITY;
 }
+
+/** Outros pedidos do mesmo cliente (concluídos ou não), do mais recente para o mais antigo. */
+export function clientHistory(views: OrderView[], current: OrderView): OrderView[] {
+  const { id, clientId } = current.order;
+  const time = ({ order }: OrderView) => (toDate(order.createdAt) ?? toDate(order.paidAt))?.getTime() ?? 0;
+  return views.filter(({ order }) => order.clientId === clientId && order.id !== id).sort((a, b) => time(b) - time(a));
+}

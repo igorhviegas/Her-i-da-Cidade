@@ -1,5 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowLeft, Loader2, Minus, Plus, Send } from 'lucide-react';
+import { ArrowLeft, History, Loader2, Minus, Pencil, Plus, Save, Send, X } from 'lucide-react';
+import { ClientHistoryList } from './orders/ClientHistoryList';
+import type { OrderView } from './orders/orderView';
 
 const MAX_FONT = 64;
 const MIN_FONT = 22;
@@ -16,6 +18,9 @@ interface Props {
   canSendToEditing: boolean;
   sending: boolean;
   error?: string;
+  /** Outros pedidos do mesmo cliente. */
+  history: OrderView[];
+  onSaveText: (text: string) => Promise<void>;
   onBack: () => void;
   onSendToEditing: () => void;
 }
@@ -60,11 +65,16 @@ function chooseLayout(box: HTMLElement, manualSize: number | null): Layout {
   return { size: manualSize ?? MIN_FONT, columns: maxColumns, scroll: true };
 }
 
-export const TeleprompterModal: React.FC<Props> = ({ title, text, canSendToEditing, sending, error, onBack, onSendToEditing }) => {
+export const TeleprompterModal: React.FC<Props> = ({ title, text, canSendToEditing, sending, error, history, onSaveText, onBack, onSendToEditing }) => {
   const boxRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const [manualSize, setManualSize] = useState<number | null>(null); // null = ajuste automático
   const [layout, setLayout] = useState<Layout>({ size: MIN_FONT, columns: 1, scroll: false });
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
   const paragraphs = text.split(/\n+/).filter((p) => p.trim());
 
   useLayoutEffect(() => {
@@ -82,13 +92,26 @@ export const TeleprompterModal: React.FC<Props> = ({ title, text, canSendToEditi
     const observer = new ResizeObserver(run);
     observer.observe(box);
     return () => { timers.forEach(clearTimeout); observer.disconnect(); };
-  }, [text, manualSize, paragraphs.length]);
+  }, [text, manualSize, paragraphs.length, editing]);
 
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !sending) onBack(); };
+    // Esc fecha primeiro a janela mais interna (histórico, depois a edição) e só então o teleprompter.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || sending || saving) return;
+      if (historyOpen) setHistoryOpen(false);
+      else if (editing) setEditing(false);
+      else onBack();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onBack, sending]);
+  }, [onBack, sending, saving, historyOpen, editing]);
+
+  const startEditing = () => { setDraft(text); setSaveError(''); setEditing(true); };
+  const save = async () => {
+    setSaving(true);
+    setSaveError('');
+    try { await onSaveText(draft); setEditing(false); } catch (saveFailure) { setSaveError(saveFailure instanceof Error ? saveFailure.message : 'Não foi possível salvar o texto.'); } finally { setSaving(false); }
+  };
 
   const adjust = (delta: number) => setManualSize(Math.min(MAX_FONT, Math.max(MIN_MANUAL_FONT, layout.size + delta)));
 
@@ -100,8 +123,11 @@ export const TeleprompterModal: React.FC<Props> = ({ title, text, canSendToEditi
             <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-300">Teleprompter</p>
             <h2 className="truncate text-sm font-bold text-white">{title}</h2>
           </div>
-          {paragraphs.length > 0 && (
-            <div className="flex shrink-0 items-center gap-1" role="group" aria-label="Tamanho da fonte">
+          <div className="flex shrink-0 items-center gap-1">
+            <button type="button" onClick={() => setHistoryOpen(true)} aria-label="Ver histórico do cliente" title="Ver histórico do cliente" className="rounded-lg border border-white/10 p-1.5 text-white/70 hover:bg-white/10"><History className="h-4 w-4" /></button>
+            <button type="button" onClick={startEditing} disabled={editing || sending} aria-label="Editar texto" title="Editar texto" className="rounded-lg border border-white/10 p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-30"><Pencil className="h-4 w-4" /></button>
+          {paragraphs.length > 0 && !editing && (
+            <div className="ml-2 flex items-center gap-1" role="group" aria-label="Tamanho da fonte">
               <button type="button" onClick={() => adjust(-FONT_STEP)} disabled={layout.size <= MIN_MANUAL_FONT} aria-label="Diminuir fonte" title="Diminuir fonte" className="rounded-lg border border-white/10 p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-30"><Minus className="h-4 w-4" /></button>
               <button type="button" onClick={() => setManualSize(null)} disabled={manualSize === null} title={manualSize === null ? 'Ajuste automático' : 'Voltar ao ajuste automático'} className="min-w-[4.5rem] rounded-lg px-2 py-1 text-center text-xs font-semibold text-white/70 enabled:hover:bg-white/10 disabled:cursor-default">
                 {layout.size}px{manualSize === null && <span className="ml-1 text-[10px] font-bold uppercase text-blue-300/80">auto</span>}
@@ -109,8 +135,28 @@ export const TeleprompterModal: React.FC<Props> = ({ title, text, canSendToEditi
               <button type="button" onClick={() => adjust(FONT_STEP)} disabled={layout.size >= MAX_FONT} aria-label="Aumentar fonte" title="Aumentar fonte" className="rounded-lg border border-white/10 p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-30"><Plus className="h-4 w-4" /></button>
             </div>
           )}
+          </div>
         </header>
 
+        {editing ? (
+          <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 py-4 sm:px-8">
+            <textarea
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              disabled={saving}
+              autoFocus
+              aria-label="Texto do teleprompter"
+              className="min-h-0 flex-1 resize-none rounded-xl border border-white/15 bg-[#0D1527] p-4 text-lg leading-relaxed text-white outline-none focus:border-blue-400/60 disabled:opacity-60"
+            />
+            {saveError && <p role="alert" className="text-sm text-red-200">{saveError}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setEditing(false)} disabled={saving} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/15 px-5 text-sm font-semibold text-white/80 hover:bg-white/5 disabled:opacity-50">Cancelar</button>
+              <button type="button" onClick={() => void save()} disabled={saving || !draft.trim()} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-blue-400/40 bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-500 disabled:opacity-50">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar texto
+              </button>
+            </div>
+          </div>
+        ) : (
         <div ref={boxRef} className={`flex min-h-0 flex-1 flex-col px-6 py-5 sm:px-10 ${layout.scroll ? 'overflow-y-auto' : 'overflow-hidden'}`}>
           <div
             ref={textRef}
@@ -121,17 +167,29 @@ export const TeleprompterModal: React.FC<Props> = ({ title, text, canSendToEditi
             )) : <p className="text-base text-white/50">Este pedido não possui texto disponível para o teleprompter.</p>}
           </div>
         </div>
+        )}
 
         {error && <p role="alert" className="shrink-0 border-t border-red-500/25 bg-red-500/10 px-4 py-2 text-sm text-red-200">{error}</p>}
         <footer className="flex shrink-0 flex-col-reverse gap-2 border-t border-white/10 px-4 py-3 sm:flex-row sm:justify-end">
           <button type="button" onClick={onBack} disabled={sending} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/15 px-5 text-sm font-semibold text-white/80 hover:bg-white/5 disabled:opacity-50">
             <ArrowLeft className="h-4 w-4" /> Voltar
           </button>
-          <button type="button" onClick={onSendToEditing} disabled={sending || !canSendToEditing} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-violet-400/40 bg-violet-600 px-5 text-sm font-bold text-white hover:bg-violet-500 disabled:opacity-50">
+          <button type="button" onClick={onSendToEditing} disabled={sending || editing || !canSendToEditing} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-violet-400/40 bg-violet-600 px-5 text-sm font-bold text-white hover:bg-violet-500 disabled:opacity-50">
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Enviar pra edição
           </button>
         </footer>
       </section>
+      {historyOpen && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60 p-3" onMouseDown={(event) => { if (event.target === event.currentTarget) setHistoryOpen(false); }}>
+          <section role="dialog" aria-modal="true" aria-label="Histórico do cliente" className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0D1527] shadow-2xl">
+            <header className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+              <h3 className="text-sm font-bold text-white">Histórico do cliente ({history.length})</h3>
+              <button type="button" onClick={() => setHistoryOpen(false)} aria-label="Fechar histórico" title="Fechar" className="rounded-lg p-1.5 text-white/55 hover:bg-white/10 hover:text-white"><X className="h-5 w-5" /></button>
+            </header>
+            <div className="overflow-y-auto p-4"><ClientHistoryList views={history} /></div>
+          </section>
+        </div>
+      )}
     </div>
   );
 };

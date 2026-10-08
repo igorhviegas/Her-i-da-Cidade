@@ -23,6 +23,7 @@ export function dailyRevenue(entries: RevenueEntry[], monthKey: string): DayReve
 export function topDay(days: DayRevenue[]): DayRevenue | null;
 export function variationPct(current: number, previous: number): number | null;
 export const EDITING_COST: number;
+export const CUSTOM_VIDEO_SERVICE_ID: string;
 export function editingCostFields(serviceId: string | undefined, existingOrder?: { editingCost?: number } | null): { editingCost?: number };
 export function editingCostForMonth(entries: RevenueEntry[], monthKey: string): { items: RevenueEntry[]; total: number };
 export function isExpenseInMonth(expense: Partial<FixedExpense>, monthKey: string): boolean;

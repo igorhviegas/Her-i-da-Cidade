@@ -16,3 +16,16 @@ export function getTeleprompterText({ order, script } = {}) {
   if (start === -1) return lines.join('\n').trim();
   return [lines[start].replace(DETAILS_MARKER, ''), ...lines.slice(start + 1)].join('\n').trim();
 }
+
+/**
+ * Novo `order.content` para um texto editado no teleprompter (inverso de getTeleprompterText).
+ * Roteiro: o texto vira o conteúdo. Vídeo Convite/Personalizado com "Detalhes:": preserva o que vem antes do marcador (dados do ManyChat).
+ */
+export function setTeleprompterText({ order } = {}, text) {
+  const clean = String(text ?? '').trim();
+  if (!order || order.scriptId) return clean;
+  const lines = String(order.content || '').split(/\r?\n/);
+  const start = lines.findIndex((line) => DETAILS_MARKER.test(line));
+  if (start === -1) return clean;
+  return [...lines.slice(0, start), `Detalhes: ${clean}`].join('\n');
+}

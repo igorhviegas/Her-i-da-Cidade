@@ -11,10 +11,12 @@ import { activityRefs, prepareActivityLog } from "./activityLog";
 import { StockError, isPresentialService, type ConsumptionLine } from "./stockCalculations.js";
 import { prepareOrderConsumption, prepareOrderReversal } from "./stockTransactions.js";
 import { currentActor } from "./stockService";
-import { editingCostFields, orderValue } from "./financeCalculations.js";
+import { CUSTOM_VIDEO_SERVICE_ID, editingCostFields, orderValue } from "./financeCalculations.js";
+import { buildPayEditorMission, payEditorMissionId } from "./paymentMission.js";
 import { LEDGER_COLLECTION, ledgerId, ledgerIdsFor, planAdjustments, planCompletion, planEntry } from "./eventFinance.js";
 
 export const ORDERS_COLLECTION = "orders";
+const MISSIONS_COLLECTION = "missions"; // igual a missionsService.MISSIONS_COLLECTION (importá-lo aqui seria import circular)
 
 export type CreateOrderInput = Omit<Order, "id" | "orderNumber" | "orderNumberDisplay" | "technicalPurchaseId" | "createdAt" | "completedAt" | "customerDueDate" | "internalDueDate"> & {
   paidAt?: Date | null;
@@ -435,12 +437,23 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
 
     if (updates.status === 'completed' && currentData.status !== 'completed') Object.assign(payload, editingCostFields(serviceId, currentData));
 
+    // Vídeo Personalizado na 1ª conclusão: missão "Pagar Vitor" (fácil, prazo no dia da conclusão). ID por pedido + checagem na
+    // transação: reabrir e concluir de novo não cria outra, e a missão já criada nunca é reescrita.
+    let payMission: { ref: ReturnType<typeof doc>; data: Record<string, unknown> } | null = null;
+    if (updates.status === 'completed' && currentData.status !== 'completed' && serviceId === CUSTOM_VIDEO_SERVICE_ID) {
+      const missionRef = doc(firestore, MISSIONS_COLLECTION, payEditorMissionId(id));
+      const [missionSnapshot, clientSnapshot] = await Promise.all([transaction.get(missionRef), transaction.get(doc(firestore, CLIENTS_COLLECTION, updates.clientId ?? currentData.clientId))]);
+      const data = missionSnapshot.exists() ? null : buildPayEditorMission({ ...currentData, ...updates, ...payload, id }, clientSnapshot.data(), null, updates.completedAt instanceof Date ? updates.completedAt : new Date());
+      if (data) payMission = { ref: missionRef, data };
+    }
+
     transaction.update(orderRef, payload);
     stock?.apply();
     ledgerWrites.forEach(({ id: entryId, record }) => transaction.set(doc(firestore, LEDGER_COLLECTION, entryId), record));
     if (draftEntry) transaction.set(doc(firestore, LEDGER_COLLECTION, draftEntry.id), draftEntry.record);
     if (activityRefsForOrder && activityRecord) transaction.set(activityRefsForOrder.logRef, activityRecord);
     if (publishRefs && publishRecord) transaction.set(publishRefs.logRef, publishRecord);
+    if (payMission) transaction.set(payMission.ref, { ...payMission.data, createdAt: serverTimestamp() });
     if (linkedScriptRef && linkedScript) {
       transaction.update(linkedScriptRef, {
         productionStatus: 'produced',

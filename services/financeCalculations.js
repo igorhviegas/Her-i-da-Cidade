@@ -104,7 +104,7 @@ export function variationPct(current, previous) {
 // na PRIMEIRA conclusão (nunca reescrito) e somado ao mês da conclusão: sem coleção nova, sem duplicidade, sem efeito retroativo
 // (pedidos concluídos antes não têm o campo). Reabrir tira o pedido (e o custo) do mês; concluir de novo o devolve, sem 2º custo.
 export const EDITING_COST = 25;
-const CUSTOM_VIDEO_SERVICE_ID = '3'; // id fixo do seed/ManyChat (ver services/teleprompter.js)
+export const CUSTOM_VIDEO_SERVICE_ID = '3'; // id fixo do seed/ManyChat (ver services/teleprompter.js)
 
 /** Campo a gravar no pedido ao concluí-lo pela primeira vez; {} se não for Vídeo Personalizado ou já tiver custo. */
 export function editingCostFields(serviceId, existingOrder) {
