@@ -44,11 +44,11 @@ function firestore() {
 
 /** Converte Timestamps do Firestore em Date. */
 function mapDoc<T>(id: string, data: Record<string, any>): T {
-  const out: Record<string, any> = { id };
+  const out: Record<string, unknown> = { id };
   for (const [key, value] of Object.entries(data)) out[key] = typeof value?.toDate === 'function' ? value.toDate() : value;
   return out as T;
 }
-const mapAll = <T,>(snapshot: { docs: { id: string; data(): Record<string, any> }[] }) => snapshot.docs.map((d) => mapDoc<T>(d.id, d.data()));
+const mapAll = <T,>(snapshot: { docs: { id: string; data(): Record<string, unknown> }[] }) => snapshot.docs.map((d) => mapDoc<T>(d.id, d.data()));
 const thirtyDaysAgo = (now: Date) => new Date(now.getTime() - HISTORY_DAYS * 86400000);
 
 // ------------------------------------------------------------- atividades (gamificação futura)
@@ -229,8 +229,8 @@ export async function completeOccurrence(id: string): Promise<void> {
 async function syncTasks(now: Date) {
   const col = (name: string) => collection(firestore(), name);
   return syncRecurringTasks({
-    listActiveTasks: async () => mapAll<any>(await getDocs(query(col(TASKS_COLLECTION), where('status', '==', 'active')))),
-    listPendingOccurrences: async () => mapAll<any>(await getDocs(query(col(OCCURRENCES_COLLECTION), where('status', '==', 'pending')))),
+    listActiveTasks: async () => mapAll<unknown>(await getDocs(query(col(TASKS_COLLECTION), where('status', '==', 'active')))),
+    listPendingOccurrences: async () => mapAll<unknown>(await getDocs(query(col(OCCURRENCES_COLLECTION), where('status', '==', 'pending')))),
     createOccurrenceIfAbsent: (id: string, data: Record<string, unknown>) => runTransaction(firestore(), async (transaction) => {
       const ref = doc(firestore(), OCCURRENCES_COLLECTION, id);
       if ((await transaction.get(ref)).exists()) return false;
@@ -300,7 +300,7 @@ async function loadRevenueEntries() {
     getDocs(query(collection(firestore(), ORDERS_COLLECTION), where('status', '==', 'completed'))),
     getDocs(collection(firestore(), LEDGER_COLLECTION)),
   ]);
-  const orders = [...mapAll<any>(completed), ...ledgerToOrders(ledger.docs.map((item) => ({ ...item.data(), id: item.id }) as any))];
+  const orders = [...mapAll<unknown>(completed), ...ledgerToOrders(ledger.docs.map((item) => ({ ...item.data(), id: item.id }) as any))];
   return buildRevenueEntries(orders).entries;
 }
 
@@ -330,7 +330,7 @@ async function loadInstagramData(): Promise<InstagramGoalData> {
 
 async function loadMetricData(since: Date, withRevenue: boolean, withInstagram: boolean) {
   const col = (name: string) => collection(firestore(), name);
-  const range = async (name: string, field: string) => mapAll<any>(await getDocs(query(col(name), where(field, '>=', since))));
+  const range = async (name: string, field: string) => mapAll<unknown>(await getDocs(query(col(name), where(field, '>=', since))));
   const merge = (...lists: any[][]) => [...new Map(lists.flat().map((item) => [item.id, item])).values()];
   const [revenueEntries, instagram, completedOrders, paidOrders, created, ready, published, missions, occurrences] = await Promise.all([
     withRevenue ? loadRevenueEntries() : Promise.resolve([]),

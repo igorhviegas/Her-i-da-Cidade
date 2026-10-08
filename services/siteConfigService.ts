@@ -132,7 +132,7 @@ export async function updatePublicSiteConfig(
   }
 
   const docRef = doc(db, SITE_CONFIG_COLLECTION, PUBLIC_CONFIG_DOC);
-  const payload: Record<string, any> = {
+  const payload: Record<string, unknown> = {
     ...updates,
     updatedAt: serverTimestamp(),
   };

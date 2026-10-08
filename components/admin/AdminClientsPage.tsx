@@ -11,7 +11,7 @@ type ClientRow = { client: Client; orders: Order[]; spent: number; lastOrder: Da
 
 function asDate(value: unknown): Date | null {
   if (!value) return null;
-  const date = typeof (value as any)?.toDate === 'function' ? (value as any).toDate() : new Date(value as string | number | Date);
+  const date = typeof (value as { toDate?: () => Date })?.toDate === 'function' ? (value as { toDate?: () => Date }).toDate() : new Date(value as string | number | Date);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 

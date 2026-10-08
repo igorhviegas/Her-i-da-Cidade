@@ -18,8 +18,8 @@ export interface Service {
   badgeText?: string;
   active?: boolean;
   order?: number;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: unknown;
+  updatedAt?: unknown;
   generateOrder?: boolean;
   productionType?: ProductionType;
   initialStatus?: OrderStatus;
@@ -42,8 +42,8 @@ export interface Client {
   name: string;
   whatsapp: string;
   whatsappNormalized: string;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: unknown;
+  updatedAt?: unknown;
 }
 
 export type FirestoreClient = Client;
@@ -59,18 +59,18 @@ export interface Order {
   clientId: string;
   serviceId: string;
   status: OrderStatus;
-  createdAt?: any;
-  paidAt?: any;
-  eventDate?: any;
+  createdAt?: unknown;
+  paidAt?: unknown;
+  eventDate?: unknown;
   content: string;
   deliveryDays?: number;
-  customerDueDate?: any;
-  internalDueDate?: any;
+  customerDueDate?: unknown;
+  internalDueDate?: unknown;
   servicePrice: number;
   rushFee: number;
   totalPaid: number;
   productionType: ProductionType;
-  completedAt?: any;
+  completedAt?: unknown;
   source: OrderSource;
   scriptId?: string;
   /** Legado: impressão digital de PDF importado (importação removida; mantido para não perder dados de pedidos antigos). */
@@ -88,7 +88,7 @@ export interface Order {
   /** Presente em pedidos de evento com livro de lançamentos (collection financeEntries). Valores já lançados (congelados). */
   eventLedger?: { entry: number; final?: number; cost?: number; /** soma dos ajustes de receita */ adj?: number; /** soma dos ajustes de despesa */ adjCost?: number; /** nº do último ajuste */ seq?: number };
   /** Vínculo com o Google Agenda, gravado pelo servidor (/api/google-calendar). */
-  googleCalendar?: { eventId: string; calendarId: string; htmlLink?: string; syncedAt?: any };
+  googleCalendar?: { eventId: string; calendarId: string; htmlLink?: string; syncedAt?: unknown };
   /** Custo de edição (R$) gravado na primeira conclusão de Vídeo Personalizado; entra nas despesas do Financeiro. */
   editingCost?: number;
 }
@@ -120,11 +120,11 @@ export interface ContentScript {
   category: string;
   productionStatus: ScriptProductionStatus;
   publicationStatus: ScriptPublicationStatus;
-  createdAt?: any;
-  updatedAt?: any;
-  publishedAt?: any;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+  publishedAt?: unknown;
   /** Primeira vez que o roteiro ficou Pronto para gravar; definido uma só vez. */
-  readyAt?: any;
+  readyAt?: unknown;
   notes: string;
   /** Pedido de produção associado a este roteiro, quando enviado. */
   orderId?: string;
@@ -149,8 +149,8 @@ export interface FirestoreService {
   badgeText?: string;
   active: boolean;
   order: number;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: unknown;
+  updatedAt?: unknown;
   generateOrder?: boolean;
   productionType?: ProductionType;
   initialStatus?: OrderStatus;
@@ -246,8 +246,8 @@ export interface Review {
  */
 export interface PublicSiteConfig {
   whatsappUrl: string;
-  updatedAt?: any;
-  [key: string]: any;
+  updatedAt?: unknown;
+  [key: string]: unknown;
 }
 
 /**

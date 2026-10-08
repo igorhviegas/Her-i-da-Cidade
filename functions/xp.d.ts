@@ -16,9 +16,9 @@ export function levelStart(level: number): number;
 export interface LevelInfo { level: number; xp: number; into: number; need: number; left: number; percent: number; nextAt: number }
 export function levelInfo(totalXp: number): LevelInfo;
 export function orderXp(value: unknown): number;
-export function xpOfEvent(event: { type?: string; xp?: number; difficulty?: number | null; meta?: Record<string, any> }): number;
-export interface XpBaseline { at: any; total: number; categories?: Record<string, { count: number; xp: number }>; counted?: { orders?: string[]; scripts?: string[] }; ig?: { followers: number } }
-export function totalXp(baseline: XpBaseline | null | undefined, events: any[]): { baseline: number; events: number; total: number } | null;
-export function eventReward(baseline: XpBaseline | null | undefined, event: any): { xp: number; revenue: number; cost: number } | null;
-export function buildBaseline(input: Record<string, any>): { categories: Record<string, { count: number; xp: number }>; total: number; counted: { orders: string[]; scripts: string[] }; ig: { followers: number } };
-export function igXpDelta(input: { prev: Record<string, any>; posts: any[]; followers: unknown; followersHigh: unknown }): { xp: number; followersHigh: number | null };
+export function xpOfEvent(event: { type?: string; xp?: number; difficulty?: number | null; meta?: Record<string, unknown> }): number;
+export interface XpBaseline { at: unknown; total: number; categories?: Record<string, { count: number; xp: number }>; counted?: { orders?: string[]; scripts?: string[] }; ig?: { followers: number } }
+export function totalXp(baseline: XpBaseline | null | undefined, events: unknown[]): { baseline: number; events: number; total: number } | null;
+export function eventReward(baseline: XpBaseline | null | undefined, event: unknown): { xp: number; revenue: number; cost: number } | null;
+export function buildBaseline(input: Record<string, unknown>): { categories: Record<string, { count: number; xp: number }>; total: number; counted: { orders: string[]; scripts: string[] }; ig: { followers: number } };
+export function igXpDelta(input: { prev: Record<string, unknown>; posts: unknown[]; followers: unknown; followersHigh: unknown }): { xp: number; followersHigh: number | null };

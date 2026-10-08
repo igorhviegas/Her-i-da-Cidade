@@ -6,7 +6,7 @@ export interface InstagramPost {
   viewsStale?: boolean; syncedAt?: string;
 }
 export function metricOrNull(value: unknown): number | null;
-export function normalizeMedia(raw: Record<string, any>, views?: number | null): InstagramPost;
+export function normalizeMedia(raw: Record<string, unknown>, views?: number | null): InstagramPost;
 export function totalFor(posts: InstagramPost[], key: MetricKey): { total: number; counted: number };
 export function sortPosts(posts: InstagramPost[], key: MetricKey | 'recent'): InstagramPost[];
 export function topPost(posts: InstagramPost[], key: MetricKey): InstagramPost | null;

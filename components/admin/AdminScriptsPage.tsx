@@ -24,7 +24,7 @@ const productionStyles: Record<ScriptProductionStatus, string> = {
 function toDate(value: unknown): Date | null {
   if (!value) return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-  if (typeof (value as any)?.toDate === 'function') return (value as any).toDate();
+  if (typeof (value as { toDate?: () => Date })?.toDate === 'function') return (value as { toDate?: () => Date }).toDate();
   const parsed = new Date(value as string | number);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }

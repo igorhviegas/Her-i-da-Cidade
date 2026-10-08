@@ -27,4 +27,4 @@ export interface TravelResult {
 export function calculateTravel(opts: { input: TravelInput; config: TravelConfig; fetchImpl?: typeof fetch; now?: Date }): Promise<TravelResult>;
 
 export interface TravelDayEvent { time: string; location: string; formType: string }
-export function listDayEvents(opts: { date: string; listOrdersBetween: (start: Date, end: Date) => Promise<any[]> }): Promise<TravelDayEvent[]>;
+export function listDayEvents(opts: { date: string; listOrdersBetween: (start: Date, end: Date) => Promise<unknown[]> }): Promise<TravelDayEvent[]>;

@@ -1,5 +1,5 @@
 import { logger } from '../lib/logger.js';
-import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, Unsubscribe, serverTimestamp, query, where, writeBatch } from "firebase/firestore";
+import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, Unsubscribe, serverTimestamp, query, where, writeBatch, type DocumentData } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Video } from "../types";
 import { extractInstagramId, generateKeywords, buildSearchText } from "../utils/videoHelpers";
@@ -19,7 +19,7 @@ export function isValidHttpUrl(urlString: string): boolean {
 }
 
 /** Convert Firestore document to UI Video */
-export function mapDocToVideo(docId: string, data: any): Video {
+export function mapDocToVideo(docId: string, data: DocumentData): Video {
   return {
     id: docId,
     title: data.title || "",
@@ -150,7 +150,7 @@ export async function createVideo(
     keywords,
   });
 
-  const payload: any = {
+  const payload: DocumentData = {
     title: input.title || "",
     instagramUrl: input.instagramUrl || "",
     instagramId: input.instagramId || extractInstagramId(input.instagramUrl || ""),
@@ -222,7 +222,7 @@ export async function updateVideo(
     }
   }
 
-  const payload: any = {
+  const payload: DocumentData = {
     ...updates,
     updatedAt: serverTimestamp(),
     needsReview: false, // salvar no formulário conta como revisão do vídeo importado
@@ -388,7 +388,7 @@ export async function importVideosFromCSV(videos: Array<any>): Promise<{
   created: number;
   updated: number;
   errors: number;
-  errorDetails: Array<{ rowIndex: number; title: string; error: any }>;
+  errorDetails: Array<{ rowIndex: number; title: string; error: unknown }>;
 }> {
   if (!db) throw new Error('Firestore não inicializado');
   if (!Array.isArray(videos)) {
@@ -397,7 +397,7 @@ export async function importVideosFromCSV(videos: Array<any>): Promise<{
   }
   let created = 0;
   let updated = 0;
-  const errorDetails: Array<{ rowIndex: number; title: string; error: any }> = [];
+  const errorDetails: Array<{ rowIndex: number; title: string; error: unknown }> = [];
 
   for (let i = 0; i < videos.length; i++) {
     const row = videos[i];

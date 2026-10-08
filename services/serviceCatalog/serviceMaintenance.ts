@@ -28,7 +28,7 @@ export async function seedServicesIfEmpty(): Promise<{
 
   try {
     const currentSnap = await getDocs(collection(db, SERVICES_COLLECTION));
-    const existingMap = new Map<string, any>();
+    const existingMap = new Map<string, unknown>();
     currentSnap.docs.forEach((d) => existingMap.set(d.id, d.data()));
 
     let inserted = 0;

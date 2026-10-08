@@ -12,7 +12,7 @@ function firestore() {
 }
 
 const rows = async (name: string, ...constraints: ReturnType<typeof where>[]) =>
-  (await getDocs(query(collection(firestore(), name), ...constraints))).docs.map((d) => ({ ...d.data(), id: d.id }) as Record<string, any>);
+  (await getDocs(query(collection(firestore(), name), ...constraints))).docs.map((d) => ({ ...d.data(), id: d.id }) as Record<string, unknown>);
 
 /** Escuta a linha de base do XP; sem Firestore inicializado não há o que escutar (retorna undefined). */
 export function subscribeToXpBaseline(next: (snapshot: DocumentSnapshot) => void, onError: (error: Error) => void): Unsubscribe | undefined {

@@ -5,8 +5,8 @@ export interface FixedExpense {
   deactivatedFrom?: string; amountHistory: Record<string, number>; adjustments?: Record<string, number>;
 }
 export interface Asset {
-  id: string; name: string; category: string; acquisitionDate: any; acquisitionValue: number; currentValue: number;
-  description?: string; status: 'active' | 'sold' | 'discarded'; statusChangedAt?: any;
+  id: string; name: string; category: string; acquisitionDate: unknown; acquisitionValue: number; currentValue: number;
+  description?: string; status: 'active' | 'sold' | 'discarded'; statusChangedAt?: unknown;
   valueHistory?: { at: string; value: number }[];
 }
 export function toDate(value: unknown): Date | null;
@@ -15,7 +15,7 @@ export function dayKeyOf(date: Date): string;
 export function daysInMonth(monthKey: string): number;
 export function shiftMonth(monthKey: string, delta: number): string;
 export function orderValue(order: { totalPaid?: number; servicePrice?: number; rushFee?: number }): number;
-export function buildRevenueEntries(orders: any[]): { entries: RevenueEntry[]; undated: number; costs: RevenueEntry[] };
+export function buildRevenueEntries(orders: unknown[]): { entries: RevenueEntry[]; undated: number; costs: RevenueEntry[] };
 export function eventCostForMonth(costs: RevenueEntry[], monthKey: string): { items: RevenueEntry[]; total: number };
 export function monthTotals(entries: RevenueEntry[], monthKey: string): { total: number; count: number };
 export function revenueSeries(entries: RevenueEntry[], endMonthKey: string, n?: number): { monthKey: string; total: number; count: number }[];

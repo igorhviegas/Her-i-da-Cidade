@@ -11,8 +11,8 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [previewData, setPreviewData] = useState<Array<any>>([]);
-  const [importResult, setImportResult] = useState<{created: number; updated: number; errors: number; errorDetails: any[]} | null>(null);
+  const [previewData, setPreviewData] = useState<Array<unknown>>([]);
+  const [importResult, setImportResult] = useState<{created: number; updated: number; errors: number; errorDetails: unknown[]} | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -21,7 +21,7 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
     }
   };
 
-  const parseCsvFile = (file: File): Promise<Array<any>> => {
+  const parseCsvFile = (file: File): Promise<Array<unknown>> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
@@ -29,7 +29,7 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
         Papa.parse(text, {
           header: true,
           skipEmptyLines: true,
-          complete: (result) => resolve(result.data as Array<any>),
+          complete: (result) => resolve(result.data as Array<unknown>),
           error: (err) => reject(err),
         });
       };

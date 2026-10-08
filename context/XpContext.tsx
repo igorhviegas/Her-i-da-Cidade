@@ -36,7 +36,7 @@ interface Toast { id: string; label: string; xp: number; revenue: number; cost: 
 export const XpProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [baseline, setBaseline] = useState<XpBaseline | null>(null);
   const [baselineReady, setBaselineReady] = useState(false);
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<unknown[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const baselineRef = useRef<XpBaseline | null>(null);
 

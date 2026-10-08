@@ -5,7 +5,7 @@ interface VideoFiltersProps {
   onSearchChange: (value: string) => void;
   category: string;
   onCategoryChange: (value: string) => void;
-  videos: any[]; // we only need categories list
+  videos: unknown[]; // we only need categories list
 }
 
 export const VideoFilters: React.FC<VideoFiltersProps> = ({ search, onSearchChange, category, onCategoryChange, videos }) => {

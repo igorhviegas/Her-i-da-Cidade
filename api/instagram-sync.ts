@@ -16,7 +16,7 @@ const STATUS_BY_CODE: Record<string, number> = { not_configured: 503, token_inva
 export async function handleInstagramSync(
   req: Request | any,
   res: Response | any,
-  deps: { secret?: string; authorize?: (req: any) => Promise<Auth>; run?: (manual: boolean) => Promise<unknown> } = {},
+  deps: { secret?: string; authorize?: (req: Request) => Promise<Auth>; run?: (manual: boolean) => Promise<unknown> } = {},
 ) {
   const send = (status: number, body: unknown) => {
     res.setHeader?.('Cache-Control', 'no-store');

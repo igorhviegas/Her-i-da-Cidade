@@ -19,7 +19,7 @@ const STATUS_BY_CODE: Record<string, number> = {
 export async function handleGoogleCalendar(
   req: Request | any,
   res: Response | any,
-  deps: { authorize?: (req: any) => Promise<Auth>; db?: any; sync?: typeof syncOrderToCalendar } = {},
+  deps: { authorize?: (req: Request) => Promise<Auth>; db?: unknown; sync?: typeof syncOrderToCalendar } = {},
 ) {
   const send = (status: number, body: unknown) => {
     res.setHeader?.('Cache-Control', 'no-store');

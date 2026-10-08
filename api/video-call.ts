@@ -18,7 +18,7 @@ const STATUS_BY_CODE: Record<string, number> = {
 export async function handleVideoCall(
   req: Request | any,
   res: Response | any,
-  deps: { database?: any; availability?: typeof getAvailability; book?: typeof createVideoCallBooking; expire?: typeof expireUnpaidBookings } = {},
+  deps: { database?: unknown; availability?: typeof getAvailability; book?: typeof createVideoCallBooking; expire?: typeof expireUnpaidBookings } = {},
 ) {
   const send = (status: number, body: unknown) => {
     res.setHeader?.('Cache-Control', 'no-store');

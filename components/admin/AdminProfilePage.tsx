@@ -47,7 +47,7 @@ export const AdminProfilePage: React.FC = () => {
 
   const xp = useXp(); // ao vivo: ativar o XP ou ganhar uma atividade atualiza a tela sozinho
   const [counts, setCounts] = useState<Awaited<ReturnType<typeof loadProfileCounts>> | null>(null);
-  const [orders, setOrders] = useState<any[] | null>(null);
+  const [orders, setOrders] = useState<unknown[] | null>(null);
   const [fixed, setFixed] = useState<FixedExpense[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hidden, setHidden] = useState(readHidden);
