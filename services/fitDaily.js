@@ -1,7 +1,7 @@
 // Séries do Fit a partir de users/{uid}/fitDaily (puro, sem React/Firebase). Dia sem registro vira null: ausente é diferente de zero.
 
 const pad = (n) => String(n).padStart(2, '0');
-/** 'AAAA-MM-DD' no fuso do navegador (o mesmo dia local que o Health Auto Export grava). */
+/** 'AAAA-MM-DD' no fuso do navegador (o mesmo dia local que o Atalho do iPhone envia). */
 export const dayKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 const shiftDay = (day, delta) => {
   const [y, m, d] = day.split('-').map(Number);

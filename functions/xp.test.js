@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBaseline, eventReward, igXpDelta, levelCost, levelInfo, levelStart, orderXp, totalXp, xpOfEvent } from './xp.js';
+import { FIT_EVENT_TYPES, buildBaseline, checkinXp, eventReward, igXpDelta, levelCost, levelInfo, levelStart, orderXp, rideXp, stepsXp, totalXp, xpOfEvent } from './xp.js';
 
 test('curva ×1,25: nível 1 custa 500, cada nível custa 25% a mais; acumulado bate com a soma', () => {
   assert.equal(levelCost(1), 500);
@@ -104,4 +104,27 @@ test('aviso de ganho: XP e valores reais do Financeiro; Instagram, eventos antig
   assert.equal(eventReward(baseline, { type: 'mission', refId: 'm0', occurredAt: new Date('2026-10-09T00:00:00Z'), difficulty: 2 }), null);
   assert.equal(eventReward(baseline, { type: 'order_completed', refId: 'z', occurredAt: after, meta: { value: 0 } }), null); // pedido interno sem valor
   assert.equal(eventReward(null, { type: 'mission', difficulty: 2, occurredAt: after }), null);
+});
+
+test('Fit: passos 1 XP a cada 10 (teto de 20.000 passos), bike 50 XP/km, check-in 500; entradas ruins valem 0', () => {
+  assert.equal(stepsXp(8000), 800);
+  assert.equal(stepsXp(19), 1);
+  assert.equal(stepsXp(9), 0);
+  assert.equal(stepsXp(20000), 2000);
+  assert.equal(stepsXp(120000), 2000); // teto diário
+  for (const bad of [0, -5, NaN, null, undefined, 'x']) { assert.equal(stepsXp(bad), 0); assert.equal(rideXp(bad), 0); }
+  assert.equal(rideXp(4.448), 222);
+  assert.equal(rideXp(20), 1000);
+  assert.equal(rideXp(0.019), 0);
+  assert.equal(checkinXp(), 500);
+});
+
+test('Fit: o evento carrega o XP congelado (xpOfEvent o devolve), só vale depois da linha de base e abre a janelinha de ganho', () => {
+  assert.deepEqual(FIT_EVENT_TYPES, ['fit_ride', 'fit_steps', 'fit_checkin']);
+  const baseline = { at: new Date('2026-10-01T00:00:00Z'), total: 1000 };
+  const ride = { type: 'fit_ride', refId: 'mywhoosh_1_20261007T200427Z', xp: 222, occurredAt: new Date('2026-10-08T12:00:00Z') };
+  assert.equal(xpOfEvent(ride), 222);
+  assert.deepEqual(totalXp(baseline, [ride, { type: 'fit_checkin', refId: 'gym_2026-10-07', xp: 500, occurredAt: new Date('2026-10-08T13:00:00Z') }]), { baseline: 1000, events: 722, total: 1722 });
+  assert.deepEqual(eventReward(baseline, ride), { xp: 222, revenue: 0, cost: 0 });
+  assert.equal(totalXp(baseline, [{ ...ride, occurredAt: new Date('2026-09-30T12:00:00Z') }]).events, 0); // antes da linha de base não conta
 });

@@ -21,6 +21,8 @@ import { AdminInstagramPage } from './AdminInstagramPage';
 import { AdminAgentPage } from './AdminAgentPage';
 import { AdminProfilePage } from './AdminProfilePage';
 import { AdminFitPage } from './AdminFitPage';
+import { AdminFitCheckinsPage } from './AdminFitCheckinsPage';
+import { AdminFitWorkoutsPage } from './AdminFitWorkoutsPage';
 import { ProfileMenu } from './ProfileMenu';
 import { AdminNav, useNavOrder, type NavItem, type NavGroup, type NavBadge } from './AdminNav';
 import { subscribeActiveOrders } from '../../services/ordersService';
@@ -58,10 +60,12 @@ import {
   SlidersHorizontal,
   Headset,
   HeartPulse,
-  Activity
+  Activity,
+  ClipboardCheck,
+  Dumbbell
 } from 'lucide-react';
 
-type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram' | 'calendar' | 'videocalls' | 'agent' | 'profile' | 'fit';
+type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram' | 'calendar' | 'videocalls' | 'agent' | 'profile' | 'fit' | 'fitcheckins' | 'fittreinos';
 
 // Módulos reorganizáveis (ordem padrão). "Principal" é fixo no topo e fica fora desta lista.
 const NAV_ITEMS: NavItem<AdminTab>[] = [
@@ -79,11 +83,13 @@ const NAV_ITEMS: NavItem<AdminTab>[] = [
   { id: 'settings', label: 'Configurações', icon: Settings },
   { id: 'agent', label: 'Agente', icon: Headset },
   { id: 'fit', label: 'Fit', icon: HeartPulse },
+  { id: 'fitcheckins', label: 'Check-ins', icon: ClipboardCheck },
+  { id: 'fittreinos', label: 'Treinos', icon: Dumbbell },
 ];
 const NAV_GROUPS: NavGroup<AdminTab>[] = [
   { key: 'crm', label: 'CRM', icon: Briefcase, ids: ['orders', 'missions', 'finance', 'instagram', 'scripts', 'clients'] },
   { key: 'streaming', label: 'Streaming', icon: Tv, ids: ['videos', 'categories'] },
-  { key: 'pessoal', label: 'Pessoal', icon: Activity, ids: ['fit'] },
+  { key: 'pessoal', label: 'Pessoal', icon: Activity, ids: ['fit', 'fitcheckins', 'fittreinos'] },
   { key: 'ajustes', label: 'Ajustes', icon: SlidersHorizontal, ids: ['services', 'content', 'dashboard', 'settings', 'agent'] },
 ];
 const NAV_ORDER = NAV_ITEMS.map((item) => item.id);
@@ -124,6 +130,10 @@ export const AdminDashboard: React.FC = () => {
       ? 'agent'
       : path === '/admin/fit'
       ? 'fit'
+      : path === '/admin/fit/checkins'
+      ? 'fitcheckins'
+      : path === '/admin/fit/treinos'
+      ? 'fittreinos'
       : path === '/admin/dashboard'
       ? 'dashboard'
       : path === '/admin/perfil'
@@ -139,7 +149,7 @@ export const AdminDashboard: React.FC = () => {
     const link = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
     if (!link) return;
     const original = link.getAttribute('href') ?? '';
-    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes', '/admin/agendamento-chamadas': 'calendario', '/admin/perfil': 'principal', '/admin/fit': 'principal' } as Record<string, string>)[path] ?? path.split('/')[2];
+    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes', '/admin/agendamento-chamadas': 'calendario', '/admin/perfil': 'principal', '/admin/fit': 'principal', '/admin/fit/checkins': 'principal', '/admin/fit/treinos': 'principal' } as Record<string, string>)[path] ?? path.split('/')[2];
     if (slug) link.setAttribute('href', `/images/modules/${slug}.png`);
     return () => link.setAttribute('href', original);
   }, [path]);
@@ -176,6 +186,10 @@ export const AdminDashboard: React.FC = () => {
       setCurrentTab('agent');
     } else if (path === '/admin/fit') {
       setCurrentTab('fit');
+    } else if (path === '/admin/fit/checkins') {
+      setCurrentTab('fitcheckins');
+    } else if (path === '/admin/fit/treinos') {
+      setCurrentTab('fittreinos');
     } else if (path === '/admin/dashboard') {
       setCurrentTab('dashboard');
     } else if (path === '/admin/perfil') {
@@ -217,6 +231,10 @@ export const AdminDashboard: React.FC = () => {
       navigate('/admin/agente');
     } else if (tabId === 'fit') {
       navigate('/admin/fit');
+    } else if (tabId === 'fitcheckins') {
+      navigate('/admin/fit/checkins');
+    } else if (tabId === 'fittreinos') {
+      navigate('/admin/fit/treinos');
     } else if (tabId === 'dashboard') {
       navigate('/admin/dashboard');
     } else if (tabId === 'profile') {
@@ -727,6 +745,8 @@ export const AdminDashboard: React.FC = () => {
           {currentTab === 'instagram' && <AdminInstagramPage />}
           {currentTab === 'agent' && <AdminAgentPage />}
           {currentTab === 'fit' && <AdminFitPage />}
+          {currentTab === 'fitcheckins' && <AdminFitCheckinsPage />}
+          {currentTab === 'fittreinos' && <AdminFitWorkoutsPage />}
 
         </main>
       </div>

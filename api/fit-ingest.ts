@@ -1,14 +1,14 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { getAdminFirestore } from '../functions/firebase-admin.js';
-import { describeInvalidPayload, parseHealthExport, writeFitDaily } from '../functions/fit-health.js';
+import { describeInvalidPayload, parseDailyPush, writeFitDaily } from '../functions/fit-health.js';
 
 const OWNER_UID = /^[A-Za-z0-9_-]{6,128}$/; // vira parte do caminho no Firestore: nada de "/" nem espaços
 
 /**
- * Recebe o POST da automação REST do Health Auto Export (`Authorization: Bearer $FIT_INGEST_TOKEN`) e grava os totais diários em
+ * Recebe o POST do Atalho do iPhone (`Authorization: Bearer $FIT_INGEST_TOKEN`, corpo { day, steps, walkRunKm, weightKg }) e grava os totais diários em
  * users/{FIT_OWNER_UID}/fitDaily/{dia}. O dono é fixado no servidor: o payload nunca escolhe o uid, e o token só escreve (não lê nada).
- * É um upsert por dia, então reenvios (período "Hoje", "Padrão", "7 dias") são seguros.
+ * É um upsert por dia, então reenviar o mesmo dia é seguro.
  */
 export async function handleFitIngest(
   req: Request | any,
@@ -43,7 +43,7 @@ export async function handleFitIngest(
   if (typeof payload === 'string' || Buffer.isBuffer(payload)) {
     try { payload = JSON.parse(payload.toString()); } catch { payload = null; }
   }
-  const parsed = parseHealthExport(payload);
+  const parsed = parseDailyPush(payload);
   if (!parsed) {
     const { message, received, dayShape } = describeInvalidPayload(payload); // só nomes, tipos e a forma do `day`, nunca os valores
     return send(400, { ok: false, error: { code: 'invalid_payload', message, received, ...(dayShape ? { dayShape } : {}) } });
@@ -52,7 +52,7 @@ export async function handleFitIngest(
   try {
     const days = await writeFitDaily(deps.database ?? getAdminFirestore(), ownerUid, parsed.days);
     // Só contagens na resposta e nos logs: nunca o conteúdo (dado de saúde).
-    return send(200, { ok: true, days, ...parsed.stats, workoutsIgnored: parsed.workouts });
+    return send(200, { ok: true, days, ...parsed.stats});
   } catch (error) {
     console.error('[Fit Ingest] Falha ao gravar:', error instanceof Error ? error.message : String(error));
     return send(500, { ok: false, error: { code: 'internal_error', message: 'Não foi possível gravar; consulte os logs.' } });

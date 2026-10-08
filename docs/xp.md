@@ -10,8 +10,11 @@ O avatar do topo abre `/admin/perfil` ("Ficha do Herói"): nome de exibição (F
 | Instagram | visualização 1, curtida 2, comentário 3, seguidor 10 |
 | Missão, tarefa e roteiro pronto | pela dificuldade: 1=100, 2=250, 3=500, 4=750, 5=1.000 |
 | Meta atingida | mensal 5.000, semanal 1.000, diária 100 |
+| Fit (ver `docs/fit.md`) | passos 1 por 10 (dia fechado, teto 20.000 passos), pedalada 50 por km, check-in de academia/funcional 500 (um por tipo e dia) |
 
 Nível: o nível 1 custa 500 XP e cada nível custa 25% a mais que o anterior (`500 × 1,25^(N−1)`), sem limite. O nível é derivado do XP total; nada de nível é gravado.
+
+> **Fit é por coleta:** passos, pedaladas e check-ins viram XP quando você clica em **Coletar**. O botão grava um evento `fit_steps`, `fit_ride` ou `fit_checkin` (criado uma vez, com o XP congelado no campo `xp`); as regras do Firestore conferem que a origem existe e que o XP não passa do que ela vale.
 
 ## Como o XP é guardado
 `XP total = xpBaseline/main + eventos do activityLog posteriores à criação dele`.

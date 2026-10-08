@@ -218,7 +218,7 @@ async function startServer() {
     handleTravelRoute(req, res);
   });
 
-  // Fit: totais diários do Apple Saúde enviados pelo Health Auto Export (segredo FIT_INGEST_TOKEN)
+  // Fit: totais diários do Apple Saúde enviados pelo Atalho do iPhone (segredo FIT_INGEST_TOKEN)
   app.all("/api/fit-ingest", (req, res) => {
     handleFitIngest(req, res);
   });

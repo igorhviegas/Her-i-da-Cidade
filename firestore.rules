@@ -118,6 +118,70 @@ service cloud.firestore {
         && d.createdAt == request.time;
     }
 
+    function isFitXpType(type) { return type in ['fit_ride', 'fit_steps', 'fit_checkin']; }
+
+    // Evento de XP do Fit: criado uma vez (id = tipo_refId), com a hora do servidor, XP inteiro e no máximo o que a origem vale:
+    // pedalada 50 XP/km, passos 1 XP/10 (teto de 20.000 passos), check-in 500. Só o dono coleta o XP dos próprios dados.
+    function validFitXpEvent(id, d) {
+      return d.keys().hasAll(['type', 'refId', 'occurredAt', 'xp'])
+        && d.keys().hasOnly(['type', 'refId', 'difficulty', 'difficultyKey', 'occurredAt', 'xp', 'meta'])
+        && d.refId is string && d.refId.size() > 0 && d.refId.size() <= 120
+        && id == d.type + '_' + d.refId
+        && d.occurredAt == request.time
+        && d.xp is int && d.xp > 0
+        && (d.type == 'fit_ride' ? (
+              exists(/databases/$(database)/documents/users/$(request.auth.uid)/fitRides/$(d.refId))
+              && d.xp <= math.floor(get(/databases/$(database)/documents/users/$(request.auth.uid)/fitRides/$(d.refId)).data.distanceKm * 50))
+          : d.type == 'fit_steps' ? (
+              exists(/databases/$(database)/documents/users/$(request.auth.uid)/fitDaily/$(d.refId))
+              && d.xp <= (get(/databases/$(database)/documents/users/$(request.auth.uid)/fitDaily/$(d.refId)).data.get('steps', 0) > 20000
+                ? 2000 : math.floor(get(/databases/$(database)/documents/users/$(request.auth.uid)/fitDaily/$(d.refId)).data.get('steps', 0) / 10)))
+          : (exists(/databases/$(database)/documents/users/$(request.auth.uid)/fitCheckins/$(d.refId)) && d.xp <= 500));
+    }
+
+    // Peso manual (um por dia; o id é o dia).
+    function validFitWeight(day, d) {
+      return day.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && d.keys().hasAll(['day', 'kg', 'updatedAt'])
+        && d.keys().hasOnly(['day', 'kg', 'updatedAt'])
+        && d.day == day
+        && d.kg is number && d.kg >= 20 && d.kg <= 500
+        && d.updatedAt == request.time;
+    }
+
+    // Check-in de academia/funcional: um por tipo e dia (id = tipo_AAAA-MM-DD).
+    function validFitCheckin(id, d) {
+      return id.matches('(gym|functional)_[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && d.keys().hasAll(['kind', 'day', 'updatedAt'])
+        && d.keys().hasOnly(['kind', 'day', 'durationMin', 'note', 'workoutName', 'exercisesDone', 'exercisesTotal', 'updatedAt'])
+        && d.kind in ['gym', 'functional']
+        && id == d.kind + '_' + d.day
+        && (!d.keys().hasAny(['durationMin']) || (d.durationMin is number && d.durationMin >= 1 && d.durationMin <= 1440))
+        && (!d.keys().hasAny(['note']) || (d.note is string && d.note.size() <= 300))
+        && (!d.keys().hasAny(['workoutName']) || (d.workoutName is string && d.workoutName.size() <= 60))
+        && (!d.keys().hasAny(['exercisesDone']) || (d.exercisesDone is int && d.exercisesDone >= 0 && d.exercisesDone <= 60))
+        && (!d.keys().hasAny(['exercisesTotal']) || (d.exercisesTotal is int && d.exercisesTotal >= 0 && d.exercisesTotal <= 60))
+        && d.updatedAt == request.time;
+    }
+
+    // Biblioteca de exercícios (timerSec nulo = sem timer) e planos de treino (lista ordenada de ids de exercícios).
+    function validFitExercise(d) {
+      return d.keys().hasAll(['name', 'category', 'timerSec', 'updatedAt'])
+        && d.keys().hasOnly(['name', 'category', 'timerSec', 'updatedAt'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 80
+        && d.category is string && d.category.size() > 0 && d.category.size() <= 40
+        && (d.timerSec == null || (d.timerSec is int && d.timerSec >= 5 && d.timerSec <= 3600))
+        && d.updatedAt == request.time;
+    }
+
+    function validFitWorkout(d) {
+      return d.keys().hasAll(['name', 'exerciseIds', 'updatedAt'])
+        && d.keys().hasOnly(['name', 'exerciseIds', 'updatedAt'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 60
+        && d.exerciseIds is list && d.exerciseIds.size() <= 60
+        && d.updatedAt == request.time;
+    }
+
     function consumptionPath(orderId) {
       return /databases/$(database)/documents/stockConsumptions/$(orderId);
     }
@@ -348,7 +412,9 @@ service cloud.firestore {
     // Histórico para a futura gamificação: cada evento é criado uma única vez (o ID é o tipo + a referência) e
     // nunca mais alterado nem apagado. Excluir o pedido, roteiro ou missão de origem não toca neste registro.
     match /activityLog/{id} {
-      allow read, create: if isAdmin();
+      allow read: if isAdmin();
+      // Eventos do Fit (fit_ride, fit_steps, fit_checkin): o XP é limitado pelo que o dado de origem vale (functions/xp.js) e a origem precisa existir.
+      allow create: if isAdmin() && (!isFitXpType(request.resource.data.get('type', '')) || validFitXpEvent(id, request.resource.data));
       allow update, delete: if false;
     }
 
@@ -373,6 +439,24 @@ service cloud.firestore {
       allow read, delete: if isAdmin() && request.auth.uid == uid;
       allow create: if isAdmin() && request.auth.uid == uid && validFitRide(rideId, request.resource.data);
       allow update: if false;
+    }
+
+    // Peso manual, check-ins, biblioteca de exercícios e planos de treino: tudo do dono, com formato validado.
+    match /users/{uid}/fitWeight/{day} {
+      allow read, delete: if isAdmin() && request.auth.uid == uid;
+      allow create, update: if isAdmin() && request.auth.uid == uid && validFitWeight(day, request.resource.data);
+    }
+    match /users/{uid}/fitCheckins/{checkinId} {
+      allow read, delete: if isAdmin() && request.auth.uid == uid;
+      allow create, update: if isAdmin() && request.auth.uid == uid && validFitCheckin(checkinId, request.resource.data);
+    }
+    match /users/{uid}/fitExercises/{exerciseId} {
+      allow read, delete: if isAdmin() && request.auth.uid == uid;
+      allow create, update: if isAdmin() && request.auth.uid == uid && validFitExercise(request.resource.data);
+    }
+    match /users/{uid}/fitWorkouts/{workoutId} {
+      allow read, delete: if isAdmin() && request.auth.uid == uid;
+      allow create, update: if isAdmin() && request.auth.uid == uid && validFitWorkout(request.resource.data);
     }
 
 

@@ -16,7 +16,7 @@ function fakeDatabase(failure) {
     batch: () => ({ set: (ref) => paths.push(ref.path), commit: async () => { if (failure) throw new Error(failure); } }),
   };
 }
-const body = { data: { metrics: [{ name: 'step_count', units: 'count', data: [{ date: '2026-10-01 00:00:00 -0300', qty: 5000, source: 'iPhone' }] }] } };
+const body = { day: '2026-10-01', steps: 5000 };
 const request = (overrides = {}) => ({ method: 'POST', headers: { authorization: `Bearer ${TOKEN}` }, body, ...overrides });
 const call = async (req, deps = {}) => { const res = response(); await handleFitIngest(req, res, { token: TOKEN, ownerUid: UID, database: fakeDatabase(), ...deps }); return res; };
 
@@ -45,7 +45,7 @@ test('fit-ingest: grava só sob users/{uid do servidor}, mesmo que o payload ten
   const res = await call(request({ body: JSON.stringify(hostile) }), { database });
   assert.equal(res.statusCode, 200);
   assert.deepEqual(database.paths, [`users/${UID}/fitDaily/2026-10-01`]);
-  assert.deepEqual(res.body, { ok: true, days: 1, accepted: 1, ignoredMetrics: 0, invalid: 0, workoutsIgnored: 0 });
+  assert.deepEqual(res.body, { ok: true, days: 1, accepted: 1, ignoredFields: 3, invalid: 0 }); // uid, ownerUid e path do payload são só descartados
   assert.equal(res.headers['cache-control'], 'no-store');
   assert.doesNotMatch(JSON.stringify(res.body), /5000|2026-10-01/); // a resposta não devolve dado de saúde
 });
@@ -55,7 +55,7 @@ test('fit-ingest: envio simples de um dia (Atalho do iPhone) grava no mesmo cami
   const res = await call(request({ body: { day: '2026-10-07', steps: '2431', walkRunKm: '1,8', weightKg: 72, uid: 'outroUsuario' } }), { database });
   assert.equal(res.statusCode, 200);
   assert.deepEqual(database.paths, [`users/${UID}/fitDaily/2026-10-07`]);
-  assert.deepEqual(res.body, { ok: true, days: 1, accepted: 3, ignoredMetrics: 1, invalid: 0, workoutsIgnored: 0 });
+  assert.deepEqual(res.body, { ok: true, days: 1, accepted: 3, ignoredFields: 1, invalid: 0 });
 });
 
 test('fit-ingest: falha ao gravar devolve 500 genérico, sem vazar a mensagem do erro', async () => {
