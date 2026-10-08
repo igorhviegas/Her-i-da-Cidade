@@ -1,16 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, Loader2, MapPin, Plus, RefreshCw, Search, Trash2, X, Pencil, AlertTriangle } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Loader2, Plus, RefreshCw, Search } from 'lucide-react';
 import { useRouter } from '../../lib/router';
 import { addDays, dateKey } from '../../functions/missions-core.js';
-import { daysBetween, eventsOnDay, shiftDate, visibleRange, type CalendarView } from '../../services/calendarEvents.js';
-import { deleteCalendarEvent, saveCalendarEvent, searchCalendarEvents, useCalendarEvents, type CalendarEvent } from '../../services/calendarService';
-import { DayAgenda, eventTimeLabel } from './CalendarAgenda';
-import { ErrorNote, WarningNote, cardClass, ghostButton, inputClass, labelClass, primaryButton } from './missionsUi';
+import { shiftDate, visibleRange, type CalendarView } from '../../services/calendarEvents.js';
+import { searchCalendarEvents, useCalendarEvents, type CalendarEvent } from '../../services/calendarService';
+import { DayAgenda } from './CalendarAgenda';
+import { ErrorNote, WarningNote, cardClass, ghostButton, primaryButton } from './missionsUi';
+import { DayList, MonthGrid, WeekList, fmt } from './ordersFlow/CalendarViews';
+import { EventDialog } from './ordersFlow/CalendarEventDialog';
 
-const fmt = (key: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('pt-BR', { ...options, timeZone: 'UTC' }).format(new Date(`${key}T12:00:00Z`));
-const WEEKDAY_SHORT = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const VIEWS: { id: CalendarView; label: string }[] = [{ id: 'month', label: 'Mês' }, { id: 'week', label: 'Semana' }, { id: 'day', label: 'Dia' }];
-const chipClass = (event: CalendarEvent) => (event.crm ? 'bg-orange-500/20 text-orange-200 hover:bg-orange-500/30' : 'bg-blue-500/20 text-blue-200 hover:bg-blue-500/30');
 
 export const AdminCalendarPage: React.FC = () => {
   const { search } = useRouter();
@@ -77,15 +76,7 @@ export const AdminCalendarPage: React.FC = () => {
         </div>
       </div>
 
-      {state.status === 'error' && <ErrorNote message={state.message} />}
-      {state.status === 'ready' && state.truncated && <WarningNote message="Há mais eventos neste período do que o limite de exibição; alguns não aparecem. Use um período menor ou a busca." />}
-      {state.status === 'loading' && <div className="flex justify-center py-8 text-white/50"><Loader2 className="h-5 w-5 animate-spin" /></div>}
-
-      {state.status !== 'loading' && (
-        view === 'month' ? <MonthGrid range={range} month={selected.slice(0, 7)} events={events} today={today} selected={selected} onSelect={setSelected} onOpen={view_} />
-        : view === 'week' ? <WeekList range={range} events={events} today={today} selected={selected} onSelect={setSelected} onOpen={view_} />
-        : <DayList events={events} dayKey={selected} onOpen={view_} />
-      )}
+      <CalendarBody state={state} view={view} selected={selected} range={range} today={today} events={events} onSelect={setSelected} onOpen={view_} />
 
       {open && (
         <EventDialog
@@ -100,90 +91,32 @@ export const AdminCalendarPage: React.FC = () => {
   );
 };
 
-// ------------------------------------------------------------------- visualizações
+type CalendarState = ReturnType<typeof useCalendarEvents>['state'];
 
-interface ViewProps { events: CalendarEvent[]; today: string; selected: string; onSelect: (key: string) => void; onOpen: (event: CalendarEvent) => void }
+interface CalendarBodyProps {
+  state: CalendarState;
+  view: CalendarView;
+  selected: string;
+  range: { from: string; to: string };
+  today: string;
+  events: CalendarEvent[];
+  onSelect: (key: string) => void;
+  onOpen: (event: CalendarEvent) => void;
+}
 
-const MonthGrid: React.FC<ViewProps & { range: { from: string; to: string }; month: string }> = ({ range, month, events, today, selected, onSelect, onOpen }) => (
-  <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0D1527]">
-    <div className="grid grid-cols-7 border-b border-white/10 text-center text-[11px] font-semibold uppercase tracking-wider text-white/45">
-      {WEEKDAY_SHORT.map((d) => <div key={d} className="py-2">{d}</div>)}
-    </div>
-    <div className="grid grid-cols-7">
-      {daysBetween(range.from, range.to).map((key) => {
-        const dayEvents = eventsOnDay(events, key);
-        const isToday = key === today;
-        return (
-          <div key={key} role="button" tabIndex={0} aria-label={`${fmt(key, { day: 'numeric', month: 'long' })}, ${dayEvents.length} compromissos`} aria-current={isToday ? 'date' : undefined}
-            onClick={() => onSelect(key)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(key); } }}
-            className={`min-h-[4.5rem] cursor-pointer border-b border-r border-white/5 p-1 text-left outline-none transition-colors hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-blue-500 sm:min-h-[6.5rem] ${key === selected ? 'bg-blue-500/10 ring-1 ring-inset ring-blue-400/60' : ''} ${key.startsWith(month) ? '' : 'opacity-40'}`}>
-            <span className={`mb-1 inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full px-1 text-xs font-semibold ${isToday ? 'bg-blue-600 text-white' : 'text-white/70'}`}>{Number(key.slice(8))}</span>
-            <ul className="space-y-0.5">
-              {dayEvents.slice(0, 3).map((event) => (
-                <li key={event.id}>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(event); }} title={event.title}
-                    className={`block w-full truncate rounded px-1 py-0.5 text-left text-[10px] font-medium sm:text-[11px] ${chipClass(event)}`}>
-                    {event.startTime && <span className="hidden tabular-nums sm:inline">{event.startTime} </span>}{event.title}
-                  </button>
-                </li>
-              ))}
-              {dayEvents.length > 3 && <li className="px-1 text-[10px] text-white/45">+{dayEvents.length - 3}</li>}
-            </ul>
-          </div>
-        );
-      })}
-    </div>
-  </div>
+const CalendarBody: React.FC<CalendarBodyProps> = ({ state, view, selected, range, today, events, onSelect, onOpen }) => (
+  <>
+    {state.status === 'error' && <ErrorNote message={state.message} />}
+    {state.status === 'ready' && state.truncated && <WarningNote message="Há mais eventos neste período do que o limite de exibição; alguns não aparecem. Use um período menor ou a busca." />}
+    {state.status === 'loading' && <div className="flex justify-center py-8 text-white/50"><Loader2 className="h-5 w-5 animate-spin" /></div>}
+
+    {state.status !== 'loading' && (
+      view === 'month' ? <MonthGrid range={range} month={selected.slice(0, 7)} events={events} today={today} selected={selected} onSelect={onSelect} onOpen={onOpen} />
+      : view === 'week' ? <WeekList range={range} events={events} today={today} selected={selected} onSelect={onSelect} onOpen={onOpen} />
+      : <DayList events={events} dayKey={selected} onOpen={onOpen} />
+    )}
+  </>
 );
-
-const WeekList: React.FC<ViewProps & { range: { from: string; to: string } }> = ({ range, events, today, selected, onSelect, onOpen }) => (
-  <div className="grid grid-cols-1 gap-2 md:grid-cols-7">
-    {daysBetween(range.from, range.to).map((key) => {
-      const dayEvents = eventsOnDay(events, key);
-      return (
-        <div key={key} className={`rounded-xl border p-2 ${key === selected ? 'border-blue-400/60 bg-blue-500/10' : 'border-white/10 bg-[#0D1527]'}`}>
-          <button type="button" onClick={() => onSelect(key)} className={`mb-2 flex w-full items-center gap-2 text-xs font-semibold ${key === today ? 'text-blue-300' : 'text-white/60'}`}>
-            <span className={`inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full px-1 ${key === today ? 'bg-blue-600 text-white' : ''}`}>{Number(key.slice(8))}</span>
-            <span className="uppercase">{fmt(key, { weekday: 'short' })}</span>
-          </button>
-          {dayEvents.length === 0 ? <p className="text-[11px] text-white/30">—</p> : (
-            <ul className="space-y-1">
-              {dayEvents.map((event) => (
-                <li key={event.id}>
-                  <button type="button" onClick={() => onOpen(event)} className={`w-full rounded-lg px-2 py-1.5 text-left text-xs ${chipClass(event)}`}>
-                    <span className="block text-[10px] font-semibold tabular-nums opacity-80">{eventTimeLabel(event)}</span>
-                    <span className="block truncate font-medium">{event.title}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      );
-    })}
-  </div>
-);
-
-const DayList: React.FC<{ events: CalendarEvent[]; dayKey: string; onOpen: (event: CalendarEvent) => void }> = ({ events, dayKey, onOpen }) => {
-  const list = eventsOnDay(events, dayKey);
-  if (!list.length) return <p className={`${cardClass} text-center text-sm text-white/50`}>Nenhum compromisso neste dia.</p>;
-  return (
-    <ul className="space-y-2">
-      {list.map((event) => (
-        <li key={event.id}>
-          <button type="button" onClick={() => onOpen(event)} className={`${cardClass} flex w-full items-start gap-4 text-left transition-colors hover:bg-white/5`}>
-            <span className="w-24 shrink-0 text-sm font-semibold tabular-nums text-orange-300">{eventTimeLabel(event)}{event.endTime && !event.allDay && <span className="block text-xs font-normal text-white/40">até {event.endTime}</span>}</span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-semibold text-white">{event.title}</span>
-              {event.location && <span className="mt-0.5 flex items-center gap-1 text-xs text-white/50"><MapPin className="h-3 w-3" aria-hidden />{event.location}</span>}
-              {event.description && <span className="mt-1 line-clamp-2 whitespace-pre-line text-xs text-white/45">{event.description}</span>}
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-};
 
 // ------------------------------------------------------------------------- busca
 
@@ -249,92 +182,3 @@ const EventSearch: React.FC<{ onOpen: (event: CalendarEvent) => void }> = ({ onO
   );
 };
 
-// ------------------------------------------------------------- detalhes / formulário
-
-const EventDialog: React.FC<{
-  event: CalendarEvent | null; mode: 'view' | 'form'; defaultDate: string;
-  onMode: (mode: 'view' | 'form') => void; onClose: () => void; onSaved: (event: CalendarEvent) => void; onDeleted: () => void;
-}> = ({ event, mode, defaultDate, onMode, onClose, onSaved, onDeleted }) => {
-  const multiDay = !!event && event.startKey !== event.endKey;
-  const [form, setForm] = useState({
-    title: event?.title ?? '', date: event?.startKey ?? defaultDate, allDay: event?.allDay ?? false,
-    startTime: event?.startTime ?? '09:00', endTime: event?.endTime ?? '10:00', location: event?.location ?? '', description: event?.description ?? '',
-  });
-  const [busy, setBusy] = useState<'save' | 'delete' | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((current) => ({ ...current, [key]: value }));
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [busy, onClose]);
-
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy('save'); setError(null);
-    try { onSaved(await saveCalendarEvent(form, event?.id)); } catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível salvar.'); setBusy(null); }
-  };
-  const remove = async () => {
-    if (!event || !confirm(`Excluir o evento "${event.title}" do Google Agenda?${event.crm ? '\n\nO pedido no Kanban será mantido.' : ''}`)) return;
-    setBusy('delete'); setError(null);
-    try { await deleteCalendarEvent(event.id); onDeleted(); } catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível excluir.'); setBusy(null); }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={mode === 'form' ? (event ? 'Editar evento' : 'Novo evento') : 'Detalhes do evento'} onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-      <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-white/10 bg-[#0D1527] p-5 shadow-2xl sm:rounded-2xl">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <h3 className="text-lg font-bold text-white">{mode === 'form' ? (event ? 'Editar evento' : 'Novo evento') : event?.title}</h3>
-          <button type="button" onClick={onClose} disabled={!!busy} aria-label="Fechar" className="rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
-        </div>
-
-        {mode === 'view' && event ? (
-          <div className="space-y-3 text-sm">
-            <p className="text-white/80"><span className="capitalize">{fmt(event.startKey, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>{event.endKey !== event.startKey && ` → ${fmt(event.endKey, { day: 'numeric', month: 'long' })}`}</p>
-            <p className="font-semibold tabular-nums text-orange-300">{event.allDay ? 'Dia inteiro' : `${event.startTime} – ${event.endTime}`}</p>
-            {event.location && <p className="flex items-start gap-2 text-white/70"><MapPin className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{event.location}</p>}
-            {event.description && <p className="whitespace-pre-line break-words rounded-xl bg-black/20 p-3 text-xs text-white/70">{event.description}</p>}
-            {event.crm && (
-              <p className="flex items-start gap-2 rounded-xl border border-orange-400/30 bg-orange-500/10 px-3 py-2 text-xs text-orange-200">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-                Evento de um pedido do Kanban. As alterações feitas aqui não voltam para o pedido, e reenviar o pedido ao Google Agenda sobrescreve este evento. Excluir mantém o pedido.
-              </p>
-            )}
-            {multiDay && <p className="text-xs text-white/40">Evento de vários dias: para editar, use o Google Agenda.</p>}
-            <ErrorNote message={error} />
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-              {event.htmlLink ? <a href={event.htmlLink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-blue-400 hover:text-blue-300"><ExternalLink className="h-3.5 w-3.5" aria-hidden />Abrir no Google Agenda</a> : <span />}
-              <div className="flex gap-2">
-                <button type="button" onClick={remove} disabled={!!busy} className={`${ghostButton} hover:!bg-red-500/20 hover:!text-red-300`}>{busy === 'delete' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}Excluir</button>
-                <button type="button" onClick={() => onMode('form')} disabled={!!busy || multiDay} className={primaryButton}><Pencil className="h-4 w-4" />Editar</button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={save} className="space-y-3">
-            <label className={labelClass}>Título<input value={form.title} onChange={(e) => set('title', e.target.value)} maxLength={250} required className={inputClass} /></label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className={labelClass}>Data<input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} required className={inputClass} /></label>
-              <label className="mt-6 flex items-center gap-2 text-xs font-semibold text-white/70"><input type="checkbox" checked={form.allDay} onChange={(e) => set('allDay', e.target.checked)} />Dia inteiro</label>
-            </div>
-            {!form.allDay && (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className={labelClass}>Início<input type="time" value={form.startTime} onChange={(e) => set('startTime', e.target.value)} required className={inputClass} /></label>
-                <label className={labelClass}>Término<input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} required className={inputClass} /></label>
-              </div>
-            )}
-            <label className={labelClass}>Local (opcional)<input value={form.location} onChange={(e) => set('location', e.target.value)} maxLength={1024} className={inputClass} /></label>
-            <label className={labelClass}>Descrição (opcional)<textarea value={form.description} onChange={(e) => set('description', e.target.value)} rows={4} maxLength={8000} className={inputClass} /></label>
-            {event?.crm && <WarningNote message="Evento de pedido do Kanban: a edição vale só na agenda e não atualiza o pedido." />}
-            <ErrorNote message={error} />
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => (event ? onMode('view') : onClose())} disabled={!!busy} className={ghostButton}>Cancelar</button>
-              <button type="submit" disabled={!!busy} className={primaryButton}>{busy === 'save' && <Loader2 className="h-4 w-4 animate-spin" />}{event ? 'Salvar' : 'Criar evento'}</button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
-  );
-};
