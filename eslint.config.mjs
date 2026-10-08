@@ -25,24 +25,24 @@ export default defineConfig([
     plugins: { quality, "react-hooks": reactHooks },
     rules: {
       "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn", // baseline: 1
+      "react-hooks/exhaustive-deps": "error",
       "no-empty": ["error", { allowEmptyCatch: true }],
       "no-var": "error",
-      // Baselines measured on install: warn until the count reaches zero,
-      // then promote back to "error".
-      "prefer-const": "warn", // baseline: 3
+      // Rules at zero are "error"; the ones still at "warn" are tracked in docs/lint-debt.md --
+      // promote each back to "error" when its count reaches zero.
+      "prefer-const": "error",
       "@typescript-eslint/no-unused-vars": [
-        "warn", // baseline: 36
+        "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
-      "@typescript-eslint/no-explicit-any": "warn", // baseline: 265
-      "@typescript-eslint/no-non-null-assertion": "warn", // baseline: 52
-      "@typescript-eslint/no-dynamic-delete": "warn", // baseline: 4
-      "@typescript-eslint/no-empty-object-type": "warn", // baseline: 2
-      "@typescript-eslint/no-unused-expressions": "warn", // baseline: 1
-      "no-control-regex": "warn", // baseline: 1
-      "no-irregular-whitespace": "warn", // baseline: 1
-      "no-useless-escape": "warn", // baseline: 1
+      "@typescript-eslint/no-explicit-any": "warn", // baseline: 47 (docs/lint-debt.md)
+      "@typescript-eslint/no-non-null-assertion": "error",
+      "@typescript-eslint/no-dynamic-delete": "error",
+      "@typescript-eslint/no-empty-object-type": "error",
+      "@typescript-eslint/no-unused-expressions": "error",
+      "no-control-regex": "error",
+      "no-irregular-whitespace": "error",
+      "no-useless-escape": "error",
       // The size and complexity budget is all "warn" on purpose. These
       // numbers are a conversation starter about factoring, not a gate --
       // promote one to "error" once the count for it reaches zero.
@@ -55,11 +55,11 @@ export default defineConfig([
         { max: 150, skipBlankLines: true, skipComments: true },
       ],
       "max-nested-callbacks": ["warn", 3],
-      "quality/max-lines": ["warn", { max: 350 }], // baseline: 20 files
+      "quality/max-lines": ["warn", { max: 350 }], // baseline: 12 files (docs/lint-debt.md)
       "quality/no-direct-console": ["error", { logger: "logger from lib/logger.js" }],
       // Presentation layers must go through services/, never lib/firebase.
       "quality/no-direct-data-access": [
-        "warn", // baseline: 1 (context/XpContext.tsx)
+        "error",
         {
           modules: ["../lib/firebase", "../../lib/firebase", "@/lib/firebase"],
           bindings: ["db"],
