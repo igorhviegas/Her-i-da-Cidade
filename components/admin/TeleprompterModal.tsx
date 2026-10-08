@@ -34,6 +34,11 @@ function fitLayout(box: HTMLElement, manualSize: number | null): Layout {
   return layout;
 }
 
+/** Tamanhos de fonte tentados: só o manual, ou do máximo ao mínimo automático. */
+function candidateSizes(manualSize: number | null): number[] {
+  return manualSize ? [manualSize] : Array.from({ length: (MAX_FONT - MIN_FONT) / FONT_STEP + 1 }, (_, i) => MAX_FONT - i * FONT_STEP);
+}
+
 function chooseLayout(box: HTMLElement, manualSize: number | null): Layout {
   // Sem espaço, as colunas transbordam para a direita (scrollWidth) ou o conteúdo estoura a altura.
   const fits = (size: number, columns: 1 | 2) => {
@@ -42,7 +47,7 @@ function chooseLayout(box: HTMLElement, manualSize: number | null): Layout {
     return box.scrollHeight <= box.clientHeight + 1 && box.scrollWidth <= box.clientWidth + 1;
   };
   const maxColumns = box.clientWidth >= TWO_COLUMNS_MIN_WIDTH ? 2 : 1;
-  const sizes = manualSize ? [manualSize] : Array.from({ length: (MAX_FONT - MIN_FONT) / FONT_STEP + 1 }, (_, i) => MAX_FONT - i * FONT_STEP);
+  const sizes = candidateSizes(manualSize);
   const oneColumn = sizes.find((size) => fits(size, 1));
   if (oneColumn && (manualSize || oneColumn >= ONE_COLUMN_MIN_FONT || maxColumns === 1)) return { size: oneColumn, columns: 1, scroll: false };
   if (maxColumns === 2) {
@@ -77,7 +82,7 @@ export const TeleprompterModal: React.FC<Props> = ({ title, text, canSendToEditi
     const observer = new ResizeObserver(run);
     observer.observe(box);
     return () => { timers.forEach(clearTimeout); observer.disconnect(); };
-  }, [text, manualSize]);
+  }, [text, manualSize, paragraphs.length]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !sending) onBack(); };

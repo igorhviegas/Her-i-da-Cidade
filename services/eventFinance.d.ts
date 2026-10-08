@@ -7,11 +7,11 @@ export type LedgerKind = 'entry' | 'final' | 'cost' | 'adjrev' | 'adjcost';
 export interface EventLedger { entry: number; final?: number; cost?: number; adj?: number; adjCost?: number; seq?: number }
 export class EventFinanceError extends Error { code: 'incomplete'; constructor(code: 'incomplete', message: string); }
 export interface LedgerRecord {
-  orderId: string; kind: LedgerKind; type: 'revenue' | 'expense'; amount: number; date: any;
+  orderId: string; kind: LedgerKind; type: 'revenue' | 'expense'; amount: number; date: unknown;
   clientId: string; serviceId: string; childName: string; category?: string; seq?: number;
 }
 export const ledgerId: (orderId: string, kind: LedgerKind, seq?: number) => string;
-export function planEntry(orderId: string, order: any, date: any): LedgerRecord;
-export function planCompletion(orderId: string, order: any, booked: { bookedRevenue?: number; final?: boolean; cost?: boolean }, date: any): LedgerRecord[];
-export function planAdjustments(orderId: string, order: any, form: { totalValue?: number; entryValue?: number; cost?: number | null }, date: any): { records: LedgerRecord[]; next: EventLedger | undefined };
+export function planEntry(orderId: string, order: unknown, date: unknown): LedgerRecord;
+export function planCompletion(orderId: string, order: unknown, booked: { bookedRevenue?: number; final?: boolean; cost?: boolean }, date: unknown): LedgerRecord[];
+export function planAdjustments(orderId: string, order: unknown, form: { totalValue?: number; entryValue?: number; cost?: number | null }, date: unknown): { records: LedgerRecord[]; next: EventLedger | undefined };
 export function ledgerToOrders(docs: Array<LedgerRecord & { id: string }>): any[];

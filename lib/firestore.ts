@@ -1,21 +1,14 @@
+import { logger } from './logger.js';
 import {
   collection,
-  doc,
   getDocs,
-  getDoc,
-  setDoc,
   Unsubscribe,
-  serverTimestamp
 } from "firebase/firestore";
 import { db, auth } from "./firebase";
 import {
   Service,
-  FirestoreService,
   FirestoreVideo,
-  adaptFirestoreServiceToLegacy,
-  adaptLegacyServiceToFirestore
 } from "../types";
-import { SERVICES as DEFAULT_SERVICES } from "../constants";
 import { getActiveServices, subscribeToActiveServices, seedServicesIfEmpty } from "../services/servicesService";
 
 export enum OperationType {
@@ -65,7 +58,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path,
   };
-  console.error("[Firestore Error]", JSON.stringify(errInfo));
+  logger.error("[Firestore Error]", JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
 
@@ -120,7 +113,7 @@ export async function getPublicVideos(): Promise<FirestoreVideo[]> {
 
     return videos;
   } catch (error) {
-    console.warn("[Firestore] Não foi possível carregar vídeos:", error);
+    logger.warn("[Firestore] Não foi possível carregar vídeos:", error);
     return [];
   }
 }

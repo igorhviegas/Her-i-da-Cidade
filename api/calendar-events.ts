@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
 import { authorizeAdminRequest } from '../functions/admin-auth.js';
 import { GoogleCalendarError, createCalendarEvent, deleteCalendarEvent, listCalendarEvents, updateCalendarEvent } from '../functions/google-calendar.js';
@@ -18,7 +19,7 @@ const ACTIONS = { list: listCalendarEvents, create: createCalendarEvent, update:
 export async function handleCalendarEvents(
   req: Request | any,
   res: Response | any,
-  deps: { authorize?: (req: any) => Promise<Auth>; actions?: Partial<typeof ACTIONS> } = {},
+  deps: { authorize?: (req: Request) => Promise<Auth>; actions?: Partial<typeof ACTIONS> } = {},
 ) {
   const send = (status: number, body: unknown) => {
     res.setHeader?.('Cache-Control', 'no-store');
@@ -35,14 +36,14 @@ export async function handleCalendarEvents(
   const body = req.body ?? {};
   const action = body.action as keyof typeof ACTIONS;
   if (!Object.hasOwn(ACTIONS, action)) return fail(400, 'invalid_request', 'Ação inválida.');
-  const run: (args: any) => Promise<any> = (deps.actions?.[action] ?? ACTIONS[action]) as any;
+  const run: (args: unknown) => Promise<any> = (deps.actions?.[action] ?? ACTIONS[action]) as any;
 
   try {
     const data = await run({ from: body.from, to: body.to, q: body.q, id: body.id, input: body.event });
     return send(200, { ok: true, ...(action === 'list' ? data : action === 'delete' ? {} : { event: data }) });
   } catch (error) {
     if (error instanceof GoogleCalendarError) return fail(STATUS_BY_CODE[error.code] ?? 502, error.code, error.message);
-    console.error('[Calendar Events] falha inesperada:', error instanceof Error ? error.name : 'erro');
+    logger.error('[Calendar Events] falha inesperada:', error instanceof Error ? error.name : 'erro');
     return fail(500, 'internal_error', 'A operação falhou; consulte os logs do servidor.');
   }
 }

@@ -1,73 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, ExternalLink, Image as ImageIcon, Loader2, RefreshCw } from 'lucide-react';
-import { subscribeInstagramDays, subscribeInstagramPosts, subscribeInstagramProfile, syncInstagramNow, type InstagramProfile } from '../../services/instagramService';
-import { currentPosts, filterByPeriod, formatDateTime as fmtDateTime, PERIODS, sortPosts, topPost, totalFor, type InstagramPost, type MetricKey } from '../../services/instagramMetrics.js';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import { subscribeInstagramDays, subscribeInstagramPosts, subscribeInstagramProfile, type InstagramProfile } from '../../services/instagramService';
+import { currentPosts, filterByPeriod, sortPosts, totalFor, type InstagramPost } from '../../services/instagramMetrics.js';
 import type { DailySummary } from '../../services/instagramDaily.js';
-import { describeDelta } from '../../services/instagramDaily.js';
 import { dateKey } from '../../functions/missions-core.js';
-import { cardClass, ghostBtn, primaryBtn } from './financeFormat';
+import { cardClass } from './financeFormat';
 import { InstagramCalendar } from './InstagramCalendar';
+import { InstagramAlerts, InstagramHeader, InstagramHighlights, InstagramKpis, InstagramPostsList, useInstagramSync } from './adminPages/InstagramSections';
+import type { Period, SortKey } from './adminPages/instagramParts';
 
-type SortKey = MetricKey | 'recent';
-const SORTS: { id: SortKey; label: string }[] = [
-  { id: 'likes', label: 'Mais curtidas' }, { id: 'views', label: 'Mais visualizações' },
-  { id: 'comments', label: 'Mais comentários' }, { id: 'recent', label: 'Mais recentes' },
-];
-const KIND_LABEL: Record<string, string> = { image: 'Imagem', video: 'Vídeo', reel: 'Reel', carousel: 'Carrossel', other: 'Outro' };
+export { DeltaText } from './adminPages/instagramParts';
+
 const PAGE_SIZE = 12;
-
-const num = new Intl.NumberFormat('pt-BR');
-const fmt = (value: number | null | undefined) => (value == null ? 'Indisponível' : num.format(value));
-
-const DELTA_TONE = { up: 'text-emerald-300', down: 'text-red-300', zero: 'text-white/50', pending: 'text-white/40', unavailable: 'text-white/40' } as const;
-
-/** Saldo do dia (texto vindo de describeDelta; sem regra de negócio aqui). */
-export const DeltaText: React.FC<{ daily: InstagramProfile['daily']; metric: 'followers' | 'likes' | 'views'; today: string; className?: string }> = ({ daily, metric, today, className = '' }) => {
-  const delta = describeDelta(daily, metric, today);
-  return <p className={`text-xs font-semibold ${DELTA_TONE[delta.kind]} ${className}`}>{delta.text}{delta.since && <span className="font-normal text-white/40"> · desde {delta.since}</span>}</p>;
-};
-
-const Kpi: React.FC<{ label: string; value: string; hint?: string; delta?: React.ReactNode }> = ({ label, value, hint, delta }) => (
-  <div className={cardClass}>
-    <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">{label}</p>
-    <p className="mt-1 text-xl font-extrabold tabular-nums text-white sm:text-2xl">{value}</p>
-    {delta && <div className="mt-1">{delta}</div>}
-    {hint && <p className="mt-1 text-xs text-white/50">{hint}</p>}
-  </div>
-);
-
-// URLs de miniatura da Meta são temporárias: se falharem ao carregar, mostra o placeholder.
-const Thumb: React.FC<{ post: InstagramPost; className: string }> = ({ post, className }) => {
-  const [broken, setBroken] = useState(false);
-  useEffect(() => setBroken(false), [post.thumbnailUrl]);
-  return post.thumbnailUrl && !broken
-    ? <img src={post.thumbnailUrl} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setBroken(true)} className={`${className} shrink-0 rounded-lg object-cover`} />
-    : <div className={`${className} flex shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/30`}><ImageIcon className="h-5 w-5" aria-hidden /></div>;
-};
-
-type Period = (typeof PERIODS)[number]['id'];
-
-const Highlight: React.FC<{ title: string; post: InstagramPost | null; metric: MetricKey; empty: string }> = ({ title, post, metric, empty }) => (
-  <div className={cardClass}>
-    <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">{title}</p>
-    {post ? (
-      <a href={post.permalink ?? undefined} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-3">
-        <Thumb post={post} className="h-14 w-14" />
-        <div className="min-w-0">
-          <p className="text-lg font-extrabold tabular-nums text-white">{fmt(post[metric])}</p>
-          <p className="truncate text-xs text-white/55">{post.caption || KIND_LABEL[post.kind]}</p>
-        </div>
-      </a>
-    ) : <p className="mt-2 text-sm text-white/45">{empty}</p>}
-  </div>
-);
 
 export const AdminInstagramPage: React.FC = () => {
   const [profile, setProfile] = useState<InstagramProfile | null | undefined>(undefined);
   const [posts, setPosts] = useState<InstagramPost[] | undefined>(undefined);
   const [loadError, setLoadError] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  const { syncing, feedback, sync } = useInstagramSync();
   const [sort, setSort] = useState<SortKey>('recent');
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [period, setPeriod] = useState<Period>('30d'); // período dos cards "Mais curtidas/visualizações/comentários"
@@ -81,59 +31,21 @@ export const AdminInstagramPage: React.FC = () => {
     return () => stops.forEach((stop) => stop());
   }, []);
 
-  const sync = async () => {
-    setSyncing(true); setFeedback(null);
-    try {
-      const { status, afterFailure } = await syncInstagramNow();
-      setFeedback(
-        status === 'running' ? { ok: false, text: 'Já existe uma sincronização em andamento. Aguarde alguns instantes.' }
-        : status === 'cooldown' ? { ok: false, text: afterFailure ? 'A última tentativa falhou há menos de 1 minuto. Aguarde para tentar de novo.' : 'Sincronizado há menos de 1 minuto. Aguarde para sincronizar de novo.' }
-        : { ok: true, text: 'Sincronização concluída.' },
-      );
-    } catch (e) {
-      setFeedback({ ok: false, text: e instanceof Error ? e.message : 'Falha na sincronização.' });
-    } finally { setSyncing(false); }
-  };
-
   // Só o conjunto da última sincronização entra nos indicadores, rankings e lista; documentos antigos ficam no banco.
   const current = useMemo(() => currentPosts(posts ?? [], profile?.syncedAt), [posts, profile?.syncedAt]);
   const sorted = useMemo(() => sortPosts(current, sort), [current, sort]);
   const totals = useMemo(() => ({ likes: totalFor(current, 'likes'), comments: totalFor(current, 'comments'), views: totalFor(current, 'views') }), [current]);
   const periodPosts = useMemo(() => filterByPeriod(current, period, Date.now()), [current, period]);
-  const tokenDays = profile?.tokenExpiresAt ? Math.floor((Date.parse(profile.tokenExpiresAt) - Date.now()) / 86_400_000) : null;
 
-  const scope = (key: MetricKey) => `Soma de ${totals[key].counted} de ${current.length} publicações da última sincronização (não é o total histórico).`;
   const loading = profile === undefined || posts === undefined;
   const today = dateKey(new Date()); // dia em Brasília, recalculado a cada render
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-white">Instagram{profile?.username ? ` · @${profile.username}` : ''}</h2>
-          <p className="text-xs text-white/50">Última sincronização bem-sucedida: {fmtDateTime(profile?.syncedAt)}{profile?.lastError && ` · Última tentativa (falhou): ${fmtDateTime(profile.lastAttemptAt)}`}</p>
-        </div>
-        <button type="button" onClick={sync} disabled={syncing} className={primaryBtn}>
-          {syncing ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <RefreshCw className="h-4 w-4" aria-hidden />}Sincronizar agora
-        </button>
-      </header>
+      <InstagramHeader profile={profile} syncing={syncing} onSync={sync} />
 
       {feedback && <p role="status" className={`text-xs ${feedback.ok ? 'text-emerald-300' : 'text-red-300'}`}>{feedback.text}</p>}
-      {profile?.lastError && (
-        <p role="alert" className="flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-200">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{profile.lastError.message} Os dados abaixo são da última sincronização bem-sucedida.
-        </p>
-      )}
-      {profile?.warning && !profile.lastError && (
-        <p role="status" className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 text-xs text-amber-200">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{profile.warning.message}
-        </p>
-      )}
-      {tokenDays !== null && tokenDays < 14 && (
-        <p role="status" className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 text-xs text-amber-200">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{tokenDays < 0 ? 'O token do Instagram expirou.' : `O token do Instagram expira em ${tokenDays} dia(s).`} Gere um novo e atualize INSTAGRAM_ACCESS_TOKEN.
-        </p>
-      )}
+      <InstagramAlerts profile={profile} />
 
       {loadError && <p role="alert" className="flex items-center gap-2 text-sm text-red-300"><AlertCircle className="h-4 w-4" aria-hidden />Não foi possível carregar os dados do Instagram.</p>}
       {loading && !loadError && <p className="flex items-center gap-2 text-sm text-white/50"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Carregando…</p>}
@@ -144,63 +56,13 @@ export const AdminInstagramPage: React.FC = () => {
 
       {profile && posts && (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <Kpi label="Seguidores" value={fmt(profile.followers)} delta={<DeltaText daily={profile.daily} metric="followers" today={today} />} />
-            <Kpi label="Publicações" value={fmt(profile.mediaCount)} hint={`${current.length} na última sincronização`} />
-            <Kpi label="Curtidas" value={fmt(totals.likes.counted ? totals.likes.total : null)} delta={<DeltaText daily={profile.daily} metric="likes" today={today} />} hint={scope('likes')} />
-            <Kpi label="Comentários" value={fmt(totals.comments.counted ? totals.comments.total : null)} hint={scope('comments')} />
-            <Kpi label="Visualizações" value={fmt(totals.views.counted ? totals.views.total : null)} delta={<DeltaText daily={profile.daily} metric="views" today={today} />} hint={scope('views')} />
-          </div>
+          <InstagramKpis profile={profile} totals={totals} current={current} today={today} />
 
-          <div>
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-white/50">Destaques entre as publicações feitas no período</p>
-              <div role="group" aria-label="Período dos destaques" className="flex gap-1">
-                {PERIODS.map((option) => (
-                  <button key={option.id} type="button" aria-pressed={period === option.id} onClick={() => setPeriod(option.id)}
-                    className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${period === option.id ? 'border-purple-400/60 bg-purple-500/30 text-white' : 'border-white/10 bg-white/5 text-white/60 hover:bg-white/10'}`}>
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {([['Mais curtidas', 'likes'], ['Mais visualizações', 'views'], ['Mais comentários', 'comments']] as const).map(([title, metric]) => (
-                <Highlight key={metric} title={title} post={topPost(periodPosts, metric)} metric={metric} empty={periodPosts.length ? 'Sem dados disponíveis' : 'Nenhuma publicação no período'} />
-              ))}
-            </div>
-          </div>
+          <InstagramHighlights period={period} onPeriod={setPeriod} periodPosts={periodPosts} />
 
           <InstagramCalendar posts={posts} days={days} daysError={daysError} today={today} />
 
-          <section className={cardClass} aria-label="Publicações">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-white">Publicações</h3>
-              <label className="flex items-center gap-2 text-xs text-white/60">Ordenar por
-                <select value={sort} onChange={(e) => { setSort(e.target.value as SortKey); setVisible(PAGE_SIZE); }} className="rounded-lg border border-white/10 bg-[#070B14] px-2 py-1.5 text-xs text-white">
-                  {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-                </select>
-              </label>
-            </div>
-            {current.length === 0 ? <p className="py-6 text-sm text-white/45">Nenhuma publicação sincronizada.</p> : (
-              <ul className="divide-y divide-white/5">
-                {sorted.slice(0, visible).map((post) => (
-                  <li key={post.id} className="flex gap-3 py-3">
-                    <Thumb post={post} className="h-16 w-16" />
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-sm text-white/85">{post.caption || <span className="text-white/40">Sem legenda</span>}</p>
-                      <p className="mt-1 text-[11px] text-white/45">{KIND_LABEL[post.kind]} · {fmtDateTime(post.publishedAt)}</p>
-                      <p className="mt-1 flex flex-wrap gap-x-4 text-xs tabular-nums text-white/70">
-                        <span>Curtidas: {fmt(post.likes)}</span><span>Comentários: {fmt(post.comments)}</span><span>Visualizações: {fmt(post.views)}{post.viewsStale && post.views != null && <span className="text-amber-300"> (desatualizado)</span>}</span>
-                      </p>
-                    </div>
-                    {post.permalink && <a href={post.permalink} target="_blank" rel="noreferrer" aria-label="Abrir no Instagram" className="self-start text-white/40 hover:text-white"><ExternalLink className="h-4 w-4" /></a>}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {visible < sorted.length && <button type="button" onClick={() => setVisible((v) => v + PAGE_SIZE)} className={`${ghostBtn} mt-3`}>Mostrar mais</button>}
-          </section>
+          <InstagramPostsList current={current} sorted={sorted} sort={sort} visible={visible} onSort={(next) => { setSort(next); setVisible(PAGE_SIZE); }} onMore={() => setVisible((v) => v + PAGE_SIZE)} />
         </>
       )}
     </div>

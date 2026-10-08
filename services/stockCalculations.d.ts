@@ -5,7 +5,7 @@ export interface StockMaterial {
 }
 export interface StockMovement {
   id: string; materialId: string; materialName: string; unit: string; type: MovementType; quantity: number; delta: number;
-  balanceAfter: number; date: any; note: string; orderId?: string; requested?: number; shortfall?: number; createdBy?: string | null; createdAt?: any;
+  balanceAfter: number; date: unknown; note: string; orderId?: string; requested?: number; shortfall?: number; createdBy?: string | null; createdAt?: unknown;
 }
 export interface ConsumptionLine { materialId: string; quantity: number }
 export interface Shortage { materialId: string; name: string; required: number; available: number; missing: number }
@@ -15,7 +15,7 @@ export const MOVEMENT_LABELS: Record<MovementType, string>;
 export class StockError extends Error { code: string; details: Shortage[]; constructor(code: string, message: string, details?: Shortage[]) }
 export function isPresentialService(service: { category?: string } | null | undefined): boolean;
 export function movementSign(type: MovementType): 1 | -1;
-export function validateMaterialInput(input: Record<string, any>): string[];
+export function validateMaterialInput(input: Record<string, unknown>): string[];
 export function isLowStock(material: { active?: boolean; balance: number; minLevel: number }): boolean;
 export function consumptionMovementId(orderId: string, cycle: number, materialId: string): string;
 export function reversalMovementId(orderId: string, cycle: number, materialId: string): string;

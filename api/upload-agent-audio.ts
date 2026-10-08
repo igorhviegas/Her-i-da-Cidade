@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import { put } from '@vercel/blob';
 import { getVercelOidcToken } from '@vercel/oidc';
 import crypto from 'crypto';
@@ -66,7 +67,7 @@ export function handleAgentAudioUpload(req: Request, res: Response): void {
         const blob = await put(`agente/audio/${crypto.randomUUID()}.${audio.ext}`, file.buffer, await getUploadOptions(audio.mime));
         if (!res.headersSent) res.status(201).json({ success: true, url: blob.url });
       } catch (error) {
-        console.error('[upload-agent-audio] Falha no Vercel Blob:', error);
+        logger.error('[upload-agent-audio] Falha no Vercel Blob:', error);
         if (!res.headersSent) jsonError(res, 500, 'Não foi possível enviar o áudio. Tente novamente.');
       }
     });

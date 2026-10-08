@@ -1,7 +1,6 @@
 // Regras do Fit (users/{uid}/fitDaily). Exige Java 21+ e firebase-tools (emulador local; não toca em produção).
 // Execução: firebase emulators:exec --only firestore --project demo-heroi-da-cidade "node --test tests/firestore-rules-fit.test.js"
 import test, { after, before } from 'node:test';
-import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { deleteDoc, doc, getDoc, getDocs, collection, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
@@ -63,7 +62,7 @@ test('fitRides: o dono cria um resumo válido, lê e apaga; ninguém edita', asy
   await assertFails(updateDoc(rideRef(db, 'owner'), { distanceKm: 99 }));
   await assertFails(setDoc(rideRef(db, 'owner'), ride({ distanceKm: 99 }))); // sobrescrever = update
   await assertSucceeds(deleteDoc(rideRef(db, 'owner')));
-  const { avgCadenceRpm, ...withoutCadence } = ride(); // cadência é opcional
+  const { avgCadenceRpm: _avgCadenceRpm, ...withoutCadence } = ride(); // cadência é opcional
   await assertSucceeds(setDoc(rideRef(db, 'owner'), withoutCadence));
   await assertSucceeds(deleteDoc(rideRef(db, 'owner')));
 });

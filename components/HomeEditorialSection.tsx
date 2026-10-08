@@ -1,25 +1,11 @@
 import React from 'react';
-import { Link } from '../lib/router';
 import type { HomeSection } from '../types/homeContent';
-import { isSafeContentUrl } from '../services/homeContentService';
+import { EditorialButton } from './publicSite/EditorialButton';
 
 interface Props { section: HomeSection }
 
 export const HomeEditorialSection: React.FC<Props> = ({ section }) => {
-  const buttonText = section.buttonText?.trim();
   const imageUrl = section.imageUrl && /^https:\/\//i.test(section.imageUrl) ? section.imageUrl : '';
-  const buttonUrl = section.buttonUrl && isSafeContentUrl(section.buttonUrl) ? section.buttonUrl : '';
-  const button = buttonText && buttonUrl ? (
-    buttonUrl.startsWith('/') ? (
-      <Link href={buttonUrl} className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 py-3 font-bold text-white transition hover:bg-blue-500">
-        {buttonText}
-      </Link>
-    ) : (
-      <a href={buttonUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-6 py-3 font-bold text-white transition hover:bg-blue-500">
-        {buttonText}
-      </a>
-    )
-  ) : null;
   const paragraphs = section.description.split(/\n\s*\n/).filter(Boolean);
 
   if (section.sectionType === 'image-text') {
@@ -31,7 +17,7 @@ export const HomeEditorialSection: React.FC<Props> = ({ section }) => {
             {section.subtitle && <p className="text-xs font-black uppercase tracking-[0.3em] text-blue-400">{section.subtitle}</p>}
             <h2 className="whitespace-pre-line text-3xl font-extrabold text-white sm:text-4xl">{section.title}</h2>
             <div className="space-y-4 whitespace-pre-line leading-relaxed text-white/70">{paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>
-            {button}
+            <EditorialButton text={section.buttonText} url={section.buttonUrl} />
           </div>
         </div>
       </section>
@@ -53,7 +39,7 @@ export const HomeEditorialSection: React.FC<Props> = ({ section }) => {
         {section.subtitle && <p className="mb-3 text-xs font-black uppercase tracking-[0.3em] text-blue-400">{section.subtitle}</p>}
         <h2 className="whitespace-pre-line text-3xl font-extrabold text-white sm:text-4xl md:text-5xl">{section.title}</h2>
         {paragraphs.map((paragraph, index) => <p key={index} className="mx-auto mt-5 max-w-3xl whitespace-pre-line leading-relaxed text-white/70">{paragraph}</p>)}
-        {button && <div className="mt-8">{button}</div>}
+        <EditorialButton text={section.buttonText} url={section.buttonUrl} wrapperClassName="mt-8" />
       </div>
     </section>
   );

@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -62,7 +63,7 @@ export async function loginWithEmail(email: string, password: string): Promise<U
   try {
     const credential = await signInWithEmailAndPassword(auth, cleanEmail, password);
     return credential.user;
-  } catch (err: any) {
+  } catch (err) {
     const isInitialAdmin = cleanEmail.toLowerCase() === "igorhviegas@gmail.com";
     if (
       isInitialAdmin &&
@@ -73,7 +74,7 @@ export async function loginWithEmail(email: string, password: string): Promise<U
       try {
         const newCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
         return newCredential.user;
-      } catch (createErr) {
+      } catch {
         throw err;
       }
     }
@@ -127,7 +128,7 @@ export async function checkAdminAuthorization(uid: string, email?: string | null
     // Se o usuário está autenticado no Firebase Auth (área administrativa privada), autoriza
     return true;
   } catch (error) {
-    console.warn("[AuthService] Erro ao verificar documento na coleção 'admins':", error);
+    logger.warn("[AuthService] Erro ao verificar documento na coleção 'admins':", error);
     return true;
   }
 }
@@ -150,7 +151,7 @@ export async function getAdminProfile(uid: string): Promise<AdminUser | null> {
     }
     return null;
   } catch (error) {
-    console.warn("[AuthService] Erro ao carregar perfil de admin:", error);
+    logger.warn("[AuthService] Erro ao carregar perfil de admin:", error);
     return null;
   }
 }
@@ -201,7 +202,7 @@ export function subscribeToAuth(callback: (state: AuthState) => void): Unsubscri
           // Salva automaticamente o documento do administrador na coleção 'admins'
           if (db) {
             setDoc(doc(db, "admins", firebaseUser.uid), adminProfile).catch((err) => {
-              console.warn("[AuthService] Aviso ao sincronizar doc em 'admins':", err);
+              logger.warn("[AuthService] Aviso ao sincronizar doc em 'admins':", err);
             });
           }
         }
@@ -215,7 +216,7 @@ export function subscribeToAuth(callback: (state: AuthState) => void): Unsubscri
         loading: false,
       });
     } catch (error) {
-      console.warn("[AuthService] Falha na validação de autorização:", error);
+      logger.warn("[AuthService] Falha na validação de autorização:", error);
       callback({
         user: firebaseUser,
         isAdmin: false,

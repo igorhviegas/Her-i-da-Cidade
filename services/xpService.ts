@@ -1,4 +1,4 @@
-import { collection, doc, getCountFromServer, getDoc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { collection, doc, getCountFromServer, getDoc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where, type DocumentSnapshot, type QuerySnapshot, type Unsubscribe } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { BASELINE_PATH, buildBaseline } from '../functions/xp.js';
 import { ACTIVITY_LOG_COLLECTION } from './activityLog';
@@ -12,7 +12,19 @@ function firestore() {
 }
 
 const rows = async (name: string, ...constraints: ReturnType<typeof where>[]) =>
-  (await getDocs(query(collection(firestore(), name), ...constraints))).docs.map((d) => ({ ...d.data(), id: d.id }) as Record<string, any>);
+  (await getDocs(query(collection(firestore(), name), ...constraints))).docs.map((d) => ({ ...d.data(), id: d.id }) as Record<string, unknown>);
+
+/** Escuta a linha de base do XP; sem Firestore inicializado não há o que escutar (retorna undefined). */
+export function subscribeToXpBaseline(next: (snapshot: DocumentSnapshot) => void, onError: (error: Error) => void): Unsubscribe | undefined {
+  if (!db) return;
+  return onSnapshot(doc(db, ...BASELINE_PATH), next, onError);
+}
+
+/** Escuta o histórico de atividades (base do XP e das janelinhas de ganho). */
+export function subscribeToActivityLog(next: (snapshot: QuerySnapshot) => void, onError: (error: Error) => void): Unsubscribe | undefined {
+  if (!db) return;
+  return onSnapshot(collection(db, ACTIVITY_LOG_COLLECTION), next, onError);
+}
 
 /** XP retroativo calculado com os dados que existem agora (somente leitura; não grava nada). */
 export async function previewBaseline() {

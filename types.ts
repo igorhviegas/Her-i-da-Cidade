@@ -18,8 +18,8 @@ export interface Service {
   badgeText?: string;
   active?: boolean;
   order?: number;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: unknown;
+  updatedAt?: unknown;
   generateOrder?: boolean;
   productionType?: ProductionType;
   initialStatus?: OrderStatus;
@@ -42,11 +42,11 @@ export interface Client {
   name: string;
   whatsapp: string;
   whatsappNormalized: string;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: unknown;
+  updatedAt?: unknown;
 }
 
-export interface FirestoreClient extends Client {}
+export type FirestoreClient = Client;
 
 /** Snapshot operacional e financeiro do pedido; preços são os praticados na venda. */
 export interface Order {
@@ -59,18 +59,18 @@ export interface Order {
   clientId: string;
   serviceId: string;
   status: OrderStatus;
-  createdAt?: any;
-  paidAt?: any;
-  eventDate?: any;
+  createdAt?: unknown;
+  paidAt?: unknown;
+  eventDate?: unknown;
   content: string;
   deliveryDays?: number;
-  customerDueDate?: any;
-  internalDueDate?: any;
+  customerDueDate?: unknown;
+  internalDueDate?: unknown;
   servicePrice: number;
   rushFee: number;
   totalPaid: number;
   productionType: ProductionType;
-  completedAt?: any;
+  completedAt?: unknown;
   source: OrderSource;
   scriptId?: string;
   /** Legado: impressão digital de PDF importado (importação removida; mantido para não perder dados de pedidos antigos). */
@@ -88,7 +88,7 @@ export interface Order {
   /** Presente em pedidos de evento com livro de lançamentos (collection financeEntries). Valores já lançados (congelados). */
   eventLedger?: { entry: number; final?: number; cost?: number; /** soma dos ajustes de receita */ adj?: number; /** soma dos ajustes de despesa */ adjCost?: number; /** nº do último ajuste */ seq?: number };
   /** Vínculo com o Google Agenda, gravado pelo servidor (/api/google-calendar). */
-  googleCalendar?: { eventId: string; calendarId: string; htmlLink?: string; syncedAt?: any };
+  googleCalendar?: { eventId: string; calendarId: string; htmlLink?: string; syncedAt?: unknown };
   /** Custo de edição (R$) gravado na primeira conclusão de Vídeo Personalizado; entra nas despesas do Financeiro. */
   editingCost?: number;
 }
@@ -107,7 +107,7 @@ export interface EventForm {
   formType: string;
 }
 
-export interface FirestoreOrder extends Order {}
+export type FirestoreOrder = Order;
 
 export type ScriptProductionStatus = 'draft' | 'ready' | 'in_production' | 'produced';
 export type ScriptPublicationStatus = 'unpublished' | 'published';
@@ -120,11 +120,11 @@ export interface ContentScript {
   category: string;
   productionStatus: ScriptProductionStatus;
   publicationStatus: ScriptPublicationStatus;
-  createdAt?: any;
-  updatedAt?: any;
-  publishedAt?: any;
+  createdAt?: unknown;
+  updatedAt?: unknown;
+  publishedAt?: unknown;
   /** Primeira vez que o roteiro ficou Pronto para gravar; definido uma só vez. */
-  readyAt?: any;
+  readyAt?: unknown;
   notes: string;
   /** Pedido de produção associado a este roteiro, quando enviado. */
   orderId?: string;
@@ -149,8 +149,8 @@ export interface FirestoreService {
   badgeText?: string;
   active: boolean;
   order: number;
-  createdAt?: any;
-  updatedAt?: any;
+  createdAt?: unknown;
+  updatedAt?: unknown;
   generateOrder?: boolean;
   productionType?: ProductionType;
   initialStatus?: OrderStatus;
@@ -246,45 +246,6 @@ export interface Review {
  */
 export interface PublicSiteConfig {
   whatsappUrl: string;
-  updatedAt?: any;
-  [key: string]: any;
-}
-
-/**
- * Adaptador para converter documento do Firestore no formato legado consumido pelo frontend.
- */
-export function adaptFirestoreServiceToLegacy(doc: FirestoreService): Service {
-  return {
-    id: doc.id,
-    title: doc.name,
-    price: doc.price,
-    description: doc.shortDescription || doc.description,
-    imageUrl: doc.image,
-    category: doc.category || 'Geral',
-    badgeText: doc.badgeText
-  };
-}
-
-/**
- * Adaptador para converter serviço legado do constants.tsx para o formato estruturado do Firestore.
- */
-export function adaptLegacyServiceToFirestore(legacy: Service, index: number): Omit<FirestoreService, 'id' | 'createdAt' | 'updatedAt'> {
-  const slug = legacy.title
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-  return {
-    name: legacy.title,
-    slug,
-    shortDescription: legacy.description,
-    description: legacy.description,
-    price: legacy.price,
-    image: legacy.imageUrl,
-    category: legacy.category,
-    active: true,
-    order: index + 1
-  };
+  updatedAt?: unknown;
+  [key: string]: unknown;
 }

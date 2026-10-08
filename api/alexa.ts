@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import { X509Certificate, createVerify } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { handleAlexaEnvelope, parseAllowedUsers } from '../functions/missions-alexa.js';
@@ -92,7 +93,7 @@ export async function handleAlexa(req: Request | any, res: Response | any, deps:
 
   const config = deps.config ?? { skillId: process.env.ALEXA_SKILL_ID, allowedUserIds: parseAllowedUsers(process.env.ALEXA_ALLOWED_USER_IDS) };
   if (!config.skillId) {
-    console.error('[Alexa] ALEXA_SKILL_ID não configurado nas variáveis de ambiente.');
+    logger.error('[Alexa] ALEXA_SKILL_ID não configurado nas variáveis de ambiente.');
     return send(500, { ok: false, error: { code: 'server_misconfigured', message: 'Serviço indisponível: configuração pendente.' } });
   }
 
@@ -118,7 +119,7 @@ export async function handleAlexa(req: Request | any, res: Response | any, deps:
     const database = deps.database ?? (await import('./manychat.js')).getAdminFirestore();
     return send(200, await handleAlexaEnvelope(envelope, { database, config, now: deps.now, logger: console }));
   } catch (error) {
-    console.error('[Alexa] Falha ao processar requisição:', error instanceof Error ? error.message : String(error));
+    logger.error('[Alexa] Falha ao processar requisição:', error instanceof Error ? error.message : String(error));
     return send(200, { version: '1.0', response: { outputSpeech: { type: 'PlainText', text: 'Não consegui criar a missão agora. Tente novamente em instantes.' }, shouldEndSession: true } });
   }
 }

@@ -120,7 +120,7 @@ export const FinanceAssets: React.FC<{ assets: Asset[]; onChanged: () => Promise
                   <ul className="mt-3 space-y-1 rounded-xl bg-black/20 p-3 text-xs text-white/60">
                     <li>Aquisição: {acquired ? formatDate(acquired) : '—'} · {formatMoney(asset.acquisitionValue)}</li>
                     {(asset.valueHistory ?? []).map((h, i) => <li key={i}>Valor estimado em {formatDate(new Date(h.at))}: {formatMoney(h.value)}</li>)}
-                    {asset.status !== 'active' && toDate(asset.statusChangedAt) && <li>{STATUS_LABELS[asset.status]} em {formatDate(toDate(asset.statusChangedAt)!)}</li>}
+                    {asset.status !== 'active' && toDate(asset.statusChangedAt) && <li>{STATUS_LABELS[asset.status]} em {formatDate(toDate(asset.statusChangedAt))}</li>}
                   </ul>
                 )}
               </div>

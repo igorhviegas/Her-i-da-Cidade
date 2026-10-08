@@ -72,7 +72,7 @@ export const FinanceManychat: React.FC<{ entries: RevenueEntry[]; monthKey: stri
     if (!file) return;
     setBusy(true); setError(null); setNotice(null);
     Papa.parse<Record<string, string>>(file, {
-      header: true, skipEmptyLines: true, transformHeader: (h) => h.replace(/^﻿/, '').trim(),
+      header: true, skipEmptyLines: true, transformHeader: (h) => h.replace(/^\uFEFF/, '').trim(),
       complete: async (result) => {
         try {
           const parsed = parseWalletRows(result.data);

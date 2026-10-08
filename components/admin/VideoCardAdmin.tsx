@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Video } from '../../types';
-import { Pencil, Trash2, Eye, EyeOff, ChevronUp, ChevronDown, Star } from 'lucide-react';
+import { ActiveToggle, FeaturedToggle, OrderControl, EditDeleteButtons } from './videoAdmin/VideoControls';
+import { VideoCardThumb, VideoCardInfo } from './videoAdmin/VideoCardParts';
 
 interface VideoCardAdminProps {
   video: Video;
@@ -19,17 +20,8 @@ export const VideoCardAdmin: React.FC<VideoCardAdminProps> = ({
   onToggleFeatured,
   onOrderChange,
 }) => {
-  const [imageError, setImageError] = useState(false);
-  const imageUrl = !imageError ? (video.thumbnailUrl || video.thumbnail) : null;
   const isActive = video.active !== false;
   const isFeatured = video.featured === true;
-
-  const handleOrderInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseInt(e.target.value, 10);
-    if (!isNaN(val) && val > 0) {
-      onOrderChange(val);
-    }
-  };
 
   return (
     <div
@@ -41,144 +33,22 @@ export const VideoCardAdmin: React.FC<VideoCardAdminProps> = ({
     >
       {/* Header with thumbnail and title */}
       <div className="flex items-start gap-4 mb-3">
-        <div className="w-20 h-20 rounded-xl overflow-hidden bg-black/40 border border-white/10 flex-shrink-0 flex items-center justify-center relative">
-          {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={video.title}
-              onError={() => setImageError(true)}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-white/30">
-              <Eye className="w-6 h-6" />
-            </div>
-          )}
-          {video.badgeText && (
-            <div className="absolute top-1 left-1 bg-gradient-to-r from-red-600 to-amber-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow z-10 uppercase tracking-wider">
-              {video.badgeText}
-            </div>
-          )}
-          {isFeatured && (
-            <div className="absolute top-1 right-1 bg-amber-500 text-black p-0.5 rounded-full shadow" title="Vídeo em destaque">
-              <Star className="w-3 h-3 fill-black text-black" />
-            </div>
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className="text-lg font-bold text-white truncate">{video.title}</h3>
-            {video.needsReview && <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-300 border border-sky-500/40 rounded font-black tracking-wide text-[9px] uppercase flex-shrink-0">Importado - revisar</span>}
-          </div>
-          <p className="text-sm text-white/60 line-clamp-2">{video.description}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-            {video.badgeText && (
-              <span className="px-2 py-0.5 bg-gradient-to-r from-red-600 to-amber-600 text-white rounded font-black tracking-wider text-[10px] shadow-sm uppercase">
-                Selo: {video.badgeText}
-              </span>
-            )}
-            {isFeatured && (
-              <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded font-black tracking-wide text-[10px] flex items-center gap-1 shadow-sm">
-                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                ★ EM DESTAQUE
-              </span>
-            )}
-            <span className="px-2 py-0.5 bg-white/5 text-white/70 rounded">
-              {(video.categories?.length ? video.categories : video.category ? [video.category] : []).join(' • ')}
-            </span>
-            <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-300 rounded">Ordem: {video.order ?? 0}</span>
-          </div>
-        </div>
+        <VideoCardThumb video={video} isFeatured={isFeatured} />
+        <VideoCardInfo video={video} isFeatured={isFeatured} />
       </div>
 
       {/* Controls */}
       <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/10 gap-2 flex-wrap">
         {/* Toggles (Active + Featured Star) */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Active toggle */}
-          <button
-            type="button"
-            onClick={onToggleActive}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all border cursor-pointer ${
-              isActive
-                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
-                : 'bg-white/5 border-white/15 text-white/40 hover:bg-white/10'
-            }`}
-            title={isActive ? 'Desativar vídeo' : 'Ativar vídeo'}
-            aria-label={isActive ? 'Desativar vídeo' : 'Ativar vídeo'}
-          >
-            <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-white/40'}`} />
-            <span>{isActive ? 'Ativo' : 'Inativo'}</span>
-          </button>
-
-          {/* Featured toggle - APENAS ÍCONE DE ESTRELA */}
-          <button
-            type="button"
-            onClick={onToggleFeatured}
-            disabled={!isActive && !isFeatured}
-            className={`w-8 h-8 flex items-center justify-center rounded-xl text-xs font-semibold transition-all border cursor-pointer ${
-              isFeatured
-                ? 'bg-amber-500/20 border-amber-500/60 text-amber-400 hover:bg-amber-500/30 shadow-sm shadow-amber-500/20'
-                : 'bg-white/5 border-white/10 text-white/40 hover:text-amber-400 hover:border-amber-400/40 hover:bg-white/10'
-            } ${!isActive && !isFeatured ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''}`}
-            title={isFeatured ? 'Remover destaque' : 'Definir como destaque'}
-            aria-label={isFeatured ? 'Remover destaque' : 'Definir como destaque'}
-          >
-            <Star className={`w-4 h-4 ${isFeatured ? 'fill-amber-400 text-amber-400' : 'text-current'}`} />
-          </button>
+          <ActiveToggle isActive={isActive} onToggleActive={onToggleActive} />
+          <FeaturedToggle isActive={isActive} isFeatured={isFeatured} onToggleFeatured={onToggleFeatured} />
         </div>
 
         {/* Order input + Actions */}
         <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap ml-auto">
-          {/* Order input */}
-          <div className="flex items-center gap-1 bg-[#070B14] border border-white/10 px-2 py-1 rounded-xl">
-            <span className="text-[11px] text-white/40 font-medium">Ordem:</span>
-            <input
-              type="number"
-              min={1}
-              defaultValue={video.order ?? 0}
-              onBlur={handleOrderInput}
-              className="w-8 text-xs text-center bg-transparent border-none text-white focus:outline-none"
-            />
-            <div className="flex flex-col">
-              <button
-                type="button"
-                onClick={() => onOrderChange((video.order ?? 0) + 1)}
-                className="p-0.5 text-white/50 hover:text-white transition-colors"
-                title="Aumentar ordem"
-              >
-                <ChevronUp className="w-3 h-3" />
-              </button>
-              <button
-                type="button"
-                onClick={() => onOrderChange(Math.max(1, (video.order ?? 0) - 1))}
-                className="p-0.5 text-white/50 hover:text-white transition-colors"
-                title="Diminuir ordem"
-              >
-                <ChevronDown className="w-3 h-3" />
-              </button>
-            </div>
-          </div>
-
-          {/* Action buttons */}
-          <button
-            type="button"
-            onClick={onEdit}
-            className="w-8 h-8 flex items-center justify-center text-white/70 hover:text-white bg-white/5 hover:bg-blue-600 rounded-xl transition-colors border border-white/10 cursor-pointer flex-shrink-0"
-            title="Editar vídeo"
-            aria-label="Editar vídeo"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onDelete}
-            className="w-8 h-8 flex items-center justify-center text-red-400 hover:text-white bg-red-500/10 hover:bg-red-600 rounded-xl transition-colors border border-red-500/20 cursor-pointer flex-shrink-0"
-            title="Excluir vídeo"
-            aria-label="Excluir vídeo"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
+          <OrderControl video={video} onOrderChange={onOrderChange} />
+          <EditDeleteButtons onEdit={onEdit} onDelete={onDelete} />
         </div>
       </div>
     </div>

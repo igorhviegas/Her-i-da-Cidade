@@ -13,7 +13,7 @@ import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const PREFIX = 'Olá, gostaria de saber mais sobre os serviços do Herói da Cidade! Tenho interesse no ';
-let env, db, tmp, svc, cfg;
+let env, db, tmp, svc;
 
 before(async () => {
   const rules = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8');
@@ -43,7 +43,7 @@ before(async () => {
   await writeFile(inRepo, await readFile(out, 'utf8'));
   tmp = { dir: tmp, inRepo };
   const mod = await import(pathToFileURL(inRepo).href);
-  svc = mod; cfg = mod;
+  svc = mod;
 });
 
 after(async () => {

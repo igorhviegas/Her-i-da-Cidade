@@ -7,6 +7,7 @@ import { dayKey } from '../../services/fitDaily.js';
 import { DailyBars } from './FitCharts';
 import { cardClass, ghostBtn, primaryBtn } from './financeFormat';
 import { ClaimButton, type useFitClaims } from './FitXp';
+import { RideImportBanners } from './adminPages/RideImportBanners';
 
 const number = (n: number, decimals = 0) => n.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 const when = (d: Date) => d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -46,10 +47,6 @@ export const FitRides: React.FC<{ uid: string; dates: string[]; claims: ReturnTy
   const summary = useMemo(() => summarizeRides(inRange), [inRange]);
   const km = useMemo(() => kmByDay(dates, inRange, dayKey), [dates, inRange]);
 
-  const imported = results.filter((r) => r.status === 'imported').length;
-  const duplicates = results.filter((r) => r.status === 'duplicate').length;
-  const failures = results.filter((r) => r.status === 'error');
-
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -65,16 +62,7 @@ export const FitRides: React.FC<{ uid: string; dates: string[]; claims: ReturnTy
         </div>
       </div>
 
-      {(imported > 0 || duplicates > 0) && (
-        <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-200">
-          {imported > 0 && `${imported} ${imported === 1 ? 'treino importado' : 'treinos importados'}.`}{imported > 0 && duplicates > 0 && ' '}{duplicates > 0 && `${duplicates} já ${duplicates === 1 ? 'estava importado' : 'estavam importados'}.`}
-        </p>
-      )}
-      {failures.length > 0 && (
-        <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
-          {failures.map((f) => <p key={f.name}><span className="font-semibold">{f.name}:</span> {f.message}</p>)}
-        </div>
-      )}
+      <RideImportBanners results={results} />
       {error && (
         <div role="alert" className="flex items-start gap-3 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><p>{error}</p>

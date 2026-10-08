@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, GripVertical, RotateCcw, type LucideIcon } from 'lucide-react';
 import { moveNavItem, resolveNavOrder, shiftNavItem } from '../../services/adminNav.js';
+import { NavButton } from './adminPages/NavButton';
 
 /** `children` (só em itens fixos): subpáginas listadas abaixo do item enquanto ele ou uma delas estiver aberto. */
 export interface NavItem<Id extends string = string> { id: Id; label: string; icon: LucideIcon; children?: NavItem<Id>[] }
@@ -78,40 +79,9 @@ export function AdminNav<Id extends string>({ pinned, items, groups, order, onRe
     requestAnimationFrame(() => document.getElementById(focusId)?.focus());
   };
 
-  const renderButton = (item: NavItem<Id>, extra?: Partial<React.ButtonHTMLAttributes<HTMLButtonElement>>) => {
-    const Icon = item.icon;
-    const active = current === item.id;
-    const badge = badges[item.id];
-    const showCount = !!badge && (badge.failed || (badge.count !== null && badge.count > 0));
-    const label = badge ? (badge.failed ? badge.failedLabel : badge.label(badge.count ?? 0)) : '';
-    return (
-      <button
-        type="button"
-        onClick={() => onSelect(item.id)}
-        aria-current={active ? 'page' : undefined}
-        className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all ${
-          active ? `bg-blue-600 text-white${variant === 'desktop' ? ' shadow-lg shadow-blue-600/20' : ''}` : 'text-white/70 hover:bg-white/5 hover:text-white'
-        }`}
-        {...extra}
-      >
-        <span className="flex min-w-0 items-center gap-3">
-          <Icon className={`w-4 h-4 shrink-0 ${active || variant === 'mobile' ? 'text-white' : 'text-white/50'}`} />
-          <span className="truncate">{item.label}</span>
-        </span>
-        {showCount && (
-          <span
-            className={`flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none tabular-nums ${
-              badge!.failed ? 'bg-white/15 text-white/70' : 'bg-amber-400 text-[#0B1120]'
-            }`}
-            aria-label={label}
-            title={label}
-          >
-            {badge!.failed ? '!' : badge!.count! > 99 ? '99+' : badge!.count}
-          </span>
-        )}
-      </button>
-    );
-  };
+  const renderButton = (item: NavItem<Id>, extra?: Partial<React.ButtonHTMLAttributes<HTMLButtonElement>>) => (
+    <NavButton item={item} active={current === item.id} badge={badges[item.id]} variant={variant} onSelect={onSelect} extra={extra} />
+  );
 
   return (
     <>
@@ -122,7 +92,7 @@ export function AdminNav<Id extends string>({ pinned, items, groups, order, onRe
           return (
             <li key={item.id}>
               {renderButton(item)}
-              {open && <ul className="mt-1 ml-5 space-y-1 border-l border-white/10 pl-2">{item.children!.map((child) => <li key={child.id}>{renderButton(child)}</li>)}</ul>}
+              {open && <ul className="mt-1 ml-5 space-y-1 border-l border-white/10 pl-2">{item.children.map((child) => <li key={child.id}>{renderButton(child)}</li>)}</ul>}
             </li>
           );
         })}

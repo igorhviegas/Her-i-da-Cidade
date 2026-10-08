@@ -38,7 +38,6 @@ export class GoogleCalendarError extends Error {
 // ---------- conteúdo do evento (puro) ----------
 
 const toJsDate = (value) => (value instanceof Date ? value : typeof value?.toDate === 'function' ? value.toDate() : value ? new Date(value) : null);
-const brl = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value) || 0);
 
 /** Data do evento ('YYYY-MM-DD') no fuso de Brasília. O pedido guarda a data ao meio-dia, então qualquer fuso do navegador cai no mesmo dia. */
 export function eventDateKey(value) {
@@ -46,8 +45,6 @@ export function eventDateKey(value) {
   if (!date || Number.isNaN(date.getTime())) return null;
   return new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
-
-const brDate = (key) => key.split('-').reverse().join('/');
 
 /** Início + duração como horário local de parede (sem conversão de fuso: o Google aplica `timeZone`). */
 export function eventTimes(dateKey, time, minutes = EVENT_DURATION_MINUTES) {

@@ -5,14 +5,14 @@ export interface OrderNumberAllocation {
   orderNumberDisplay: string;
 }
 export interface OrderNumberTransaction {
-  get(reference: any): Promise<any>;
-  set(reference: any, value: any): any;
+  get(reference: unknown): Promise<unknown>;
+  set(reference: unknown, value: unknown): unknown;
 }
 export function nextOrderNumber(lastIssued: number): OrderNumberAllocation;
 export function formatOrderNumber(orderNumber: number): string;
 export function allocateOrderNumber(
   transaction: OrderNumberTransaction,
-  counterRef: any,
-  updatedAt: any,
+  counterRef: unknown,
+  updatedAt: unknown,
   orderId: string,
 ): Promise<OrderNumberAllocation>;

@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import {
   handleManyChatWebhook,
   parseServiceAccountCredentials,
-  resetAdminFirestore,
 } from '../api/manychat.ts';
 import { handleManyChatOrderRequest } from '../functions/manychat-handler.js';
 

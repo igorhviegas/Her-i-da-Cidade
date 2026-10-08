@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import { timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { getAdminFirestore } from '../functions/firebase-admin.js';
@@ -28,7 +29,7 @@ export async function handleFitIngest(
   const token = deps.token ?? process.env.FIT_INGEST_TOKEN;
   const ownerUid = deps.ownerUid ?? process.env.FIT_OWNER_UID;
   if (!token || !ownerUid || !OWNER_UID.test(ownerUid)) {
-    console.error('[Fit Ingest] FIT_INGEST_TOKEN ou FIT_OWNER_UID ausente/inválido nas variáveis de ambiente.');
+    logger.error('[Fit Ingest] FIT_INGEST_TOKEN ou FIT_OWNER_UID ausente/inválido nas variáveis de ambiente.');
     return send(500, { ok: false, error: { code: 'server_misconfigured', message: 'Serviço indisponível: configuração pendente.' } });
   }
 
@@ -54,7 +55,7 @@ export async function handleFitIngest(
     // Só contagens na resposta e nos logs: nunca o conteúdo (dado de saúde).
     return send(200, { ok: true, days, ...parsed.stats});
   } catch (error) {
-    console.error('[Fit Ingest] Falha ao gravar:', error instanceof Error ? error.message : String(error));
+    logger.error('[Fit Ingest] Falha ao gravar:', error instanceof Error ? error.message : String(error));
     return send(500, { ok: false, error: { code: 'internal_error', message: 'Não foi possível gravar; consulte os logs.' } });
   }
 }

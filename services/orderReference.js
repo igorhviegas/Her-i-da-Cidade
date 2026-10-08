@@ -36,7 +36,7 @@ export function extractBirthdayPerson(order) {
   const content = typeof order.content === 'string' ? order.content.trim() : '';
   if (!content) return null;
 
-  const match = content.match(/(?:nome\s+do\s+aniversariante|aniversariante)\s*[:\-]\s*([^\r\n]+)/i);
+  const match = content.match(/(?:nome\s+do\s+aniversariante|aniversariante)\s*[:-]\s*([^\r\n]+)/i);
   if (match && match[1]) {
     const rawName = match[1].trim();
     const cleaned = rawName.replace(/[.,;]+$/, '').trim();

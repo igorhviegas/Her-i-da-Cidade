@@ -271,7 +271,7 @@ export const PlansTab: React.FC<{ uid: string; workouts: Workout[]; exercises: E
                 <li key={w.id} className={`${cardClass} flex flex-wrap items-center justify-between gap-3 !p-4`}>
                   <div className="min-w-0">
                     <p className="font-bold text-white">{w.name}</p>
-                    <p className="truncate text-xs text-white/50">{valid.length} exercícios{valid.length ? `: ${valid.map((id) => exercisesById.get(id)!.name).join(', ')}` : ''}</p>
+                    <p className="truncate text-xs text-white/50">{valid.length} exercícios{valid.length ? `: ${valid.map((id) => exercisesById.get(id).name).join(', ')}` : ''}</p>
                   </div>
                   <div className="flex gap-2">
                     <button type="button" className={ghostBtn} onClick={() => open(w)} aria-label={`Editar ${w.name}`}><Pencil className="h-3.5 w-3.5" /> Editar</button>
@@ -294,7 +294,7 @@ export const PlansTab: React.FC<{ uid: string; workouts: Workout[]; exercises: E
             {ids.length === 0 ? <p className="mt-1.5 text-sm text-white/50">Nenhum exercício ainda.</p> : (
               <ol className="mt-1.5 space-y-1.5">
                 {ids.map((id, index) => {
-                  const ex = exercisesById.get(id)!;
+                  const ex = exercisesById.get(id);
                   return (
                     <li key={id} className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#070B14] px-3 py-2 text-sm text-white/90">
                       <span className="w-5 text-xs tabular-nums text-white/40">{index + 1}.</span>

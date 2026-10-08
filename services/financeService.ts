@@ -43,7 +43,7 @@ export function subscribeCompletedOrders(onData: (orders: Order[]) => void, onEr
     const emit = () => {
       if (!completed || !ledger) return;
       lastOrders = [...completed, ...ledger];
-      listeners.forEach((l) => l.onData(lastOrders!));
+      listeners.forEach((l) => l.onData(lastOrders));
     };
     const fail = (error: Error) => {
       // O Firestore encerra a escuta após um erro: limpa o estado para que a próxima assinatura crie uma nova (sem dados velhos nem escuta morta).

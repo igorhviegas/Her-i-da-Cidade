@@ -77,7 +77,7 @@ export function normalizeVideoCallConfig(raw) {
   };
 }
 
-export const formatPrice = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value).replace(/ /g, ' ');
+export const formatPrice = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value).replace(/\u00a0/g, ' ');
 
 /** Troca {valor} {duracao} {prazo} (e {data} {horario}, quando informados) no texto. Variável desconhecida fica como está. */
 export function fillText(template, config, slot = {}) {

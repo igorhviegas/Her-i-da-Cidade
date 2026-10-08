@@ -24,7 +24,7 @@ async function call<T>(code: string, payload: unknown, failure: string): Promise
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
-  } catch (error: any) {
+  } catch (error) {
     throw new TravelRequestError(error?.name === 'AbortError' ? 'A consulta demorou demais. Tente novamente.' : 'Sem conexão com o servidor. Tente novamente.');
   } finally {
     clearTimeout(timeoutId);

@@ -7,6 +7,7 @@ import { dayKey } from '../../services/fitDaily.js';
 import { checkinXp } from '../../functions/xp.js';
 import { DailyBars } from './FitCharts';
 import { ClaimButton, useFitClaims } from './FitXp';
+import { CheckinStatCards } from './adminPages/CheckinStatCards';
 import { cardClass, ghostBtn, inputClass, labelClass, primaryBtn } from './financeFormat';
 
 const number = (n: number, decimals = 0) => n.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
@@ -76,20 +77,7 @@ export const AdminFitCheckinsPage: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          ['Esta semana', String(stats.week), 'treinos (seg a dom)'],
-          ['Neste mês', String(stats.month.length), 'treinos'],
-          ['Academia no mês', String(stats.month.filter((c) => c.kind === 'gym').length), 'check-ins'],
-          ['Funcional no mês', String(stats.month.filter((c) => c.kind === 'functional').length), 'check-ins'],
-        ].map(([label, value, hint]) => (
-          <div key={label} className={cardClass}>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">{label}</p>
-            <p className="mt-1 text-xl font-extrabold tabular-nums text-white sm:text-2xl">{value}</p>
-            <p className="mt-1 text-xs text-white/50">{hint}</p>
-          </div>
-        ))}
-      </div>
+      <CheckinStatCards week={stats.week} month={stats.month} />
 
       <form onSubmit={submitCheckin} className={`${cardClass} space-y-3`}>
         <h3 className="text-sm font-bold text-white">Registrar check-in</h3>

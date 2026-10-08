@@ -17,7 +17,7 @@ export const AdminCategoriesPage: React.FC = () => {
       await syncCategoriesFromVideos();
       setCategories(await getCategories());
       setError(null);
-    } catch (err: any) {
+    } catch (err) {
       setError(err?.message || 'Não foi possível carregar as categorias.');
     } finally {
       setLoading(false);
@@ -34,7 +34,7 @@ export const AdminCategoriesPage: React.FC = () => {
       setName('');
       setEditing(null);
       await loadCategories();
-    } catch (err: any) {
+    } catch (err) {
       setError(err?.message || 'Não foi possível salvar a categoria.');
     } finally {
       setSaving(false);
@@ -44,7 +44,7 @@ export const AdminCategoriesPage: React.FC = () => {
   const beginDelete = async (category: Category) => {
     try {
       setDeleting({ category, videoCount: await countCategoryVideos(category) });
-    } catch (err: any) {
+    } catch (err) {
       setError(err?.message || 'Não foi possível verificar os vídeos associados.');
     }
   };
@@ -55,7 +55,7 @@ export const AdminCategoriesPage: React.FC = () => {
       await deleteCategory(deleting.category);
       setDeleting(null);
       await loadCategories();
-    } catch (err: any) {
+    } catch (err) {
       setError(err?.message || 'Não foi possível excluir a categoria.');
     } finally {
       setSaving(false);

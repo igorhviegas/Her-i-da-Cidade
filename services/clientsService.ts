@@ -54,7 +54,7 @@ export async function createClient(input: { name: string; whatsapp: string }): P
   return runTransaction(db, async (transaction) => {
     const indexSnapshot = await transaction.get(indexReference);
     if (indexSnapshot.exists()) {
-      const clientSnapshot = await transaction.get(doc(db!, CLIENTS_COLLECTION, indexSnapshot.data().clientId));
+      const clientSnapshot = await transaction.get(doc(db, CLIENTS_COLLECTION, indexSnapshot.data().clientId));
       if (clientSnapshot.exists()) return mapClient(clientSnapshot.id, clientSnapshot.data());
       transaction.set(reference, { name, whatsapp, whatsappNormalized, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       transaction.set(indexReference, { clientId: reference.id, whatsappNormalized, recordType: 'whatsapp-index' });
@@ -132,18 +132,18 @@ export async function updateClient(id: string, updates: { name?: string; whatsap
   if (!current) throw new Error("Cliente não encontrado.");
   await runTransaction(db, async (transaction) => {
     const indexReference = updates.whatsapp !== undefined
-      ? doc(db!, CLIENTS_COLLECTION, whatsappIndexId(String(payload.whatsappNormalized)))
+      ? doc(db, CLIENTS_COLLECTION, whatsappIndexId(String(payload.whatsappNormalized)))
       : null;
     const oldIndexReference = updates.whatsapp !== undefined && current.whatsappNormalized !== payload.whatsappNormalized
-      ? doc(db!, CLIENTS_COLLECTION, whatsappIndexId(current.whatsappNormalized))
+      ? doc(db, CLIENTS_COLLECTION, whatsappIndexId(current.whatsappNormalized))
       : null;
     const newIndex = indexReference ? await transaction.get(indexReference) : null;
     const oldIndex = oldIndexReference ? await transaction.get(oldIndexReference) : null;
     if (newIndex?.exists() && newIndex.data().clientId !== id) throw new Error("Este WhatsApp já está associado a outro cliente.");
     if (updates.whatsapp !== undefined) {
-      transaction.set(indexReference!, { clientId: id, whatsappNormalized: payload.whatsappNormalized, recordType: 'whatsapp-index' });
-      if (oldIndex?.exists() && oldIndex.data().clientId === id) transaction.delete(oldIndexReference!);
+      transaction.set(indexReference, { clientId: id, whatsappNormalized: payload.whatsappNormalized, recordType: 'whatsapp-index' });
+      if (oldIndex?.exists() && oldIndex.data().clientId === id) transaction.delete(oldIndexReference);
     }
-    transaction.update(doc(db!, CLIENTS_COLLECTION, id), payload);
+    transaction.update(doc(db, CLIENTS_COLLECTION, id), payload);
   });
 }

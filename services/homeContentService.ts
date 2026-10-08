@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import {
   Timestamp,
   collection,
@@ -12,7 +13,7 @@ import {
   writeBatch,
   type Unsubscribe,
 } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { db } from '../lib/firebase';
 import type { HomeContent, HomeSection, HomeSectionInput, HomeSectionType } from '../types/homeContent';
 
@@ -287,7 +288,7 @@ export function useHomeContent(enabled = true) {
       setLoading(false);
       setError(null);
     }, (reason) => {
-      console.warn('[siteContentService] Falha ao carregar conteúdo da home. Exibindo valores padrão.', reason);
+      logger.warn('[siteContentService] Falha ao carregar conteúdo da home. Exibindo valores padrão.', reason);
       setError(reason.message);
       setContent({ seoTitle: HOME_SEO_TITLE, seoDescription: HOME_SEO_DESCRIPTION, sections: DEFAULT_HOME_SECTIONS });
       setLoading(false);

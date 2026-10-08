@@ -1,6 +1,7 @@
-import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, Unsubscribe, serverTimestamp, query, where, writeBatch } from "firebase/firestore";
+import { logger } from '../lib/logger.js';
+import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, Unsubscribe, serverTimestamp, query, where, writeBatch, type DocumentData } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { Video, FirestoreVideo } from "../types";
+import { Video } from "../types";
 import { extractInstagramId, generateKeywords, buildSearchText } from "../utils/videoHelpers";
 import { uploadThumbnailToVercelBlob } from "./blobUploadService";
 
@@ -18,7 +19,7 @@ export function isValidHttpUrl(urlString: string): boolean {
 }
 
 /** Convert Firestore document to UI Video */
-export function mapDocToVideo(docId: string, data: any): Video {
+export function mapDocToVideo(docId: string, data: DocumentData): Video {
   return {
     id: docId,
     title: data.title || "",
@@ -125,8 +126,8 @@ export async function createVideo(
   if (thumbnailFile) {
     try {
       finalThumbnailUrl = await uploadThumbnailToVercelBlob(thumbnailFile);
-    } catch (uploadErr: any) {
-      console.error('[createVideo] Erro no upload da thumbnail:', uploadErr);
+    } catch (uploadErr) {
+      logger.error('[createVideo] Erro no upload da thumbnail:', uploadErr);
       throw new Error(`Erro ao enviar a imagem: ${uploadErr?.message || 'Falha no upload'}`);
     }
   }
@@ -149,7 +150,7 @@ export async function createVideo(
     keywords,
   });
 
-  const payload: any = {
+  const payload: DocumentData = {
     title: input.title || "",
     instagramUrl: input.instagramUrl || "",
     instagramId: input.instagramId || extractInstagramId(input.instagramUrl || ""),
@@ -192,7 +193,7 @@ export async function createVideo(
 
   // Sanitização contra campos undefined
   Object.keys(payload).forEach(key => {
-    if (payload[key] === undefined) delete payload[key];
+    if (payload[key] === undefined) Reflect.deleteProperty(payload, key);
   });
 
   await setDoc(newDocRef, payload);
@@ -215,13 +216,13 @@ export async function updateVideo(
   if (options?.thumbnailFile) {
     try {
       newThumbnailUrl = await uploadThumbnailToVercelBlob(options.thumbnailFile);
-    } catch (uploadErr: any) {
-      console.error('[updateVideo] Erro no upload da thumbnail:', uploadErr);
+    } catch (uploadErr) {
+      logger.error('[updateVideo] Erro no upload da thumbnail:', uploadErr);
       throw new Error(`Erro ao enviar a imagem: ${uploadErr?.message || 'Falha no upload'}`);
     }
   }
 
-  const payload: any = {
+  const payload: DocumentData = {
     ...updates,
     updatedAt: serverTimestamp(),
     needsReview: false, // salvar no formulário conta como revisão do vídeo importado
@@ -299,7 +300,7 @@ export async function updateVideo(
   // Sanitizar quaisquer valores undefined para não quebrar o Firestore
   Object.keys(payload).forEach(key => {
     if (payload[key] === undefined) {
-      delete payload[key];
+      Reflect.deleteProperty(payload, key);
     }
   });
 
@@ -387,16 +388,16 @@ export async function importVideosFromCSV(videos: Array<any>): Promise<{
   created: number;
   updated: number;
   errors: number;
-  errorDetails: Array<{ rowIndex: number; title: string; error: any }>;
+  errorDetails: Array<{ rowIndex: number; title: string; error: unknown }>;
 }> {
   if (!db) throw new Error('Firestore não inicializado');
   if (!Array.isArray(videos)) {
-    console.error('Dados CSV inválidos');
+    logger.error('Dados CSV inválidos');
     return { created: 0, updated: 0, errors: 0, errorDetails: [] };
   }
   let created = 0;
   let updated = 0;
-  const errorDetails: Array<{ rowIndex: number; title: string; error: any }> = [];
+  const errorDetails: Array<{ rowIndex: number; title: string; error: unknown }> = [];
 
   for (let i = 0; i < videos.length; i++) {
     const row = videos[i];
@@ -439,7 +440,7 @@ export async function importVideosFromCSV(videos: Array<any>): Promise<{
         if (isValidHttpUrl(rawThumbnail)) {
           validThumbnailUrl = rawThumbnail;
         } else {
-          console.warn(`[CSV] URL de thumbnail inválida na linha ${i + 1}: "${rawThumbnail}". O vídeo será importado normalmente sem thumbnail.`);
+          logger.warn(`[CSV] URL de thumbnail inválida na linha ${i + 1}: "${rawThumbnail}". O vídeo será importado normalmente sem thumbnail.`);
         }
       }
 
@@ -467,7 +468,7 @@ export async function importVideosFromCSV(videos: Array<any>): Promise<{
 
       // Remover undefined
       Object.keys(videoData).forEach(k => {
-        if (videoData[k] === undefined) delete videoData[k];
+        if (videoData[k] === undefined) Reflect.deleteProperty(videoData, k);
       });
 
       // Deduplicate por instagramId
@@ -483,7 +484,7 @@ export async function importVideosFromCSV(videos: Array<any>): Promise<{
         created++;
       }
     } catch (e) {
-      console.error('Error importing CSV row', row, e);
+      logger.error('Error importing CSV row', row, e);
       errorDetails.push({
         rowIndex: i + 1,
         title: (row.title ?? row.Title ?? row.Tema ?? '').toString(),

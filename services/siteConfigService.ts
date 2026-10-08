@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import { useState, useEffect, useCallback } from "react";
 import {
   doc,
@@ -8,7 +9,7 @@ import {
   Unsubscribe,
   serverTimestamp
 } from "firebase/firestore";
-import { auth, db } from "../lib/firebase";
+import { db } from "../lib/firebase";
 import { PublicSiteConfig } from "../types";
 import { isValidWhatsAppUrl } from "./serviceWhatsApp.js";
 import { VIDEO_CALL_CONFIG_PATH, normalizeVideoCallConfig, type VideoCallConfig } from "../functions/video-call-config.js";
@@ -56,7 +57,7 @@ export function buildWhatsAppLink(baseUrl: string, customMessage?: string): stri
  */
 export async function getPublicSiteConfig(): Promise<PublicSiteConfig> {
   if (!db) {
-    console.warn("[siteConfigService] Firestore não inicializado. Utilizando fallback temporário.");
+    logger.warn("[siteConfigService] Firestore não inicializado. Utilizando fallback temporário.");
     return DEFAULT_PUBLIC_SITE_CONFIG;
   }
 
@@ -86,7 +87,7 @@ export async function getPublicSiteConfig(): Promise<PublicSiteConfig> {
       return DEFAULT_PUBLIC_SITE_CONFIG;
     }
   } catch (error) {
-    console.error("[siteConfigService] Erro ao buscar configuração pública do Firestore:", error);
+    logger.error("[siteConfigService] Erro ao buscar configuração pública do Firestore:", error);
     return DEFAULT_PUBLIC_SITE_CONFIG;
   }
 }
@@ -131,7 +132,7 @@ export async function updatePublicSiteConfig(
   }
 
   const docRef = doc(db, SITE_CONFIG_COLLECTION, PUBLIC_CONFIG_DOC);
-  const payload: Record<string, any> = {
+  const payload: Record<string, unknown> = {
     ...updates,
     updatedAt: serverTimestamp(),
   };
@@ -139,7 +140,7 @@ export async function updatePublicSiteConfig(
   try {
     try {
       await updateDoc(docRef, payload);
-    } catch (err: any) {
+    } catch (err) {
       // Se o documento não existir ainda, cria com setDoc merge
       if (err?.code === "not-found" || err?.message?.includes("No document to update")) {
         await setDoc(
@@ -154,8 +155,8 @@ export async function updatePublicSiteConfig(
         throw err;
       }
     }
-  } catch (error: any) {
-    console.error("[siteConfigService] Erro ao atualizar siteConfig/public:", error);
+  } catch (error) {
+    logger.error("[siteConfigService] Erro ao atualizar siteConfig/public:", error);
     throw error;
   }
 }
@@ -189,13 +190,13 @@ export function subscribeToPublicSiteConfig(
         }
       },
       (error) => {
-        console.warn("[siteConfigService] Listener de siteConfig retornou erro:", error);
+        logger.warn("[siteConfigService] Listener de siteConfig retornou erro:", error);
         if (onError) onError(error);
         onUpdate(DEFAULT_PUBLIC_SITE_CONFIG);
       }
     );
-  } catch (err: any) {
-    console.warn("[siteConfigService] Falha ao iniciar listener de siteConfig:", err);
+  } catch (err) {
+    logger.warn("[siteConfigService] Falha ao iniciar listener de siteConfig:", err);
     if (onError) onError(err);
     onUpdate(DEFAULT_PUBLIC_SITE_CONFIG);
     return () => {};
@@ -216,7 +217,7 @@ export function useSiteConfig() {
     try {
       const data = await getPublicSiteConfig();
       setConfig(data);
-    } catch (err: any) {
+    } catch (err) {
       setError(err?.message || "Erro ao carregar configurações");
       setConfig(DEFAULT_PUBLIC_SITE_CONFIG);
     } finally {

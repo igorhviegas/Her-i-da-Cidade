@@ -1,4 +1,5 @@
-import { collection, deleteField, doc, documentId, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
+import { logger } from '../lib/logger.js';
+import { collection, deleteField, doc, documentId, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { activityRefs, prepareActivityLog } from './activityLog';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../types';
@@ -6,7 +7,7 @@ import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } f
 export const CONTENT_SCRIPTS_COLLECTION = 'contentScripts';
 
 function logContentScriptsError(operation: string, error: unknown): void {
-  console.error(`[contentScriptsService] Falha na operação: ${operation}`, {
+  logger.error(`[contentScriptsService] Falha na operação: ${operation}`, {
     error,
     stack: error instanceof Error ? error.stack : undefined,
   });
@@ -213,7 +214,7 @@ async function validateParent(scriptId: string | undefined, parentScriptId: stri
 
 function toMillis(value: unknown): number {
   if (value instanceof Date) return value.getTime();
-  if (typeof (value as any)?.toDate === 'function') return (value as any).toDate().getTime();
+  if (typeof (value as { toDate?: () => Date })?.toDate === 'function') return (value as { toDate?: () => Date }).toDate().getTime();
   const parsed = value ? new Date(value as string | number).getTime() : 0;
   return Number.isNaN(parsed) ? 0 : parsed;
 }

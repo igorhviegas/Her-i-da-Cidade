@@ -1,9 +1,8 @@
+import { logger } from '../lib/logger.js';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { collection, doc, onSnapshot } from 'firebase/firestore';
 import { Zap } from 'lucide-react';
-import { db } from '../lib/firebase';
-import { BASELINE_PATH, eventReward, levelInfo, totalXp, type LevelInfo, type XpBaseline } from '../functions/xp.js';
-import { ACTIVITY_LOG_COLLECTION } from '../services/activityLog';
+import { eventReward, levelInfo, totalXp, type LevelInfo, type XpBaseline } from '../functions/xp.js';
+import { subscribeToActivityLog, subscribeToXpBaseline } from '../services/xpService';
 import { formatMoney } from '../components/admin/financeFormat';
 
 export interface XpContextType {
@@ -37,25 +36,23 @@ interface Toast { id: string; label: string; xp: number; revenue: number; cost: 
 export const XpProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [baseline, setBaseline] = useState<XpBaseline | null>(null);
   const [baselineReady, setBaselineReady] = useState(false);
-  const [events, setEvents] = useState<any[]>([]);
+  const [events, setEvents] = useState<unknown[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const baselineRef = useRef<XpBaseline | null>(null);
 
   const dismiss = useCallback((id: string) => setToasts((list) => list.filter((toast) => toast.id !== id)), []);
 
   useEffect(() => {
-    if (!db) return;
-    return onSnapshot(doc(db, ...BASELINE_PATH), (snapshot) => {
+    return subscribeToXpBaseline((snapshot) => {
       baselineRef.current = snapshot.exists() ? (snapshot.data() as XpBaseline) : null;
       setBaseline(baselineRef.current);
       setBaselineReady(true);
-    }, (error) => { console.error('[XpContext] linha de base indisponível', error); setBaselineReady(true); });
+    }, (error) => { logger.error('[XpContext] linha de base indisponível', error); setBaselineReady(true); });
   }, []);
 
   useEffect(() => {
-    if (!db) return;
     let first = true;
-    return onSnapshot(collection(db, ACTIVITY_LOG_COLLECTION), (snapshot) => {
+    return subscribeToActivityLog((snapshot) => {
       setEvents(snapshot.docs.map((item) => ({ ...item.data(), id: item.id })));
       if (first) { first = false; return; }
       for (const change of snapshot.docChanges()) {
@@ -67,7 +64,7 @@ export const XpProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         setToasts((list) => [...list.filter((toast) => toast.id !== id), { id, label: LABELS[event.type] ?? 'Atividade concluída', ...reward }]);
         window.setTimeout(() => dismiss(id), TOAST_MS);
       }
-    }, (error) => console.error('[XpContext] histórico de atividades indisponível', error));
+    }, (error) => logger.error('[XpContext] histórico de atividades indisponível', error));
   }, [dismiss]);
 
   const value = useMemo<XpContextType>(() => {

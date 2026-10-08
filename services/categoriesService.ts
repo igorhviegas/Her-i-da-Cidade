@@ -60,7 +60,7 @@ async function commitInBatches(updates: Array<{ ref: ReturnType<typeof doc>; dat
   }
 }
 
-function categoriesForVideo(data: Record<string, any>): string[] {
+function categoriesForVideo(data: Record<string, unknown>): string[] {
   if (Array.isArray(data.categories)) return data.categories.map(String).map((name) => name.trim()).filter(Boolean);
   return typeof data.category === 'string' && data.category.trim() ? [data.category.trim()] : [];
 }

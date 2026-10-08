@@ -7,7 +7,7 @@ const DETAILS_MARKER = /^\s*detalhes\s*:\s*/i;
  * - Roteiro: order.content (snapshot gravado ao criar o pedido); cai no roteiro vinculado se vazio.
  * - Vídeo Convite/Personalizado: o que vem após "Detalhes:" em order.content (ManyChat); sem marcador, o conteúdo inteiro (pedido manual).
  */
-export function getTeleprompterText({ order, service, script } = {}) {
+export function getTeleprompterText({ order, script } = {}) {
   if (!order) return null;
   if (order.scriptId) return String(order.content || script?.content || '').trim();
   if (!DETAILS_SERVICE_IDS.includes(order.serviceId)) return null;

@@ -4,7 +4,6 @@ import { AdminLogin } from './AdminLogin';
 import { AdminDashboard } from './AdminDashboard';
 import { ProtectedAdminRoute } from './ProtectedAdminRoute';
 import { XpProvider } from '../../context/XpContext';
-import { AdminVideosPage } from './AdminVideosPage';
 
 export const AdminApp: React.FC = () => {
   const { path } = useRouter();

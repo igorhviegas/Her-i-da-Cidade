@@ -1,6 +1,8 @@
+import { logger } from '../../lib/logger.js';
 import React, { useState } from 'react';
 import Papa from 'papaparse';
 import { importVideosFromCSV } from '../../services/videosService';
+import { CsvImportResult, CsvImportResultBox, CsvPreviewTable, normalizeCsvRow } from './videoAdmin/csvImportParts';
 
 interface Props {
   onClose: () => void;
@@ -10,8 +12,8 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [previewData, setPreviewData] = useState<Array<any>>([]);
-  const [importResult, setImportResult] = useState<{created: number; updated: number; errors: number; errorDetails: any[]} | null>(null);
+  const [previewData, setPreviewData] = useState<Array<unknown>>([]);
+  const [importResult, setImportResult] = useState<CsvImportResult | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -20,7 +22,7 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
     }
   };
 
-  const parseCsvFile = (file: File): Promise<Array<any>> => {
+  const parseCsvFile = (file: File): Promise<Array<unknown>> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => {
@@ -28,7 +30,7 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
         Papa.parse(text, {
           header: true,
           skipEmptyLines: true,
-          complete: (result) => resolve(result.data as Array<any>),
+          complete: (result) => resolve(result.data as Array<unknown>),
           error: (err) => reject(err),
         });
       };
@@ -46,17 +48,9 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
     setError(null);
     try {
       const parsedData = await parseCsvFile(file);
-      const normalized = parsedData.map((row) => ({
-        'Nº': row['Nº'] ?? row['Numero'] ?? row['Number'] ?? '',
-        Tema: row['Tema'] ?? row['title'] ?? row['Title'] ?? '',
-        Categoria: row['Categoria'] ?? row['category'] ?? row['Category'] ?? '',
-        'Link do Reel': row['Link do Reel'] ?? row['link'] ?? row['instagramUrl'] ?? row['InstagramUrl'] ?? '',
-        Thumbnail: row['Thumbnail'] ?? row['thumbnail'] ?? row['thumbnailUrl'] ?? row['Thumbnail Url'] ?? '',
-        ID: row['ID'] ?? row['Id'] ?? '',
-        'Palavras-chave / Pesquisa': row['Palavras-chave / Pesquisa'] ?? row['keywords'] ?? '',
-      }));
+      const normalized = parsedData.map(normalizeCsvRow);
       setPreviewData(normalized);
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message ?? 'Falha ao ler o CSV');
     } finally {
       setLoading(false);
@@ -74,7 +68,7 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
       const result = await importVideosFromCSV(previewData);
       setImportResult(result);
     } catch (e) {
-      console.error(e);
+      logger.error(e);
       setError('Erro ao importar CSV');
     } finally {
       setLoading(false);
@@ -103,38 +97,7 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
           <div className="flex flex-col flex-1 mt-4">
             <p className="mb-2">{previewData.length} registros encontrados</p>
             <div className="flex-1 overflow-y-auto">
-              <table className="min-w-full table-auto border border-gray-700">
-                <thead className="bg-gray-800">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Nº</th>
-                    <th className="px-3 py-2 text-left">Tema</th>
-                    <th className="px-3 py-2 text-left">Categoria</th>
-                    <th className="px-3 py-2 text-left">Thumbnail</th>
-                    <th className="px-3 py-2 text-left">Link do Reel</th>
-                    <th className="px-3 py-2 text-left">ID</th>
-                    <th className="px-3 py-2 text-left">Palavras-chave / Pesquisa</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {previewData.map((row, idx) => (
-                    <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800'}>
-                      <td className="px-3 py-1 whitespace-nowrap">{row['Nº']}</td>
-                      <td className="px-3 py-1 whitespace-nowrap">{row['Tema']}</td>
-                      <td className="px-3 py-1 whitespace-nowrap">{row['Categoria']}</td>
-                      <td className="px-3 py-1 whitespace-nowrap max-w-[140px] truncate text-xs" title={row['Thumbnail']}>
-                        {row['Thumbnail'] ? (
-                          <span className="text-emerald-400 font-mono text-[11px] truncate block">{row['Thumbnail']}</span>
-                        ) : (
-                          <span className="text-white/30 italic text-[11px]">Sem thumbnail</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-1 whitespace-nowrap break-all">{row['Link do Reel']}</td>
-                      <td className="px-3 py-1 whitespace-nowrap">{row['ID']}</td>
-                      <td className="px-3 py-1 whitespace-nowrap">{row['Palavras-chave / Pesquisa']}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <CsvPreviewTable previewData={previewData} />
             </div>
             <div className="flex justify-end space-x-2 mt-4">
               <button type="button" onClick={onClose} className="px-4 py-2 bg-gray-600 rounded hover:bg-gray-500 transition">
@@ -144,22 +107,7 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
                 Continuar
               </button>
             </div>
-            {importResult && (
-              <div className="mt-4 p-4 bg-gray-800 rounded">
-                <p className="text-green-400 mb-2">Importação concluída</p>
-                <p>Criados: {importResult.created}</p>
-                <p>Atualizados: {importResult.updated}</p>
-                <p>Erros: {importResult.errors}</p>
-                {importResult.errorDetails.length > 0 && (
-                  <details className="mt-2 text-sm">
-                    <summary>Detalhes dos erros</summary>
-                    {importResult.errorDetails.map((e, i) => (
-                      <p key={i}>Linha {e.rowIndex}: {e.error?.message || String(e.error)}</p>
-                    ))}
-                  </details>
-                )}
-              </div>
-            )}
+            {importResult && <CsvImportResultBox importResult={importResult} />}
           </div>
         )}
       </div>

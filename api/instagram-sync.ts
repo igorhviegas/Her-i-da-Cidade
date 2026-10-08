@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import { timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { getAdminFirestore } from '../functions/firebase-admin.js';
@@ -15,7 +16,7 @@ const STATUS_BY_CODE: Record<string, number> = { not_configured: 503, token_inva
 export async function handleInstagramSync(
   req: Request | any,
   res: Response | any,
-  deps: { secret?: string; authorize?: (req: any) => Promise<Auth>; run?: (manual: boolean) => Promise<unknown> } = {},
+  deps: { secret?: string; authorize?: (req: Request) => Promise<Auth>; run?: (manual: boolean) => Promise<unknown> } = {},
 ) {
   const send = (status: number, body: unknown) => {
     res.setHeader?.('Cache-Control', 'no-store');
@@ -45,7 +46,7 @@ export async function handleInstagramSync(
     return send(200, { ok: true, ...(result as object) });
   } catch (error) {
     if (error instanceof InstagramSyncError) return fail(STATUS_BY_CODE[error.code] ?? 502, error.code, error.message);
-    console.error('[Instagram Sync] falha inesperada:', error instanceof Error ? error.name : 'erro');
+    logger.error('[Instagram Sync] falha inesperada:', error instanceof Error ? error.name : 'erro');
     return fail(500, 'internal_error', 'A sincronização falhou; consulte os logs.');
   }
 }

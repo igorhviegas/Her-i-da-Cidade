@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
 import { getAdminFirestore } from '../functions/firebase-admin.js';
 import { GoogleCalendarError } from '../functions/google-calendar.js';
@@ -17,7 +18,7 @@ const STATUS_BY_CODE: Record<string, number> = {
 export async function handleVideoCall(
   req: Request | any,
   res: Response | any,
-  deps: { database?: any; availability?: typeof getAvailability; book?: typeof createVideoCallBooking; expire?: typeof expireUnpaidBookings } = {},
+  deps: { database?: unknown; availability?: typeof getAvailability; book?: typeof createVideoCallBooking; expire?: typeof expireUnpaidBookings } = {},
 ) {
   const send = (status: number, body: unknown) => {
     res.setHeader?.('Cache-Control', 'no-store');
@@ -30,7 +31,7 @@ export async function handleVideoCall(
     const database = deps.database ?? getAdminFirestore();
     // A limpeza nunca impede o cliente de agendar: se falhar, fica para a próxima chamada.
     try { await (deps.expire ?? expireUnpaidBookings)({ database }); }
-    catch (error) { console.error('[VideoCall] limpeza de reservas vencidas falhou:', error instanceof Error ? error.message : 'erro'); }
+    catch (error) { logger.error('[VideoCall] limpeza de reservas vencidas falhou:', error instanceof Error ? error.message : 'erro'); }
 
     if (req.method === 'GET') {
       const { days, config } = await (deps.availability ?? getAvailability)({ database });
@@ -42,11 +43,11 @@ export async function handleVideoCall(
     if (error instanceof VideoCallError || error instanceof GoogleCalendarError) {
       // Falhas do Google/credenciais não vazam detalhes ao público: mensagem genérica, o log do servidor tem o código.
       const publicError = error instanceof VideoCallError;
-      if (!publicError) console.error('[VideoCall] Google Agenda:', error.code);
+      if (!publicError) logger.error('[VideoCall] Google Agenda:', error.code);
       if (!publicError) return fail(error.code === 'rate_limited' ? 429 : 503, 'calendar_unavailable', 'Não foi possível consultar a agenda agora. Tente novamente em instantes.');
       return fail(STATUS_BY_CODE[error.code] ?? 400, error.code, error.message);
     }
-    console.error('[VideoCall] falha inesperada:', error instanceof Error ? error.message : 'erro');
+    logger.error('[VideoCall] falha inesperada:', error instanceof Error ? error.message : 'erro');
     return fail(500, 'internal_error', 'Não foi possível concluir agora. Tente novamente.');
   }
 }

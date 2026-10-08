@@ -21,7 +21,7 @@ export interface MaterialInput {
 }
 
 function assertValid(input: object) {
-  const errors = validateMaterialInput(input as Record<string, any>);
+  const errors = validateMaterialInput(input as Record<string, unknown>);
   if (errors.length) throw new Error(errors.join(" "));
 }
 
@@ -32,7 +32,7 @@ export async function listMaterials(): Promise<StockMaterial[]> {
 
 export interface StockPending {
   id: string; orderId: string; cycle: number; materialId: string; materialName: string; unit: string;
-  required: number; fulfilled: number; missing: number; status: "open" | "voided"; createdBy?: string | null; createdAt?: any;
+  required: number; fulfilled: number; missing: number; status: "open" | "voided"; createdBy?: string | null; createdAt?: unknown;
 }
 
 /** Pendências de estoque (faltas registradas em conclusões excepcionais): não são movimentações e não alteram saldo. */

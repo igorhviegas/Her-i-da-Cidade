@@ -49,7 +49,7 @@ const BookingsList: React.FC = () => {
   useEffect(() => subscribeVideoCallOrders(dateKey(new Date()), (list) => { setOrders(list); setError(''); }, () => setError('Não foi possível carregar os agendamentos.')), []);
   useEffect(() => { listClients().then((list) => setClients(new Map(list.map((c) => [c.id, c])))).catch(() => {}); }, []);
 
-  const rows = useMemo(() => [...(orders ?? [])].filter((o) => o.videoCall).sort((a, b) => `${a.videoCall!.date}T${a.videoCall!.time}`.localeCompare(`${b.videoCall!.date}T${b.videoCall!.time}`)), [orders]);
+  const rows = useMemo(() => [...(orders ?? [])].filter((o) => o.videoCall).sort((a, b) => `${a.videoCall.date}T${a.videoCall.time}`.localeCompare(`${b.videoCall.date}T${b.videoCall.time}`)), [orders]);
   const link = `${window.location.origin}${PUBLIC_PATH}`;
   const copy = async () => { try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* sem área de transferência: o link está visível */ } };
 
@@ -72,15 +72,15 @@ const BookingsList: React.FC = () => {
         {rows.map((order) => {
           const client = clients.get(order.clientId);
           const pending = order.paymentPending === true;
-          const call = order.videoCall!;
+          const call = order.videoCall;
           // Cliente em outro fuso: o horário dele ao lado do de Brasília (a agenda é sempre a de Brasília).
           const local = call.timezone && call.timezone !== BUSINESS_TIME_ZONE ? localSlot(call.date, call.time, call.timezone) : null;
           return (
             <li key={order.id}>
               <button type="button" onClick={() => navigate(`/admin/pedidos?orderId=${encodeURIComponent(order.id)}`)} className={`${cardClass} flex w-full flex-wrap items-center gap-x-4 gap-y-2 text-left hover:bg-white/[0.03]`}>
-                <span className="w-32 shrink-0 text-sm font-bold text-white">{weekday(order.videoCall!.date)}, {brDate(order.videoCall!.date)}<span className="block text-blue-300">{order.videoCall!.time}</span></span>
+                <span className="w-32 shrink-0 text-sm font-bold text-white">{weekday(order.videoCall.date)}, {brDate(order.videoCall.date)}<span className="block text-blue-300">{order.videoCall.time}</span></span>
                 <span className="min-w-0 flex-1 text-sm text-white/80">
-                  <span className="block truncate font-semibold text-white">{client?.name ?? 'Cliente'} · {order.childName} ({order.videoCall!.childAge})</span>
+                  <span className="block truncate font-semibold text-white">{client?.name ?? 'Cliente'} · {order.childName} ({order.videoCall.childAge})</span>
                   <span className="block truncate text-xs text-white/50">{[client?.whatsapp, call.email, call.theme].filter(Boolean).join(' · ')}</span>
                   {local && !local.same && <span className="block truncate text-xs text-sky-300/80">Cliente em {call.timezone}: {brDate(local.date)} às {local.time} no horário dele</span>}
                 </span>

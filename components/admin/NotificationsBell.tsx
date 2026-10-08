@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger.js';
 import React, { useEffect, useState } from 'react';
 import { Bell, X } from 'lucide-react';
 import { dismissAllNotifications, dismissNotification, previousDaysNotifications, runClientSync, subscribeNotifications, type AppNotification } from '../../services/missionsService';
@@ -10,7 +11,7 @@ export const NotificationsBell: React.FC<{ onOpenMissions: () => void }> = ({ on
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const sync = () => runClientSync().catch((error) => console.error('[NotificationsBell] sincronização falhou', error));
+    const sync = () => runClientSync().catch((error) => logger.error('[NotificationsBell] sincronização falhou', error));
     void sync();
     const timer = window.setInterval(sync, SYNC_INTERVAL_MS);
     const unsubscribe = subscribeNotifications(setItems);

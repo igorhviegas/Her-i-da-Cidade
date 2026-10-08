@@ -1,7 +1,6 @@
 // Regras do XP. Exige Java 21+ e firebase-tools (emulador local; não toca em produção).
 // Execução: firebase emulators:exec --only firestore --project demo-heroi-da-cidade "node --test tests/firestore-rules-xp.test.js"
 import test, { after, before } from 'node:test';
-import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';

@@ -33,7 +33,7 @@ export type UpdateOrderInput = Partial<Omit<Order, "id" | "orderNumber" | "order
   allowStockShortage?: boolean;
 };
 
-function mapOrder(id: string, data: Record<string, any>): Order {
+function mapOrder(id: string, data: Record<string, unknown>): Order {
   return { ...data, id } as Order;
 }
 
@@ -194,7 +194,7 @@ export async function deleteOrder(id: string): Promise<void> {
       ? await Promise.all(ledgerIdsFor(id, order.eventLedger).map((entryId) => transaction.get(doc(firestore, LEDGER_COLLECTION, entryId))))
       : [];
     let linkedScriptRef: ReturnType<typeof doc> | null = null;
-    let linkedScript: Record<string, any> | null = null;
+    let linkedScript: Record<string, unknown> | null = null;
     if (typeof order.scriptId === 'string' && order.scriptId) {
       if (order.scriptId.includes('/')) throw new Error('O pedido possui um scriptId inválido; nenhum documento foi alterado.');
       linkedScriptRef = doc(firestore, CONTENT_SCRIPTS_COLLECTION, order.scriptId);
@@ -217,7 +217,7 @@ export async function deleteOrder(id: string): Promise<void> {
 
 /** Pedido que já nasce concluído: grava o pedido e o registro de atividade na mesma transação. */
 async function setCompletedOrder(reference: ReturnType<typeof doc>, payload: Record<string, unknown>, occurredAt: Date): Promise<void> {
-  const firestore = db!;
+  const firestore = db;
   await runTransaction(firestore, async (transaction) => {
     const refs = activityRefs(firestore, 'order_completed', reference.id);
     const record = await prepareActivityLog(transaction, refs, {
@@ -230,8 +230,8 @@ async function setCompletedOrder(reference: ReturnType<typeof doc>, payload: Rec
 
 /** Pedido de evento: o pedido e o lançamento da entrada (1ª parcela, data = criação) nascem na mesma transação. */
 async function setEventOrder(reference: ReturnType<typeof doc>, payload: Record<string, unknown>): Promise<void> {
-  const firestore = db!;
-  const entry = planEntry(reference.id, payload as any, serverTimestamp());
+  const firestore = db;
+  const entry = planEntry(reference.id, payload as unknown, serverTimestamp());
   await runTransaction(firestore, async (transaction) => {
     transaction.set(reference, payload);
     transaction.set(doc(firestore, LEDGER_COLLECTION, ledgerId(reference.id, 'entry')), { ...entry, createdAt: serverTimestamp() });
@@ -276,7 +276,7 @@ export function subscribeActiveOrders(onData: (orders: Order[]) => void, onError
       query(collection(db, ORDERS_COLLECTION), where("status", "in", ACTIVE_ORDER_STATUSES)),
       (snapshot) => {
         lastActive = snapshot.docs.map((item) => mapOrder(item.id, item.data()));
-        activeListeners.forEach((l) => l.onData(lastActive!));
+        activeListeners.forEach((l) => l.onData(lastActive));
       },
       (error) => {
         // O Firestore encerra a escuta após um erro: limpa o estado para que a próxima assinatura crie uma nova (nada de contagem velha).
@@ -334,7 +334,7 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     }
 
     let linkedScriptRef: ReturnType<typeof doc> | null = null;
-    let linkedScript: Record<string, any> | null = null;
+    let linkedScript: Record<string, unknown> | null = null;
     if (updates.status === 'completed' && typeof currentData.scriptId === 'string') {
       linkedScriptRef = doc(firestore, CONTENT_SCRIPTS_COLLECTION, currentData.scriptId);
       const scriptSnapshot = await transaction.get(linkedScriptRef);

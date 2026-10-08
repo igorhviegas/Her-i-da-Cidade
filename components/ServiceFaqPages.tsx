@@ -77,7 +77,7 @@ export const ServiceFaqPages: React.FC<{ slug?: string; onResolved?: (service: S
                   <span className="min-w-0 flex-1">
                     <span className="block text-[10px] font-black uppercase tracking-widest text-blue-400">{s.category}</span>
                     <span className="block text-base font-bold leading-tight text-white">{s.title}</span>
-                    <span className="mt-1 block text-xs text-white/50">{s.faq!.length} {s.faq!.length === 1 ? 'categoria' : 'categorias'}</span>
+                    <span className="mt-1 block text-xs text-white/50">{s.faq.length} {s.faq.length === 1 ? 'categoria' : 'categorias'}</span>
                   </span>
                   <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-white/40 group-hover:text-white" aria-hidden />
                 </Link>
