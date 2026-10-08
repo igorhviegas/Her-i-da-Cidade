@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Video } from '../../types';
-import { Pencil, Trash2, Eye, EyeOff, ChevronUp, ChevronDown, Star } from 'lucide-react';
+import { Pencil, Trash2, Eye, ChevronUp, ChevronDown, Star } from 'lucide-react';
 
 interface VideoCardAdminProps {
   video: Video;

@@ -1,4 +1,4 @@
-import { collection, deleteField, doc, documentId, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, deleteField, doc, documentId, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { activityRefs, prepareActivityLog } from './activityLog';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../types';

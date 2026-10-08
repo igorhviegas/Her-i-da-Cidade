@@ -125,7 +125,7 @@ export function subscribeToAuthState(
         } : null),
         loading: false,
       });
-    } catch (_err) {
+    } catch {
       const isBootstrappedAdmin = user.email === "igorhviegas@gmail.com";
       callback({
         user,

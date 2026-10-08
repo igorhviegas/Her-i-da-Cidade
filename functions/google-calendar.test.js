@@ -58,7 +58,7 @@ test('link inteiro clicável no Google Agenda mobile: nada com emoji (nem acento
     // sem emoji/combinação antes da URL: unidades UTF-16 = code points = caracteres visíveis => deslocamento zero
     assert.equal(prefix.length, [...prefix].length);
     assert.equal(prefix.length, [...segmenter.segment(prefix)].length);
-    assert.match(prefix, /^[\x00-\x7F]*$/);
+    assert.ok([...prefix].every((char) => char.charCodeAt(0) < 128));
   }
 });
 
@@ -179,7 +179,7 @@ test('falhas: permissão, agenda inexistente, autenticação, limite, indisponib
   await assert.rejects(run(() => reply(401)), (e) => e.code === 'auth');
   await assert.rejects(run(() => reply(429)), (e) => e.code === 'rate_limited');
   await assert.rejects(run(() => reply(503)), (e) => e.code === 'unavailable');
-  await assert.rejects(run((_i, n) => reply(404)), (e) => e.code === 'calendar_not_found'); // PUT 404 e POST 404
+  await assert.rejects(run(() => reply(404)), (e) => e.code === 'calendar_not_found'); // PUT 404 e POST 404
   await assert.rejects(run(() => reply(200, {})), (e) => e.code === 'api_error'); // 200 sem id não é confirmação
   await assert.rejects(run(() => { throw new Error('rede'); }), (e) => e.code === 'unavailable');
   resetTokenCache();

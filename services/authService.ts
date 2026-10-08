@@ -73,7 +73,7 @@ export async function loginWithEmail(email: string, password: string): Promise<U
       try {
         const newCredential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
         return newCredential.user;
-      } catch (createErr) {
+      } catch {
         throw err;
       }
     }

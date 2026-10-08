@@ -12,7 +12,7 @@ import {
   writeBatch,
   type Unsubscribe,
 } from 'firebase/firestore';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { db } from '../lib/firebase';
 import type { HomeContent, HomeSection, HomeSectionInput, HomeSectionType } from '../types/homeContent';
 

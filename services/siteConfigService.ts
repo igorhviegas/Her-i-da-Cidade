@@ -8,7 +8,7 @@ import {
   Unsubscribe,
   serverTimestamp
 } from "firebase/firestore";
-import { auth, db } from "../lib/firebase";
+import { db } from "../lib/firebase";
 import { PublicSiteConfig } from "../types";
 import { isValidWhatsAppUrl } from "./serviceWhatsApp.js";
 import { VIDEO_CALL_CONFIG_PATH, normalizeVideoCallConfig, type VideoCallConfig } from "../functions/video-call-config.js";

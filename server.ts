@@ -148,7 +148,7 @@ async function refreshReviewsInBackground() {
     if (!success) {
       lastFetchedTime = Date.now() - (CACHE_DURATION_MS - 5 * 60 * 1000);
     }
-  } catch (_err) {
+  } catch {
     console.warn("[Reviews] Serving current cached reviews.");
   } finally {
     isFetchingFresh = false;

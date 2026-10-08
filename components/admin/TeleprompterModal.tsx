@@ -77,7 +77,7 @@ export const TeleprompterModal: React.FC<Props> = ({ title, text, canSendToEditi
     const observer = new ResizeObserver(run);
     observer.observe(box);
     return () => { timers.forEach(clearTimeout); observer.disconnect(); };
-  }, [text, manualSize]);
+  }, [text, manualSize, paragraphs.length]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !sending) onBack(); };

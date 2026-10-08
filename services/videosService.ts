@@ -1,6 +1,6 @@
 import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, Unsubscribe, serverTimestamp, query, where, writeBatch } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { Video, FirestoreVideo } from "../types";
+import { Video } from "../types";
 import { extractInstagramId, generateKeywords, buildSearchText } from "../utils/videoHelpers";
 import { uploadThumbnailToVercelBlob } from "./blobUploadService";
 
@@ -192,7 +192,7 @@ export async function createVideo(
 
   // Sanitização contra campos undefined
   Object.keys(payload).forEach(key => {
-    if (payload[key] === undefined) delete payload[key];
+    if (payload[key] === undefined) Reflect.deleteProperty(payload, key);
   });
 
   await setDoc(newDocRef, payload);
@@ -299,7 +299,7 @@ export async function updateVideo(
   // Sanitizar quaisquer valores undefined para não quebrar o Firestore
   Object.keys(payload).forEach(key => {
     if (payload[key] === undefined) {
-      delete payload[key];
+      Reflect.deleteProperty(payload, key);
     }
   });
 
@@ -467,7 +467,7 @@ export async function importVideosFromCSV(videos: Array<any>): Promise<{
 
       // Remover undefined
       Object.keys(videoData).forEach(k => {
-        if (videoData[k] === undefined) delete videoData[k];
+        if (videoData[k] === undefined) Reflect.deleteProperty(videoData, k);
       });
 
       // Deduplicate por instagramId

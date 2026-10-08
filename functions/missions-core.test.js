@@ -301,9 +301,6 @@ test('faturamento da meta respeita os limites do ciclo (início inclusivo, fim e
 
 // ------------------------------------------------ metas do Instagram
 
-const igDay = (d, h = 15) => new Date(`2026-10-${d}T${String(h).padStart(2, '0')}:00:00Z`);
-const igPost = (id, day, likes, comments, views) => ({ id, publishedAt: igDay(day).toISOString(), likes, comments, views });
-
 // post: [id, dia da publicação, curtidas, comentários, views]; snap: retrato diário por publicação
 const post = (id, published, likes, comments, views) => ({ id, publishedAt: published, likes, comments, views });
 const snap = (day, posts) => ({ day, followers: 1000, posts });

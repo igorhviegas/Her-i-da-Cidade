@@ -95,7 +95,7 @@ const NAV_GROUPS: NavGroup<AdminTab>[] = [
 const NAV_ORDER = NAV_ITEMS.map((item) => item.id);
 
 export const AdminDashboard: React.FC = () => {
-  const { user, adminData, logout } = useAuth();
+  const { user, logout } = useAuth();
   const { path, navigate } = useRouter();
 
   // Sincronização inicial da aba com a URL

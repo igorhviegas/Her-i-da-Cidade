@@ -40,7 +40,7 @@ async function uploadImageToVercelBlob(file: File, purpose?: 'services'): Promis
   let data: any = null;
   try {
     data = await response.json();
-  } catch (_e) {
+  } catch {
     throw new Error(`Falha no servidor ao processar upload (Código HTTP ${response.status}).`);
   }
 

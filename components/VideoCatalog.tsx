@@ -3,7 +3,6 @@ import { useRouter } from '../lib/router';
 import { Video } from '../types';
 import { getVideos, subscribeToVideos } from '../services/videosService';
 import { searchVideos } from '../utils/videoSearch';
-import { isValidInstagramUrl } from '../utils/videoHelpers';
 import { VideoPlayerFullscreen } from './VideoPlayerFullscreen';
 import { VideoRow } from './VideoRow';
 import { BackToTop } from './BackToTop';

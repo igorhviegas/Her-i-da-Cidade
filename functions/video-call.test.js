@@ -22,7 +22,10 @@ function fakeDatabase(seed = {}) {
   };
   const apply = (path, values, merge) => {
     const next = merge ? { ...docs.get(path) } : {};
-    for (const [k, v] of Object.entries(values)) isDelete(v) ? delete next[k] : (next[k] = v);
+    for (const [k, v] of Object.entries(values)) {
+      if (isDelete(v)) Reflect.deleteProperty(next, k);
+      else next[k] = v;
+    }
     docs.set(path, next);
   };
   const refOf = (path) => ({

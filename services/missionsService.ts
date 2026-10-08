@@ -409,7 +409,8 @@ export const previousDaysNotifications = (items: AppNotification[], now = new Da
 
 /** Contador do menu "Missões": tarefas pendentes de hoje + to-dos pendentes com prazo hoje. Reavalia a virada do dia a cada minuto. */
 export function subscribeTodayMissionsCount(onChange: (count: number | null) => void): () => void {
-  let tasks = 0, todos: Mission[] = [], loaded = { tasks: false, todos: false }, today = dateKey(new Date()), stopTasks = () => {};
+  const loaded = { tasks: false, todos: false };
+  let tasks = 0, todos: Mission[] = [], today = dateKey(new Date()), stopTasks = () => {};
   const emit = () => onChange(loaded.tasks && loaded.todos ? tasks + todos.filter((m) => m.dueAt && dateKey(m.dueAt) === today).length : null);
   const fail = (error: Error) => { console.error('[missionsService] contador de missões indisponível', error); onChange(null); };
   const watchTasks = () => {

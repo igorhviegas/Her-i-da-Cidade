@@ -46,7 +46,7 @@ export interface Client {
   updatedAt?: any;
 }
 
-export interface FirestoreClient extends Client {}
+export type FirestoreClient = Client;
 
 /** Snapshot operacional e financeiro do pedido; preços são os praticados na venda. */
 export interface Order {
@@ -107,7 +107,7 @@ export interface EventForm {
   formType: string;
 }
 
-export interface FirestoreOrder extends Order {}
+export type FirestoreOrder = Order;
 
 export type ScriptProductionStatus = 'draft' | 'ready' | 'in_production' | 'produced';
 export type ScriptPublicationStatus = 'unpublished' | 'published';

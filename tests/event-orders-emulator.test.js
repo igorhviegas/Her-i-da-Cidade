@@ -126,7 +126,7 @@ step('rascunho do ManyChat: sem lançamentos e conclusão bloqueada');
 
 const filled = { ...input().eventForm };
 await orders.updateOrder(draftId, { eventForm: filled, childName: 'Pedro', eventDate: new Date(2026, 9, 10, 12), content: 'x', servicePrice: 1000, rushFee: 0, totalPaid: 1000 });
-let draft = await orderDoc(draftId);
+const draft = await orderDoc(draftId);
 assert.equal(draft.eventDraft, undefined);
 assert.deepEqual(draft.eventLedger, { entry: 500 });
 l = await ledger(draftId);

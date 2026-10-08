@@ -75,7 +75,7 @@ test('moveSessionItem: alterna a ordem na sessão, preserva timer em andamento e
 });
 
 test('cronômetro e resumo: tempo desde o início, feitos/total e duração em minutos (mínimo 1)', () => {
-  let s = toggleItem(startSession(plan, exercises, T0), 'supino');
+  const s = toggleItem(startSession(plan, exercises, T0), 'supino');
   assert.equal(elapsedSec(s, T0 + 75_400), 75);
   assert.equal(elapsedSec(s, T0 - 5000), 0);
   assert.deepEqual(summarizeSession(s, T0 + 45 * 60_000), { exercisesDone: 1, exercisesTotal: 3, durationMin: 45 });

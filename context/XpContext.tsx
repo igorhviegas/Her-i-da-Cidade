@@ -1,9 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { collection, doc, onSnapshot } from 'firebase/firestore';
 import { Zap } from 'lucide-react';
-import { db } from '../lib/firebase';
-import { BASELINE_PATH, eventReward, levelInfo, totalXp, type LevelInfo, type XpBaseline } from '../functions/xp.js';
-import { ACTIVITY_LOG_COLLECTION } from '../services/activityLog';
+import { eventReward, levelInfo, totalXp, type LevelInfo, type XpBaseline } from '../functions/xp.js';
+import { subscribeToActivityLog, subscribeToXpBaseline } from '../services/xpService';
 import { formatMoney } from '../components/admin/financeFormat';
 
 export interface XpContextType {
@@ -44,8 +42,7 @@ export const XpProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const dismiss = useCallback((id: string) => setToasts((list) => list.filter((toast) => toast.id !== id)), []);
 
   useEffect(() => {
-    if (!db) return;
-    return onSnapshot(doc(db, ...BASELINE_PATH), (snapshot) => {
+    return subscribeToXpBaseline((snapshot) => {
       baselineRef.current = snapshot.exists() ? (snapshot.data() as XpBaseline) : null;
       setBaseline(baselineRef.current);
       setBaselineReady(true);
@@ -53,9 +50,8 @@ export const XpProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   }, []);
 
   useEffect(() => {
-    if (!db) return;
     let first = true;
-    return onSnapshot(collection(db, ACTIVITY_LOG_COLLECTION), (snapshot) => {
+    return subscribeToActivityLog((snapshot) => {
       setEvents(snapshot.docs.map((item) => ({ ...item.data(), id: item.id })));
       if (first) { first = false; return; }
       for (const change of snapshot.docChanges()) {
