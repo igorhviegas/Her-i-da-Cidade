@@ -39,6 +39,11 @@ A integração nunca foi executada contra a API real da Meta (sem credenciais): 
 ## Retrato diário de seguidores (`instagramStats`)
 No mesmo batch da sincronização, a 1ª sincronização bem-sucedida de cada dia (Brasília) grava `instagramStats/{YYYY-MM-DD}` = `{ day, followers, baselineAt, posts, postsAt }`: `followers` é a referência do dia (a mesma do balanço diário) e `posts` o retrato por publicação (`{ id: [curtidas, comentários, views] }`) do 1º sync do dia com este recurso; ambos são preservados nas sincronizações seguintes, e repetições e falhas não os alteram. Base das metas "ganho de seguidores" e "curtidas/comentários/views recebidos no ciclo" do módulo Missões (`docs/missoes.md`). Regras: leitura admin, escrita `false`.
 
+## Auditoria de conteúdo e teste de legenda
+Adaptado de [instagram-agent-skill](https://github.com/Jakeschincariol/instagram-agent-skill) (`ig-audit` e `caption.py`), em português, calculado no navegador a partir de `instagramPosts` (`services/instagramAudit.js`; nada novo no servidor nem no Firestore).
+- **Auditoria:** múltiplo = visualizações (ou curtidas, se menos de 10 publicações têm visualização) ÷ mediana da conta, sobre as publicações da última sincronização. Mostra as 5 mais acima e as 5 mais abaixo da mediana e a mediana dos múltiplos por tipo e por legenda com/sem pedido (CTA). Com menos de 10 publicações não afirma padrão; grupo com menos de 5 vem marcado "amostra pequena". A API não entrega alcance, compartilhamentos nem retenção: é indício, não causa.
+- **Testar legenda:** mostra os ~125 caracteres que o feed exibe antes do "… mais" (aproximação) e verifica tamanho (2.200), primeira linha, hashtags (máx. 5), posição das hashtags, links e um pedido só. O limite de 5 hashtags vem do repositório de referência (dez/2025) e **não foi confirmado** na documentação da Meta; ajuste `HASHTAG_CAP` se divergir.
+
 ## Calendário de publicações e filtro dos destaques
 - **Calendário** (`/admin/instagram`): mês com um quadradinho por dia; **roxo = publicou** (feed ou Reel; a dica do dia detalha quantos de cada). Dentro de cada dia, o saldo de seguidores e de visualizações.
 - Os dias de publicação vêm de `instagramPosts` (histórico completo guardado, não só das últimas 100). A API só entrega as 100 mais recentes: antes da publicação mais antiga conhecida, o calendário não afirma nada.
