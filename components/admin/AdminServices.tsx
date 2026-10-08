@@ -147,7 +147,7 @@ export const AdminServices: React.FC = () => {
 
       setIsFormModalOpen(false);
       setEditingServiceId(null);
-    } catch (err: any) {
+    } catch (err) {
       logger.error('[AdminServices] Erro ao salvar serviço:', err);
       showFeedback('error', describeSaveError(err));
     } finally {
@@ -164,7 +164,7 @@ export const AdminServices: React.FC = () => {
         'success',
         `Serviço "${service.title}" ${newStatus ? 'ativado e publicado no site' : 'desativado (ocultado do site público)'}.`
       );
-    } catch (err: any) {
+    } catch (err) {
       logger.error('[AdminServices] Erro ao alterar status:', err);
       showFeedback('error', 'Não foi possível alterar o status do serviço.');
     }
@@ -179,7 +179,7 @@ export const AdminServices: React.FC = () => {
     try {
       await updateServiceOrder(service.id, newOrder);
       showFeedback('success', `Ordem do serviço "${service.title}" ajustada para ${newOrder}.`);
-    } catch (err: any) {
+    } catch (err) {
       logger.error('[AdminServices] Erro ao alterar ordem:', err);
       showFeedback('error', 'Falha ao reordenar o serviço.');
     }
@@ -193,7 +193,7 @@ export const AdminServices: React.FC = () => {
       await deleteService(serviceToDelete.id);
       showFeedback('success', `Serviço "${serviceToDelete.title}" excluído com sucesso.`);
       setServiceToDelete(null);
-    } catch (err: any) {
+    } catch (err) {
       logger.error('[AdminServices] Erro ao excluir serviço:', err);
       showFeedback('error', 'Falha ao excluir o serviço. Verifique suas permissões.');
     } finally {

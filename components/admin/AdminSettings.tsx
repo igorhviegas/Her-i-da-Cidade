@@ -35,7 +35,7 @@ export const AdminSettings: React.FC = () => {
       const current = config.whatsappUrl || TEMPORARY_FALLBACK_WHATSAPP_URL;
       setWhatsappUrl(current);
       setSavedWhatsappUrl(current);
-    } catch (err: any) {
+    } catch (err) {
       setFeedback({
         type: 'error',
         message: 'Não foi possível carregar as configurações do Firestore. ' + (err?.message || ''),
@@ -85,14 +85,14 @@ export const AdminSettings: React.FC = () => {
       try {
         const { changed } = await syncAutoServiceWhatsAppUrls();
         if (changed > 0) syncNote = ` ${changed} serviço(s) com link automático foram atualizados.`;
-      } catch (syncErr: any) {
+      } catch (syncErr) {
         syncNote = ` Atenção: o número foi salvo, mas os links dos serviços não foram atualizados: ${syncErr?.message || 'erro desconhecido'}`;
       }
       setFeedback({
         type: syncNote.startsWith(' Atenção') ? 'error' : 'success',
         message: 'Link do WhatsApp salvo com sucesso no Firestore! Todos os botões do site já estão atualizados.' + syncNote,
       });
-    } catch (err: any) {
+    } catch (err) {
       logger.error('[AdminSettings] Erro ao salvar:', err);
       setFeedback({
         type: 'error',

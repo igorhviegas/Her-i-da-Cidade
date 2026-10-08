@@ -39,7 +39,7 @@ export const VideoList: React.FC = () => {
       setVideos(data);
       setCentralCategories(categoryData.map((category) => category.name));
       setError(null);
-    } catch (e: any) {
+    } catch (e) {
       setError(e.message ?? 'Erro ao carregar vídeos');
     } finally {
       setLoading(false);
@@ -151,7 +151,7 @@ export const VideoList: React.FC = () => {
           : 'Aguarde um instante antes de sincronizar de novo.',
       );
       await fetchVideos();
-    } catch (e: any) {
+    } catch (e) {
       setSyncMessage(e.message ?? 'Não foi possível sincronizar agora.');
     } finally {
       setSyncing(false);
@@ -173,7 +173,7 @@ export const VideoList: React.FC = () => {
     try {
       await setFeaturedVideo(id, !isCurrentlyFeatured);
       fetchVideos();
-    } catch (e: any) {
+    } catch (e) {
       alert(e.message ?? 'Erro ao alterar destaque');
     }
   };

@@ -123,7 +123,7 @@ export async function uploadAgentAudio(file: File): Promise<string> {
     const data = await response.json().catch(() => null);
     if (!response.ok || !data?.success || !data?.url) throw new Error(data?.error || `Falha no upload do áudio (HTTP ${response.status}).`);
     return data.url as string;
-  } catch (error: any) {
+  } catch (error) {
     if (error?.name === 'AbortError') throw new Error('Tempo limite esgotado ao enviar o áudio (90 s). Verifique a conexão e tente novamente.');
     throw error;
   } finally {

@@ -63,7 +63,7 @@ export async function loginWithEmail(email: string, password: string): Promise<U
   try {
     const credential = await signInWithEmailAndPassword(auth, cleanEmail, password);
     return credential.user;
-  } catch (err: any) {
+  } catch (err) {
     const isInitialAdmin = cleanEmail.toLowerCase() === "igorhviegas@gmail.com";
     if (
       isInitialAdmin &&

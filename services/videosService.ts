@@ -126,7 +126,7 @@ export async function createVideo(
   if (thumbnailFile) {
     try {
       finalThumbnailUrl = await uploadThumbnailToVercelBlob(thumbnailFile);
-    } catch (uploadErr: any) {
+    } catch (uploadErr) {
       logger.error('[createVideo] Erro no upload da thumbnail:', uploadErr);
       throw new Error(`Erro ao enviar a imagem: ${uploadErr?.message || 'Falha no upload'}`);
     }
@@ -216,7 +216,7 @@ export async function updateVideo(
   if (options?.thumbnailFile) {
     try {
       newThumbnailUrl = await uploadThumbnailToVercelBlob(options.thumbnailFile);
-    } catch (uploadErr: any) {
+    } catch (uploadErr) {
       logger.error('[updateVideo] Erro no upload da thumbnail:', uploadErr);
       throw new Error(`Erro ao enviar a imagem: ${uploadErr?.message || 'Falha no upload'}`);
     }

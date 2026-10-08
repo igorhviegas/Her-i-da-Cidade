@@ -27,7 +27,7 @@ async function uploadImageToVercelBlob(file: File, purpose?: 'services'): Promis
       body: formData,
       signal: controller.signal,
     });
-  } catch (netError: any) {
+  } catch (netError) {
     clearTimeout(timeoutId);
     if (netError?.name === 'AbortError') {
       throw new Error('Tempo limite esgotado ao enviar a imagem (25s). Verifique sua conexão e tente novamente.');

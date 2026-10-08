@@ -80,17 +80,17 @@ export const AdminProfilePage: React.FC = () => {
 
   const saveName = async () => {
     setSaving(true); setNameError(null); setSaved(false);
-    try { await setDisplayName(name); setSaved(true); } catch (e: any) { setNameError(e?.message ?? 'Não foi possível salvar o nome.'); } finally { setSaving(false); }
+    try { await setDisplayName(name); setSaved(true); } catch (e) { setNameError(e?.message ?? 'Não foi possível salvar o nome.'); } finally { setSaving(false); }
   };
 
   const startActivation = async () => {
     setActivating(true); setLoadError(null);
-    try { setPreview(await previewBaseline()); } catch (e: any) { setLoadError(e?.message ?? 'Falha ao calcular o XP inicial.'); } finally { setActivating(false); }
+    try { setPreview(await previewBaseline()); } catch (e) { setLoadError(e?.message ?? 'Falha ao calcular o XP inicial.'); } finally { setActivating(false); }
   };
   const confirmActivation = async () => {
     if (!preview) return;
     setActivating(true); setLoadError(null);
-    try { await activateXp(preview); setPreview(null); } catch (e: any) { setLoadError(e?.message ?? 'Falha ao gravar o XP inicial (as regras do Firestore já foram publicadas?).'); } finally { setActivating(false); }
+    try { await activateXp(preview); setPreview(null); } catch (e) { setLoadError(e?.message ?? 'Falha ao gravar o XP inicial (as regras do Firestore já foram publicadas?).'); } finally { setActivating(false); }
   };
 
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'Administrador';

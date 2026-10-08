@@ -140,7 +140,7 @@ export async function updatePublicSiteConfig(
   try {
     try {
       await updateDoc(docRef, payload);
-    } catch (err: any) {
+    } catch (err) {
       // Se o documento não existir ainda, cria com setDoc merge
       if (err?.code === "not-found" || err?.message?.includes("No document to update")) {
         await setDoc(
@@ -155,7 +155,7 @@ export async function updatePublicSiteConfig(
         throw err;
       }
     }
-  } catch (error: any) {
+  } catch (error) {
     logger.error("[siteConfigService] Erro ao atualizar siteConfig/public:", error);
     throw error;
   }
@@ -195,7 +195,7 @@ export function subscribeToPublicSiteConfig(
         onUpdate(DEFAULT_PUBLIC_SITE_CONFIG);
       }
     );
-  } catch (err: any) {
+  } catch (err) {
     logger.warn("[siteConfigService] Falha ao iniciar listener de siteConfig:", err);
     if (onError) onError(err);
     onUpdate(DEFAULT_PUBLIC_SITE_CONFIG);
@@ -217,7 +217,7 @@ export function useSiteConfig() {
     try {
       const data = await getPublicSiteConfig();
       setConfig(data);
-    } catch (err: any) {
+    } catch (err) {
       setError(err?.message || "Erro ao carregar configurações");
       setConfig(DEFAULT_PUBLIC_SITE_CONFIG);
     } finally {

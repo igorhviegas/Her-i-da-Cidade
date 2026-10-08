@@ -22,7 +22,7 @@ export const AdminAgentPage: React.FC = () => {
   const run = async (fn: () => Promise<unknown>, ok?: string) => {
     setFeedback(null);
     try { await fn(); if (ok) setFeedback({ type: 'success', message: ok }); return true; }
-    catch (err: any) { setFeedback({ type: 'error', message: err?.message || 'Não foi possível salvar. Verifique suas permissões de administrador.' }); return false; }
+    catch (err) { setFeedback({ type: 'error', message: err?.message || 'Não foi possível salvar. Verifique suas permissões de administrador.' }); return false; }
   };
 
   return (

@@ -48,7 +48,7 @@ export async function getServices(options: ServiceFetchOptions = {}): Promise<Se
     return services.length > 0
       ? services
       : (onlyActive ? FALLBACK_SERVICES.filter((s) => s.active !== false) : FALLBACK_SERVICES);
-  } catch (error: any) {
+  } catch (error) {
     const errorMessage = error?.message || "Erro desconhecido ao carregar serviços do Firestore";
     logger.error("[servicesService] Erro ao buscar serviços:", error);
 
@@ -132,7 +132,7 @@ export function subscribeToServices(
         onUpdate(onlyActive ? FALLBACK_SERVICES.filter((s) => s.active !== false) : FALLBACK_SERVICES);
       }
     );
-  } catch (error: any) {
+  } catch (error) {
     logger.warn("[servicesService] Falha ao iniciar listener:", error);
     if (onError) onError(error);
     onUpdate(onlyActive ? FALLBACK_SERVICES.filter((s) => s.active !== false) : FALLBACK_SERVICES);

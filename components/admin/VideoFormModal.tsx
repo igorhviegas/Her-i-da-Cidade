@@ -156,7 +156,7 @@ const VideoFormModal: React.FC<Props> = ({ video, existingCategories = [], onClo
       setCategories(prev => [...prev, category.name]);
       setNewCategory('');
       setCategoryError(null);
-    } catch (err: any) {
+    } catch (err) {
       setCategoryError(err?.message || 'Não foi possível criar a categoria.');
     }
   };
@@ -218,7 +218,7 @@ const VideoFormModal: React.FC<Props> = ({ video, existingCategories = [], onClo
         await createVideo(payload, selectedFile);
       }
       onClose();
-    } catch (err: any) {
+    } catch (err) {
       logger.error('[VideoFormModal] Erro ao salvar vídeo:', err);
       setError(err?.message ?? 'Falha ao salvar vídeo');
       if (bodyScrollRef.current) bodyScrollRef.current.scrollTop = 0;

@@ -86,7 +86,7 @@ export async function createService(input: CreateServiceInput): Promise<Service>
 
   try {
     await setDoc(newDocRef, payload);
-  } catch (err: any) {
+  } catch (err) {
     if (err?.message?.includes("permission") || err?.code === "permission-denied") {
       handleFirestoreError(err, OperationType.CREATE, `${SERVICES_COLLECTION}/${docId}`);
     }
@@ -207,7 +207,7 @@ export async function updateService(id: string, updates: UpdateServiceInput): Pr
   try {
     try {
       await updateDoc(docRef, payload);
-    } catch (updateErr: any) {
+    } catch (updateErr) {
       // Se o documento ainda não existia fisicamente, cria com merge
       if (updateErr?.code === 'not-found' || updateErr?.message?.includes('No document to update')) {
         await setDoc(docRef, payload, { merge: true });
@@ -215,7 +215,7 @@ export async function updateService(id: string, updates: UpdateServiceInput): Pr
         throw updateErr;
       }
     }
-  } catch (err: any) {
+  } catch (err) {
     if (err?.message?.includes("permission") || err?.code === "permission-denied") {
       handleFirestoreError(err, OperationType.UPDATE, `${SERVICES_COLLECTION}/${id}`);
     }
@@ -237,7 +237,7 @@ export async function deleteService(id: string): Promise<void> {
   const docRef = doc(db, SERVICES_COLLECTION, id);
   try {
     await deleteDoc(docRef);
-  } catch (err: any) {
+  } catch (err) {
     if (err?.message?.includes("permission") || err?.code === "permission-denied") {
       handleFirestoreError(err, OperationType.DELETE, `${SERVICES_COLLECTION}/${id}`);
     }

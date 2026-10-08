@@ -273,7 +273,7 @@ export const AdminDashboard: React.FC = () => {
           message: `${currentList.length} serviços já sincronizados no Firestore. Nenhuma duplicata criada.`,
         });
       }
-    } catch (err: any) {
+    } catch (err) {
       logger.error('[AdminDashboard] Erro ao sincronizar serviços:', err);
       if (!auto) {
         setSyncFeedback({

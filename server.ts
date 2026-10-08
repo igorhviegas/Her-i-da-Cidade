@@ -141,7 +141,7 @@ async function refreshReviewsInBackground() {
             break;
           }
         }
-      } catch (err: any) {
+      } catch (err) {
         logger.warn(`[Reviews] Model ${model} unavailable or busy (${err?.status || err?.message || "error"}), trying alternative...`);
       }
     }

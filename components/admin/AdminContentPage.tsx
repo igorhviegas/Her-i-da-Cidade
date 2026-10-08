@@ -157,7 +157,7 @@ export const AdminContentPage: React.FC = () => {
       setDraft(null);
       setEditingId(null);
       setFeedback({ type: 'success', message: 'Seção salva com sucesso.' });
-    } catch (reason: any) {
+    } catch (reason) {
       setFeedback({ type: 'error', message: reason?.message || 'Não foi possível salvar a seção.' });
     } finally {
       setSavingSection(false);
@@ -168,7 +168,7 @@ export const AdminContentPage: React.FC = () => {
     setFeedback(null);
     try {
       await setHomeSectionActive(section.id, !section.active);
-    } catch (reason: any) {
+    } catch (reason) {
       setFeedback({ type: 'error', message: reason?.message || 'Não foi possível alterar a visibilidade.' });
     }
   };
@@ -182,7 +182,7 @@ export const AdminContentPage: React.FC = () => {
     setFeedback(null);
     try {
       await updateHomeSectionOrder(reordered.map((section) => section.id));
-    } catch (reason: any) {
+    } catch (reason) {
       setFeedback({ type: 'error', message: reason?.message || 'Não foi possível salvar a ordem.' });
     } finally {
       setMovingId(null);
@@ -195,7 +195,7 @@ export const AdminContentPage: React.FC = () => {
     try {
       await deleteHomeSection(section.id);
       setFeedback({ type: 'success', message: 'Seção excluída.' });
-    } catch (reason: any) {
+    } catch (reason) {
       setFeedback({ type: 'error', message: reason?.message || 'Não foi possível excluir a seção.' });
     }
   };
@@ -207,7 +207,7 @@ export const AdminContentPage: React.FC = () => {
     try {
       await updateHomeSeo(seoTitle, seoDescription);
       setFeedback({ type: 'success', message: 'SEO da página inicial salvo.' });
-    } catch (reason: any) {
+    } catch (reason) {
       setFeedback({ type: 'error', message: reason?.message || 'Não foi possível salvar o SEO.' });
     } finally {
       setSavingSeo(false);

@@ -42,7 +42,7 @@ export const AdminLogin: React.FC = () => {
       await login(email.trim(), password);
       // Redirecionamento é tratado pelo observer ou manualmente
       navigate('/admin');
-    } catch (error: any) {
+    } catch (error) {
       logger.error('[AdminLogin] Erro ao autenticar:', error);
       const code = error?.code || 'auth/unknown';
       setErrorMessage(getAuthErrorMessage(code));

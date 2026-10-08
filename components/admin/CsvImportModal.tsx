@@ -57,7 +57,7 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
         'Palavras-chave / Pesquisa': row['Palavras-chave / Pesquisa'] ?? row['keywords'] ?? '',
       }));
       setPreviewData(normalized);
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message ?? 'Falha ao ler o CSV');
     } finally {
       setLoading(false);

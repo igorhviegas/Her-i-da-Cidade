@@ -32,7 +32,7 @@ export function useServices(hookOptions: {
         loading: false,
         error: null,
       });
-    } catch (err: any) {
+    } catch (err) {
       const errorMsg = err?.message || "Não foi possível carregar os serviços.";
       setState({
         services: FALLBACK_SERVICES,
