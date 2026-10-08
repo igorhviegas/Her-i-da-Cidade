@@ -224,3 +224,12 @@ Mesmo endpoint, mesmo `Authorization: Bearer <segredo>`; o evento é `mission.cr
 | `mission.difficulty` | obrigatório, inteiro de 1 a 5 (texto `"3"` é aceito) |
 
 Qualquer outro campo gera `400` e nada é criado. Sucesso: `{ "ok": true, "missionId": "<id>" }`. Não há deduplicação (como nos pedidos): em caso de timeout, confira o CRM antes de reenviar. O fluxo de pagamento (`payment.paid`) não foi alterado.
+
+## Gasto da carteira (Financeiro → aba "WhatsApp API")
+
+Acompanhamento do que o ManyChat debita da carteira por mensagem paga. **Não é despesa**: a despesa continua sendo a recarga, lançada à mão em Despesas.
+
+- **Origem:** o ManyChat não tem API para isso. Exporte o CSV em Settings → Billing → Wallet → Usage History e use **Importar CSV** na aba. Só os débitos entram; recargas são ignoradas. Reimportar um período já importado não duplica (a chave é o `Id` da cobrança).
+- **Moeda:** a carteira cobra em US$. O campo "US$ 1 = R$" converte tudo na tela (fica salvo no navegador).
+- **Dados:** coleção `manychatWalletDays` (um documento por dia × telefone, só administradores). A aba lê o ano selecionado.
+- **Visões:** gasto por dia, semana (seg–dom) e mês; custo do chat por tipo de serviço; consumo por cliente. O cruzamento usa o WhatsApp do cliente cadastrado (tolera a falta do 9º dígito) e o gasto do cliente é dividido entre os pedidos dele no mês. Consumo e venda são comparados dentro do mesmo mês.
