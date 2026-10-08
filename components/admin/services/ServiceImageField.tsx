@@ -1,7 +1,7 @@
 import React from 'react';
-import { Image as ImageIcon, RefreshCw, Upload } from 'lucide-react';
 import type { ServiceFormData } from './serviceForm';
 import type { ServiceImageUpload } from './useServiceImageUpload';
+import { ServiceImageActions, ServiceImagePreview } from '../adminPages/ServiceImageParts';
 
 interface ServiceImageFieldProps {
   formData: ServiceFormData;
@@ -28,7 +28,6 @@ export const ServiceImageField: React.FC<ServiceImageFieldProps> = ({
     setComplete: setServiceImageUploadComplete,
     clear: clearSelectedServiceImage,
     onFileChange: handleServiceImageFileChange,
-    upload: handleUploadServiceImage,
   } = image;
 
   return (
@@ -63,38 +62,7 @@ export const ServiceImageField: React.FC<ServiceImageFieldProps> = ({
             className="hidden"
             disabled={isSubmitting || isServiceImageUploading}
           />
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => serviceImageInputRef.current?.click()}
-              disabled={isSubmitting || isServiceImageUploading}
-              className="inline-flex items-center gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-300 transition hover:bg-blue-500/20 disabled:opacity-50"
-            >
-              <ImageIcon className="h-3.5 w-3.5" />
-              {selectedServiceImage ? 'Escolher outra imagem' : formData.imageUrl ? 'Substituir por upload' : 'Escolher imagem'}
-            </button>
-            {selectedServiceImage && (
-              <>
-                <button
-                  type="button"
-                  onClick={handleUploadServiceImage}
-                  disabled={isSubmitting || isServiceImageUploading}
-                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
-                >
-                  {isServiceImageUploading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-                  {isServiceImageUploading ? 'Enviando imagem...' : 'Enviar imagem'}
-                </button>
-                <button
-                  type="button"
-                  onClick={clearSelectedServiceImage}
-                  disabled={isSubmitting || isServiceImageUploading}
-                  className="rounded-lg bg-white/5 px-3 py-2 text-xs font-semibold text-white/60 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
-                >
-                  Cancelar seleção
-                </button>
-              </>
-            )}
-          </div>
+          <ServiceImageActions image={image} imageUrl={formData.imageUrl} isSubmitting={isSubmitting} />
           {selectedServiceImage && (
             <p className="mt-2 truncate text-[11px] text-amber-300">
               {selectedServiceImage.name} · {(selectedServiceImage.size / (1024 * 1024)).toFixed(2)} MB — envie antes de salvar.
@@ -106,21 +74,7 @@ export const ServiceImageField: React.FC<ServiceImageFieldProps> = ({
         </div>
 
         {/* Preview Container */}
-        <div className="w-16 h-24 rounded-xl overflow-hidden bg-black/40 border border-white/10 shrink-0 flex items-center justify-center">
-          {serviceImagePreviewUrl || formData.imageUrl ? (
-            <img
-              src={serviceImagePreviewUrl || formData.imageUrl}
-              alt="Preview"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.currentTarget as HTMLElement).style.display = 'none';
-              }}
-            />
-          ) : (
-            <ImageIcon className="w-6 h-6 text-white/20" />
-          )}
-        </div>
+        <ServiceImagePreview previewUrl={serviceImagePreviewUrl} imageUrl={formData.imageUrl} />
       </div>
       {formErrors.imageUrl && (
         <p className="text-xs text-red-400 mt-1">{formErrors.imageUrl}</p>

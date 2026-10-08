@@ -1,18 +1,16 @@
 import { logger } from '../../lib/logger.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, ArrowRight, CalendarDays, Camera, ChevronDown, ChevronUp, RotateCcw, CheckCircle2, Circle, ClipboardList, Loader2, RefreshCw, Target, Wallet, XCircle } from 'lucide-react';
+import { CalendarDays, Camera, ChevronDown, ChevronUp, RotateCcw, CheckCircle2, Circle, Target, Wallet, XCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from '../../lib/router';
 import { subscribeCompletedOrders } from '../../services/financeService';
-import { subscribeActiveOrders } from '../../services/ordersService';
 import { listMissions, listOccurrencesSince, runClientSync, type Mission, type TaskOccurrence } from '../../services/missionsService';
-import { getClientById } from '../../services/clientsService';
-import { getServiceById } from '../../services/servicesService';
 import { buildRevenueEntries, dailyRevenue, monthKeyOf } from '../../services/financeCalculations.js';
-import { deliveriesToday, tasksToday } from '../../services/homeToday.js';
+import { tasksToday } from '../../services/homeToday.js';
 import { dateKey } from '../../functions/missions-core.js';
-import { formatOrderReference } from '../../services/orderReference.js';
-import type { Client, Order, Service } from '../../types';
+import type { Order } from '../../types';
+import { Widget, Loading, Empty, ErrorState, type Load } from './adminPages/homeWidgetParts';
+import { DeliveriesWidget } from './adminPages/DeliveriesWidget';
 import { formatMoney } from './financeFormat';
 import { subscribeInstagramProfile, type InstagramProfile } from '../../services/instagramService';
 import { DeltaText } from './AdminInstagramPage';
@@ -20,8 +18,6 @@ import { useCalendarEvents } from '../../services/calendarService';
 import { eventsOnDay } from '../../services/calendarEvents.js';
 import { DayAgenda } from './CalendarAgenda';
 import { resolveNavOrder, shiftNavItem } from '../../services/adminNav.js';
-
-type Load<T> = { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: T };
 
 /** Reavalia "hoje" a cada minuto (a página pode ficar aberta na virada do dia). */
 function useNow(): Date {
@@ -36,33 +32,6 @@ function useNow(): Date {
   }, []);
   return now;
 }
-
-const Widget: React.FC<{
-  title: string; subtitle: string; icon: React.ElementType; tone: string; onOpen: () => void; openLabel: string; children: React.ReactNode;
-}> = ({ title, subtitle, icon: Icon, tone, onOpen, openLabel, children }) => (
-  <section className="flex min-h-[220px] flex-col rounded-2xl border border-white/10 bg-[#0D1527] p-5 shadow-lg" aria-label={title}>
-    <header className="mb-4 flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <h3 className="text-sm font-bold text-white">{title}</h3>
-        <p className="mt-0.5 text-[11px] leading-snug text-white/45">{subtitle}</p>
-      </div>
-      <div className={`shrink-0 rounded-xl p-2 ${tone}`}><Icon className="h-4 w-4" aria-hidden /></div>
-    </header>
-    <div className="flex-1">{children}</div>
-    <button type="button" onClick={onOpen} className="mt-4 flex items-center gap-1 self-start text-xs font-semibold text-blue-400 transition-colors hover:text-blue-300">
-      {openLabel}<ArrowRight className="h-3.5 w-3.5" aria-hidden />
-    </button>
-  </section>
-);
-
-const Loading = () => <div className="flex items-center gap-2 py-6 text-xs text-white/50"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Carregando…</div>;
-const Empty: React.FC<{ children: React.ReactNode }> = ({ children }) => <p className="py-6 text-sm text-white/45">{children}</p>;
-const ErrorState: React.FC<{ onRetry?: () => void }> = ({ onRetry }) => (
-  <div className="flex flex-col items-start gap-2 py-4 text-xs text-red-300">
-    <span className="flex items-center gap-2"><AlertCircle className="h-4 w-4 shrink-0" aria-hidden />Não foi possível carregar este widget.</span>
-    {onRetry && <button type="button" onClick={onRetry} className="flex items-center gap-1 font-semibold text-red-200 hover:text-white"><RefreshCw className="h-3 w-3" aria-hidden />Tentar de novo</button>}
-  </div>
-);
 
 // ------------------------------------------------------------------ Financeiro
 
@@ -153,81 +122,6 @@ const TasksWidget: React.FC<{ now: Date; onOpen: () => void }> = ({ now, onOpen 
             ))}
           </ul>
           {summary.items.length > 6 && <p className="mt-2 text-[11px] text-white/40">+ {summary.items.length - 6} no módulo Missões</p>}
-        </>
-      ))}
-    </Widget>
-  );
-};
-
-// --------------------------------------------------------------------- Pedidos
-
-// Etapas do Kanban (mesmos nomes de AdminOrdersPage). Só "Entregar" está pronto; as anteriores ainda precisam de atenção.
-const STAGE_LABELS: Record<string, string> = { scheduled: 'Agendado', recording: 'Gravar', editing: 'Editar', delivery: 'Pronto para entregar' };
-
-const DeliveriesWidget: React.FC<{ now: Date; onOpenOrder: (id: string) => void; onOpen: () => void }> = ({ now, onOpenOrder, onOpen }) => {
-  const [state, setState] = useState<Load<Order[]>>({ status: 'loading' });
-  const [names, setNames] = useState<{ clients: Map<string, Client | null>; services: Map<string, Service | null> }>({ clients: new Map(), services: new Map() });
-  useEffect(() => subscribeActiveOrders(
-    (orders) => setState({ status: 'ready', data: orders }),
-    () => setState({ status: 'error' }),
-  ), []);
-
-  const rows = useMemo<{ order: Order; attention: boolean }[]>(() => (state.status === 'ready' ? deliveriesToday(state.data, now) : []), [state, now]);
-  const lookupKey = rows.map(({ order }) => `${order.clientId}|${order.serviceId}`).join();
-  useEffect(() => {
-    // Só busca nome/serviço dos pedidos de hoje que ainda não foram buscados.
-    const missingClients: string[] = Array.from(new Set<string>(rows.map(({ order }) => order.clientId))).filter((id) => !!id && !names.clients.has(id));
-    const missingServices: string[] = Array.from(new Set<string>(rows.map(({ order }) => order.serviceId))).filter((id) => !!id && !names.services.has(id));
-    if (!missingClients.length && !missingServices.length) return;
-    let cancelled = false;
-    void Promise.all([
-      Promise.all(missingClients.map((id) => getClientById(id).catch(() => null))),
-      Promise.all(missingServices.map((id) => getServiceById(id).catch(() => null))),
-    ]).then(([clients, services]) => {
-      if (cancelled) return;
-      setNames((current) => ({
-        clients: new Map([...current.clients, ...missingClients.map((id, i) => [id, clients[i]] as const)]),
-        services: new Map([...current.services, ...missingServices.map((id, i) => [id, services[i]] as const)]),
-      }));
-    });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lookupKey]);
-
-  const attentionCount = rows.filter((row) => row.attention).length;
-  const reference = (order: Order): string => formatOrderReference(order, state.status === 'ready' ? state.data : []);
-
-  return (
-    <Widget title="Entregas de hoje" subtitle="Pedidos em andamento com prazo de entrega ao cliente hoje. Em amarelo: ainda não estão em Entregar." icon={ClipboardList} tone="bg-emerald-500/10 text-emerald-300" onOpen={onOpen} openLabel="Abrir Pedidos">
-      {state.status === 'loading' && <Loading />}
-      {state.status === 'error' && <ErrorState />}
-      {state.status === 'ready' && (rows.length === 0 ? <Empty>Nenhuma entrega prevista para hoje.</Empty> : (
-        <>
-          <p className="mb-3 text-xs text-white/55">
-            {rows.length} {rows.length === 1 ? 'entrega' : 'entregas'}
-            {attentionCount > 0 && <> · <span className="font-semibold text-amber-300">{attentionCount} {attentionCount === 1 ? 'precisa de atenção' : 'precisam de atenção'}</span></>}
-          </p>
-          <ul className="space-y-2">
-            {rows.slice(0, 5).map(({ order, attention }) => {
-              const client = names.clients.get(order.clientId);
-              const service = names.services.get(order.serviceId);
-              return (
-                <li key={order.id}>
-                  <button type="button" onClick={() => onOpenOrder(order.id)}
-                    className={`w-full rounded-xl border px-3 py-2 text-left transition-colors hover:bg-white/5 ${attention ? 'border-amber-400/40 bg-amber-400/5' : 'border-white/10'}`}>
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-semibold text-white">{client?.name ?? 'Cliente'}</span>
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${attention ? 'bg-amber-400/15 text-amber-200' : 'bg-emerald-400/15 text-emerald-200'}`}>
-                        {STAGE_LABELS[order.status] ?? order.status}
-                      </span>
-                    </span>
-                    <span className="mt-0.5 block truncate text-xs text-white/50">{service?.title ?? 'Serviço'} · Pedido {reference(order)}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          {rows.length > 5 && <p className="mt-2 text-[11px] text-white/40">+ {rows.length - 5} no Kanban</p>}
         </>
       ))}
     </Widget>

@@ -64,6 +64,16 @@ export const serviceToFormData = (service: Service): ServiceFormData => ({
   faq: service.faq ?? [],
 });
 
+const validateImageUrl = (errors: ServiceFormErrors, formData: ServiceFormData, hasPendingImage: boolean) => {
+  if (hasPendingImage) {
+    errors.imageUrl = 'Envie a imagem selecionada antes de salvar o serviço.';
+  } else if (!formData.imageUrl.trim()) {
+    errors.imageUrl = 'A URL da imagem é obrigatória.';
+  } else if (!formData.imageUrl.startsWith('http://') && !formData.imageUrl.startsWith('https://')) {
+    errors.imageUrl = 'Informe uma URL válida iniciada por https:// ou http://';
+  }
+};
+
 export const validateServiceForm = (formData: ServiceFormData, hasPendingImage: boolean): ServiceFormErrors => {
   const errors: ServiceFormErrors = {};
 
@@ -79,13 +89,7 @@ export const validateServiceForm = (formData: ServiceFormData, hasPendingImage: 
   if (!formData.category.trim()) {
     errors.category = 'A categoria é obrigatória.';
   }
-  if (hasPendingImage) {
-    errors.imageUrl = 'Envie a imagem selecionada antes de salvar o serviço.';
-  } else if (!formData.imageUrl.trim()) {
-    errors.imageUrl = 'A URL da imagem é obrigatória.';
-  } else if (!formData.imageUrl.startsWith('http://') && !formData.imageUrl.startsWith('https://')) {
-    errors.imageUrl = 'Informe uma URL válida iniciada por https:// ou http://';
-  }
+  validateImageUrl(errors, formData, hasPendingImage);
   if (typeof formData.order !== 'number' || isNaN(formData.order) || formData.order < 1) {
     errors.order = 'A ordem de exibição deve ser um número maior que zero.';
   }

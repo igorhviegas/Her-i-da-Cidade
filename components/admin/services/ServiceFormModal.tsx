@@ -8,6 +8,7 @@ import { ServiceImageField } from './ServiceImageField';
 import { ServiceOrderConfigSection } from './ServiceOrderConfigSection';
 import { ServiceDeliveryMessageSection } from './ServiceDeliveryMessageSection';
 import { ServiceFaqSection } from './ServiceFaqSection';
+import { ServiceDescriptionField, ServiceTitleField } from '../adminPages/ServiceTextFields';
 
 interface ServiceFormModalProps {
   formData: ServiceFormData;
@@ -79,23 +80,7 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
         <form onSubmit={handleSubmitService} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
           
           {/* Nome / Título */}
-          <div>
-            <label className="block text-xs font-semibold text-white/80 uppercase tracking-wider mb-1.5">
-              Nome do Serviço <span className="text-red-400">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="ex: Vídeo Especial de Aniversário"
-              className={`w-full px-3.5 py-2.5 bg-[#070B14] border rounded-xl text-sm text-white placeholder-white/40 focus:outline-none transition-colors ${
-                formErrors.title ? 'border-red-500 focus:border-red-400' : 'border-white/10 focus:border-blue-500'
-              }`}
-            />
-            {formErrors.title && (
-              <p className="text-xs text-red-400 mt-1">{formErrors.title}</p>
-            )}
-          </div>
+          <ServiceTitleField formData={formData} setFormData={setFormData} formErrors={formErrors} />
 
           <ServicePriceCategoryFields formData={formData} setFormData={setFormData} formErrors={formErrors} isCustomCategory={isCustomCategory} setIsCustomCategory={setIsCustomCategory} />
 
@@ -114,23 +99,7 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
           </div>
 
           {/* Descrição */}
-          <div>
-            <label className="block text-xs font-semibold text-white/80 uppercase tracking-wider mb-1.5">
-              Descrição do Serviço <span className="text-red-400">*</span>
-            </label>
-            <textarea
-              rows={3}
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Descreva o que o cliente recebe neste serviço..."
-              className={`w-full px-3.5 py-2.5 bg-[#070B14] border rounded-xl text-sm text-white placeholder-white/40 focus:outline-none transition-colors ${
-                formErrors.description ? 'border-red-500 focus:border-red-400' : 'border-white/10 focus:border-blue-500'
-              }`}
-            />
-            {formErrors.description && (
-              <p className="text-xs text-red-400 mt-1">{formErrors.description}</p>
-            )}
-          </div>
+          <ServiceDescriptionField formData={formData} setFormData={setFormData} formErrors={formErrors} />
 
           <ServiceImageField
             formData={formData}
