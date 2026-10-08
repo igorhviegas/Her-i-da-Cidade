@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminFirestore } from '../functions/firebase-admin.js';
@@ -55,7 +56,7 @@ export async function handleGoogleCalendar(
     return send(200, { ok: true, created: result.created, htmlLink: result.htmlLink ?? null, persisted });
   } catch (error) {
     if (error instanceof GoogleCalendarError) return fail(STATUS_BY_CODE[error.code] ?? 502, error.code, error.message);
-    console.error('[Google Calendar] falha inesperada:', error instanceof Error ? error.name : 'erro');
+    logger.error('[Google Calendar] falha inesperada:', error instanceof Error ? error.name : 'erro');
     return fail(500, 'internal_error', 'O envio falhou; consulte os logs do servidor.');
   }
 }

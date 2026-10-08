@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger.js';
 import { auth } from "../../lib/firebase";
 
 export enum OperationType {
@@ -43,6 +44,6 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  logger.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }

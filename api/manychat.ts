@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
@@ -167,7 +168,7 @@ export async function handleManyChatWebhook(req: Request | any, res: Response | 
 
   const secret = process.env.MANYCHAT_WEBHOOK_SECRET;
   if (!secret) {
-    console.error('[ManyChat Webhook] Segredo MANYCHAT_WEBHOOK_SECRET não configurado nas variáveis de ambiente.');
+    logger.error('[ManyChat Webhook] Segredo MANYCHAT_WEBHOOK_SECRET não configurado nas variáveis de ambiente.');
     return normalizedRes.status(500).json({
       ok: false,
       error: {
@@ -187,7 +188,7 @@ export async function handleManyChatWebhook(req: Request | any, res: Response | 
       .replace(/-----BEGIN[^-]+-----/g, '[REDACTED_KEY_HEADER]')
       .replace(/-----END[^-]+-----/g, '[REDACTED_KEY_FOOTER]')
       .replace(/[A-Za-z0-9+/=]{40,}/g, '[REDACTED_TOKEN]');
-    console.error(`[ManyChat Webhook] Falha ao inicializar Firebase Admin SDK (${errorName}): ${sanitizedMessage}`);
+    logger.error(`[ManyChat Webhook] Falha ao inicializar Firebase Admin SDK (${errorName}): ${sanitizedMessage}`);
     return normalizedRes.status(500).json({
       ok: false,
       error: {

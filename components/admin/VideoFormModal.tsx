@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger.js';
 import React, { useState, useEffect, useRef } from 'react';
 import { Video } from '../../types';
 import { createVideo, updateVideo, getVideoByInstagramId } from '../../services/videosService';
@@ -218,7 +219,7 @@ const VideoFormModal: React.FC<Props> = ({ video, existingCategories = [], onClo
       }
       onClose();
     } catch (err: any) {
-      console.error('[VideoFormModal] Erro ao salvar vídeo:', err);
+      logger.error('[VideoFormModal] Erro ao salvar vídeo:', err);
       setError(err?.message ?? 'Falha ao salvar vídeo');
       if (bodyScrollRef.current) bodyScrollRef.current.scrollTop = 0;
     } finally {

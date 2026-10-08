@@ -1,3 +1,4 @@
+import { logger } from './lib/logger.js';
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
@@ -141,7 +142,7 @@ async function refreshReviewsInBackground() {
           }
         }
       } catch (err: any) {
-        console.warn(`[Reviews] Model ${model} unavailable or busy (${err?.status || err?.message || "error"}), trying alternative...`);
+        logger.warn(`[Reviews] Model ${model} unavailable or busy (${err?.status || err?.message || "error"}), trying alternative...`);
       }
     }
 
@@ -149,7 +150,7 @@ async function refreshReviewsInBackground() {
       lastFetchedTime = Date.now() - (CACHE_DURATION_MS - 5 * 60 * 1000);
     }
   } catch {
-    console.warn("[Reviews] Serving current cached reviews.");
+    logger.warn("[Reviews] Serving current cached reviews.");
   } finally {
     isFetchingFresh = false;
   }
@@ -243,7 +244,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    logger.log(`Server running on http://localhost:${PORT}`);
   });
 }
 

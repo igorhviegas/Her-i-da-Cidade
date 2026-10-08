@@ -1,4 +1,5 @@
 
+import { logger } from '../lib/logger.js';
 import { Review } from "../types";
 
 export const fetchLiveReviews = async (): Promise<Review[]> => {
@@ -12,7 +13,7 @@ export const fetchLiveReviews = async (): Promise<Review[]> => {
       return data;
     }
   } catch (error) {
-    console.error("Erro ao buscar avaliações do servidor:", error);
+    logger.error("Erro ao buscar avaliações do servidor:", error);
   }
 
   // Fallback seguro caso a requisição falhe

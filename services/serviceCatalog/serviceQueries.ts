@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger.js';
 import { collection, doc, getDocs, getDoc, onSnapshot, Unsubscribe } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { Service } from "../../types";
@@ -17,7 +18,7 @@ export async function getServices(options: ServiceFetchOptions = {}): Promise<Se
 
   if (!db) {
     const warningMsg = "[servicesService] Firebase Firestore não inicializado. Utilizando fallback local.";
-    console.warn(warningMsg);
+    logger.warn(warningMsg);
     if (!fallbackOnError) {
       throw new Error(warningMsg);
     }
@@ -28,7 +29,7 @@ export async function getServices(options: ServiceFetchOptions = {}): Promise<Se
     const querySnapshot = await getDocs(collection(db, SERVICES_COLLECTION));
 
     if (querySnapshot.empty) {
-      console.info("[servicesService] Coleção 'services' vazia. Utilizando fallback temporário.");
+      logger.info("[servicesService] Coleção 'services' vazia. Utilizando fallback temporário.");
       return onlyActive ? FALLBACK_SERVICES.filter((s) => s.active !== false) : FALLBACK_SERVICES;
     }
 
@@ -49,7 +50,7 @@ export async function getServices(options: ServiceFetchOptions = {}): Promise<Se
       : (onlyActive ? FALLBACK_SERVICES.filter((s) => s.active !== false) : FALLBACK_SERVICES);
   } catch (error: any) {
     const errorMessage = error?.message || "Erro desconhecido ao carregar serviços do Firestore";
-    console.error("[servicesService] Erro ao buscar serviços:", error);
+    logger.error("[servicesService] Erro ao buscar serviços:", error);
 
     if (!fallbackOnError) {
       throw new Error(`Falha no serviço de serviços: ${errorMessage}`);
@@ -85,7 +86,7 @@ export async function getServiceById(id: string): Promise<Service | null> {
 
     return FALLBACK_SERVICES.find((s) => s.id === id) || null;
   } catch (error) {
-    console.error(`[servicesService] Erro ao buscar serviço ID ${id}:`, error);
+    logger.error(`[servicesService] Erro ao buscar serviço ID ${id}:`, error);
     return FALLBACK_SERVICES.find((s) => s.id === id) || null;
   }
 }
@@ -126,13 +127,13 @@ export function subscribeToServices(
         onUpdate(services.length > 0 ? services : FALLBACK_SERVICES);
       },
       (err) => {
-        console.warn("[servicesService] Erro na inscrição em tempo real:", err);
+        logger.warn("[servicesService] Erro na inscrição em tempo real:", err);
         if (onError) onError(err);
         onUpdate(onlyActive ? FALLBACK_SERVICES.filter((s) => s.active !== false) : FALLBACK_SERVICES);
       }
     );
   } catch (error: any) {
-    console.warn("[servicesService] Falha ao iniciar listener:", error);
+    logger.warn("[servicesService] Falha ao iniciar listener:", error);
     if (onError) onError(error);
     onUpdate(onlyActive ? FALLBACK_SERVICES.filter((s) => s.active !== false) : FALLBACK_SERVICES);
     return () => {};

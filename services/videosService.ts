@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, deleteField, onSnapshot, Unsubscribe, serverTimestamp, query, where, writeBatch } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Video } from "../types";
@@ -126,7 +127,7 @@ export async function createVideo(
     try {
       finalThumbnailUrl = await uploadThumbnailToVercelBlob(thumbnailFile);
     } catch (uploadErr: any) {
-      console.error('[createVideo] Erro no upload da thumbnail:', uploadErr);
+      logger.error('[createVideo] Erro no upload da thumbnail:', uploadErr);
       throw new Error(`Erro ao enviar a imagem: ${uploadErr?.message || 'Falha no upload'}`);
     }
   }
@@ -216,7 +217,7 @@ export async function updateVideo(
     try {
       newThumbnailUrl = await uploadThumbnailToVercelBlob(options.thumbnailFile);
     } catch (uploadErr: any) {
-      console.error('[updateVideo] Erro no upload da thumbnail:', uploadErr);
+      logger.error('[updateVideo] Erro no upload da thumbnail:', uploadErr);
       throw new Error(`Erro ao enviar a imagem: ${uploadErr?.message || 'Falha no upload'}`);
     }
   }
@@ -391,7 +392,7 @@ export async function importVideosFromCSV(videos: Array<any>): Promise<{
 }> {
   if (!db) throw new Error('Firestore não inicializado');
   if (!Array.isArray(videos)) {
-    console.error('Dados CSV inválidos');
+    logger.error('Dados CSV inválidos');
     return { created: 0, updated: 0, errors: 0, errorDetails: [] };
   }
   let created = 0;
@@ -439,7 +440,7 @@ export async function importVideosFromCSV(videos: Array<any>): Promise<{
         if (isValidHttpUrl(rawThumbnail)) {
           validThumbnailUrl = rawThumbnail;
         } else {
-          console.warn(`[CSV] URL de thumbnail inválida na linha ${i + 1}: "${rawThumbnail}". O vídeo será importado normalmente sem thumbnail.`);
+          logger.warn(`[CSV] URL de thumbnail inválida na linha ${i + 1}: "${rawThumbnail}". O vídeo será importado normalmente sem thumbnail.`);
         }
       }
 
@@ -483,7 +484,7 @@ export async function importVideosFromCSV(videos: Array<any>): Promise<{
         created++;
       }
     } catch (e) {
-      console.error('Error importing CSV row', row, e);
+      logger.error('Error importing CSV row', row, e);
       errorDetails.push({
         rowIndex: i + 1,
         title: (row.title ?? row.Title ?? row.Tema ?? '').toString(),

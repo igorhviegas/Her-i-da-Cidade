@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Zap } from 'lucide-react';
 import { eventReward, levelInfo, totalXp, type LevelInfo, type XpBaseline } from '../functions/xp.js';
@@ -46,7 +47,7 @@ export const XpProvider: React.FC<{ children: React.ReactNode }> = ({ children }
       baselineRef.current = snapshot.exists() ? (snapshot.data() as XpBaseline) : null;
       setBaseline(baselineRef.current);
       setBaselineReady(true);
-    }, (error) => { console.error('[XpContext] linha de base indisponível', error); setBaselineReady(true); });
+    }, (error) => { logger.error('[XpContext] linha de base indisponível', error); setBaselineReady(true); });
   }, []);
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export const XpProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         setToasts((list) => [...list.filter((toast) => toast.id !== id), { id, label: LABELS[event.type] ?? 'Atividade concluída', ...reward }]);
         window.setTimeout(() => dismiss(id), TOAST_MS);
       }
-    }, (error) => console.error('[XpContext] histórico de atividades indisponível', error));
+    }, (error) => logger.error('[XpContext] histórico de atividades indisponível', error));
   }, [dismiss]);
 
   const value = useMemo<XpContextType>(() => {

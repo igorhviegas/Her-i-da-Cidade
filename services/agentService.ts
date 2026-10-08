@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { auth, db } from '../lib/firebase';
@@ -23,7 +24,7 @@ function useCollection<T extends { id: string; order: number }>(name: string): T
     return onSnapshot(
       collection(db, name),
       (snap) => setItems(sortByOrder(snap.docs.map((d) => ({ ...d.data(), id: d.id }) as unknown as T))),
-      (error) => { console.warn(`[agentService] ${name}:`, error); setItems(null); },
+      (error) => { logger.warn(`[agentService] ${name}:`, error); setItems(null); },
     );
   }, [name]);
   return items;

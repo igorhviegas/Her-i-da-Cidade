@@ -56,10 +56,7 @@ export default defineConfig([
       ],
       "max-nested-callbacks": ["warn", 3],
       "quality/max-lines": ["warn", { max: 350 }], // baseline: 20 files
-      "quality/no-direct-console": [
-        "warn", // baseline: 77
-        { logger: "the project logging helper" },
-      ],
+      "quality/no-direct-console": ["error", { logger: "logger from lib/logger.js" }],
       // Presentation layers must go through services/, never lib/firebase.
       "quality/no-direct-data-access": [
         "warn", // baseline: 1 (context/XpContext.tsx)
@@ -71,6 +68,12 @@ export default defineConfig([
         },
       ],
     },
+  },
+  {
+    // The log adapter itself. This block MUST come after the block that turns
+    // the rule on, or the "error" above silently overrides this "off".
+    files: ["lib/logger.js"],
+    rules: { "quality/no-direct-console": "off" },
   },
   {
     // The same file budget for test files, at "warn". Placed after the

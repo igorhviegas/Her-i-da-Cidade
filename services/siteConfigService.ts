@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import { useState, useEffect, useCallback } from "react";
 import {
   doc,
@@ -56,7 +57,7 @@ export function buildWhatsAppLink(baseUrl: string, customMessage?: string): stri
  */
 export async function getPublicSiteConfig(): Promise<PublicSiteConfig> {
   if (!db) {
-    console.warn("[siteConfigService] Firestore não inicializado. Utilizando fallback temporário.");
+    logger.warn("[siteConfigService] Firestore não inicializado. Utilizando fallback temporário.");
     return DEFAULT_PUBLIC_SITE_CONFIG;
   }
 
@@ -86,7 +87,7 @@ export async function getPublicSiteConfig(): Promise<PublicSiteConfig> {
       return DEFAULT_PUBLIC_SITE_CONFIG;
     }
   } catch (error) {
-    console.error("[siteConfigService] Erro ao buscar configuração pública do Firestore:", error);
+    logger.error("[siteConfigService] Erro ao buscar configuração pública do Firestore:", error);
     return DEFAULT_PUBLIC_SITE_CONFIG;
   }
 }
@@ -155,7 +156,7 @@ export async function updatePublicSiteConfig(
       }
     }
   } catch (error: any) {
-    console.error("[siteConfigService] Erro ao atualizar siteConfig/public:", error);
+    logger.error("[siteConfigService] Erro ao atualizar siteConfig/public:", error);
     throw error;
   }
 }
@@ -189,13 +190,13 @@ export function subscribeToPublicSiteConfig(
         }
       },
       (error) => {
-        console.warn("[siteConfigService] Listener de siteConfig retornou erro:", error);
+        logger.warn("[siteConfigService] Listener de siteConfig retornou erro:", error);
         if (onError) onError(error);
         onUpdate(DEFAULT_PUBLIC_SITE_CONFIG);
       }
     );
   } catch (err: any) {
-    console.warn("[siteConfigService] Falha ao iniciar listener de siteConfig:", err);
+    logger.warn("[siteConfigService] Falha ao iniciar listener de siteConfig:", err);
     if (onError) onError(err);
     onUpdate(DEFAULT_PUBLIC_SITE_CONFIG);
     return () => {};

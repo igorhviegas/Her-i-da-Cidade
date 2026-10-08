@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import { createCategory, getCategories, normalizeCategoryName } from './categoriesService';
 import { ensureInternalContentClient } from './clientsService';
 import { getContentScriptById } from './contentScriptsService';
@@ -8,7 +9,7 @@ async function runLogged<T>(operation: string, action: () => Promise<T>): Promis
   try {
     return await action();
   } catch (error) {
-    console.error(`[scriptProductionService] Falha na operação: ${operation}`, {
+    logger.error(`[scriptProductionService] Falha na operação: ${operation}`, {
       error,
       stack: error instanceof Error ? error.stack : undefined,
     });

@@ -1,3 +1,4 @@
+import { logger } from './logger.js';
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
 import { getFirestore, Firestore, doc, getDocFromServer } from "firebase/firestore";
@@ -47,11 +48,11 @@ if (isFirebaseConfigured) {
         });
     }
   } catch (error) {
-    console.warn("[Firebase] Inicialização do SDK falhou:", error);
+    logger.warn("[Firebase] Inicialização do SDK falhou:", error);
   }
 } else {
   if (typeof window !== "undefined") {
-    console.info(
+    logger.info(
       "[Firebase] Configurações do Firebase não encontradas. O site utilizará a base de dados local padrão."
     );
   }

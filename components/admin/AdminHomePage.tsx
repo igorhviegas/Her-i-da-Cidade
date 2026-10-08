@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, ArrowRight, CalendarDays, Camera, ChevronDown, ChevronUp, RotateCcw, CheckCircle2, Circle, ClipboardList, Loader2, RefreshCw, Target, Wallet, XCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -121,7 +122,7 @@ const TasksWidget: React.FC<{ now: Date; onOpen: () => void }> = ({ now, onOpen 
       const unique = [...new Map([...missions.pending, ...missions.history].map((mission) => [mission.id, mission])).values()];
       if (alive.current) setState({ status: 'ready', data: { occurrences, missions: unique } });
     } catch (error) {
-      console.error('[AdminHomePage] tarefas de hoje indisponíveis', error);
+      logger.error('[AdminHomePage] tarefas de hoje indisponíveis', error);
       if (alive.current) setState({ status: 'error' });
     }
   }, [today]);

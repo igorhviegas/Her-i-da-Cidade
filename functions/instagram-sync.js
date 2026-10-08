@@ -1,4 +1,5 @@
 // Sincronização com a Instagram API (Instagram Login, graph.instagram.com). Só roda no servidor: o token nunca vai ao navegador.
+import { logger } from '../lib/logger.js';
 import { randomUUID } from 'node:crypto';
 import { applyDaily } from '../services/instagramDaily.js';
 import { importReelsAsVideos } from './instagram-video-import.js';
@@ -70,7 +71,7 @@ async function resolveToken({ db, fetchImpl, env, now }) {
       await db.doc(TOKEN_PATH).set(state);
     } catch (error) {
       // Renovação falhou (ex.: token com menos de 24h, resposta incompleta): segue com o token atual; se estiver inválido, a chamada seguinte acusa.
-      console.warn('[Instagram Sync] renovação do token falhou:', error.code ?? 'erro');
+      logger.warn('[Instagram Sync] renovação do token falhou:', error.code ?? 'erro');
     }
   }
   return { token: state.accessToken, expiresAt: state.expiresAt ?? null };
@@ -154,7 +155,7 @@ async function planInstagramXp({ db, posts, followers, now, day }) {
     }
     return writes;
   } catch (error) {
-    console.error('[Instagram Sync] XP não calculado nesta rodada:', error instanceof Error ? error.name : 'erro');
+    logger.error('[Instagram Sync] XP não calculado nesta rodada:', error instanceof Error ? error.name : 'erro');
     return [];
   }
 }
@@ -228,7 +229,7 @@ async function sync({ db, fetchImpl, env, now }) {
     });
     await batch.commit();
     // Importa Reels novos como vídeos inativos; uma falha aqui nunca derruba a sincronização.
-    const videos = await importReelsAsVideos({ db, posts, now, fetchImpl }).catch((e) => { console.error('[Instagram Sync] import de vídeos falhou:', e instanceof Error ? e.name : 'erro'); return null; });
+    const videos = await importReelsAsVideos({ db, posts, now, fetchImpl }).catch((e) => { logger.error('[Instagram Sync] import de vídeos falhou:', e instanceof Error ? e.name : 'erro'); return null; });
     return { status: 'completed', posts: posts.length, warning: warning?.code ?? null, ...(videos && (videos.imported || videos.failed) ? { videos } : {}) };
   } catch (error) {
     const code = error instanceof InstagramSyncError ? error.code : 'api_error';

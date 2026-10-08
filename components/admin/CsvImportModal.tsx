@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger.js';
 import React, { useState } from 'react';
 import Papa from 'papaparse';
 import { importVideosFromCSV } from '../../services/videosService';
@@ -74,7 +75,7 @@ const CsvImportModal: React.FC<Props> = ({ onClose }) => {
       const result = await importVideosFromCSV(previewData);
       setImportResult(result);
     } catch (e) {
-      console.error(e);
+      logger.error(e);
       setError('Erro ao importar CSV');
     } finally {
       setLoading(false);

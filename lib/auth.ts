@@ -1,3 +1,4 @@
+import { logger } from './logger.js';
 import {
   signInWithEmailAndPassword,
   signOut,
@@ -52,7 +53,7 @@ export async function checkIsAdmin(uid: string, email?: string | null): Promise<
     }
     return false;
   } catch (error) {
-    console.warn("[Auth] Erro ao verificar permissões de administrador:", error);
+    logger.warn("[Auth] Erro ao verificar permissões de administrador:", error);
     return false;
   }
 }
@@ -75,7 +76,7 @@ export async function getAdminData(uid: string): Promise<AdminUser | null> {
     }
     return null;
   } catch (error) {
-    console.warn("[Auth] Erro ao buscar dados de admin:", error);
+    logger.warn("[Auth] Erro ao buscar dados de admin:", error);
     return null;
   }
 }

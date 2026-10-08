@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import { collection, deleteField, doc, documentId, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { activityRefs, prepareActivityLog } from './activityLog';
@@ -6,7 +7,7 @@ import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } f
 export const CONTENT_SCRIPTS_COLLECTION = 'contentScripts';
 
 function logContentScriptsError(operation: string, error: unknown): void {
-  console.error(`[contentScriptsService] Falha na operação: ${operation}`, {
+  logger.error(`[contentScriptsService] Falha na operação: ${operation}`, {
     error,
     stack: error instanceof Error ? error.stack : undefined,
   });

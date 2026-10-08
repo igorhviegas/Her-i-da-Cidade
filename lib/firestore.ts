@@ -1,3 +1,4 @@
+import { logger } from './logger.js';
 import {
   collection,
   getDocs,
@@ -57,7 +58,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path,
   };
-  console.error("[Firestore Error]", JSON.stringify(errInfo));
+  logger.error("[Firestore Error]", JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
 
@@ -112,7 +113,7 @@ export async function getPublicVideos(): Promise<FirestoreVideo[]> {
 
     return videos;
   } catch (error) {
-    console.warn("[Firestore] Não foi possível carregar vídeos:", error);
+    logger.warn("[Firestore] Não foi possível carregar vídeos:", error);
     return [];
   }
 }

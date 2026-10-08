@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminFirestore } from '../functions/firebase-admin.js';
@@ -47,7 +48,7 @@ export async function handleTravelRoute(
       const date = req.body?.date;
       const events = await listDayEvents({ date: typeof date === 'string' ? date : '', listOrdersBetween: deps.listOrdersBetween ?? ordersBetween }).catch((error) => {
         if (error instanceof TravelRouteError) throw error;
-        console.error('[Travel] consulta de eventos falhou:', error instanceof Error ? error.name : 'erro'); // sem detalhes: podem citar dados do pedido
+        logger.error('[Travel] consulta de eventos falhou:', error instanceof Error ? error.name : 'erro'); // sem detalhes: podem citar dados do pedido
         throw new TravelRouteError('events_unavailable');
       });
       return send(200, { ok: true, date, events });
@@ -60,10 +61,10 @@ export async function handleTravelRoute(
   } catch (error) {
     if (error instanceof TravelRouteError) {
       // Falhas de chave/cota são do servidor: o agente vê a mensagem genérica; o log tem o código e o status do Google.
-      if (['auth', 'rate_limited', 'api_error'].includes(error.code)) console.error('[Travel] Google:', error.code, error.detail);
+      if (['auth', 'rate_limited', 'api_error'].includes(error.code)) logger.error('[Travel] Google:', error.code, error.detail);
       return fail(STATUS_BY_CODE[error.code] ?? 502, error.code, error.message);
     }
-    console.error('[Travel] falha inesperada:', error instanceof Error ? error.name : 'erro');
+    logger.error('[Travel] falha inesperada:', error instanceof Error ? error.name : 'erro');
     return fail(500, 'internal_error', 'Não foi possível calcular agora. Tente novamente.');
   }
 }

@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger.js';
 import { collection, doc, getDocs, setDoc, updateDoc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 import { FirestoreService } from "../../types";
@@ -68,7 +69,7 @@ export async function seedServicesIfEmpty(): Promise<{
         : `Todos os serviços já existem no Firestore (${currentSnap.size} encontrados). Nenhuma duplicata gerada.`,
     };
   } catch (error) {
-    console.error("[servicesService] Falha ao migrar serviços para o Firestore:", error);
+    logger.error("[servicesService] Falha ao migrar serviços para o Firestore:", error);
     throw error;
   }
 }

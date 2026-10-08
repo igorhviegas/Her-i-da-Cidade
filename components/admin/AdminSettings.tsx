@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger.js';
 import React, { useState, useEffect } from 'react';
 import { 
   getPublicSiteConfig, 
@@ -92,7 +93,7 @@ export const AdminSettings: React.FC = () => {
         message: 'Link do WhatsApp salvo com sucesso no Firestore! Todos os botões do site já estão atualizados.' + syncNote,
       });
     } catch (err: any) {
-      console.error('[AdminSettings] Erro ao salvar:', err);
+      logger.error('[AdminSettings] Erro ao salvar:', err);
       setFeedback({
         type: 'error',
         message: 'Falha ao salvar configuração no Firestore: ' + (err?.message || 'Verifique suas permissões de administrador.'),

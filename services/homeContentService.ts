@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import {
   Timestamp,
   collection,
@@ -287,7 +288,7 @@ export function useHomeContent(enabled = true) {
       setLoading(false);
       setError(null);
     }, (reason) => {
-      console.warn('[siteContentService] Falha ao carregar conteúdo da home. Exibindo valores padrão.', reason);
+      logger.warn('[siteContentService] Falha ao carregar conteúdo da home. Exibindo valores padrão.', reason);
       setError(reason.message);
       setContent({ seoTitle: HOME_SEO_TITLE, seoDescription: HOME_SEO_DESCRIPTION, sections: DEFAULT_HOME_SECTIONS });
       setLoading(false);

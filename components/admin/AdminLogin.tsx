@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger.js';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from '../../lib/router';
@@ -42,7 +43,7 @@ export const AdminLogin: React.FC = () => {
       // Redirecionamento é tratado pelo observer ou manualmente
       navigate('/admin');
     } catch (error: any) {
-      console.error('[AdminLogin] Erro ao autenticar:', error);
+      logger.error('[AdminLogin] Erro ao autenticar:', error);
       const code = error?.code || 'auth/unknown';
       setErrorMessage(getAuthErrorMessage(code));
     } finally {

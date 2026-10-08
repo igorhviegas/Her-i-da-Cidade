@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import { put } from '@vercel/blob';
 import { getVercelOidcToken } from '@vercel/oidc';
 import crypto from 'crypto';
@@ -174,7 +175,7 @@ export function handleThumbnailUpload(req: Request, res: Response): void {
       const blob = await put(pathname, file.buffer, await getUploadOptions(file.mimetype));
       if (!res.headersSent) res.status(201).json({ success: true, url: blob.url });
     } catch (error) {
-      console.error('[upload-thumbnail] Falha no Vercel Blob:', error);
+      logger.error('[upload-thumbnail] Falha no Vercel Blob:', error);
       if (!res.headersSent) {
         jsonError(res, 500, 'Não foi possível enviar a imagem. Tente novamente.');
       }

@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger.js';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from '../../lib/router';
@@ -273,7 +274,7 @@ export const AdminDashboard: React.FC = () => {
         });
       }
     } catch (err: any) {
-      console.error('[AdminDashboard] Erro ao sincronizar serviços:', err);
+      logger.error('[AdminDashboard] Erro ao sincronizar serviços:', err);
       if (!auto) {
         setSyncFeedback({
           type: 'error',
@@ -295,7 +296,7 @@ export const AdminDashboard: React.FC = () => {
       await logout();
       navigate('/admin/login');
     } catch (error) {
-      console.error('[AdminDashboard] Erro ao deslogar:', error);
+      logger.error('[AdminDashboard] Erro ao deslogar:', error);
       setIsLoggingOut(false);
     }
   };

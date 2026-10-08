@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
 import { authorizeAdminRequest } from '../functions/admin-auth.js';
 import { GoogleCalendarError, createCalendarEvent, deleteCalendarEvent, listCalendarEvents, updateCalendarEvent } from '../functions/google-calendar.js';
@@ -42,7 +43,7 @@ export async function handleCalendarEvents(
     return send(200, { ok: true, ...(action === 'list' ? data : action === 'delete' ? {} : { event: data }) });
   } catch (error) {
     if (error instanceof GoogleCalendarError) return fail(STATUS_BY_CODE[error.code] ?? 502, error.code, error.message);
-    console.error('[Calendar Events] falha inesperada:', error instanceof Error ? error.name : 'erro');
+    logger.error('[Calendar Events] falha inesperada:', error instanceof Error ? error.name : 'erro');
     return fail(500, 'internal_error', 'A operação falhou; consulte os logs do servidor.');
   }
 }

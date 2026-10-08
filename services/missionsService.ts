@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import {
   collection, deleteDoc, deleteField, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch, type Transaction,
 } from 'firebase/firestore';
@@ -393,7 +394,7 @@ export function subscribeNotifications(onChange: (items: AppNotification[]) => v
   return onSnapshot(
     query(collection(firestore(), NOTIFICATIONS_COLLECTION), where('dismissed', '==', false)),
     (snapshot) => onChange(mapAll<AppNotification>(snapshot).sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0))),
-    (error) => console.error('[missionsService] notificações indisponíveis', error),
+    (error) => logger.error('[missionsService] notificações indisponíveis', error),
   );
 }
 
@@ -412,7 +413,7 @@ export function subscribeTodayMissionsCount(onChange: (count: number | null) => 
   const loaded = { tasks: false, todos: false };
   let tasks = 0, todos: Mission[] = [], today = dateKey(new Date()), stopTasks = () => {};
   const emit = () => onChange(loaded.tasks && loaded.todos ? tasks + todos.filter((m) => m.dueAt && dateKey(m.dueAt) === today).length : null);
-  const fail = (error: Error) => { console.error('[missionsService] contador de missões indisponível', error); onChange(null); };
+  const fail = (error: Error) => { logger.error('[missionsService] contador de missões indisponível', error); onChange(null); };
   const watchTasks = () => {
     stopTasks();
     stopTasks = onSnapshot(query(collection(firestore(), OCCURRENCES_COLLECTION), where('date', '==', today), where('status', '==', 'pending')), (s) => { tasks = s.size; loaded.tasks = true; emit(); }, fail);

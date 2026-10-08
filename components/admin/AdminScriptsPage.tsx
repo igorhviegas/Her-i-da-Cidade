@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger.js';
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, ArrowUpRight, BookOpen, CheckCircle2, Copy, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { getCategories } from '../../services/categoriesService';
@@ -35,7 +36,7 @@ function formatDate(value: unknown): string {
 
 function logScriptOperationError(operation: string, error: unknown): void {
   const stack = error instanceof Error ? error.stack : undefined;
-  console.error(`[AdminScriptsPage] Falha na operação: ${operation}`, { error, stack });
+  logger.error(`[AdminScriptsPage] Falha na operação: ${operation}`, { error, stack });
 }
 
 export const AdminScriptsPage: React.FC = () => {

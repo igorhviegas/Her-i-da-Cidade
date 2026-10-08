@@ -1,3 +1,4 @@
+import { logger } from '../lib/logger.js';
 import { timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { getAdminFirestore } from '../functions/firebase-admin.js';
@@ -25,7 +26,7 @@ export async function handleMissionsCron(
 
   const secret = deps.secret ?? process.env.CRON_SECRET;
   if (!secret) {
-    console.error('[Missions Cron] CRON_SECRET não configurado nas variáveis de ambiente.');
+    logger.error('[Missions Cron] CRON_SECRET não configurado nas variáveis de ambiente.');
     return send(500, { ok: false, error: { code: 'server_misconfigured', message: 'Serviço indisponível: configuração pendente.' } });
   }
 
@@ -40,7 +41,7 @@ export async function handleMissionsCron(
     const result = await (deps.run ?? (() => runMissionsSync(getAdminFirestore())))();
     return send(200, { ok: true, ...(result as object) });
   } catch (error) {
-    console.error('[Missions Cron] Falha na rotina de missões:', error instanceof Error ? error.message : String(error));
+    logger.error('[Missions Cron] Falha na rotina de missões:', error instanceof Error ? error.message : String(error));
     return send(500, { ok: false, error: { code: 'internal_error', message: 'A rotina de missões falhou; consulte os logs.' } });
   }
 }

@@ -1,3 +1,4 @@
+import { logger } from '../../lib/logger.js';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CalendarCheck, CheckCircle2, ChevronDown, Flame, ListTodo, Loader2, Plus, RefreshCw, Repeat, Target, Trash2, Pencil, Check } from 'lucide-react';
 import { addDays, dateKey, taskStreak } from '../../functions/missions-core.js';
@@ -41,7 +42,7 @@ export const AdminMissionsPage: React.FC = () => {
     try {
       await runClientSync(now);
     } catch (err) {
-      console.error('[AdminMissionsPage] Falha na sincronização:', err);
+      logger.error('[AdminMissionsPage] Falha na sincronização:', err);
       setWarning('Não foi possível sincronizar as tarefas de hoje agora; exibindo os dados já salvos. Use Atualizar para tentar de novo.');
     }
     // Cada bloco carrega de forma independente: uma falha não esconde os demais, que mantêm o último valor conhecido.
@@ -55,7 +56,7 @@ export const AdminMissionsPage: React.FC = () => {
     }));
     const failed = [['missões', missions], ['tarefas', tasks], ['ocorrências', occurrences], ['metas', goals]].filter(([, r]) => (r as PromiseSettledResult<unknown>).status === 'rejected');
     if (failed.length) {
-      failed.forEach(([name, r]) => console.error(`[AdminMissionsPage] Falha ao carregar ${name}:`, (r as PromiseRejectedResult).reason));
+      failed.forEach(([name, r]) => logger.error(`[AdminMissionsPage] Falha ao carregar ${name}:`, (r as PromiseRejectedResult).reason));
       setError(`Não foi possível carregar: ${failed.map(([name]) => name).join(', ')}. O restante foi exibido normalmente.`);
     }
     setLoading(false);
