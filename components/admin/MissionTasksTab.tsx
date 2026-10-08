@@ -13,7 +13,7 @@ function describe(task: RecurringTask): string {
   if (task.frequency === 'weekly') return `${task.weekdays.map((d) => WEEKDAYS[d]).join(', ')} às ${task.time}`;
   const parts: string[] = [];
   if (task.monthDay) parts.push(`dia ${task.monthDay}`);
-  if (task.monthNth) parts.push(`${NTH_LABELS.find(([w]) => w === task.monthNth!.week)?.[1]} ${WEEKDAYS[task.monthNth.weekday]} do mês`);
+  if (task.monthNth) parts.push(`${NTH_LABELS.find(([w]) => w === task.monthNth.week)?.[1]} ${WEEKDAYS[task.monthNth.weekday]} do mês`);
   return `${parts.join(' e ')} às ${task.time}`;
 }
 

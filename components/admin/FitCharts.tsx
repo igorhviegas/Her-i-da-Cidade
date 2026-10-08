@@ -10,7 +10,7 @@ export const DailyBars: React.FC<{ days: string[]; values: (number | null)[]; un
   const max = Math.max(...values.map((v) => v ?? 0), 0);
   const lastIndex = values.findLastIndex((v) => v !== null);
   const shown = hover ?? lastIndex;
-  const at = (i: number) => (values[i] === null ? 'sem registro' : `${number(values[i]!, decimals)} ${unit}`);
+  const at = (i: number) => (values[i] === null ? 'sem registro' : `${number(values[i], decimals)} ${unit}`);
   return (
     <div>
       <p className="mb-3 text-xs text-white/50"><span className="font-semibold text-white/80">{shortDay(days[shown])}</span> · {at(shown)}</p>

@@ -84,7 +84,7 @@ export async function listMissions(now = new Date()): Promise<{ pending: Mission
   ]);
   return {
     pending: mapAll<Mission>(pending),
-    history: mapAll<Mission>(history).sort((a, b) => b.completedAt!.getTime() - a.completedAt!.getTime()),
+    history: mapAll<Mission>(history).sort((a, b) => b.completedAt.getTime() - a.completedAt.getTime()),
   };
 }
 
@@ -92,14 +92,14 @@ export async function createMission(input: MissionInput): Promise<void> {
   const clean = cleanMission(input);
   await setDoc(doc(collection(firestore(), MISSIONS_COLLECTION)), {
     title: clean.title, description: clean.description, difficulty: clean.difficulty, status: 'pending', source: 'crm',
-    ...(clean.dueAt ? { dueAt: clean.dueAt } : {}), ...(clean.checklist!.length ? { checklist: clean.checklist } : {}), alexaReminder: clean.alexaReminder, createdAt: serverTimestamp(),
+    ...(clean.dueAt ? { dueAt: clean.dueAt } : {}), ...(clean.checklist.length ? { checklist: clean.checklist } : {}), alexaReminder: clean.alexaReminder, createdAt: serverTimestamp(),
   });
 }
 
 export async function updateMission(id: string, input: MissionInput): Promise<void> {
   const clean = cleanMission(input);
   await updateDoc(doc(firestore(), MISSIONS_COLLECTION, id), {
-    title: clean.title, description: clean.description, difficulty: clean.difficulty, dueAt: clean.dueAt ?? deleteField(), checklist: clean.checklist!.length ? clean.checklist : deleteField(), alexaReminder: clean.alexaReminder, updatedAt: serverTimestamp(),
+    title: clean.title, description: clean.description, difficulty: clean.difficulty, dueAt: clean.dueAt ?? deleteField(), checklist: clean.checklist.length ? clean.checklist : deleteField(), alexaReminder: clean.alexaReminder, updatedAt: serverTimestamp(),
   });
 }
 
@@ -118,7 +118,7 @@ export async function toggleChecklistItem(missionId: string, itemId: string, don
 async function openNotices(transaction: Transaction, ids: string[]) {
   const refs = ids.map((id) => doc(firestore(), NOTIFICATIONS_COLLECTION, id));
   const snapshots = await Promise.all(refs.map((ref) => transaction.get(ref)));
-  return refs.filter((_, index) => snapshots[index].exists() && snapshots[index].data()!.dismissed === false);
+  return refs.filter((_, index) => snapshots[index].exists() && snapshots[index].data().dismissed === false);
 }
 const dismissNotices = (transaction: Transaction, refs: ReturnType<typeof doc>[]) => refs.forEach((ref) => transaction.update(ref, { dismissed: true, dismissedAt: serverTimestamp() }));
 
@@ -354,7 +354,7 @@ export async function loadGoals(now = new Date()): Promise<GoalView[]> {
   const since = new Date(Math.min(...goals.map((g) => Math.min(g.cycleStart.getTime(), boundsOf(g, now).start.getTime()))));
   const usesMetric = (test: (metric: GoalMetric) => boolean) => goals.some((g) => g.source === 'auto' && g.metric && test(g.metric));
   const data = await loadMetricData(since, usesMetric((m) => m === 'revenue_completed'), usesMetric((m) => INSTAGRAM_METRICS.includes(m)));
-  const valueIn = (g: Goal, bounds: { start: Date; end: Date }) => (g.source === 'manual' ? g.progress : metricValue(g.metric!, bounds, data, today));
+  const valueIn = (g: Goal, bounds: { start: Date; end: Date }) => (g.source === 'manual' ? g.progress : metricValue(g.metric, bounds, data, today));
 
   const views: GoalView[] = [];
   for (const stored of goals) {

@@ -419,7 +419,7 @@ const MusicView: React.FC<{ player: Player; tracks: ReturnType<typeof useAgentCo
     return (
       <li key={track.id} className="flex items-center gap-2">
         <button
-          onClick={() => { if (opts.groupId) setOpen((o) => (o.includes(opts.groupId!) ? o : [...o, opts.groupId!])); if (active) player.toggle(); else player.playTrack(track); }}
+          onClick={() => { if (opts.groupId) setOpen((o) => (o.includes(opts.groupId) ? o : [...o, opts.groupId])); if (active) player.toggle(); else player.playTrack(track); }}
           className={`${btn} flex min-w-0 flex-1 items-center gap-4 rounded-2xl border px-4 ${opts.child ? 'py-3' : 'py-4'} text-left ${active ? 'border-pink-400 bg-pink-500/20' : 'border-white/10 bg-[#0D1527]'}`}
         >
           <span className={`flex shrink-0 items-center justify-center rounded-full text-sm font-bold ${opts.child ? 'h-8 w-8' : 'h-10 w-10'} ${active ? 'bg-pink-500' : 'bg-white/10 text-white/70'}`}>
@@ -432,7 +432,7 @@ const MusicView: React.FC<{ player: Player; tracks: ReturnType<typeof useAgentCo
         </button>
         {((active && player.elapsed >= 1) || player.startedIds.includes(track.id)) && <RestartButton onClick={() => player.restart(track)} />}
         {!!opts.effects && (
-          <button onClick={() => setOpen((o) => (o.includes(opts.groupId!) ? o.filter((id) => id !== opts.groupId) : [...o, opts.groupId!]))} aria-expanded={expanded} aria-label={expanded ? 'Recolher efeitos' : 'Mostrar efeitos'} className={`${btn} flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/70`}>
+          <button onClick={() => setOpen((o) => (o.includes(opts.groupId) ? o.filter((id) => id !== opts.groupId) : [...o, opts.groupId]))} aria-expanded={expanded} aria-label={expanded ? 'Recolher efeitos' : 'Mostrar efeitos'} className={`${btn} flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/70`}>
             <ChevronDown className={`h-5 w-5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
           </button>
         )}
@@ -450,7 +450,7 @@ const MusicView: React.FC<{ player: Player; tracks: ReturnType<typeof useAgentCo
             <p className="text-[11px] font-bold uppercase tracking-widest text-pink-300">{player.current ? (player.playing ? 'Tocando agora' : 'Pausado') : 'Toque em play'}</p>
             <div className="flex min-h-[2.5rem] items-center justify-center gap-2">
               <p className="text-xl font-extrabold leading-tight">{player.current?.title ?? groups[0]?.track.title}</p>
-              {player.current && player.elapsed >= 1 && <RestartButton onClick={() => player.restart(player.current!)} />}
+              {player.current && player.elapsed >= 1 && <RestartButton onClick={() => player.restart(player.current)} />}
             </div>
             <div className="flex justify-center"><PlayerButtons player={player} size="lg" /></div>
             <button onClick={player.toggleLoop} aria-pressed={player.loop} className={`${btn} mx-auto flex items-center gap-2 rounded-full border px-5 py-3 text-sm font-bold ${player.loop ? 'border-pink-400 bg-pink-500/25 text-pink-100' : 'border-white/15 text-white/60'}`}><Repeat1 className="h-5 w-5" />{player.loop ? 'Repetindo esta música' : 'Repetir música'}</button>

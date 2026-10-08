@@ -39,7 +39,7 @@ export const MissionGoalsTab: React.FC<{ goals: GoalView[]; reload: () => Promis
                 </p>
                 {g.description && <p className="mt-0.5 text-xs text-white/60">{g.description}</p>}
                 <p className="mt-1 text-[11px] text-white/50">
-                  {PERIOD_LABELS[g.period]} · ciclo {dayMonth(g.cycleStart)} a {dayMonth(new Date(g.cycleEnd.getTime() - 1))} · {g.source === 'auto' ? `automática: ${GOAL_METRICS[g.metric!]}` : 'manual'}
+                  {PERIOD_LABELS[g.period]} · ciclo {dayMonth(g.cycleStart)} a {dayMonth(new Date(g.cycleEnd.getTime() - 1))} · {g.source === 'auto' ? `automática: ${GOAL_METRICS[g.metric]}` : 'manual'}
                 </p>
               </div>
               <div className="flex shrink-0 gap-1">

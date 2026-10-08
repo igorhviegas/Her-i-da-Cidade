@@ -232,7 +232,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
         content: content.trim(),
         servicePrice: serviceAmount,
         rushFee: rushAmount,
-        totalPaid: initialValues && totalPaid.trim() ? inputAmount(totalPaid)! : serviceAmount + rushAmount,
+        totalPaid: initialValues && totalPaid.trim() ? inputAmount(totalPaid) : serviceAmount + rushAmount,
         productionType: selectedService.productionType,
         source: 'manual',
         ...(completed ? { completedAt: new Date() } : {}),
@@ -286,7 +286,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
               {selectedService && (serviceConfigured && initialStatus ? (
                 <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs">
                   <span className="text-white/45">Status inicial:</span><span className="font-semibold text-blue-200">{statusLabels[initialStatus]}</span>
-                  <span className="ml-auto text-white/35">Produção: {productionLabels[selectedService.productionType!]}</span>
+                  <span className="ml-auto text-white/35">Produção: {productionLabels[selectedService.productionType]}</span>
                 </div>
               ) : <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">Este serviço ainda não possui configuração de pedido. É necessário habilitar a geração e definir o tipo de produção e o status inicial.</p>)}
             </section>

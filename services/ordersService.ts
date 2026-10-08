@@ -217,7 +217,7 @@ export async function deleteOrder(id: string): Promise<void> {
 
 /** Pedido que já nasce concluído: grava o pedido e o registro de atividade na mesma transação. */
 async function setCompletedOrder(reference: ReturnType<typeof doc>, payload: Record<string, unknown>, occurredAt: Date): Promise<void> {
-  const firestore = db!;
+  const firestore = db;
   await runTransaction(firestore, async (transaction) => {
     const refs = activityRefs(firestore, 'order_completed', reference.id);
     const record = await prepareActivityLog(transaction, refs, {
@@ -230,7 +230,7 @@ async function setCompletedOrder(reference: ReturnType<typeof doc>, payload: Rec
 
 /** Pedido de evento: o pedido e o lançamento da entrada (1ª parcela, data = criação) nascem na mesma transação. */
 async function setEventOrder(reference: ReturnType<typeof doc>, payload: Record<string, unknown>): Promise<void> {
-  const firestore = db!;
+  const firestore = db;
   const entry = planEntry(reference.id, payload as unknown, serverTimestamp());
   await runTransaction(firestore, async (transaction) => {
     transaction.set(reference, payload);
@@ -276,7 +276,7 @@ export function subscribeActiveOrders(onData: (orders: Order[]) => void, onError
       query(collection(db, ORDERS_COLLECTION), where("status", "in", ACTIVE_ORDER_STATUSES)),
       (snapshot) => {
         lastActive = snapshot.docs.map((item) => mapOrder(item.id, item.data()));
-        activeListeners.forEach((l) => l.onData(lastActive!));
+        activeListeners.forEach((l) => l.onData(lastActive));
       },
       (error) => {
         // O Firestore encerra a escuta após um erro: limpa o estado para que a próxima assinatura crie uma nova (nada de contagem velha).

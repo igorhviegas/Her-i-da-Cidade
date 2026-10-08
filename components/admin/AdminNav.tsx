@@ -101,12 +101,12 @@ export function AdminNav<Id extends string>({ pinned, items, groups, order, onRe
         {showCount && (
           <span
             className={`flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none tabular-nums ${
-              badge!.failed ? 'bg-white/15 text-white/70' : 'bg-amber-400 text-[#0B1120]'
+              badge.failed ? 'bg-white/15 text-white/70' : 'bg-amber-400 text-[#0B1120]'
             }`}
             aria-label={label}
             title={label}
           >
-            {badge!.failed ? '!' : badge!.count! > 99 ? '99+' : badge!.count}
+            {badge.failed ? '!' : badge.count > 99 ? '99+' : badge.count}
           </span>
         )}
       </button>
@@ -122,7 +122,7 @@ export function AdminNav<Id extends string>({ pinned, items, groups, order, onRe
           return (
             <li key={item.id}>
               {renderButton(item)}
-              {open && <ul className="mt-1 ml-5 space-y-1 border-l border-white/10 pl-2">{item.children!.map((child) => <li key={child.id}>{renderButton(child)}</li>)}</ul>}
+              {open && <ul className="mt-1 ml-5 space-y-1 border-l border-white/10 pl-2">{item.children.map((child) => <li key={child.id}>{renderButton(child)}</li>)}</ul>}
             </li>
           );
         })}

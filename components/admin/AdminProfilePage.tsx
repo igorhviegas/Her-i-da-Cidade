@@ -158,7 +158,7 @@ export const AdminProfilePage: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
-                  <p className="text-sm font-bold text-white">Total: {number(preview.total)} XP → nível {previewLevel!.level}</p>
+                  <p className="text-sm font-bold text-white">Total: {number(preview.total)} XP → nível {previewLevel.level}</p>
                   <p className="text-[11px] text-white/45">Esta gravação acontece uma única vez e não pode ser desfeita pelo painel.</p>
                   <div className="flex gap-2">
                     <button type="button" onClick={confirmActivation} disabled={activating} className={primaryBtn}>{activating && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Ativar com este XP</button>
