@@ -2,52 +2,22 @@ import { logger } from '../../lib/logger.js';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from '../../lib/router';
-import { getServices, seedServicesIfEmpty } from '../../services/servicesService';
-import { AdminServices } from './AdminServices';
-import { AdminSettings } from './AdminSettings';
-import { AdminVideosPage } from './AdminVideosPage';
-import { AdminCategoriesPage } from './AdminCategoriesPage';
-import { AdminContentPage } from './AdminContentPage';
-import { AdminOrdersPage } from './AdminOrdersPage';
-import { AdminScriptsPage } from './AdminScriptsPage';
-import { AdminClientsPage } from './AdminClientsPage';
-import { AdminMissionsPage } from './AdminMissionsPage';
-import { NotificationsBell } from './NotificationsBell';
-import { AdminFinancePage } from './AdminFinancePage';
-import { FinanceRevenueBadge } from './FinanceRevenueBadge';
 import { AdminHomePage } from './AdminHomePage';
-import { AdminCalendarPage } from './AdminCalendarPage';
-import { AdminVideoCallsPage } from './AdminVideoCallsPage';
-import { AdminInstagramPage } from './AdminInstagramPage';
-import { AdminAgentPage } from './AdminAgentPage';
-import { AdminProfilePage } from './AdminProfilePage';
-import { AdminFitPage } from './AdminFitPage';
-import { AdminFitCheckinsPage } from './AdminFitCheckinsPage';
-import { AdminFitWorkoutsPage } from './AdminFitWorkoutsPage';
-import { ProfileMenu } from './ProfileMenu';
-import { AdminNav, useNavOrder, type NavItem, type NavGroup, type NavBadge } from './AdminNav';
-import { subscribeActiveOrders } from '../../services/ordersService';
-import { subscribeTodayMissionsCount } from '../../services/missionsService';
-import { subscribeToVideos } from '../../services/videosService';
-import { 
-  Shield, 
-  LayoutDashboard, 
-  Sparkles, 
-  Video, 
-  FileText, 
-  Settings, 
-  LogOut, 
-  ExternalLink, 
-  Menu, 
-  X, 
-  CheckCircle2, 
-  Database, 
-  Layers, 
-  Clock, 
-  ArrowRight,
+import { AdminNav, useNavOrder, type NavItem, type NavGroup } from './AdminNav';
+import { useServicesSync } from './videoAdmin/useServicesSync';
+import { useNavBadges } from './videoAdmin/useNavBadges';
+import { DashboardDesktopSidebar, DashboardMobileDrawer, DashboardTopbar } from './videoAdmin/DashboardChrome';
+import { DashboardTab } from './videoAdmin/DashboardTab';
+import { AdminTabContentPrimary, AdminTabContentSecondary } from './videoAdmin/AdminTabContent';
+import type { AdminTab } from './videoAdmin/dashboardTypes';
+import {
+  LayoutDashboard,
+  Sparkles,
+  Video,
+  FileText,
+  Settings,
+  Layers,
   UserCheck,
-  RefreshCw,
-  AlertCircle,
   ClipboardList,
   BookOpen,
   Target,
@@ -65,8 +35,6 @@ import {
   ClipboardCheck,
   Dumbbell
 } from 'lucide-react';
-
-type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram' | 'calendar' | 'videocalls' | 'agent' | 'profile' | 'fit' | 'fitcheckins' | 'fittreinos';
 
 // Módulos reorganizáveis (ordem padrão). "Principal" é fixo no topo e fica fora desta lista.
 const NAV_ITEMS: NavItem<AdminTab>[] = [
@@ -95,12 +63,8 @@ const NAV_GROUPS: NavGroup<AdminTab>[] = [
 ];
 const NAV_ORDER = NAV_ITEMS.map((item) => item.id);
 
-export const AdminDashboard: React.FC = () => {
-  const { user, logout } = useAuth();
-  const { path, navigate } = useRouter();
-
-  // Sincronização inicial da aba com a URL
-  const initialTab: AdminTab = 
+// Sincronização inicial da aba com a URL
+const tabFromPath = (path: string): AdminTab =>
     path === '/admin/servicos' || path === '/admin/services'
       ? 'services'
       : path === '/admin/configuracoes' || path === '/admin/settings'
@@ -141,22 +105,8 @@ export const AdminDashboard: React.FC = () => {
       ? 'profile'
       : 'home';
 
-  const [currentTab, setCurrentTab] = useState<AdminTab>(initialTab);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  // Ícone do iOS ("Adicionar à Tela de Início") acompanha o módulo aberto
-  useEffect(() => {
-    const link = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
-    if (!link) return;
-    const original = link.getAttribute('href') ?? '';
-    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes', '/admin/agendamento-chamadas': 'calendario', '/admin/perfil': 'principal', '/admin/fit': 'principal', '/admin/fit/checkins': 'principal', '/admin/fit/treinos': 'principal' } as Record<string, string>)[path] ?? path.split('/')[2];
-    if (slug) link.setAttribute('href', `/images/modules/${slug}.png`);
-    return () => link.setAttribute('href', original);
-  }, [path]);
-
-  // Monitora alterações na URL para refletir na aba
-  useEffect(() => {
+// Monitora alterações na URL para refletir na aba
+const syncTabFromPath = (path: string, setCurrentTab: (tab: AdminTab) => void) => {
     if (path === '/admin/servicos' || path === '/admin/services') {
       setCurrentTab('services');
     } else if (path === '/admin/configuracoes' || path === '/admin/settings') {
@@ -198,10 +148,9 @@ export const AdminDashboard: React.FC = () => {
     } else if (path === '/admin') {
       setCurrentTab('home');
     }
-  }, [path]);
+};
 
-  const handleTabChange = (tabId: AdminTab) => {
-    setCurrentTab(tabId);
+const navigateToTab = (tabId: AdminTab, navigate: (to: string) => void) => {
     if (tabId === 'services') {
       navigate('/admin/servicos');
     } else if (tabId === 'videos') {
@@ -243,52 +192,38 @@ export const AdminDashboard: React.FC = () => {
     } else if (tabId === 'home') {
       navigate('/admin');
     }
-  };
+};
 
-  // Estado da sincronização dos serviços
-  const [servicesCount, setServicesCount] = useState<number | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncFeedback, setSyncFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+export const AdminDashboard: React.FC = () => {
+  const { user, logout } = useAuth();
+  const { path, navigate } = useRouter();
 
-  const checkAndSyncServices = async (auto = false) => {
-    try {
-      if (!auto) setIsSyncing(true);
-      const currentList = await getServices();
-      setServicesCount(currentList.length);
+  const initialTab: AdminTab = tabFromPath(path);
 
-      // Se ainda não houver nenhum serviço no Firestore, executa o seed seguro
-      if (currentList.length === 0) {
-        const result = await seedServicesIfEmpty();
-        const updated = await getServices();
-        setServicesCount(updated.length);
-        if (!auto) {
-          setSyncFeedback({
-            type: 'success',
-            message: result.message,
-          });
-        }
-      } else if (!auto) {
-        setSyncFeedback({
-          type: 'success',
-          message: `${currentList.length} serviços já sincronizados no Firestore. Nenhuma duplicata criada.`,
-        });
-      }
-    } catch (err) {
-      logger.error('[AdminDashboard] Erro ao sincronizar serviços:', err);
-      if (!auto) {
-        setSyncFeedback({
-          type: 'error',
-          message: 'Falha ao sincronizar serviços no Firestore. Verifique as permissões de administrador.',
-        });
-      }
-    } finally {
-      if (!auto) setIsSyncing(false);
-    }
-  };
+  const [currentTab, setCurrentTab] = useState<AdminTab>(initialTab);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Ícone do iOS ("Adicionar à Tela de Início") acompanha o módulo aberto
+  useEffect(() => {
+    const link = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
+    if (!link) return;
+    const original = link.getAttribute('href') ?? '';
+    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes', '/admin/agendamento-chamadas': 'calendario', '/admin/perfil': 'principal', '/admin/fit': 'principal', '/admin/fit/checkins': 'principal', '/admin/fit/treinos': 'principal' } as Record<string, string>)[path] ?? path.split('/')[2];
+    if (slug) link.setAttribute('href', `/images/modules/${slug}.png`);
+    return () => link.setAttribute('href', original);
+  }, [path]);
 
   useEffect(() => {
-    checkAndSyncServices(true);
-  }, []);
+    syncTabFromPath(path, setCurrentTab);
+  }, [path]);
+
+  const handleTabChange = (tabId: AdminTab) => {
+    setCurrentTab(tabId);
+    navigateToTab(tabId, navigate);
+  };
+
+  const { servicesCount, isSyncing, syncFeedback, checkAndSyncServices } = useServicesSync();
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -305,34 +240,7 @@ export const AdminDashboard: React.FC = () => {
   const navItems: NavItem<AdminTab>[] = NAV_ITEMS;
   const { order: navOrder, setOrder: setNavOrder, reset: resetNavOrder, customized: navCustomized } = useNavOrder<AdminTab>(user?.uid, NAV_ORDER);
 
-  // Contador do menu: pedidos em andamento (todas as etapas do Kanban, exceto Concluído), em tempo real e compartilhado com o widget da Principal.
-  // null = ainda carregando ou indisponível (erro de conexão/permissão): nunca é exibido como zero.
-  const [activeOrdersCount, setActiveOrdersCount] = useState<number | null>(null);
-  const [ordersCountFailed, setOrdersCountFailed] = useState(false);
-  useEffect(() => subscribeActiveOrders(
-    (orders) => { setActiveOrdersCount(orders.length); setOrdersCountFailed(false); },
-    () => { setActiveOrdersCount(null); setOrdersCountFailed(true); },
-  ), []);
-
-  // Contador "Missões": tarefas e to-dos com prazo para hoje ainda pendentes.
-  const [todayMissionsCount, setTodayMissionsCount] = useState<number | null>(null);
-  useEffect(() => subscribeTodayMissionsCount(setTodayMissionsCount), []);
-
-  // Contador "Vídeos": importados do Instagram aguardando revisão (mesmo critério do filtro "Aguardando revisão").
-  const [reviewVideosCount, setReviewVideosCount] = useState<number | null>(null);
-  const [reviewVideosFailed, setReviewVideosFailed] = useState(false);
-  useEffect(() => subscribeToVideos(
-    (videos) => { setReviewVideosCount(videos.filter((v) => v.needsReview).length); setReviewVideosFailed(false); },
-    () => { setReviewVideosCount(null); setReviewVideosFailed(true); },
-    false,
-  ), []);
-
-  const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`);
-  const navBadges: Partial<Record<AdminTab, NavBadge>> = {
-    orders: { count: activeOrdersCount, failed: ordersCountFailed, label: (n) => `${plural(n, 'pedido', 'pedidos')} em andamento`, failedLabel: 'Não foi possível contar os pedidos em andamento' },
-    missions: { count: todayMissionsCount, failed: false, label: (n) => `${plural(n, 'tarefa ou to-do', 'tarefas e to-dos')} para hoje`, failedLabel: '' },
-    videos: { count: reviewVideosCount, failed: reviewVideosFailed, label: (n) => `${plural(n, 'vídeo', 'vídeos')} aguardando revisão`, failedLabel: 'Não foi possível contar os vídeos aguardando revisão' },
-  };
+  const navBadges = useNavBadges();
 
   const renderNav = (variant: 'desktop' | 'mobile', afterSelect?: () => void) => (
     <AdminNav<AdminTab>
@@ -352,402 +260,52 @@ export const AdminDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#070B14] text-white flex flex-col lg:flex-row antialiased selection:bg-blue-600 selection:text-white">
-      
-      {/* 1. SIDEBAR DESKTOP */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-[#0B1120] border-r border-white/10 shrink-0">
-        {/* Brand Header */}
-        <div className="p-6 border-b border-white/10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-blue-400 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-            <Shield className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">
-              Herói da Cidade
-            </span>
-            <span className="text-base font-bold text-white tracking-tight">
-              Painel Admin
-            </span>
-          </div>
-        </div>
 
-        {/* Link to Public Site */}
-        <div className="p-4 pb-0">
-          <button
-            onClick={() => navigate('/')}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-white/60 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-colors border border-white/5"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span>Ver Site Público</span>
-          </button>
-        </div>
+      <DashboardDesktopSidebar onOpenPublicSite={() => navigate('/')} nav={renderNav('desktop')} />
 
-        {/* Navigation Items */}
-        <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-          <div className="px-3 py-2 text-[10px] font-semibold text-white/40 uppercase tracking-widest">
-            Navegação Principal
-          </div>
-          {renderNav('desktop')}
-        </nav>
-      </aside>
-
-      {/* 2. SIDEBAR MOBILE (DRAWER) */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden flex">
-          {/* Backdrop */}
-          <div 
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity" 
-            onClick={() => setMobileMenuOpen(false)}
-          />
-
-          {/* Drawer content */}
-          <div className="relative w-72 max-w-[85vw] bg-[#0B1120] border-r border-white/10 flex flex-col h-full z-10">
-            <div className="p-5 border-b border-white/10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white">
-                  <Shield className="w-5 h-5" />
-                </div>
-                <div>
-                  <span className="block text-[10px] font-black uppercase tracking-widest text-blue-400">
-                    Herói da Cidade
-                  </span>
-                  <span className="text-sm font-bold text-white">
-                    Painel Admin
-                  </span>
-                </div>
-              </div>
-              <button 
-                onClick={() => setMobileMenuOpen(false)}
-                className="p-1.5 text-white/60 hover:text-white rounded-lg hover:bg-white/10"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 pb-0">
-              <button
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  navigate('/');
-                }}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-white/70 hover:text-white bg-white/5 rounded-xl"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>Ver Site Público</span>
-              </button>
-            </div>
-
-            <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-              {renderNav('mobile', () => setMobileMenuOpen(false))}
-            </nav>
-
-            <div className="p-4 border-t border-white/10 space-y-2">
-              <button
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-red-400 hover:text-red-300 bg-red-500/10 rounded-xl"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Sair do Painel</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <DashboardMobileDrawer
+          onClose={() => setMobileMenuOpen(false)}
+          onOpenPublicSite={() => {
+            setMobileMenuOpen(false);
+            navigate('/');
+          }}
+          onLogout={handleLogout}
+          isLoggingOut={isLoggingOut}
+          nav={renderNav('mobile', () => setMobileMenuOpen(false))}
+        />
       )}
 
       {/* 3. MAIN AREA */}
       <div className="flex-1 flex flex-col min-w-0">
-        
-        {/* TOPBAR */}
-        <header className="h-16 bg-[#0B1120]/80 backdrop-blur-md border-b border-white/10 px-4 sm:px-6 flex items-center justify-between sticky top-0 z-20">
-          <div className="flex min-w-0 items-center gap-3">
-            {/* Mobile Hamburger */}
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            
-            <div className="flex min-w-0 items-center gap-2">
-              <h1 className="hidden min-[420px]:block truncate text-base sm:text-lg font-bold text-white tracking-tight">
-                Painel Administrativo
-              </h1>
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Online
-              </span>
-            </div>
-          </div>
 
-          {/* User Status & Logout */}
-          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-            <FinanceRevenueBadge />
-            <NotificationsBell onOpenMissions={() => handleTabChange('missions')} />
-            <ProfileMenu onOpenProfile={() => handleTabChange('profile')} onLogout={handleLogout} loggingOut={isLoggingOut} />
-          </div>
-        </header>
+        <DashboardTopbar
+          onOpenMenu={() => setMobileMenuOpen(true)}
+          onOpenMissions={() => handleTabChange('missions')}
+          onOpenProfile={() => handleTabChange('profile')}
+          onLogout={handleLogout}
+          isLoggingOut={isLoggingOut}
+        />
 
         {/* CONTENT VIEWPORT */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
-          
+
           {currentTab === 'home' && <AdminHomePage onNavigate={handleTabChange} />}
-          {currentTab === 'calendar' && <AdminCalendarPage />}
-          {currentTab === 'videocalls' && <AdminVideoCallsPage />}
-          {currentTab === 'profile' && <AdminProfilePage />}
 
-          {/* TAB: DASHBOARD */}
           {currentTab === 'dashboard' && (
-            <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
-              
-              {/* Welcome Hero Card */}
-              <div className="bg-gradient-to-r from-blue-950/50 via-[#0E1626] to-[#0A101D] border border-blue-500/20 rounded-2xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
-                <div className="max-w-2xl relative z-10">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20 mb-3">
-                    <UserCheck className="w-3.5 h-3.5" />
-                    Sessão Administrativa Ativa
-                  </span>
-                  <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mb-2">
-                    Bem-vindo, {user?.displayName || user?.email?.split('@')[0] || 'Administrador'}!
-                  </h2>
-                  <p className="text-sm sm:text-base text-white/70 leading-relaxed font-light">
-                    A fundação da área administrativa do <strong className="text-white font-medium">Herói da Cidade</strong> está configurada e integrada com autenticação protegida e Firestore Security Rules.
-                  </p>
-                </div>
-              </div>
-
-              {/* Status Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                
-                <div className="bg-[#0D1527] border border-white/10 rounded-2xl p-5 shadow-lg">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">
-                      Projeto Firebase
-                    </span>
-                    <div className="p-2 bg-blue-500/10 rounded-xl text-blue-400">
-                      <Database className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <p className="text-lg font-bold text-white tracking-tight">heroi-da-cidade</p>
-                  <p className="text-xs text-emerald-400 flex items-center gap-1 mt-1 font-medium">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Conectado ao Cloud Firestore (default)
-                  </p>
-                </div>
-
-                <div className="bg-[#0D1527] border border-white/10 rounded-2xl p-5 shadow-lg">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">
-                      Autenticação & Regras
-                    </span>
-                    <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400">
-                      <Shield className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <p className="text-lg font-bold text-white tracking-tight">Permissões de Admin</p>
-                  <p className="text-xs text-white/60 flex items-center gap-1 mt-1">
-                    <span className="text-emerald-400 font-semibold">Regras ativas:</span> Coleção admins/{'{uid}'}
-                  </p>
-                </div>
-
-                <div className="bg-[#0D1527] border border-white/10 rounded-2xl p-5 shadow-lg sm:col-span-2 lg:col-span-1 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-semibold text-white/50 uppercase tracking-wider">
-                        Coleção de Serviços
-                      </span>
-                      <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400">
-                        <Layers className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <p className="text-lg font-bold text-white tracking-tight">
-                      {servicesCount !== null ? `${servicesCount} Serviços no Firestore` : 'Consultando Firestore...'}
-                    </p>
-                    <p className="text-xs text-emerald-400 flex items-center gap-1 mt-1 font-medium">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      IDs 1 a 6 mapeados com active: true
-                    </p>
-                  </div>
-
-                  <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
-                    <button
-                      onClick={() => checkAndSyncServices(false)}
-                      disabled={isSyncing}
-                      className="text-[11px] font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
-                      <span>{isSyncing ? 'Sincronizando...' : 'Verificar / Sincronizar'}</span>
-                    </button>
-                    <span className="text-[10px] text-white/40">Idempotente</span>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Feedback de Sincronização */}
-              {syncFeedback && (
-                <div className={`p-4 rounded-xl border text-xs flex items-center gap-2.5 transition-all ${
-                  syncFeedback.type === 'success'
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                    : 'bg-red-500/10 border-red-500/30 text-red-300'
-                }`}>
-                  {syncFeedback.type === 'success' ? (
-                    <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-                  )}
-                  <span className="flex-1 font-medium">{syncFeedback.message}</span>
-                </div>
-              )}
-
-              {/* Module Cards (Roadmap / Futuros Módulos) */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-white/60">
-                    Módulos Administrativos
-                  </h3>
-                  <span className="text-xs text-white/40">
-                    Estrutura preparada para expansão modular
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                  
-                  {/* Card Serviços */}
-                  <div 
-                    onClick={() => handleTabChange('services')}
-                    className="group bg-[#0D1527] hover:bg-[#111B30] border border-white/10 hover:border-blue-500/40 rounded-2xl p-6 transition-all cursor-pointer shadow-lg"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-105 transition-transform">
-                        <Sparkles className="w-6 h-6" />
-                      </div>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Ativo • Gerenciável
-                      </span>
-                    </div>
-                    <h4 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors mb-2">
-                      Serviços e Preços
-                    </h4>
-                    <p className="text-sm text-white/60 leading-relaxed font-light mb-4">
-                      Gerenciamento completo: criar novos serviços, editar preços, alterar status ativo/inativo, reordenar e excluir.
-                    </p>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-blue-400 group-hover:translate-x-1 transition-transform">
-                      <span>Acessar gerenciador de serviços</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </div>
-                  </div>
-
-                  {/* Card Vídeos */}
-                  <div 
-                    onClick={() => setCurrentTab('videos')}
-                    className="group bg-[#0D1527] hover:bg-[#111B30] border border-white/10 hover:border-purple-500/40 rounded-2xl p-6 transition-all cursor-pointer shadow-lg"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 group-hover:scale-105 transition-transform">
-                        <Video className="w-6 h-6" />
-                      </div>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                        <Clock className="w-3 h-3" />
-                        Em breve • Etapa 4
-                      </span>
-                    </div>
-                    <h4 className="text-lg font-bold text-white group-hover:text-purple-400 transition-colors mb-2">
-                      Plataforma de vídeos
-                    </h4>
-                    <p className="text-sm text-white/60 leading-relaxed font-light mb-4">
-                      Catálogo e indexação de conteúdos educativos e divertidos do Instagram, categorizados por temas e faixa etária.
-                    </p>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-purple-400 group-hover:translate-x-1 transition-transform">
-                      <span>Ver detalhes do módulo</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </div>
-                  </div>
-
-                  {/* Card Conteúdo */}
-                  <div 
-                    onClick={() => handleTabChange('content')}
-                    className="group bg-[#0D1527] hover:bg-[#111B30] border border-white/10 hover:border-emerald-500/40 rounded-2xl p-6 transition-all cursor-pointer shadow-lg"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
-                        <FileText className="w-6 h-6" />
-                      </div>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Ativo
-                      </span>
-                    </div>
-                    <h4 className="text-lg font-bold text-white group-hover:text-emerald-400 transition-colors mb-2">
-                      Textos & Conteúdo
-                    </h4>
-                    <p className="text-sm text-white/60 leading-relaxed font-light mb-4">
-                      Edição de textos estratégicos do site, frases de impacto, seção Sobre e links de agendamento.
-                    </p>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-emerald-400 group-hover:translate-x-1 transition-transform">
-                      <span>Ver detalhes do módulo</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </div>
-                  </div>
-
-                  {/* Card Configurações */}
-                  <div 
-                    onClick={() => handleTabChange('settings')}
-                    className="group bg-[#0D1527] hover:bg-[#111B30] border border-white/10 hover:border-slate-400 rounded-2xl p-6 transition-all cursor-pointer shadow-lg"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 rounded-xl bg-slate-500/10 border border-slate-500/20 flex items-center justify-center text-slate-400 group-hover:scale-105 transition-transform">
-                        <Settings className="w-6 h-6" />
-                      </div>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Ativo • Gerenciável
-                      </span>
-                    </div>
-                    <h4 className="text-lg font-bold text-white group-hover:text-slate-300 transition-colors mb-2">
-                      Configurações Gerais
-                    </h4>
-                    <p className="text-sm text-white/60 leading-relaxed font-light mb-4">
-                      Gerenciamento de canais de conversão (WhatsApp), parâmetros do sistema e dados públicos do site.
-                    </p>
-                    <div className="flex items-center gap-1 text-xs font-semibold text-slate-400 group-hover:translate-x-1 transition-transform">
-                      <span>Acessar configurações</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-
-            </div>
+            <DashboardTab
+              user={user}
+              servicesCount={servicesCount}
+              isSyncing={isSyncing}
+              syncFeedback={syncFeedback}
+              onSync={() => checkAndSyncServices(false)}
+              onNavigate={handleTabChange}
+              onOpenVideos={() => setCurrentTab('videos')}
+            />
           )}
 
-          {/* TAB: SERVIÇOS (ETAPA 4) */}
-          {currentTab === 'services' && (
-            <AdminServices />
-          )}
-
-            {/* TAB: CONFIGURAÇÕES */}
-            {currentTab === 'content' && <AdminContentPage />}
-            {currentTab === 'settings' && (
-            <AdminSettings />
-          )}
-          {currentTab === 'videos' && (
-            <AdminVideosPage />
-          )}
-          {currentTab === 'categories' && (
-            <AdminCategoriesPage />
-          )}
-          {currentTab === 'orders' && <AdminOrdersPage />}
-          {currentTab === 'clients' && <AdminClientsPage />}
-          {currentTab === 'scripts' && <AdminScriptsPage />}
-          {currentTab === 'missions' && <AdminMissionsPage />}
-          {currentTab === 'finance' && <AdminFinancePage />}
-          {currentTab === 'instagram' && <AdminInstagramPage />}
-          {currentTab === 'agent' && <AdminAgentPage />}
-          {currentTab === 'fit' && <AdminFitPage />}
-          {currentTab === 'fitcheckins' && <AdminFitCheckinsPage />}
-          {currentTab === 'fittreinos' && <AdminFitWorkoutsPage />}
+          <AdminTabContentPrimary currentTab={currentTab} />
+          <AdminTabContentSecondary currentTab={currentTab} />
 
         </main>
       </div>

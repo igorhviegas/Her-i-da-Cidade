@@ -1,0 +1,1 @@
+export type AdminTab = 'home' | 'dashboard' | 'services' | 'videos' | 'categories' | 'content' | 'settings' | 'orders' | 'scripts' | 'clients' | 'missions' | 'finance' | 'instagram' | 'calendar' | 'videocalls' | 'agent' | 'profile' | 'fit' | 'fitcheckins' | 'fittreinos';
