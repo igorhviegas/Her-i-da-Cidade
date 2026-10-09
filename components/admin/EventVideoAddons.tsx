@@ -35,11 +35,12 @@ function applyParsed(parsed: ParsedEventForm, event: EventFormState, addons: Vid
 interface ImportProps {
   event: EventFormState;
   addons: VideoAddons;
-  clientName: string;
+  /** Só no Novo pedido: preenche o nome do cliente (se vazio). Ao editar (ex.: pedido do ManyChat) cliente e WhatsApp nunca mudam. */
+  clientName?: string;
   disabled?: boolean;
   onEvent: (next: EventFormState) => void;
   onAddons: (next: VideoAddons) => void;
-  onClientName: (name: string) => void;
+  onClientName?: (name: string) => void;
 }
 
 /**
@@ -60,7 +61,7 @@ export const ImportFormButton: React.FC<ImportProps> = ({ event, addons, clientN
       const next = applyParsed(parsed, event, addons);
       onEvent(next.event);
       onAddons(next.addons);
-      if (!clientName.trim() && parsed.responsible) onClientName(parsed.responsible);
+      if (onClientName && !clientName?.trim() && parsed.responsible) onClientName(parsed.responsible);
       setMessage({ ok: true, text: 'Dados importados. Confira e complete: WhatsApp, #formulário, autorização de imagem, PCD, teia extra e valores.' });
     } catch (error) {
       setMessage({ ok: false, text: error instanceof PdfImportError ? error.message : 'Não foi possível ler o PDF. Preencha manualmente.' });
