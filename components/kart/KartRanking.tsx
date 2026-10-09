@@ -8,7 +8,10 @@ import { KartLink, MEDAL_STYLE, WeatherIcon, card, formatDate, medalOf, plural, 
 type Mode = 'points' | 'laps';
 type ScopeKey = 'recent' | 'all' | `y${number}`;
 
-interface Line { pilotId: string; name: string; rank: number; races: number; big: string; small: string; rain?: boolean }
+interface Line { pilotId: string; name: string; rank: number; races: number; wins: number; podiums: number; extras?: number; big: string; sub?: string; rain?: boolean }
+
+/** "12 corridas · 5 vitórias · 8 pódios" (em duas linhas no pódio). */
+const stats = (l: Line) => [plural(l.races, 'corrida', 'corridas'), plural(l.wins, 'vitória', 'vitórias'), plural(l.podiums, 'pódio', 'pódios')];
 
 const toScope = (key: ScopeKey): KartScope => (key === 'recent' ? { type: 'recent' } : key === 'all' ? { type: 'all' } : { type: 'year', year: Number(key.slice(1)) });
 
@@ -25,7 +28,8 @@ const Podium: React.FC<{ lines: Line[] }> = ({ lines }) => {
           <KartLink key={line.pilotId} to={`/kart/piloto/${line.pilotId}`} className="group block min-w-0 text-center">
             {medal === 1 && <Crown className="mx-auto mb-1 h-6 w-6 text-amber-300" />}
             <p className="truncate px-1 text-sm font-bold text-white group-hover:underline">{line.name}</p>
-            <p className={`text-lg font-black italic tabular-nums ${style.text}`}>{line.big}</p>
+            <p className={`flex items-center justify-center gap-1 text-lg font-black italic tabular-nums ${style.text}`}>{line.rain && <WeatherIcon weather="rain" className="h-3.5 w-3.5" />}{line.big}</p>
+            <p className="px-1 text-[11px] leading-tight text-white/55">{stats(line)[0]}<br />{stats(line)[1]} · {stats(line)[2]}</p>
             <div className={`mt-1 flex ${height[medal]} items-start justify-center rounded-t-xl bg-gradient-to-b ${style.gradient} pt-2 text-3xl font-black italic text-black/70 ${style.glow}`}>{line.rank}</div>
           </KartLink>
         );
@@ -41,10 +45,11 @@ const Row: React.FC<{ line: Line }> = ({ line }) => {
       <span className={`w-9 shrink-0 text-center text-2xl font-black italic tabular-nums ${medal ? MEDAL_STYLE[medal].text : 'text-white/40'}`}>{line.rank}</span>
       <span className="min-w-0 flex-1">
         <span className="block truncate font-bold">{line.name}</span>
-        <span className="block text-xs text-white/50">{plural(line.races, 'corrida', 'corridas')}{line.small ? ` · ${line.small}` : ''}</span>
+        <span className="block text-xs text-white/50">{stats(line).join(' · ')}{line.extras ? ` · +${plural(line.extras, 'avulsa', 'avulsas')}` : ''}</span>
       </span>
-      <span className="flex shrink-0 items-center gap-1.5 text-right text-xl font-black italic tabular-nums">
-        {line.rain && <WeatherIcon weather="rain" />}{line.big}
+      <span className="shrink-0 text-right">
+        <span className="flex items-center justify-end gap-1.5 text-xl font-black italic tabular-nums">{line.rain && <WeatherIcon weather="rain" />}{line.big}</span>
+        {line.sub && <span className="block text-[11px] text-white/45">{line.sub}</span>}
       </span>
     </KartLink>
   );
@@ -63,8 +68,8 @@ export const KartRanking: React.FC<{ races: KartRace[]; pilots: KartPilot[] }> =
   const inScope = racesInScope(races, scope);
 
   const lines = useMemo<Line[]>(() => mode === 'points'
-    ? standings(races, scope).map((r) => ({ pilotId: r.pilotId, name: r.name, rank: r.rank, races: r.races, big: `${r.points}`, small: `${plural(r.wins, 'vitória', 'vitórias')}` }))
-    : lapRanking(races, scope).map((r) => ({ pilotId: r.pilotId, name: r.name, rank: r.rank, races: r.races, big: formatLap(r.bestLapMs), small: formatDate(r.date), rain: r.rain })),
+    ? standings(races, scope).map((r) => ({ pilotId: r.pilotId, name: r.name, rank: r.rank, races: r.races, wins: r.wins, podiums: r.podiums, big: `${r.points}` }))
+    : lapRanking(races, scope).map((r) => ({ pilotId: r.pilotId, name: r.name, rank: r.rank, races: r.races, wins: r.wins, podiums: r.podiums, extras: r.extras, big: formatLap(r.bestLapMs), sub: `${formatDate(r.date)}${r.extra ? ' · avulsa' : ''}`, rain: r.rain })),
   [races, mode, scope]);
   const record = useMemo(() => trackRecord(races, scope), [races, scope]);
 
@@ -78,7 +83,7 @@ export const KartRanking: React.FC<{ races: KartRace[]; pilots: KartPilot[] }> =
           <Timer className="absolute -right-3 -top-3 h-24 w-24 rotate-12 text-white/5" />
           <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-red-300">Recorde da pista · {periodLabel}</p>
           <p className="mt-1 text-5xl font-black italic tabular-nums text-white">{formatLap(record.bestLapMs)}</p>
-          <p className="mt-1 text-sm text-white/70"><span className="font-bold text-white">{record.name}</span> · {formatDate(record.date)}</p>
+          <p className="mt-1 text-sm text-white/70"><span className="font-bold text-white">{record.name}</span> · {formatDate(record.date)}{record.extra && ' · fora do campeonato'}</p>
         </KartLink>
       )}
 
@@ -113,10 +118,10 @@ export const KartRanking: React.FC<{ races: KartRace[]; pilots: KartPilot[] }> =
         <>
           <p className="px-1 text-xs text-white/50">
             {mode === 'points' ? 'Pontos' : 'Melhor volta'} · {periodLabel} · {plural(inScope.length, 'corrida', 'corridas')}
-            {mode === 'laps' && ' · nuvem = volta na chuva'}
+            {mode === 'laps' && ' · inclui corridas fora do campeonato (avulsas) · nuvem = volta na chuva'}
           </p>
-          {mode === 'points' && <Podium lines={lines} />}
-          <ol className="space-y-2">{(mode === 'points' ? lines.slice(lines.length >= 3 ? 3 : 0) : lines).map((l) => <li key={l.pilotId}><Row line={l} /></li>)}</ol>
+          <Podium lines={lines} />
+          <ol className="space-y-2">{lines.slice(lines.length >= 3 ? 3 : 0).map((l) => <li key={l.pilotId}><Row line={l} /></li>)}</ol>
         </>
       )}
     </div>

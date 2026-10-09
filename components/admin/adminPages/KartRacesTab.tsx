@@ -16,7 +16,7 @@ export const KartRacesTab: React.FC<{ run: Run }> = ({ run }) => {
   if (races === null || pilots === null) return <Loading />;
 
   const saved = officialRaces(races).reverse();
-  const unofficial = races.filter((r) => !saved.some((s) => s.id === r.id));
+  const unofficial = races.filter((r) => !saved.some((s) => s.id === r.id)).sort((a, b) => b.date.localeCompare(a.date)); // avulsas e baterias sem inscritos suficientes
 
   return (
     <div className="space-y-6">
@@ -33,11 +33,11 @@ export const KartRacesTab: React.FC<{ run: Run }> = ({ run }) => {
         {saved.length === 0 && <p className={`${card} px-5 py-6 text-sm text-white/50`}>Nenhuma corrida ainda. Importe o PDF de uma bateria ou lance a corrida manualmente.</p>}
         {[...saved, ...unofficial].map((race) => {
           const winner = race.results[0];
-          const number = 'number' in race ? `Corrida ${race.number}` : 'Não oficial';
+          const number = 'number' in race ? `Corrida ${race.number}` : race.extra ? 'Fora do campeonato' : 'Não oficial';
           return (
             <div key={race.id} className={`${card} flex items-center gap-3 p-3`}>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold text-white">{number} · {brDate(race.date)} <span className="font-normal text-white/45">· {race.heat}</span></p>
+                <p className={`text-sm font-bold ${race.extra ? 'text-red-300' : 'text-white'}`}>{number} · {brDate(race.date)} <span className="font-normal text-white/45">· {race.heat}</span></p>
                 <p className="truncate text-xs text-white/50">{race.results.length} inscritos · 🏆 {winner?.name ?? '—'} · melhor volta {formatLap(Math.min(...race.results.map((r) => r.bestLapMs ?? Infinity)))}</p>
               </div>
               <button type="button" title={race.weather === 'rain' ? 'Chuva (clique para marcar seco)' : 'Seco (clique para marcar chuva)'} onClick={() => run(() => saveKartRace({ ...race, weather: race.weather === 'rain' ? 'dry' : 'rain' }))} className={iconBtn}>

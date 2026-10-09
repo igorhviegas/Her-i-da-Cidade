@@ -84,4 +84,5 @@ export function buildResults(rows, pilots) {
   return { results, outsiders };
 }
 
-export const isOfficial = (race) => (race.results?.length ?? 0) >= MIN_OFFICIAL_PILOTS;
+/** Conta para o campeonato: não é sessão avulsa (`extra`) e tem 3 ou mais inscritos. */
+export const isOfficial = (race) => !race.extra && (race.results?.length ?? 0) >= MIN_OFFICIAL_PILOTS;

@@ -99,3 +99,33 @@ test('link do YouTube: vários formatos', () => {
   assert.equal(youtubeId('https://vimeo.com/123'), '');
   assert.equal(youtubeId(''), '');
 });
+
+const extra = (id, date, order, laps, weather = 'dry') => ({ ...race(id, date, weather, order, laps), extra: true });
+
+test('sessão avulsa não pontua nem vira corrida oficial, mas entra no ranking de volta e no recorde', () => {
+  const races = [race('a', '2025-01-01', 'dry', ['ana', 'bia', 'caio'], { ana: 75000, bia: 74000, caio: 76000 }), extra('x', '2025-03-01', ['ana'], { ana: 72000 })];
+  assert.equal(isOfficial(races[1]), false);
+  assert.equal(officialRaces(races).length, 1);
+  assert.equal(standings(races, { type: 'all' })[0].points, 25); // só a corrida do campeonato
+  const laps = lapRanking(races, { type: 'all' });
+  assert.deepEqual(laps.slice(0, 2).map((l) => [l.name, l.bestLapMs, l.extra, l.races, l.extras, l.wins, l.podiums]), [['ana', 72000, true, 1, 1, 1, 1], ['bia', 74000, false, 1, 0, 0, 1]]);
+  assert.equal(trackRecord(races, { type: 'all' }).name, 'ana');
+});
+
+test('ranking padrão de volta só junta avulsas a partir da primeira corrida do período; por ano filtra pela data', () => {
+  const races = [
+    extra('old', '2024-01-01', ['bia'], { bia: 60000 }),
+    race('a', '2025-01-01', 'dry', ['ana', 'bia', 'caio']), extra('new', '2025-06-01', ['caio'], { caio: 70000 }),
+  ];
+  assert.deepEqual(lapRanking(races).map((l) => l.name), ['caio', 'ana', 'bia']); // a avulsa de 2024 fica fora das "últimas 10"
+  assert.equal(lapRanking(races, { type: 'all' })[0].name, 'bia');
+  assert.equal(lapRanking(races, { type: 'year', year: 2024 })[0].name, 'bia');
+});
+
+test('perfil: sessões avulsas aparecem à parte e o recorde considera todas', () => {
+  const races = [race('a', '2025-01-01', 'dry', ['ana', 'bia', 'caio'], { ana: 75000 }), extra('x', '2025-03-01', ['ana'], { ana: 72000 })];
+  const p = pilotProfile('ana', races);
+  assert.equal(p.history.length, 1);
+  assert.deepEqual(p.extras.map((e) => [e.raceId, e.bestLapMs]), [['x', 72000]]);
+  assert.deepEqual([p.record.bestLapMs, p.record.extra], [72000, true]);
+});

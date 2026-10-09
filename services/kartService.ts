@@ -41,7 +41,7 @@ export const useKartVideos = () => useCollection<KartVideo>(VIDEOS);
 export const raceDocId = (date: string, time: string) => `${date}-${time.replace(':', '') || 'x'}`;
 
 export const saveKartRace = (race: KartRace) => setDoc(doc(requireDb(), RACES, race.id), {
-  date: race.date, heat: race.heat, weather: race.weather, results: race.results, updatedAt: serverTimestamp(),
+  date: race.date, heat: race.heat, weather: race.weather, extra: !!race.extra, results: race.results, updatedAt: serverTimestamp(),
 });
 export const deleteKartRace = (id: string) => deleteDoc(doc(requireDb(), RACES, id));
 

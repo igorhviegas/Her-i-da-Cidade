@@ -13,23 +13,25 @@ interface Draft {
   heat: string;
   time: string;
   weather: 'dry' | 'rain';
+  /** Fora do campeonato: não pontua, vale só para o recorde de volta. */
+  extra: boolean;
   results: KartResult[];
   outsiders: string[];
 }
 
 async function readDraft(file: File, pilots: KartPilot[]): Promise<Draft> {
-  const base = { key: `${file.name}-${file.size}`, file: file.name, date: '', heat: '', time: '', weather: 'dry' as const, results: [], outsiders: [] };
+  const base = { key: `${file.name}-${file.size}`, file: file.name, date: '', heat: '', time: '', weather: 'dry' as const, extra: false, results: [], outsiders: [] };
   try {
     const report = parseTimingReport(await readPdfText(file));
     if (!report) return { ...base, error: 'Este PDF não parece um relatório de cronometragem do kartódromo.' };
-    return { ...base, date: report.date, heat: report.heat, time: report.time, ...buildResults(report.rows, pilots) };
+    const built = buildResults(report.rows, pilots);
+    return { ...base, date: report.date, heat: report.heat, time: report.time, extra: built.results.length < MIN_OFFICIAL_PILOTS, ...built };
   } catch (err) {
     return { ...base, error: err instanceof Error ? err.message : 'Não foi possível ler o PDF.' };
   }
 }
 
 const DraftCard: React.FC<{ draft: Draft; exists: boolean; onChange: (d: Draft) => void; onRemove: () => void }> = ({ draft, exists, onChange, onRemove }) => {
-  const official = draft.results.length >= MIN_OFFICIAL_PILOTS;
   return (
     <div className={`${card} space-y-3 p-4`}>
       <div className="flex items-start justify-between gap-3">
@@ -54,8 +56,11 @@ const DraftCard: React.FC<{ draft: Draft; exists: boolean; onChange: (d: Draft) 
             </fieldset>
           </div>
 
-          {!official && <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-200">Só {draft.results.length} inscrito(s): precisa de {MIN_OFFICIAL_PILOTS} ou mais para valer como corrida oficial. Se faltou alguém, cadastre o piloto (ou o apelido dele) na aba Pilotos e importe de novo.</p>}
-          {exists && official && <p className="rounded-lg bg-blue-500/10 px-3 py-2 text-sm text-blue-200">Esta corrida já está salva: salvar de novo substitui o resultado.</p>}
+          <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${draft.extra ? 'border-red-500/60 bg-red-500/10' : 'border-white/10 bg-white/5'}`}>
+            <input type="checkbox" checked={draft.extra} onChange={(e) => onChange({ ...draft, extra: e.target.checked })} className="mt-0.5 h-4 w-4 accent-red-600" />
+            <span><b className="text-white">Corrida fora do campeonato</b><span className="block text-white/60">Não pontua; vale só para o recorde de melhor volta.{draft.results.length < MIN_OFFICIAL_PILOTS && ` Só ${draft.results.length} inscrito(s): para valer pontos precisa de ${MIN_OFFICIAL_PILOTS} ou mais (se faltou alguém, cadastre o piloto ou o apelido dele na aba Pilotos e importe de novo).`}</span></span>
+          </label>
+          {exists && <p className="rounded-lg bg-blue-500/10 px-3 py-2 text-sm text-blue-200">Esta corrida já está salva: salvar de novo substitui o resultado.</p>}
 
           <ol className="grid gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
             {draft.results.map((r) => (
@@ -88,10 +93,10 @@ export const KartImport: React.FC<{ pilots: KartPilot[]; races: KartRace[]; run:
     if (fileInput.current) fileInput.current.value = '';
   };
 
-  const ready = drafts.filter((d) => !d.error && d.date && d.results.length >= MIN_OFFICIAL_PILOTS);
-  const idOf = (d: Draft) => raceDocId(d.date, d.time);
+  const ready = drafts.filter((d) => !d.error && d.date && d.results.length >= (d.extra ? 1 : MIN_OFFICIAL_PILOTS));
+  const idOf = (d: Draft) => (d.extra ? `extra-${d.date}-${d.time.replace(':', '') || 'x'}` : raceDocId(d.date, d.time));
   const saveAll = async () => {
-    const ok = await run(async () => { for (const d of ready) await saveKartRace({ id: idOf(d), date: d.date, heat: d.heat, weather: d.weather, results: d.results }); }, `${ready.length} corrida(s) salva(s).`);
+    const ok = await run(async () => { for (const d of ready) await saveKartRace({ id: idOf(d), date: d.date, heat: d.heat, weather: d.weather, extra: d.extra, results: d.results }); }, `${ready.length} corrida(s) salva(s).`);
     if (ok) setDrafts((prev) => prev.filter((d) => !ready.includes(d)));
   };
 
