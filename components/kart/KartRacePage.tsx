@@ -30,7 +30,7 @@ export const KartRacePage: React.FC<{ races: KartRace[]; id: string; video?: Kar
           <Flag className="h-3.5 w-3.5" />{scored ? 'Corrida do campeonato' : 'Fora do campeonato'}
         </p>
         <h2 className="mt-1 text-3xl font-black italic leading-tight">{scored ? `Corrida ${number}` : 'Sessão avulsa'}</h2>
-        <p className="mt-1 text-sm capitalize text-white/70">{formatDateLong(race.date)}</p>
+        <p className="mt-1 text-sm text-white/70 first-letter:uppercase">{formatDateLong(race.date)}</p>
         <p className="mt-0.5 flex items-center gap-1.5 text-sm text-white/50"><WeatherIcon weather={race.weather} className="h-4 w-4" />{race.weather === 'rain' ? 'Chuva' : 'Pista seca'} · {race.heat}</p>
 
         <div className="mt-4 grid grid-cols-2 gap-2">

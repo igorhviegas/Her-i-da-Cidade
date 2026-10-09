@@ -22,7 +22,8 @@ Leitura pública, escrita só de administradores (`firestore.rules` e a cópia `
 | Coleção | Conteúdo |
 |---|---|
 | `kartPilots/{id}` | `name`, `aliases[]`, `active`. O `id` é o nome sem acento, em minúsculas e com hífens. |
-| `kartRaces/{data}-{hhmm}` | `date`, `heat`, `weather` (`dry`/`rain`), `extra` (true = fora do campeonato), `results[]` = `{ pilotId, name, pos, racePos, bestLapMs, laps }`. Importar o mesmo PDF de novo substitui a corrida. Avulsas têm id `extra-{data}-{hhmm ou código}`. |
+| `kartRaces/{data}-{hhmm}` | `date`, `heat`, `weather` (`dry`/`rain`), `extra` (true = fora do campeonato), `pdfUrl` (relatório original no Vercel Blob), `results[]` = `{ pilotId, name, pos, racePos, bestLapMs, laps }`. Importar o mesmo PDF de novo substitui a corrida. Avulsas têm id `extra-{data}-{hhmm ou código}`. |
+| `kartConfig/next` | Próxima corrida: `date`, `time`, `place`, `note` (sem confirmação de presença). O card some sozinho depois da data (fuso de Brasília). |
 | `kartVideos/{id}` | `title`, `youtubeId`, `kind` (`tip`/`race`), `order`, `active`, `raceId` (opcional: corrida a que o vídeo pertence). |
 
 O número da corrida ("Corrida 12") **não é gravado**: é a posição cronológica entre as corridas oficiais. O nome exibido vem do cadastro de pilotos, então renomear um piloto vale para o histórico todo.
@@ -35,6 +36,29 @@ O nome do relatório é o nome completo (ex.: `LEMUEL KESSELEH`). Um piloto casa
 
 Os PDFs originais ficam arquivados em `docs/kart/resultados/oficiais/AAAA-MM-DD_HHMM.pdf` (e `fora-do-campeonato/` para baterias sem inscritos suficientes).
 
+## Página da corrida e PDF original
+
+Cada corrida tem página própria, `/kart/corrida/{id}`, aberta pelo ícone ↗ da lista (a lista continua simples, com o resultado expansível). A página mostra data, pista, vencedor, melhor volta, o vídeo vinculado e o resultado completo, e tem o botão **Baixar PDF original** e o de **Compartilhar**.
+
+O PDF fica no Vercel Blob (`/api/upload-kart-pdf`, só administradores, até 4 MB, valida `%PDF-`) e o link vai em `pdfUrl`. Ele é enviado **ao importar**. Para anexar o PDF a corridas já salvas, importe os PDFs de novo: o clima e o tipo (avulsa) da corrida salva são mantidos, só o PDF é acrescentado. Corridas lançadas à mão não têm PDF.
+
+## Próxima corrida
+
+Admin → Kart → Corridas → **Próxima corrida**: data, horário, local e recado (opcionais). Aparece como card no topo do ranking e some depois da data.
+
+## Confronto direto
+
+`/kart/confronto?p=id1,id2,…` compara de 2 a 5 pilotos (o endereço guarda a escolha, então dá para mandar o link). Mostra pontos, corridas, vitórias, pódios, pontos por corrida, posição média e melhor volta (a melhor de cada linha em destaque), os **duelos** (nas corridas em que os dois correram, quem terminou na frente), a evolução da melhor volta e as corridas em comum. Aceita os mesmos períodos do ranking. Entradas: botão "Comparar pilotos" no ranking e "Comparar com outros pilotos" no perfil.
+
+## Gráficos do perfil
+
+- **Forma:** uma coluna por corrida das últimas 10 (mais antiga à esquerda), com a posição no topo, os pontos na barra (altura até 25) e a data embaixo. Cor: ouro P1, prata P2, bronze P3, azul as demais.
+- **Evolução da melhor volta:** uma ponto por corrida (campeonato ●, avulsa ◆); a linha forte é o recorde pessoal e os pontos com anel são as voltas que o baixaram. Volta na chuva fica fora do gráfico (não é comparável). O mesmo gráfico, com uma linha por piloto, aparece no confronto.
+
+## Compartilhar (imagem para o Story)
+
+O ícone de compartilhar fica no ranking (pontos e melhor volta), em cada corrida e no confronto. Gera no navegador uma imagem **1080 × 1920** (formato Story) com a marca, o conteúdo e `heroidacidade.com/kart`; no celular abre o compartilhamento do sistema, no computador baixa o PNG. Os textos vêm de `services/kartShare.js` (testado) e o desenho de `components/kart/kartStoryCanvas.ts`.
+
 ## Lançar ou corrigir uma corrida à mão
 
 Admin → Kart → Corridas → **Lançar corrida manualmente** (para corridas sem PDF). Informe data, horário da bateria (opcional) e clima, depois adicione os inscritos **na ordem de chegada entre eles** (setas reordenam) com a melhor volta de cada um, se tiver (`1:13.169`, `1.13.169` ou `1:14.20`). Precisa de 3 ou mais pilotos. Marque **Corrida fora do campeonato** para uma sessão avulsa: aceita 1 piloto ou mais, a melhor volta de cada um é obrigatória e a ordem é pela volta. O lápis na lista de corridas salvas reabre o mesmo formulário para corrigir uma corrida (inclusive as importadas); mudar a data ou o horário move a corrida em vez de duplicá-la.
@@ -45,4 +69,4 @@ Admin → Kart → Vídeos: cole o link do YouTube (watch, youtu.be, shorts, emb
 
 ## Testes
 
-`services/kart.test.js` (parser dos dois formatos, casamento de nomes, pontos, rankings, perfil e links do YouTube), incluído em `npm test`. Fixtures em `services/fixtures/kart-timing-*.txt`.
+`tests/firestore-rules-kart.test.js` (regras no emulador: leitura pública e escrita só de admin; `npm run test:rules`) e `tests/api-kart-pdf.test.js` (upload do PDF). `services/kart.test.js` (parser dos dois formatos, casamento de nomes, pontos, rankings, perfil e links do YouTube), incluído em `npm test`. Fixtures em `services/fixtures/kart-timing-*.txt`.

@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { buildResults, formatLap, isOfficial, matchPilot, parseLap, parseLapInput, parseTimingReport, pointsFor } from './kart.js';
 import { DEFAULT_KART_PILOTS } from './kartPilots.js';
-import { lapRanking, officialRaces, pilotProfile, standings, titlesByPilot, trackRecord, yearlyChampions } from './kartRanking.js';
+import { comparePilots } from './kartCompare.js';
+import { compareStory, raceStory, rankingStory } from './kartShare.js';
+import { lapHistory, lapRanking, officialRaces, pilotProfile, standings, titlesByPilot, trackRecord, yearlyChampions } from './kartRanking.js';
 import { videosByRace, youtubeId } from './kartVideos.js';
 import { daysUntil, todayInBrazil, upcomingRace } from './kartNext.js';
 
@@ -158,4 +160,57 @@ test('próxima corrida: contagem regressiva em dias e some depois da data', () =
   assert.equal(upcomingRace({ date: 'lixo' }, '2026-12-01'), null);
   assert.equal(upcomingRace(null), null);
   assert.match(todayInBrazil(new Date('2026-10-10T01:00:00Z')), /^2026-10-09$/); // 22h de Brasília ainda é dia 9
+});
+
+test('evolução da volta: marca recorde pessoal só em pista seca e inclui avulsas', () => {
+  const races = [
+    race('a', '2025-01-01', 'dry', ['ana', 'bia', 'caio'], { ana: 80000 }),
+    race('b', '2025-02-01', 'rain', ['ana', 'bia', 'caio'], { ana: 70000 }), // chuva nunca é recorde
+    race('c', '2025-03-01', 'dry', ['ana', 'bia', 'caio'], { ana: 82000 }),
+    extra('x', '2025-04-01', ['ana'], { ana: 78000 }),
+  ];
+  assert.deepEqual(lapHistory(races, 'ana').map((l) => [l.raceId, l.ms, l.rain, l.extra, l.pb]), [['a', 80000, false, false, true], ['b', 70000, true, false, false], ['c', 82000, false, false, false], ['x', 78000, false, true, true]]);
+  assert.deepEqual(lapHistory(races, 'ninguém'), []);
+});
+
+test('confronto: estatísticas, duelos só onde os dois correram, líderes por métrica', () => {
+  const races = [
+    race('a', '2025-01-01', 'dry', ['ana', 'bia', 'caio'], { ana: 74000, bia: 75000, caio: 76000 }),
+    race('b', '2025-02-01', 'dry', ['bia', 'ana', 'dedé'], { ana: 73000, bia: 75500 }),
+    race('c', '2025-03-01', 'dry', ['ana', 'caio', 'dedé']),
+    race('d', '2025-04-01', 'dry', ['bia', 'caio', 'dedé']),
+  ];
+  const names = new Map([['ana', 'Ana'], ['bia', 'Bia']]);
+  const c = comparePilots(races, ['ana', 'bia', 'ana'], names); // duplicado é ignorado
+  assert.deepEqual(c.pilots.map((p) => [p.name, p.races, p.wins, p.podiums, p.points, p.avgPos, p.bestLapMs]), [['Ana', 3, 2, 3, 25 + 22 + 25, 1.3, 73000], ['Bia', 3, 2, 3, 22 + 25 + 25, 1.3, 75000]]);
+  assert.deepEqual(c.duels, [{ a: 'ana', b: 'bia', aWins: 1, bWins: 1, together: 2 }]);
+  assert.equal(c.together, 2);
+  assert.deepEqual(c.common.map((r) => [r.number, r.positions]), [[2, [2, 1]], [1, [1, 2]]]);
+  assert.deepEqual([c.best.points, c.best.avgPos, c.best.races, c.best.bestLapMs], [[], [], [], ['ana']]); // empate total = ninguém destacado; só a volta decide
+});
+
+test('Story: ranking limita a 10 linhas, texto de pontos/volta e avisa quantos ficaram de fora', () => {
+  const lines = Array.from({ length: 12 }, (_, i) => ({ rank: i + 1, name: `P${i + 1}`, races: 1, wins: i === 0 ? 1 : 0, podiums: i < 3 ? 1 : 0, big: i === 0 ? '25' : '1' }));
+  const story = rankingStory({ mode: 'points', periodLabel: 'Últimas 10 corridas', lines });
+  assert.equal(story.rows.length, 10);
+  assert.deepEqual([story.rows[0].value, story.rows[0].sub, story.rows[0].medal, story.rows[3].medal], ['25 pts', '1 corrida · 1 vitória · 1 pódio', 1, null]);
+  assert.equal(story.footnote, '+2 no ranking completo');
+  assert.equal(rankingStory({ mode: 'laps', periodLabel: 'x', lines: [{ ...lines[0], big: '1:10.358' }] }).rows[0].value, '1:10.358');
+});
+
+test('Story: corrida mostra pontos e a avulsa avisa que não conta', () => {
+  const r = race('a', '2026-01-01', 'dry', ['ana', 'bia', 'caio'], { ana: 74000 });
+  const scored = raceStory({ race: r, title: 'Corrida 3', subtitle: 'x' });
+  assert.deepEqual([scored.kicker, scored.rows[0].value, scored.rows[0].sub, scored.rows[1].sub, scored.footnote], ['Resultado', '1:14.000', '25 pontos', '22 pontos', '']);
+  const avulsa = raceStory({ race: { ...r, extra: true }, title: 'Sessão avulsa', subtitle: 'x' });
+  assert.deepEqual([avulsa.kicker, avulsa.rows[0].sub, avulsa.rows[0].medal], ['Fora do campeonato', '', null]);
+  assert.match(avulsa.footnote, /não conta/i);
+});
+
+test('Story: confronto destaca a melhor célula e resume os duelos', () => {
+  const races = [race('a', '2025-01-01', 'dry', ['ana', 'bia', 'caio'], { ana: 74000, bia: 75000 }), race('b', '2025-02-01', 'dry', ['bia', 'ana', 'caio'], { ana: 73000, bia: 75500 })];
+  const story = compareStory({ comparison: comparePilots(races, ['ana', 'bia'], new Map([['ana', 'Ana Silva'], ['bia', 'Bia']])), colors: ['#f00', '#00f'], periodLabel: 'Todo o período' });
+  assert.equal(story.title, 'Ana × Bia');
+  assert.deepEqual(story.rows.find((r) => r.label === 'Melhor volta'), { label: 'Melhor volta', values: ['1:13.000', '1:15.000'], best: [0] });
+  assert.deepEqual(story.lines, ['Ana Silva 1 × 1 Bia · 2 corridas juntas']);
 });
