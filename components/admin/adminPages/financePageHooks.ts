@@ -8,19 +8,19 @@ import type { Client, Service } from '../../../types';
 export type Lookup<T> = Map<string, T | null>;
 export interface Loaded { expenses: FixedExpense[]; assets: Asset[] }
 
-/** Nomes de clientes/serviços: busca apenas ids ainda não conhecidos. */
-export function useNameLookups(entries: RevenueEntry[], costs: RevenueEntry[]) {
+/** Nomes de clientes/serviços: busca apenas ids ainda não conhecidos. `known` = nomes que o chamador já tem (não são buscados de novo; memorize o objeto). */
+export function useNameLookups(entries: RevenueEntry[], costs: RevenueEntry[], known?: { clients: Lookup<Client>; services: Lookup<Service> }) {
   const [clients, setClients] = useState<Lookup<Client>>(new Map());
   const [services, setServices] = useState<Lookup<Service>>(new Map());
 
   useEffect(() => {
-    const missing = (ids: (string | undefined)[], known: Lookup<unknown>) => [...new Set(ids.filter((id): id is string => !!id && !known.has(id)))];
+    const missing = (ids: (string | undefined)[], fetched: Lookup<unknown>, have?: Lookup<unknown>) => [...new Set(ids.filter((id): id is string => !!id && !fetched.has(id) && !have?.has(id)))];
     const withCosts = [...entries, ...costs];
-    const newClients = missing(withCosts.map((e) => e.order.clientId), clients);
-    const newServices = missing(withCosts.map((e) => e.order.serviceId), services);
+    const newClients = missing(withCosts.map((e) => e.order.clientId), clients, known?.clients);
+    const newServices = missing(withCosts.map((e) => e.order.serviceId), services, known?.services);
     if (newClients.length) void Promise.all(newClients.map((id) => getClientById(id).catch(() => null))).then((r) => setClients((prev) => new Map([...prev, ...newClients.map((id, i) => [id, r[i]] as const)])));
     if (newServices.length) void Promise.all(newServices.map((id) => getServiceById(id).catch(() => null))).then((r) => setServices((prev) => new Map([...prev, ...newServices.map((id, i) => [id, r[i]] as const)])));
-  }, [entries, costs, clients, services]);
+  }, [entries, costs, clients, services, known]);
 
   return { clients, services };
 }
