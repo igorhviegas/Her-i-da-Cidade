@@ -24,10 +24,13 @@ const getAvatarColor = (name: string) => {
 
 interface FeedbacksHeaderProps {
   googleIconUrl: string;
-  onScroll: (direction: "left" | "right") => void;
+  rating?: number | null;
+  count?: number | null;
+  /** Sem setas quando não há avaliações para rolar. */
+  onScroll?: (direction: "left" | "right") => void;
 }
 
-export const FeedbacksHeader: React.FC<FeedbacksHeaderProps> = ({ googleIconUrl, onScroll }) => (
+export const FeedbacksHeader: React.FC<FeedbacksHeaderProps> = ({ googleIconUrl, rating, count, onScroll }) => (
   <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6 bg-white/5 p-8 rounded-3xl border border-white/10">
     <div className="flex items-center gap-6">
       <a
@@ -57,8 +60,8 @@ export const FeedbacksHeader: React.FC<FeedbacksHeaderProps> = ({ googleIconUrl,
         </svg>
       </a>
       <div>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-3xl font-black text-white">5.0</span>
+        {rating != null && <div className="flex items-center gap-2 mb-1">
+          <span className="text-3xl font-black text-white">{rating.toFixed(1)}</span>
           <div className="flex gap-0.5 text-yellow-400">
             {[...Array(5)].map((_, i) => (
               <svg
@@ -70,13 +73,13 @@ export const FeedbacksHeader: React.FC<FeedbacksHeaderProps> = ({ googleIconUrl,
               </svg>
             ))}
           </div>
-        </div>
+        </div>}
         <p className="text-white/40 text-xs font-bold uppercase tracking-widest">
-          Baseado em 350+ avaliações no Google
+          {count ? `Baseado em ${count} avaliações no Google` : "Avaliações dos nossos clientes no Google"}
         </p>
       </div>
     </div>
-    <div className="flex gap-2">
+    {onScroll && <div className="flex gap-2">
       <button
         onClick={() => onScroll("left")}
         className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all active:scale-90"
@@ -115,7 +118,7 @@ export const FeedbacksHeader: React.FC<FeedbacksHeaderProps> = ({ googleIconUrl,
           />
         </svg>
       </button>
-    </div>
+    </div>}
   </div>
 );
 
@@ -191,16 +194,7 @@ export const ReviewCard: React.FC<ReviewCardProps> = ({ review, href }) => (
     </p>
     <div className="flex items-center justify-between opacity-50 text-[10px] font-bold uppercase tracking-widest border-t border-white/5 pt-4">
       <span>Google Review</span>
-      <span className="flex items-center gap-1">
-        <svg
-          className="w-3 h-3"
-          fill="currentColor"
-          viewBox="0 0 20 20"
-        >
-          <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" />
-        </svg>
-        Verificado
-      </span>
+      <span>{review.when}</span>
     </div>
   </a>
 );

@@ -239,6 +239,8 @@ export interface Review {
   rating: number;
   comment: string;
   avatar: string;
+  /** Texto relativo do Google ("2 meses atrás"). */
+  when?: string;
 }
 
 /**

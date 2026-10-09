@@ -1,11 +1,10 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Review } from "../types";
-import { fetchLiveReviews } from "../services/aiService";
+import { fetchGoogleReviews, type GoogleReviews } from "../services/reviewsService";
 import { FeedbacksHeader, ReviewCard, ReviewSkeleton } from "./publicSite/FeedbackParts";
 
 export const Feedbacks: React.FC = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [data, setData] = useState<GoogleReviews | null>(null);
   const [loading, setLoading] = useState(true);
 
   const googleIconUrl = "https://maps.app.goo.gl/Tfb9LL7Byjj8n81U9";
@@ -16,13 +15,13 @@ export const Feedbacks: React.FC = () => {
 
   useEffect(() => {
     const loadReviews = async () => {
-      setLoading(true);
-      const data = await fetchLiveReviews();
-      setReviews(data);
+      setData(await fetchGoogleReviews());
       setLoading(false);
     };
     loadReviews();
   }, []);
+
+  const reviews = data?.reviews ?? [];
 
   const scroll = (direction: "left" | "right") => {
     if (scrollRef.current) {
@@ -41,19 +40,27 @@ export const Feedbacks: React.FC = () => {
       className="py-24 overflow-hidden border-t border-white/5"
     >
       <div className="max-w-7xl mx-auto px-6">
-        <FeedbacksHeader googleIconUrl={googleIconUrl} onScroll={scroll} />
+        <FeedbacksHeader
+          googleIconUrl={googleIconUrl}
+          rating={data?.rating}
+          count={data?.count}
+          onScroll={reviews.length ? scroll : undefined}
+        />
 
-        <div
-          ref={scrollRef}
-          className="flex gap-6 overflow-x-auto pb-8 scrollbar-hide snap-x"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-        >
-          {loading
-            ? [...Array(4)].map((_, i) => <ReviewSkeleton key={i} />)
-            : reviews.map((review) => (
-                <ReviewCard key={review.id} review={review} href={googleMapsUrl} />
-              ))}
-        </div>
+        {/* Falhou ou sem avaliações: sem carrossel (nada inventado), só o link para o Google. */}
+        {(loading || reviews.length > 0) && (
+          <div
+            ref={scrollRef}
+            className="flex gap-6 overflow-x-auto pb-8 scrollbar-hide snap-x"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {loading
+              ? [...Array(4)].map((_, i) => <ReviewSkeleton key={i} />)
+              : reviews.map((review) => (
+                  <ReviewCard key={review.id} review={review} href={googleMapsUrl} />
+                ))}
+          </div>
+        )}
         <div className="mt-12 text-center">
           <a
             href={shareGoogleUrl}
