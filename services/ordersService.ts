@@ -1,5 +1,5 @@
 import {
-  collection, deleteField, doc, getDoc, getDocs, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, where,
+  collection, deleteField, doc, getDoc, getDocs, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, Timestamp, where,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { Order, OrderStatus, ProductionType, OrderSource } from "../types";
@@ -25,7 +25,7 @@ export type CreateOrderInput = Omit<Order, "id" | "orderNumber" | "orderNumberDi
   customerDueDate?: Date | null;
   internalDueDate?: Date | null;
 };
-export type UpdateOrderInput = Partial<Omit<Order, "id" | "orderNumber" | "orderNumberDisplay" | "technicalPurchaseId" | "createdAt" | "paidAt" | "eventDate" | "deliveryDays">> & {
+export type UpdateOrderInput = Partial<Omit<Order, "id" | "orderNumber" | "orderNumberDisplay" | "technicalPurchaseId" | "createdAt" | "paidAt" | "eventDate" | "deliveryDays" | "stageHistory">> & {
   paidAt?: Date | null;
   eventDate?: Date | null;
   deliveryDays?: number | null;
@@ -311,7 +311,12 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     delete safeUpdates.orderNumber;
     delete safeUpdates.orderNumberDisplay;
     delete safeUpdates.technicalPurchaseId;
+    delete safeUpdates.stageHistory;
     const payload: Record<string, unknown> = { ...safeUpdates, updatedAt: serverTimestamp() };
+    // Histórico de etapas (relatório de tempo parado por etapa): cada mudança de status vira { from, to, at }. serverTimestamp não vale dentro de array, então usa a hora do aparelho.
+    if (updates.status !== undefined && updates.status !== currentData.status) {
+      payload.stageHistory = [...(Array.isArray(currentData.stageHistory) ? currentData.stageHistory : []), { from: currentData.status, to: updates.status, at: Timestamp.now() }];
+    }
     if (updates.eventDate === null) payload.eventDate = deleteField();
     if (updates.deliveryDays === null) payload.deliveryDays = deleteField();
     if (updates.status === 'completed' && updates.completedAt === undefined && currentData.status === 'completed') {

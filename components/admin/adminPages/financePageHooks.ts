@@ -3,24 +3,26 @@ import { getClientById } from '../../../services/clientsService';
 import { getServiceById } from '../../../services/servicesService';
 import { extractBirthdayPerson } from '../../../services/orderReference.js';
 import { buildStatement, type Asset, type FixedExpense, type RevenueEntry } from '../../../services/financeCalculations.js';
+import { isMonthKey } from '../../../services/monthlyReport.js';
+import { useRouter } from '../../../lib/router';
 import type { Client, Service } from '../../../types';
 
 export type Lookup<T> = Map<string, T | null>;
 export interface Loaded { expenses: FixedExpense[]; assets: Asset[] }
 
-/** Nomes de clientes/serviços: busca apenas ids ainda não conhecidos. */
-export function useNameLookups(entries: RevenueEntry[], costs: RevenueEntry[]) {
+/** Nomes de clientes/serviços: busca apenas ids ainda não conhecidos. `known` = nomes que o chamador já tem (não são buscados de novo; memorize o objeto). */
+export function useNameLookups(entries: RevenueEntry[], costs: RevenueEntry[], known?: { clients: Lookup<Client>; services: Lookup<Service> }) {
   const [clients, setClients] = useState<Lookup<Client>>(new Map());
   const [services, setServices] = useState<Lookup<Service>>(new Map());
 
   useEffect(() => {
-    const missing = (ids: (string | undefined)[], known: Lookup<unknown>) => [...new Set(ids.filter((id): id is string => !!id && !known.has(id)))];
+    const missing = (ids: (string | undefined)[], fetched: Lookup<unknown>, have?: Lookup<unknown>) => [...new Set(ids.filter((id): id is string => !!id && !fetched.has(id) && !have?.has(id)))];
     const withCosts = [...entries, ...costs];
-    const newClients = missing(withCosts.map((e) => e.order.clientId), clients);
-    const newServices = missing(withCosts.map((e) => e.order.serviceId), services);
+    const newClients = missing(withCosts.map((e) => e.order.clientId), clients, known?.clients);
+    const newServices = missing(withCosts.map((e) => e.order.serviceId), services, known?.services);
     if (newClients.length) void Promise.all(newClients.map((id) => getClientById(id).catch(() => null))).then((r) => setClients((prev) => new Map([...prev, ...newClients.map((id, i) => [id, r[i]] as const)])));
     if (newServices.length) void Promise.all(newServices.map((id) => getServiceById(id).catch(() => null))).then((r) => setServices((prev) => new Map([...prev, ...newServices.map((id, i) => [id, r[i]] as const)])));
-  }, [entries, costs, clients, services]);
+  }, [entries, costs, clients, services, known]);
 
   return { clients, services };
 }
@@ -60,4 +62,15 @@ export function useFinanceStatement({ data, entries, costs, monthKey, clients, s
   }, [statement, clients, services, search, newestFirst, kindFilter]);
 
   return { statement, statementRows, search, setSearch, newestFirst, setNewestFirst, kindFilter, setKindFilter };
+}
+
+/**
+ * Aviso do sino "Relatório de <mês> pronto": /admin/financeiro?relatorio=AAAA-MM. Devolve o mês pedido (ou null) e chama
+ * `onOpen` sempre que o link muda, para a página abrir a aba Relatórios.
+ */
+export function useReportLink(onOpen: () => void): string | null {
+  const { search } = useRouter();
+  const month = useMemo(() => { const value = new URLSearchParams(search).get('relatorio'); return isMonthKey(value) ? value : null; }, [search]);
+  useEffect(() => { if (month) onOpen(); }, [month]); // eslint-disable-line react-hooks/exhaustive-deps -- onOpen é um setState da página (estável)
+  return month;
 }

@@ -89,6 +89,8 @@ export interface Order {
   eventLedger?: { entry: number; final?: number; cost?: number; /** soma dos ajustes de receita */ adj?: number; /** soma dos ajustes de despesa */ adjCost?: number; /** nº do último ajuste */ seq?: number };
   /** Vínculo com o Google Agenda, gravado pelo servidor (/api/google-calendar). */
   googleCalendar?: { eventId: string; calendarId: string; htmlLink?: string; syncedAt?: unknown };
+  /** Mudanças de etapa do Kanban, gravadas por updateOrder desde a introdução do recurso (pedidos mais antigos não têm). Base do tempo parado por etapa. */
+  stageHistory?: { from: OrderStatus; to: OrderStatus; at: unknown }[];
   /** Custo de edição (R$) gravado na primeira conclusão de Vídeo Personalizado; entra nas despesas do Financeiro. */
   editingCost?: number;
 }

@@ -1,6 +1,6 @@
 import { logger } from '../../lib/logger.js';
 import React, { useEffect, useState } from 'react';
-import { Bell, Camera, CircleX, Clock, ListChecks, Target, Trophy, TriangleAlert, X, type LucideIcon } from 'lucide-react';
+import { Bell, Camera, CircleX, Clock, FileText, ListChecks, Target, Trophy, TriangleAlert, X, type LucideIcon } from 'lucide-react';
 import { useRouter } from '../../lib/router';
 import { dismissAllNotifications, dismissNotification, previousDaysNotifications, runClientSync, subscribeNotifications, type AppNotification } from '../../services/missionsService';
 
@@ -27,6 +27,7 @@ const LOOKS: Record<string, Look> = {
   task_today: look(ListChecks, 'blue'),
   goal_near: look(Target, 'violet'),
   goal_completed: look(Trophy, 'green'),
+  monthly_report: look(FileText, 'blue'),
 };
 const DEFAULT_LOOK: Look = { icon: Bell, badge: 'bg-white/10 text-white/60', card: 'border-transparent bg-white/5' };
 
@@ -70,7 +71,7 @@ export const NotificationsBell: React.FC<{ onOpenMissions: () => void }> = ({ on
                 return (
                 <li key={n.id} className={`flex items-start gap-2.5 rounded-xl border p-2.5 ${card}`}>
                   <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${badge}`}><Icon className="h-4 w-4" aria-hidden /></span>
-                  <button type="button" onClick={() => { setOpen(false); if (n.refType === 'instagram') navigate('/admin/instagram'); else onOpenMissions(); }} className="min-w-0 flex-1 text-left">
+                  <button type="button" onClick={() => { setOpen(false); if (n.refType === 'instagram') navigate('/admin/instagram'); else if (n.refType === 'report') navigate(`/admin/financeiro?relatorio=${n.refId}`); else onOpenMissions(); }} className="min-w-0 flex-1 text-left">
                     <span className="block text-xs font-semibold text-white">{n.title}</span>
                     <span className="line-clamp-3 text-[11px] text-white/60">{n.body}</span>
                   </button>
