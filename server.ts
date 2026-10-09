@@ -4,7 +4,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { handleThumbnailUpload } from "./api/upload-thumbnail";
 import { handleAgentAudioUpload } from "./api/upload-agent-audio";
-import { handleKartPdfUpload } from "./api/upload-kart-pdf";
+import { handleKartPdfUpload } from "./functions/kart-pdf-upload.js";
 import { handleManyChatWebhook } from "./api/manychat";
 import { handleMissionsCron } from "./api/missions-cron";
 import { handleAlexa } from "./api/alexa";

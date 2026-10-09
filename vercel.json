@@ -24,6 +24,10 @@
     {
       "source": "/((?!api/.*).*)",
       "destination": "/index.html"
+    },
+    {
+      "source": "/api/upload-kart-pdf",
+      "destination": "/api/upload-agent-audio?kind=kart-pdf"
     }
   ]
 }

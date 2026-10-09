@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleKartPdfUpload, isPdf } from '../api/upload-kart-pdf.ts';
+import { handleKartPdfUpload, isPdf } from '../functions/kart-pdf-upload.js';
 
 const fakeRes = () => {
   const res = { statusCode: 0, body: null, ended: false };

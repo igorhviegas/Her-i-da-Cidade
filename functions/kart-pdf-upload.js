@@ -1,23 +1,24 @@
+// Upload do relatório original (PDF) de uma corrida do /kart, somente administradores: envia ao Vercel Blob e devolve a URL pública.
+// Fica fora de api/ de propósito: o plano Hobby da Vercel limita o total de funções (12) e api/ já está no limite.
+// É atendido por api/upload-agent-audio.ts (rewrite /api/upload-kart-pdf → ?kind=kart-pdf em vercel.json) e, no dev, direto por server.ts.
 import { logger } from '../lib/logger.js';
 import { put } from '@vercel/blob';
 import { getVercelOidcToken } from '@vercel/oidc';
 import crypto from 'crypto';
 import multer from 'multer';
-import type { Request, Response } from 'express';
-import { authorizeAdminRequest } from '../functions/admin-auth.js';
+import { authorizeAdminRequest } from './admin-auth.js';
 
-// Arquivos de api/ não podem importar outros de api/ (a função falha ao carregar na Vercel): helpers locais.
 const BLOB_STORE_ID = process.env.BLOB_STORE_ID || 'store_ZlySBsEZT51qmJ7I';
 
-function jsonError(res: Response, status: number, error: string): void {
+function jsonError(res, status, error) {
   res.status(status).json({ success: false, error });
 }
 
 async function getUploadOptions() {
   // Token OIDC só no runtime da Vercel; em dev local o SDK usa BLOB_READ_WRITE_TOKEN, se existir.
-  let oidcToken: string | undefined;
+  let oidcToken;
   try { oidcToken = await getVercelOidcToken(); } catch { /* sem OIDC fora da Vercel */ }
-  return { access: 'public' as const, contentType: 'application/pdf', storeId: BLOB_STORE_ID, ...(oidcToken ? { oidcToken } : {}) };
+  return { access: 'public', contentType: 'application/pdf', storeId: BLOB_STORE_ID, ...(oidcToken ? { oidcToken } : {}) };
 }
 
 // A Vercel limita o corpo da requisição a 4,5 MB; 4 MB deixa folga para o multipart (os relatórios do kartódromo têm ~150 KB).
@@ -25,15 +26,14 @@ const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_SIZE, files: 1 } });
 
 /** Todo PDF começa com "%PDF-". */
-export const isPdf = (buffer: Buffer): boolean => buffer.length >= 5 && buffer.toString('ascii', 0, 5) === '%PDF-';
+export const isPdf = (buffer) => buffer.length >= 5 && buffer.toString('ascii', 0, 5) === '%PDF-';
 
-/** Upload do relatório original (PDF) de uma corrida do /kart, somente administradores: envia ao Vercel Blob e devolve a URL pública. */
-export function handleKartPdfUpload(req: Request, res: Response): void {
+export function handleKartPdfUpload(req, res) {
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
   if (req.method !== 'POST') { jsonError(res, 405, 'Método não permitido.'); return; }
 
   void (async () => {
-    let authorization: 'unauthenticated' | 'forbidden' | 'authorized';
+    let authorization;
     try {
       authorization = await authorizeAdminRequest(req);
     } catch {
@@ -64,5 +64,3 @@ export function handleKartPdfUpload(req: Request, res: Response): void {
     });
   })();
 }
-
-export default handleKartPdfUpload;
