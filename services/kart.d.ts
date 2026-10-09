@@ -9,6 +9,8 @@ export interface KartRace {
   weather: 'dry' | 'rain';
   /** Sessão fora do campeonato (ex.: ir sozinho bater a melhor volta): não pontua, mas conta para o recorde de volta. */
   extra?: boolean;
+  /** Link do relatório original (PDF) no Vercel Blob; vazio/ausente = sem PDF anexado. */
+  pdfUrl?: string;
   results: KartResult[];
 }
 export interface TimingRow { racePos: number | null; kart: string; name: string; bestLapMs: number | null; laps: number }

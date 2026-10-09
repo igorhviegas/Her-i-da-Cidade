@@ -2,7 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { Crown, Search, Timer, Trophy } from 'lucide-react';
 import { formatLap, norm } from '../../services/kart.js';
 import { lapRanking, racesInScope, raceYears, standings, trackRecord, type KartScope } from '../../services/kartRanking.js';
+import type { UpcomingRace } from '../../services/kartNext.js';
 import type { KartPilot, KartRace } from '../../services/kartService';
+import { KartNextCard } from './KartNextCard';
 import { KartScoringInfo } from './KartScoringInfo';
 import { KartLink, MEDAL_STYLE, WeatherIcon, card, formatDate, medalOf, plural, type Medal } from './kartUi';
 
@@ -60,7 +62,7 @@ const Pill: React.FC<{ active: boolean; onClick: () => void; children: React.Rea
   <button type="button" onClick={onClick} aria-pressed={active} className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition-colors ${active ? 'bg-white text-[#070B14]' : 'border border-white/15 text-white/70 hover:text-white'}`}>{children}</button>
 );
 
-export const KartRanking: React.FC<{ races: KartRace[]; pilots: KartPilot[] }> = ({ races, pilots }) => {
+export const KartRanking: React.FC<{ races: KartRace[]; pilots: KartPilot[]; next?: UpcomingRace | null }> = ({ races, pilots, next }) => {
   const [mode, setMode] = useState<Mode>('points');
   const [scopeKey, setScopeKey] = useState<ScopeKey>('recent');
   const [query, setQuery] = useState('');
@@ -79,6 +81,7 @@ export const KartRanking: React.FC<{ races: KartRace[]; pilots: KartPilot[] }> =
 
   return (
     <div className="space-y-4">
+      {next && <KartNextCard next={next} />}
       {record && (
         <KartLink to={`/kart/piloto/${record.pilotId}`} className="relative block overflow-hidden rounded-2xl border border-red-500/30 bg-gradient-to-br from-[#2A0A0F] via-[#150B18] to-[#0D1527] p-5">
           <Timer className="absolute -right-3 -top-3 h-24 w-24 rotate-12 text-white/5" />

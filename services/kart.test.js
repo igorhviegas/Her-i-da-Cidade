@@ -5,6 +5,7 @@ import { buildResults, formatLap, isOfficial, matchPilot, parseLap, parseLapInpu
 import { DEFAULT_KART_PILOTS } from './kartPilots.js';
 import { lapRanking, officialRaces, pilotProfile, standings, titlesByPilot, trackRecord, yearlyChampions } from './kartRanking.js';
 import { videosByRace, youtubeId } from './kartVideos.js';
+import { daysUntil, todayInBrazil, upcomingRace } from './kartNext.js';
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 const r2025 = parseTimingReport(fixture('kart-timing-2025-07-12.txt'));
@@ -147,4 +148,14 @@ test('vídeo da corrida: só ativo, com link, o primeiro pela ordem', () => {
   const map = videosByRace([v('b', 'r1', 2), v('a', 'r1', 1), v('off', 'r2', 1, false), v('none', '', 1), v('nolink', 'r3', 1, true, '')]);
   assert.deepEqual([...map.keys()], ['r1']);
   assert.equal(map.get('r1').id, 'a');
+});
+
+test('próxima corrida: contagem regressiva em dias e some depois da data', () => {
+  assert.deepEqual([daysUntil('2026-12-12', '2026-12-03'), daysUntil('2026-12-12', '2026-12-12'), daysUntil('2027-01-01', '2026-12-31'), daysUntil('2026-12-01', '2026-12-02')], [9, 0, 1, -1]);
+  assert.deepEqual(['2026-12-12', '2026-12-11', '2026-12-10'].map((t) => upcomingRace({ date: '2026-12-12' }, t).countdown), ['hoje', 'amanhã', 'em 2 dias']);
+  assert.deepEqual(upcomingRace({ date: '2026-12-12', time: '15:30', place: 'Betim' }, '2026-12-03'), { date: '2026-12-12', time: '15:30', place: 'Betim', note: '', days: 9, countdown: 'em 9 dias' });
+  assert.equal(upcomingRace({ date: '2026-12-12' }, '2026-12-13'), null);
+  assert.equal(upcomingRace({ date: 'lixo' }, '2026-12-01'), null);
+  assert.equal(upcomingRace(null), null);
+  assert.match(todayInBrazil(new Date('2026-10-10T01:00:00Z')), /^2026-10-09$/); // 22h de Brasília ainda é dia 9
 });

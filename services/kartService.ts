@@ -1,9 +1,10 @@
 import { logger } from '../lib/logger.js';
 import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { db } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import type { KartPilot, KartRace } from './kart.js';
 import { DEFAULT_KART_PILOTS } from './kartPilots.js';
+import type { KartNextConfig } from './kartNext.js';
 import type { KartVideo } from './kartVideos.js';
 
 export type { KartPilot, KartRace, KartResult } from './kart.js';
@@ -13,6 +14,7 @@ export type { KartVideo, KartVideoKind } from './kartVideos.js';
 const PILOTS = 'kartPilots';
 const RACES = 'kartRaces';
 const VIDEOS = 'kartVideos';
+const CONFIG = 'kartConfig';
 
 function requireDb() {
   if (!db) throw new Error('Firebase Firestore não inicializado.');
@@ -33,6 +35,25 @@ function useCollection<T>(name: string): T[] | null {
   return items;
 }
 
+/** Próxima corrida (kartConfig/next): undefined = carregando, null = nenhuma cadastrada. */
+export function useKartNext(): KartNextConfig | null | undefined {
+  const [next, setNext] = useState<KartNextConfig | null | undefined>(undefined);
+  useEffect(() => {
+    if (!db) return;
+    return onSnapshot(
+      doc(db, CONFIG, 'next'),
+      (snap) => setNext(snap.exists() ? (snap.data() as KartNextConfig) : null),
+      (error) => { logger.warn('[kartService] kartConfig/next:', error); setNext(null); },
+    );
+  }, []);
+  return next;
+}
+
+export const saveKartNext = (n: KartNextConfig) => setDoc(doc(requireDb(), CONFIG, 'next'), {
+  date: n.date, time: n.time ?? '', place: (n.place ?? '').trim(), note: (n.note ?? '').trim(), updatedAt: serverTimestamp(),
+});
+export const clearKartNext = () => deleteDoc(doc(requireDb(), CONFIG, 'next'));
+
 export const useKartPilots = () => useCollection<KartPilot>(PILOTS);
 export const useKartRaces = () => useCollection<KartRace>(RACES);
 export const useKartVideos = () => useCollection<KartVideo>(VIDEOS);
@@ -41,8 +62,29 @@ export const useKartVideos = () => useCollection<KartVideo>(VIDEOS);
 export const raceDocId = (date: string, time: string) => `${date}-${time.replace(':', '') || 'x'}`;
 
 export const saveKartRace = (race: KartRace) => setDoc(doc(requireDb(), RACES, race.id), {
-  date: race.date, heat: race.heat, weather: race.weather, extra: !!race.extra, results: race.results, updatedAt: serverTimestamp(),
+  date: race.date, heat: race.heat, weather: race.weather, extra: !!race.extra, pdfUrl: race.pdfUrl ?? '', results: race.results, updatedAt: serverTimestamp(),
 });
+/** Envia o PDF original da corrida para /api/upload-kart-pdf (Vercel Blob, só administradores) e devolve a URL pública. */
+export async function uploadKartPdf(file: File): Promise<string> {
+  const user = auth?.currentUser;
+  if (!user) throw new Error('Faça login como administrador para anexar o PDF.');
+  const formData = new FormData();
+  formData.append('file', file);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60_000);
+  try {
+    const response = await fetch('/api/upload-kart-pdf', { method: 'POST', headers: { Authorization: `Bearer ${await user.getIdToken()}` }, body: formData, signal: controller.signal });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.success || !data?.url) throw new Error(data?.error || `Falha no upload do PDF (HTTP ${response.status}).`);
+    return data.url as string;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw new Error('Tempo limite esgotado ao enviar o PDF (60 s). Verifique a conexão e tente novamente.');
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export const deleteKartRace = (id: string) => deleteDoc(doc(requireDb(), RACES, id));
 
 export const saveKartPilot = (p: KartPilot) => setDoc(doc(requireDb(), PILOTS, p.id), {

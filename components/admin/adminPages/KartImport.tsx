@@ -3,12 +3,14 @@ import { CloudRain, FileUp, Loader2, Sun, TriangleAlert, UserPlus, X } from 'luc
 import { MIN_OFFICIAL_PILOTS, buildResults, formatLap, parseTimingReport, type TimingRow } from '../../../services/kart.js';
 import { pilotId } from '../../../services/kartPilots.js';
 import { readPdfText } from '../../../services/pdfImportBrowser';
-import { raceDocId, saveKartPilot, saveKartRace, type KartPilot, type KartRace } from '../../../services/kartService';
+import { raceDocId, saveKartPilot, saveKartRace, uploadKartPdf, type KartPilot, type KartRace } from '../../../services/kartService';
 import { card, input, type Run } from './agentShared';
 
 interface Draft {
   key: string;
   file: string;
+  /** O próprio PDF, anexado à corrida ao salvar (para o botão "Baixar PDF original"). */
+  pdf: File | null;
   error?: string;
   date: string;
   heat: string;
@@ -20,17 +22,20 @@ interface Draft {
   rows: TimingRow[];
 }
 
+const extraDocId = (date: string, time: string) => `extra-${date}-${time.replace(':', '') || 'x'}`;
 const isExtra = (d: Draft, results: unknown[]) => d.extra ?? results.length < MIN_OFFICIAL_PILOTS;
 
 /** Nome do relatório (CAIXA ALTA) em formato de cadastro: "Salun Marvin Pires Bento". */
 const titleCase = (name: string) => name.toLowerCase().replace(/(^|\s)\S/g, (c) => c.toUpperCase());
 
-async function readDraft(file: File): Promise<Draft> {
-  const base = { key: `${file.name}-${file.size}`, file: file.name, date: '', heat: '', time: '', weather: 'dry' as const, extra: null, rows: [] };
+async function readDraft(file: File, saved: KartRace[]): Promise<Draft> {
+  const base = { key: `${file.name}-${file.size}`, file: file.name, pdf: file, date: '', heat: '', time: '', weather: 'dry' as const, extra: null, rows: [] };
   try {
     const report = parseTimingReport(await readPdfText(file));
     if (!report) return { ...base, error: 'Este PDF não parece um relatório de cronometragem do kartódromo.' };
-    return { ...base, date: report.date, heat: report.heat, time: report.time, rows: report.rows };
+    // Corrida já salva: mantém o clima e o tipo escolhidos antes (reimportar só para anexar o PDF não desfaz nada).
+    const before = saved.find((r) => r.id === raceDocId(report.date, report.time) || r.id === extraDocId(report.date, report.time));
+    return { ...base, date: report.date, heat: report.heat, time: report.time, rows: report.rows, weather: before?.weather ?? 'dry', extra: before ? !!before.extra : null };
   } catch (err) {
     return { ...base, error: err instanceof Error ? err.message : 'Não foi possível ler o PDF.' };
   }
@@ -124,7 +129,7 @@ export const KartImport: React.FC<{ pilots: KartPilot[]; races: KartRace[]; run:
   const onFiles = async (files: FileList | null) => {
     if (!files?.length) return;
     setReading(true);
-    const read = await Promise.all([...files].map(readDraft));
+    const read = await Promise.all([...files].map((f) => readDraft(f, races)));
     setDrafts((prev) => [...prev.filter((p) => !read.some((r) => r.key === p.key)), ...read].sort((a, b) => a.date.localeCompare(b.date)));
     setReading(false);
     if (fileInput.current) fileInput.current.value = '';
@@ -133,9 +138,12 @@ export const KartImport: React.FC<{ pilots: KartPilot[]; races: KartRace[]; run:
   // Cada rascunho com o resultado calculado agora (inscrever um piloto novo já entra aqui).
   const computed = drafts.map((d) => { const { results } = buildResults(d.rows, pilots); return { d, results, extra: isExtra(d, results) }; });
   const ready = computed.filter(({ d, results, extra }) => !d.error && d.date && results.length >= (extra ? 1 : MIN_OFFICIAL_PILOTS));
-  const idOf = (d: Draft, extra: boolean) => (extra ? `extra-${d.date}-${d.time.replace(':', '') || 'x'}` : raceDocId(d.date, d.time));
+  const idOf = (d: Draft, extra: boolean) => (extra ? extraDocId(d.date, d.time) : raceDocId(d.date, d.time));
   const saveAll = async () => {
-    const ok = await run(async () => { for (const { d, results, extra } of ready) await saveKartRace({ id: idOf(d, extra), date: d.date, heat: d.heat, weather: d.weather, extra, results }); }, `${ready.length} corrida(s) salva(s).`);
+    const ok = await run(async () => { for (const { d, results, extra } of ready) {
+      const pdfUrl = d.pdf ? await uploadKartPdf(d.pdf) : races.find((r) => r.id === idOf(d, extra))?.pdfUrl;
+      await saveKartRace({ id: idOf(d, extra), date: d.date, heat: d.heat, weather: d.weather, extra, pdfUrl, results });
+    } }, `${ready.length} corrida(s) salva(s).`);
     if (ok) setDrafts((prev) => prev.filter((d) => !ready.some((r) => r.d === d)));
   };
 
@@ -144,7 +152,7 @@ export const KartImport: React.FC<{ pilots: KartPilot[]; races: KartRace[]; run:
       <div className={`${card} flex flex-wrap items-center gap-3 p-4`}>
         <div className="min-w-0 flex-1">
           <p className="font-bold text-white">Importar resultado da corrida (PDF)</p>
-          <p className="text-sm text-white/55">Suba um ou vários relatórios do kartódromo. Só os pilotos inscritos entram, reclassificados entre si. Você confere antes de salvar.</p>
+          <p className="text-sm text-white/55">Suba um ou vários relatórios do kartódromo. Só os pilotos inscritos entram, reclassificados entre si. O PDF fica anexado à corrida (botão "Baixar PDF original" na página dela). Reimportar uma corrida já salva mantém o clima e só acrescenta o PDF.</p>
         </div>
         <input ref={fileInput} type="file" accept="application/pdf,.pdf" multiple hidden onChange={(e) => onFiles(e.target.files)} />
         <button type="button" disabled={reading || pilots.length === 0} onClick={() => fileInput.current?.click()} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-40">

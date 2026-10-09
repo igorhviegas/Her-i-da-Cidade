@@ -493,6 +493,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+    // Configuração do campeonato (kartConfig/next = próxima corrida)
+    match /kartConfig/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
 
     // =========================================================
     // ADMINS

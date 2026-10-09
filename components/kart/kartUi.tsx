@@ -44,6 +44,9 @@ export const medalOf = (rank: number): Medal | null => (rank >= 1 && rank <= 3 ?
 export const formatDate = (iso: string, withYear = true) =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', ...(withYear ? { year: 'numeric' } : {}), timeZone: 'UTC' }).replace('.', '');
 
+export const formatDateLong = (iso: string) =>
+  new Date(`${iso}T12:00:00Z`).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+
 export const WeatherIcon: React.FC<{ weather: 'dry' | 'rain'; className?: string }> = ({ weather, className = 'h-4 w-4' }) =>
   weather === 'rain'
     ? <CloudRain className={`${className} text-sky-300`} aria-label="Chuva" />

@@ -34,7 +34,7 @@ export const KartRaceForm: React.FC<{ pilots: KartPilot[]; race: KartRace | null
     const ordered = extra ? [...entries].sort((a, b) => (parseLapInput(a.lap) ?? Infinity) - (parseLapInput(b.lap) ?? Infinity)) : entries; // avulsa: ordem pela volta
     const results = ordered.map((e, i) => ({ pilotId: e.pilotId, name: e.name, pos: i + 1, racePos: null, bestLapMs: parseLapInput(e.lap), laps: 0 }));
     const ok = await run(async () => {
-      await saveKartRace({ id, date, heat: `${extra ? 'Avulsa' : 'Bateria'}${time ? ` ${time}` : ''}`, weather, extra, results });
+      await saveKartRace({ id, date, heat: `${extra ? 'Avulsa' : 'Bateria'}${time ? ` ${time}` : ''}`, weather, extra, pdfUrl: race?.pdfUrl, results });
       if (race && race.id !== id) await deleteKartRace(race.id); // data/horário mudou: não deixa a corrida antiga duplicada
     }, race ? 'Corrida atualizada.' : 'Corrida lançada.');
     if (ok) onClose();
