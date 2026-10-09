@@ -33,7 +33,8 @@ import {
   HeartPulse,
   Activity,
   ClipboardCheck,
-  Dumbbell
+  Dumbbell,
+  Flag
 } from 'lucide-react';
 
 // Módulos reorganizáveis (ordem padrão). "Principal" é fixo no topo e fica fora desta lista.
@@ -54,11 +55,12 @@ const NAV_ITEMS: NavItem<AdminTab>[] = [
   { id: 'fit', label: 'Fit', icon: HeartPulse },
   { id: 'fitcheckins', label: 'Check-ins', icon: ClipboardCheck },
   { id: 'fittreinos', label: 'Treinos', icon: Dumbbell },
+  { id: 'kart', label: 'Kart', icon: Flag },
 ];
 const NAV_GROUPS: NavGroup<AdminTab>[] = [
   { key: 'crm', label: 'CRM', icon: Briefcase, ids: ['orders', 'missions', 'finance', 'instagram', 'scripts', 'clients'] },
   { key: 'streaming', label: 'Streaming', icon: Tv, ids: ['videos', 'categories'] },
-  { key: 'pessoal', label: 'Pessoal', icon: Activity, ids: ['fit', 'fitcheckins', 'fittreinos'] },
+  { key: 'pessoal', label: 'Pessoal', icon: Activity, ids: ['fit', 'fitcheckins', 'fittreinos', 'kart'] },
   { key: 'ajustes', label: 'Ajustes', icon: SlidersHorizontal, ids: ['services', 'content', 'dashboard', 'settings', 'agent'] },
 ];
 const NAV_ORDER = NAV_ITEMS.map((item) => item.id);
@@ -99,6 +101,8 @@ const tabFromPath = (path: string): AdminTab =>
       ? 'fitcheckins'
       : path === '/admin/fit/treinos'
       ? 'fittreinos'
+      : path === '/admin/kart'
+      ? 'kart'
       : path === '/admin/dashboard'
       ? 'dashboard'
       : path === '/admin/perfil'
@@ -141,6 +145,8 @@ const syncTabFromPath = (path: string, setCurrentTab: (tab: AdminTab) => void) =
       setCurrentTab('fitcheckins');
     } else if (path === '/admin/fit/treinos') {
       setCurrentTab('fittreinos');
+    } else if (path === '/admin/kart') {
+      setCurrentTab('kart');
     } else if (path === '/admin/dashboard') {
       setCurrentTab('dashboard');
     } else if (path === '/admin/perfil') {
@@ -185,6 +191,8 @@ const navigateToTab = (tabId: AdminTab, navigate: (to: string) => void) => {
       navigate('/admin/fit/checkins');
     } else if (tabId === 'fittreinos') {
       navigate('/admin/fit/treinos');
+    } else if (tabId === 'kart') {
+      navigate('/admin/kart');
     } else if (tabId === 'dashboard') {
       navigate('/admin/dashboard');
     } else if (tabId === 'profile') {
