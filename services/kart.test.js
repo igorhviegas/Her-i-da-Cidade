@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { buildResults, formatLap, isOfficial, matchPilot, parseLap, parseLapInput, parseTimingReport, pointsFor } from './kart.js';
 import { DEFAULT_KART_PILOTS } from './kartPilots.js';
-import { lapRanking, officialRaces, pilotProfile, standings, trackRecord } from './kartRanking.js';
-import { youtubeId } from './kartVideos.js';
+import { lapRanking, officialRaces, pilotProfile, standings, titlesByPilot, trackRecord, yearlyChampions } from './kartRanking.js';
+import { videosByRace, youtubeId } from './kartVideos.js';
 
 const fixture = (name) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 const r2025 = parseTimingReport(fixture('kart-timing-2025-07-12.txt'));
@@ -128,4 +128,23 @@ test('perfil: sessões avulsas aparecem à parte e o recorde considera todas', (
   assert.equal(p.history.length, 1);
   assert.deepEqual(p.extras.map((e) => [e.raceId, e.bestLapMs]), [['x', 72000]]);
   assert.deepEqual([p.record.bestLapMs, p.record.extra], [72000, true]);
+});
+
+test('campeões por ano: só ano encerrado dá título; o ano corrente mostra o líder', () => {
+  const races = [
+    race('a', '2024-01-01', 'dry', ['ana', 'bia', 'caio']), race('b', '2024-02-01', 'dry', ['ana', 'caio', 'bia']),
+    race('c', '2025-01-01', 'dry', ['bia', 'ana', 'caio']), race('d', '2026-01-01', 'dry', ['caio', 'bia', 'ana']),
+  ];
+  const champs = yearlyChampions(races, 2026);
+  assert.deepEqual(champs.map((c) => [c.year, c.races, c.done, c.top[0].pilotId]), [[2026, 1, false, 'caio'], [2025, 1, true, 'bia'], [2024, 2, true, 'ana']]);
+  assert.deepEqual([...titlesByPilot(champs)], [['bia', [2025]], ['ana', [2024]]]);
+  assert.deepEqual(pilotProfile('ana', races, 2026).titles, [2024]);
+  assert.deepEqual(pilotProfile('caio', races, 2026).titles, []);
+});
+
+test('vídeo da corrida: só ativo, com link, o primeiro pela ordem', () => {
+  const v = (id, raceId, order, active = true, youtubeId = 'abcdefghijk') => ({ id, raceId, order, active, youtubeId, title: id, kind: 'race' });
+  const map = videosByRace([v('b', 'r1', 2), v('a', 'r1', 1), v('off', 'r2', 1, false), v('none', '', 1), v('nolink', 'r3', 1, true, '')]);
+  assert.deepEqual([...map.keys()], ['r1']);
+  assert.equal(map.get('r1').id, 'a');
 });

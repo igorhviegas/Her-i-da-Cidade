@@ -14,3 +14,10 @@ export function youtubeId(input) {
     return /^[\w-]{11}$/.test(id ?? '') ? id : '';
   } catch { return ''; }
 }
+
+/** Vídeo ativo de cada corrida: Map raceId → vídeo (o primeiro, na ordem da lista). */
+export function videosByRace(videos) {
+  const map = new Map();
+  for (const v of [...(videos ?? [])].sort((a, b) => a.order - b.order)) if (v.raceId && v.active !== false && v.youtubeId && !map.has(v.raceId)) map.set(v.raceId, v);
+  return map;
+}

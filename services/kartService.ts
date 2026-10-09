@@ -58,6 +58,6 @@ export async function seedKartPilots() {
 }
 
 export const saveKartVideo = (v: KartVideo) => setDoc(doc(requireDb(), VIDEOS, v.id), {
-  title: v.title.trim(), youtubeId: v.youtubeId, kind: v.kind, order: v.order, active: v.active !== false, updatedAt: serverTimestamp(),
+  title: v.title.trim(), youtubeId: v.youtubeId, kind: v.kind, raceId: v.raceId ?? '', order: v.order, active: v.active !== false, updatedAt: serverTimestamp(),
 });
 export const deleteKartVideo = (id: string) => deleteDoc(doc(requireDb(), VIDEOS, id));
