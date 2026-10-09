@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AgentTrack } from '../../services/agentService';
 import { groupTracks } from '../../services/agentContent.js';
+import { loadAudioBlobUrl, pruneAudioCache, shouldPrefetchAudio } from './audioCache';
 
 /**
  * Player único da área do agente. Mora no componente raiz (AgentApp), então trocar de tela não o desmonta
@@ -26,6 +27,9 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
   const positions = useRef(new Map<string, number>());
   // Ids com posição guardada (para mostrar o botão de recomeçar nas músicas que não estão no início).
   const [startedIds, setStartedIds] = useState<string[]>([]);
+  // URL remota -> URL local (blob:) das músicas já baixadas; `loadedUrlRef` = URL remota da faixa carregada no <audio>.
+  const localUrls = useRef(new Map<string, string>());
+  const loadedUrlRef = useRef<string | null>(null);
 
   const playTrack = useCallback((track: AgentTrack) => {
     const audio = audioRef.current;
@@ -35,8 +39,9 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
       positions.current.set(previousId, audio.currentTime);
       setStartedIds((ids) => (ids.includes(previousId) ? ids : [...ids, previousId]));
     }
-    if (previousId !== track.id || audio.src !== track.url) {
-      audio.src = track.url;
+    if (previousId !== track.id || loadedUrlRef.current !== track.url) {
+      audio.src = localUrls.current.get(track.url) ?? track.url; // baixada = toca na hora; senão, streaming
+      loadedUrlRef.current = track.url;
       const resumeAt = positions.current.get(track.id);
       // O iOS ignora currentTime antes dos metadados: só posiciona quando carregarem.
       if (resumeAt) audio.addEventListener('loadedmetadata', () => { audio.currentTime = resumeAt; }, { once: true });
@@ -117,6 +122,23 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
 
   // Repetir a música atual (com loop ligado o 'ended' nem dispara); vale também ao trocar de música.
   useEffect(() => { if (audioRef.current) audioRef.current.loop = loop; }, [loop]);
+
+  // Baixa a playlist em segundo plano (2 por vez, na ordem da lista) para o play não depender da rede.
+  const urlsKey = tracks.map((t) => t.url).join('\n');
+  useEffect(() => {
+    const urls = urlsKey ? urlsKey.split('\n') : [];
+    if (urls.length === 0 || !shouldPrefetchAudio()) return;
+    const controller = new AbortController();
+    const queue = urls.filter((url) => !localUrls.current.has(url));
+    const worker = async () => {
+      for (let url = queue.shift(); url && !controller.signal.aborted; url = queue.shift()) {
+        try { localUrls.current.set(url, await loadAudioBlobUrl(url, controller.signal)); } catch { /* segue em streaming */ }
+      }
+    };
+    void Promise.all([worker(), worker()]).then(() => pruneAudioCache(urls));
+    return () => controller.abort();
+  }, [urlsKey]);
+  useEffect(() => () => { localUrls.current.forEach((url) => URL.revokeObjectURL(url)); }, []);
 
   // Controles da tela de bloqueio / fones (iOS e Android).
   const current = tracks.find((t) => t.id === currentId) ?? null;
