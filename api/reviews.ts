@@ -4,7 +4,7 @@ import { ReviewsError, fetchGoogleReviews, readReviewsConfig } from '../function
 
 /**
  * GET público: avaliações reais do Google. A resposta fica 24 h no cache da Vercel (e serve a antiga por até 7 dias
- * enquanto renova), então a Places API é chamada ~1x/dia, longe do limite gratuito. Erros nunca vão para o cache.
+ * enquanto renova), então a Places API é chamada ~1x/dia, longe do limite gratuito. Erros nunca vão para o cache; o código do erro (sem detalhes) vem no corpo para facilitar o diagnóstico.
  */
 export async function handleReviews(
   req: Pick<Request, 'method'>,
@@ -23,9 +23,12 @@ export async function handleReviews(
     res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
     return res.status(200).json(data);
   } catch (error) {
-    if (error instanceof ReviewsError) logger.error('[Reviews] Google:', error.code, error.detail);
-    else logger.error('[Reviews] falha inesperada:', error instanceof Error ? error.name : 'erro');
-    return fail(502, 'unavailable');
+    if (!(error instanceof ReviewsError)) {
+      logger.error('[Reviews] falha inesperada:', error instanceof Error ? error.name : 'erro');
+      return fail(502, 'unavailable');
+    }
+    logger.error('[Reviews] Google:', error.code, error.detail);
+    return fail(502, error.code); // só o código (auth, not_found, rate_limited...), nunca a mensagem do Google
   }
 }
 
