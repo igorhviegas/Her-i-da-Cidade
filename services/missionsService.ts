@@ -426,15 +426,18 @@ export function subscribeTodayMissionsCount(onChange: (count: number | null) => 
 
 let syncing: Promise<void> | null = null;
 
-/** Sincroniza tarefas e cria avisos ausentes (ID determinístico; avisos descartados nunca reaparecem). Chamadas simultâneas compartilham a execução. */
-export function runClientSync(now = new Date()): Promise<void> {
+/**
+ * Sincroniza tarefas e cria avisos ausentes (ID determinístico; avisos descartados nunca reaparecem). Chamadas simultâneas compartilham a execução.
+ * `preloadedGoals` reaproveita um carregamento de metas já em andamento (loadGoals é a leitura mais pesada do CRM).
+ */
+export function runClientSync(now = new Date(), preloadedGoals?: Promise<GoalView[]>): Promise<void> {
   syncing ??= (async () => {
     try {
       await syncTasks(now);
       const [missionsSnap, recent, goals] = await Promise.all([
         getDocs(query(collection(firestore(), MISSIONS_COLLECTION), where('status', '==', 'pending'))),
         listOccurrencesSince(addDays(dateKey(now), -1)),
-        loadGoals(now),
+        preloadedGoals ?? loadGoals(now),
       ]);
       const candidates = buildNotifications({
         missions: mapAll<Mission>(missionsSnap), occurrences: recent,

@@ -35,7 +35,7 @@ export const AdminOrdersPage: React.FC = () => {
   const { calendarState, handleSendToCalendar } = useOrderCalendar(setSelectedOrder);
   const { deletingOrderId, handleDeleteOrder } = useOrderDelete({ setOrders, setCompletedOrders, setTotalOrderCount, setSelectedOrder, setOrderActionError, setSuccess });
   const { handleOrderSaved } = useOrderSaved({ orders, completedOrders, setOrders, setCompletedOrders, setSelectedOrder, setEditOrderOpen, setSuccess });
-  const { updatingOrderId, consumptionView, setConsumptionView, requireEventCost, handleStatusChange } = useOrderStatus({ orders, completedOrders, loadOrders, setSelectedOrder, setEditOrderOpen, setOrderActionError, setSuccess });
+  const { updatingOrderId, consumptionView, setConsumptionView, requireEventCost, handleStatusChange, applyStatusLocally } = useOrderStatus({ orders, completedOrders, loadOrders, setOrders, setCompletedOrders, setSelectedOrder, setEditOrderOpen, setOrderActionError, setSuccess });
   const { teleprompterView, setTeleprompterView, handleSendToEditing, handleSaveTeleprompterText } = useTeleprompterFlow(handleStatusChange, loadOrders);
   const { draggingOrderId, setDraggingOrderId, dragOverStatus, setDragOverStatus, handleDropOrder } = useOrderDrag(handleStatusChange);
 
@@ -46,7 +46,7 @@ export const AdminOrdersPage: React.FC = () => {
     setConsumptionView(null);
     setSelectedOrder((current) => (current?.order.id === orderId ? null : current));
     setSuccess(allowShortage ? 'Evento concluído com pendências de estoque (veja Financeiro → Estoque).' : 'Evento concluído e materiais baixados do estoque.');
-    await loadOrders();
+    applyStatusLocally(orderId, 'completed');
   };
 
   const handleCompleteOrder = async (view: OrderView) => {
