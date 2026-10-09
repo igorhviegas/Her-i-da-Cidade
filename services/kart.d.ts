@@ -15,6 +15,7 @@ export interface TimingReport { date: string; heat: string; time: string; rows: 
 export const MIN_OFFICIAL_PILOTS: number;
 export function norm(s: unknown): string;
 export function parseLap(text: unknown): number | null;
+export function parseLapInput(text: unknown): number | null;
 export function formatLap(ms: number | null | undefined): string;
 /** null = o texto não é um relatório de cronometragem. */
 export function parseTimingReport(text: unknown): TimingReport | null;

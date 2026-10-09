@@ -12,6 +12,12 @@ export function parseLap(text) {
   return m ? Number(m[1]) * 60000 + Number(m[2]) * 1000 + Number(m[3]) : null;
 }
 
+/** Tempo digitado à mão: '1:13.169', '1.13.169', '1:13,169' ou '1:14.20' (centésimos) → ms; null se inválido. */
+export function parseLapInput(text) {
+  const m = /^(\d{1,2})[:.](\d{2})[.,](\d{1,3})$/.exec(String(text ?? '').trim());
+  return m && Number(m[2]) < 60 ? Number(m[1]) * 60000 + Number(m[2]) * 1000 + Number(m[3].padEnd(3, '0')) : null;
+}
+
 /** 73169 → '1:13.169'; '—' sem tempo. */
 export function formatLap(ms) {
   if (!Number.isFinite(ms) || ms <= 0) return '—';
