@@ -104,7 +104,7 @@ export const AdminFinancePage: React.FC = () => {
               kindFilter={kindFilter} onKindFilter={setKindFilter} onOpenOrders={() => navigate('/admin/pedidos')} />
           )}
 
-          {tab === 'reports' && <FinanceReportsTab entries={entries} costs={costs} expenses={data.expenses} clients={clients} services={services} />}
+          {tab === 'reports' && <FinanceReportsTab entries={entries} costs={costs} orders={orders ?? []} expenses={data.expenses} clients={clients} services={services} />}
 
           <FinanceOtherTabs tab={tab} expenses={data.expenses} assets={data.assets} videoCost={view.editing} eventCost={view.eventCost} monthKey={monthKey} onChanged={reloadCollections} entries={entries} nameOf={serviceName} />
         </>

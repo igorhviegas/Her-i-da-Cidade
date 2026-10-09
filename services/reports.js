@@ -1,7 +1,7 @@
 // Relatórios do Financeiro (puros, sem React/Firebase). Parte dos mesmos itens do módulo Financeiro (buildRevenueEntries):
 // `entries` = faturamento, `costs` = despesas de evento do livro. Datas no fuso do navegador, como o resto do Financeiro.
 // Missões e XP ficam de fora de propósito.
-import { monthKeyOf, shiftMonth } from './financeCalculations.js';
+import { monthKeyOf, shiftMonth, toDate } from './financeCalculations.js';
 
 const DAY_MS = 86_400_000;
 const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -181,4 +181,113 @@ export function clientRetention(entries, now = new Date()) {
     top: [...rows].sort((a, b) => b.revenue - a.revenue || b.orders - a.orders).slice(0, 10),
     winback: rows.filter((r) => daysSince(r) >= WINBACK_FROM_DAYS && daysSince(r) <= WINBACK_TO_DAYS).sort((a, b) => b.revenue - a.revenue).slice(0, 20),
   };
+}
+
+// ---------------------------------------------------------------- recortes de período para rentabilidade e operação
+
+export const PRESETS = ['month', '90d', 'year', 'all'];
+
+/** Mês corrente, últimos 90 dias (incluindo hoje), ano corrente ou todo o histórico. */
+export function presetRange(preset, now = new Date()) {
+  const today = startOfDay(now);
+  if (preset === 'month') return periodRange('month', now);
+  if (preset === '90d') return { start: addDays(today, -89), end: addDays(today, 1) };
+  if (preset === 'year') return { start: new Date(today.getFullYear(), 0, 1), end: new Date(today.getFullYear() + 1, 0, 1) };
+  if (preset === 'all') return { start: new Date(0), end: new Date(8.64e15) };
+  throw new Error(`Recorte inválido: ${preset}`);
+}
+
+// ---------------------------------------------------------------- rentabilidade (só custos registrados)
+
+const margin = (revenue, cost) => ({ margin: revenue - cost, marginPct: revenue > 0 ? (revenue - cost) / revenue : null });
+
+/**
+ * Por serviço no período: faturamento, custos registrados (custo de edição do pedido + despesa de evento do livro) e margem.
+ * Custo que não é registrado no sistema (estoque, tempo) não entra: a margem de serviço sem custo registrado é a do faturamento.
+ */
+export function serviceProfitability(entries, costs, range) {
+  const groups = new Map();
+  const group = (id) => groups.get(id) ?? groups.set(id, { serviceId: id, orders: new Set(), revenue: 0, cost: 0 }).get(id);
+  for (const e of entries.filter((item) => inRange(item, range))) {
+    const g = group(e.order.serviceId || 'sem-servico');
+    g.revenue += e.value;
+    if (isRealOrder(e)) g.orders.add(realOrderId(e));
+    if (typeof e.order.editingCost === 'number') g.cost += e.order.editingCost;
+  }
+  for (const c of costs.filter((item) => inRange(item, range))) group(c.order.serviceId || 'sem-servico').cost += c.value;
+  return [...groups.values()]
+    .map((g) => ({ serviceId: g.serviceId, count: g.orders.size, revenue: g.revenue, cost: g.cost, ...margin(g.revenue, g.cost), marginPerOrder: g.orders.size ? (g.revenue - g.cost) / g.orders.size : null }))
+    .sort((a, b) => b.margin - a.margin || a.serviceId.localeCompare(b.serviceId));
+}
+
+/**
+ * Eventos encerrados (com a 2ª parcela lançada) cuja conclusão cai no período. Receita e custo são do evento inteiro
+ * (entrada, 2ª parcela, ajustes e despesa do livro), mesmo que a entrada tenha sido em outro mês.
+ */
+export function eventProfitability(entries, costs, range) {
+  const events = new Map();
+  const event = (id) => events.get(id) ?? events.set(id, { orderId: id, revenue: 0, cost: 0, closedAt: null }).get(id);
+  for (const e of entries.filter((item) => item.order.ledger)) {
+    const ev = event(e.order.orderId);
+    ev.revenue += e.value;
+    Object.assign(ev, { serviceId: e.order.serviceId, clientId: e.order.clientId, childName: ev.childName || e.order.childName });
+    if (e.order.ledgerKind === 'final') ev.closedAt = e.revenueDate;
+  }
+  for (const c of costs) event(c.order.orderId).cost += c.value;
+  const rows = [...events.values()]
+    .filter((ev) => ev.closedAt && ev.closedAt >= range.start && ev.closedAt < range.end)
+    .map((ev) => ({ ...ev, date: ev.closedAt, ...margin(ev.revenue, ev.cost) }))
+    .sort((a, b) => b.date - a.date);
+  const revenue = sum(rows, (r) => r.revenue);
+  const cost = sum(rows, (r) => r.cost);
+  return { rows, totals: { count: rows.length, revenue, cost, ...margin(revenue, cost) } };
+}
+
+// ---------------------------------------------------------------- operação: prazos e atrasos
+
+const dayDiff = (later, earlier) => Math.round((startOfDay(later) - startOfDay(earlier)) / DAY_MS); // em dias de calendário, como o Kanban compara prazos
+
+/** Linha de entrega de um pedido concluído no período com prazo ao cliente; null se o pedido não conta. */
+function deliveryRow(o, range) {
+  const completed = toDate(o.completedAt);
+  const due = toDate(o.customerDueDate);
+  if (o.ledger || o.scriptId || o.status !== 'completed' || !completed || !due || completed < range.start || completed >= range.end) return null;
+  const start = toDate(o.paidAt) ?? toDate(o.createdAt);
+  return { order: o, lateDays: Math.max(0, dayDiff(completed, due)), leadDays: start ? (completed - start) / DAY_MS : null };
+}
+
+/**
+ * Entregas concluídas no período que tinham prazo ao cliente: % no prazo (dia da conclusão ≤ dia do prazo), atraso médio dos atrasados
+ * e tempo médio do pagamento (ou criação) à conclusão. `orders` = pedidos concluídos (documentos reais, sem itens de livro nem roteiros).
+ */
+export function deliveryPerformance(orders, range) {
+  const rows = orders.map((o) => deliveryRow(o, range)).filter(Boolean);
+  const late = rows.filter((r) => r.lateDays > 0);
+  const leads = rows.filter((r) => r.leadDays !== null).map((r) => r.leadDays);
+  return {
+    delivered: rows.length,
+    onTime: rows.length - late.length,
+    onTimeRate: rows.length ? (rows.length - late.length) / rows.length : null,
+    avgLateDays: late.length ? sum(late, (r) => r.lateDays) / late.length : null,
+    avgLeadDays: leads.length ? sum(leads, (d) => d) / leads.length : null,
+    late: late.sort((x, y) => y.lateDays - x.lateDays).slice(0, 10),
+  };
+}
+
+export const ACTIVE_STAGES = ['scheduled', 'recording', 'editing', 'delivery'];
+
+/** Pedidos em andamento hoje: por etapa, atrasados (prazo ao cliente em dia anterior a hoje) e os que vencem hoje ou em até 2 dias. */
+export function activeHealth(active, now = new Date()) {
+  const byStatus = Object.fromEntries(ACTIVE_STAGES.map((status) => [status, 0]));
+  const overdue = [];
+  let dueSoon = 0;
+  for (const order of active) {
+    if (order.status in byStatus) byStatus[order.status] += 1;
+    const due = toDate(order.customerDueDate);
+    if (!due) continue;
+    const days = dayDiff(now, due); // > 0: venceu há N dias
+    if (days > 0) overdue.push({ order, lateDays: days });
+    else if (days >= -2) dueSoon += 1;
+  }
+  return { total: active.length, byStatus, overdue: overdue.sort((a, b) => b.lateDays - a.lateDays), dueSoon };
 }

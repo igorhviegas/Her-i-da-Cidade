@@ -14,6 +14,16 @@ Seletor Dia / Semana / Mês, com setas e "Hoje" (independente do seletor de mês
 | Resultado | Faturamento − custos. Em dia e semana **não há despesas fixas** (são mensais): o resultado é operacional. |
 | vs. período anterior | Variação do faturamento e dos serviços contra o dia/semana/mês imediatamente anterior. |
 
+## Rentabilidade
+Recortes: este mês, últimos 90 dias, este ano ou tudo. **Só entram os custos que o sistema registra**: custo de edição (R$ 25 do Vídeo Personalizado) e a despesa do evento (que já inclui o deslocamento: o custo do formulário do evento é um valor único). Estoque consumido e tempo gasto **não** entram (o estoque não tem valor unitário e não há registro de horas). Por isso um serviço sem custo registrado mostra margem de 100%.
+- **Por serviço:** faturamento, custos, margem, margem % e margem por serviço. Cada parcela conta no mês em que foi lançada (a entrada de um evento pode ter caído em outro mês).
+- **Por evento:** eventos concluídos no período, com receita e custo do evento inteiro (entrada, 2ª parcela, ajustes e despesa), mesmo que a entrada tenha sido em outro mês. Mostra quais eventos deram prejuízo.
+
+## Operação
+- **Agora, em andamento:** pedidos por etapa, atrasados (prazo ao cliente em dia anterior a hoje) e os que vencem em até 2 dias. Compara por dia de calendário, como o Kanban.
+- **Entregas no período:** entregues com prazo, % no prazo, atraso médio dos atrasados, tempo médio do pagamento à conclusão e a lista dos mais atrasados. Pedidos sem prazo ao cliente (eventos, roteiros internos) ficam de fora.
+- **Tempo parado em cada etapa do Kanban ainda não é medido:** o sistema não guardava a data de cada mudança de etapa.
+
 ## Sazonalidade
 Faturamento médio por mês do ano, só com **meses completos** (o mês em andamento fica fora das médias, mas aparece na tabela por ano com `*`). Mês sem faturamento conta zero. A classificação compara cada mês com o **mês típico (mediana)**, não com a média, para que poucos meses muito fortes não façam o resto parecer fraco: ≥ 115% = Forte, ≤ 85% = Fraco. Com menos de 12 meses de histórico a tela avisa que pode ser acaso.
 
@@ -23,6 +33,5 @@ Faturamento médio por mês do ano, só com **meses completos** (o mês em andam
 - Pedidos internos de roteiro não entram.
 
 ## Ainda não feito
-- **Rentabilidade por serviço e por evento:** hoje só existem o custo de edição (R$ 25 fixo) e o custo digitado no formulário do evento. Estoque consumido (sem valor unitário nos materiais), deslocamento (não é gravado por pedido) e tempo gasto (não existe) dependem de novos campos.
-- **Saúde operacional:** prazo médio de entrega e atrasados saem dos dados atuais; "tempo parado em cada etapa" exige gravar a data de cada mudança de etapa a partir de agora (o histórico não existe).
-- **Relatório mensal em PDF** com Instagram e Fit.
+- **Tempo parado em cada etapa do Kanban:** exige gravar a data de cada mudança de etapa a partir de agora (o histórico anterior não existe).
+- **Relatório mensal em PDF** (receita, custos, serviços, Instagram e Fit), com aviso no sino no dia 1º e PDF pelo botão de imprimir do navegador.

@@ -23,3 +23,19 @@ export interface ClientRetention {
   top: ClientRetentionRow[]; winback: ClientRetentionRow[];
 }
 export function clientRetention(entries: RevenueEntry[], now?: Date): ClientRetention;
+
+export type Preset = 'month' | '90d' | 'year' | 'all';
+export const PRESETS: Preset[];
+export function presetRange(preset: Preset, now?: Date): PeriodRange;
+
+export interface ServiceProfitRow { serviceId: string; count: number; revenue: number; cost: number; margin: number; marginPct: number | null; marginPerOrder: number | null }
+export function serviceProfitability(entries: RevenueEntry[], costs: RevenueEntry[], range: PeriodRange): ServiceProfitRow[];
+export interface EventProfitRow { orderId: string; serviceId?: string; clientId?: string; childName?: string; revenue: number; cost: number; date: Date; margin: number; marginPct: number | null }
+export function eventProfitability(entries: RevenueEntry[], costs: RevenueEntry[], range: PeriodRange): { rows: EventProfitRow[]; totals: { count: number; revenue: number; cost: number; margin: number; marginPct: number | null } };
+
+export interface LateDelivery { order: any; lateDays: number; leadDays: number | null }
+export function deliveryPerformance(orders: any[], range: PeriodRange): {
+  delivered: number; onTime: number; onTimeRate: number | null; avgLateDays: number | null; avgLeadDays: number | null; late: LateDelivery[];
+};
+export const ACTIVE_STAGES: string[];
+export function activeHealth(active: any[], now?: Date): { total: number; byStatus: Record<string, number>; overdue: { order: any; lateDays: number }[]; dueSoon: number };

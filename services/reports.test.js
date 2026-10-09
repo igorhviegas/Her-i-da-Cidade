@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRevenueEntries } from './financeCalculations.js';
-import { clientRetention, dailyBreakdown, periodRange, periodTotals, seasonality, serviceBreakdown, shiftPeriod } from './reports.js';
+import { activeHealth, clientRetention, dailyBreakdown, deliveryPerformance, eventProfitability, periodRange, periodTotals, presetRange, seasonality, serviceBreakdown, serviceProfitability, shiftPeriod } from './reports.js';
 
 const at = (iso) => new Date(`${iso}T12:00:00`); // meio-dia local: sem virar o dia por fuso
 const order = (id, over = {}) => ({ id, status: 'completed', clientId: 'c1', serviceId: 's1', totalPaid: 100, completedAt: at('2026-10-05'), ...over });
@@ -95,4 +95,76 @@ test('seasonality: dois meses muito fortes não fazem os meses típicos parecere
   const { entries } = build(months.map((m, i) => order(`o${i}`, { completedAt: at(`${m}-10`), totalPaid: m.endsWith('-10') || m.endsWith('-12') ? 3000 : 100 })));
   const { months: result } = seasonality(entries, now);
   assert.deepEqual(result.map((m) => m.level), ['medium', 'medium', 'medium', 'medium', 'medium', 'medium', 'medium', 'medium', 'medium', 'strong', 'medium', 'strong']);
+});
+
+// ---------------------------------------------------------------- rentabilidade e operação
+
+const ledgerOrder = (id, kind, amount, date) => ({ id, orderId: 'ev1', ledger: true, ledgerKind: kind, status: 'completed', clientId: 'c1', serviceId: 'sp', childName: 'Davi', completedAt: at(date), ...(kind.endsWith('cost') ? { eventCost: amount } : { totalPaid: amount }) });
+
+test('presetRange: mês, 90 dias (com hoje), ano e tudo', () => {
+  const now = at('2026-10-10');
+  assert.deepEqual(presetRange('month', now), { start: new Date(2026, 9, 1), end: new Date(2026, 10, 1) });
+  assert.deepEqual(presetRange('90d', now), { start: new Date(2026, 6, 13), end: new Date(2026, 9, 11) });
+  assert.deepEqual(presetRange('year', now), { start: new Date(2026, 0, 1), end: new Date(2027, 0, 1) });
+  assert.ok(presetRange('all', now).start <= new Date(2000, 0, 1) && presetRange('all', now).end >= new Date(2100, 0, 1));
+  assert.throws(() => presetRange('x', now), /inválido/);
+});
+
+test('serviceProfitability: margem por serviço com custo de edição e despesa de evento; sem custo registrado a margem é a receita', () => {
+  const { entries, costs } = build([
+    order('a', { serviceId: '3', totalPaid: 60, editingCost: 25, completedAt: at('2026-10-02') }),
+    order('b', { serviceId: '3', totalPaid: 60, editingCost: 25, completedAt: at('2026-10-03') }),
+    order('c', { serviceId: '1', totalPaid: 30, completedAt: at('2026-10-04') }),
+    ledgerOrder('evt-ev1-entry', 'entry', 200, '2026-10-05'), ledgerOrder('evt-ev1-final', 'final', 200, '2026-10-06'), ledgerOrder('evt-ev1-cost', 'cost', 150, '2026-10-06'),
+    order('old', { serviceId: '1', totalPaid: 999, completedAt: at('2026-09-01') }), // fora do período
+  ]);
+  const rows = serviceProfitability(entries, costs, periodRange('month', at('2026-10-10')));
+  assert.deepEqual(rows.map((r) => [r.serviceId, r.count, r.revenue, r.cost, r.margin, r.marginPct]), [
+    ['sp', 1, 400, 150, 250, 0.625],
+    ['3', 2, 120, 50, 70, 70 / 120],
+    ['1', 1, 30, 0, 30, 1],
+  ]);
+  assert.equal(rows[0].marginPerOrder, 250);
+});
+
+test('eventProfitability: só eventos encerrados no período; receita e custo do evento inteiro, inclusive entrada e ajustes de outro mês', () => {
+  const { entries, costs } = build([
+    ledgerOrder('evt-ev1-entry', 'entry', 200, '2026-09-20'), ledgerOrder('evt-ev1-final', 'final', 200, '2026-10-06'),
+    ledgerOrder('evt-ev1-adjrev-1', 'adjrev', 50, '2026-10-07'), ledgerOrder('evt-ev1-cost', 'cost', 150, '2026-10-06'),
+    { ...ledgerOrder('evt-ev2-entry', 'entry', 300, '2026-10-08'), orderId: 'ev2', childName: 'Lia' }, // ainda aberto: sem 2ª parcela
+    { ...ledgerOrder('evt-ev3-final', 'final', 100, '2026-08-01'), orderId: 'ev3' }, // encerrado em outro mês
+  ]);
+  const { rows, totals } = eventProfitability(entries, costs, periodRange('month', at('2026-10-10')));
+  assert.deepEqual(rows.map((r) => [r.orderId, r.childName, r.revenue, r.cost, r.margin]), [['ev1', 'Davi', 450, 150, 300]]);
+  assert.deepEqual(totals, { count: 1, revenue: 450, cost: 150, margin: 300, marginPct: 300 / 450 });
+  assert.deepEqual(eventProfitability(entries, costs, periodRange('month', at('2026-12-10'))).totals, { count: 0, revenue: 0, cost: 0, margin: 0, marginPct: null });
+});
+
+test('deliveryPerformance: no prazo por dia de calendário, atraso médio só dos atrasados e tempo médio do pagamento à conclusão', () => {
+  const range = periodRange('month', at('2026-10-10'));
+  const done = (id, over) => ({ id, status: 'completed', paidAt: at('2026-10-01'), customerDueDate: at('2026-10-05'), completedAt: at('2026-10-05'), ...over });
+  const r = deliveryPerformance([
+    done('a'), // no dia do prazo: no prazo
+    done('b', { completedAt: new Date(2026, 9, 5, 23, 30) }), // mesmo dia, mais tarde: no prazo
+    done('c', { completedAt: at('2026-10-08') }), // 3 dias de atraso
+    done('d', { completedAt: at('2026-10-06') }), // 1 dia de atraso
+    done('e', { completedAt: at('2026-09-02'), customerDueDate: at('2026-09-01'), paidAt: at('2026-08-28') }), // concluído antes do período
+    done('f', { customerDueDate: undefined }), // sem prazo: fora
+    done('g', { scriptId: 's1' }), // roteiro interno: fora
+    done('h', { status: 'editing' }), // não concluído: fora
+  ], range);
+  assert.deepEqual([r.delivered, r.onTime, r.onTimeRate, r.avgLateDays], [4, 2, 0.5, 2]);
+  assert.deepEqual(r.late.map((l) => [l.order.id, l.lateDays]), [['c', 3], ['d', 1]]);
+  assert.ok(Math.abs(r.avgLeadDays - (4 + (4 + 11.5 / 24) + 7 + 5) / 4) < 1e-9); // a: 4 dias; b: 4 dias e 11,5 h (12:00 → 23:30); c: 7; d: 5
+  assert.deepEqual(deliveryPerformance([], range), { delivered: 0, onTime: 0, onTimeRate: null, avgLateDays: null, avgLeadDays: null, late: [] });
+});
+
+test('activeHealth: contagem por etapa, atrasados do mais antigo ao mais novo e a vencer em até 2 dias', () => {
+  const now = at('2026-10-10');
+  const o = (id, status, due) => ({ id, status, ...(due ? { customerDueDate: at(due) } : {}) });
+  const h = activeHealth([o('a', 'recording', '2026-10-07'), o('b', 'editing', '2026-10-09'), o('c', 'editing', '2026-10-10'), o('d', 'delivery', '2026-10-12'), o('e', 'scheduled', '2026-10-13'), o('f', 'scheduled')], now);
+  assert.deepEqual(h.byStatus, { scheduled: 2, recording: 1, editing: 2, delivery: 1 });
+  assert.deepEqual(h.overdue.map((x) => [x.order.id, x.lateDays]), [['a', 3], ['b', 1]]);
+  assert.equal(h.dueSoon, 2); // vence hoje (c) e em 2 dias (d); e (3 dias) e f (sem prazo) ficam de fora
+  assert.equal(h.total, 6);
 });
