@@ -22,7 +22,7 @@ interface HomeViewProps {
 }
 
 const HomeView: React.FC<HomeViewProps> = ({ saved, update, progress, player, trackCount, setView, onStart }) => {
-  const { nextStep, done, total } = progress;
+  const { done, total } = progress;
   return (
     <>
         {saved.event ? (
@@ -33,13 +33,6 @@ const HomeView: React.FC<HomeViewProps> = ({ saved, update, progress, player, tr
           </div>
         ) : (
           <button onClick={onStart} className={`${btn} w-full rounded-2xl bg-emerald-500 px-6 py-8 text-2xl font-black uppercase tracking-wide text-[#04210F] shadow-lg shadow-emerald-500/30`}>Iniciar evento</button>
-        )}
-        {nextStep && (
-          <button onClick={() => setView(`step:${nextStep.id}`)} className={`${bigBtn} border-blue-500/40 bg-blue-600/15`}>
-            <ClipboardList className="h-7 w-7 shrink-0 text-blue-300" />
-            <span className="min-w-0 flex-1"><span className="block text-[11px] font-bold uppercase tracking-widest text-blue-300">Continuar</span><span className="block truncate text-lg font-bold">{nextStep.title}</span></span>
-            <ChevronRight className="h-5 w-5 text-white/40" />
-          </button>
         )}
         <button onClick={() => setView('music')} className={bigBtn}>
           <Music className="h-7 w-7 shrink-0 text-pink-300" />
@@ -71,11 +64,13 @@ const StepsList: React.FC<StepsListProps> = ({ steps, progress, setView }) => (
   <>
     {steps.map((step) => {
     const d = progress.stepDone(step); const t = progress.stepTotal(step);
+    const isNext = progress.nextStep?.id === step.id; // próxima etapa pendente: destacada para continuar com um toque
     return (
-      <button key={step.id} onClick={() => setView(`step:${step.id}`)} className={`${bigBtn} ${step.highlight ? 'border-amber-400/50 bg-amber-400/10' : ''}`}>
+      <button key={step.id} onClick={() => setView(`step:${step.id}`)} className={`${bigBtn} ${step.highlight ? 'border-amber-400/50 bg-amber-400/10' : isNext ? 'border-blue-500/40 bg-blue-600/15' : ''}`}>
         <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold ${d === t && t > 0 ? 'bg-emerald-500 text-[#04210F]' : 'bg-white/10 text-white/80'}`}>{d === t && t > 0 ? '✓' : `${d}/${t}`}</span>
         <span className="min-w-0 flex-1">
-          {step.kicker && <span className="block text-[11px] font-bold uppercase tracking-widest text-white/40">{step.kicker}</span>}
+          {isNext ? <span className="block text-[11px] font-bold uppercase tracking-widest text-blue-300">Continuar{step.kicker ? ` · ${step.kicker}` : ''}</span>
+            : step.kicker && <span className="block text-[11px] font-bold uppercase tracking-widest text-white/40">{step.kicker}</span>}
           <span className="block text-lg font-bold leading-tight">{step.title}</span>
         </span>
         {step.alert && <TriangleAlert className="h-5 w-5 shrink-0 text-red-400" aria-label="Contém alerta" />}
