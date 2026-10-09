@@ -22,6 +22,7 @@ function fakeAdminDatabase(seed = {}) {
           return {
             async create(data) { if (store.has(path)) { const e = new Error('6 ALREADY_EXISTS'); e.code = 6; throw e; } store.set(path, data); creates.push(path); },
             async update(patch) { store.set(path, { ...store.get(path), ...patch }); },
+            async get() { return { data: () => store.get(path) }; },
           };
         },
       };
@@ -61,4 +62,15 @@ test('um aviso descartado não é recriado pela rotina', async () => {
   db.store.set('notifications/task_today_t1_2026-10-01', { ...db.store.get('notifications/task_today_t1_2026-10-01'), dismissed: true });
   await runMissionsSync(db, now);
   assert.equal(db.store.get('notifications/task_today_t1_2026-10-01').dismissed, true);
+});
+
+test('rotina agendada cria os avisos de saúde do Instagram uma única vez e não quebra sem perfil', async () => {
+  const now = new Date('2026-10-10T03:30:00Z');
+  const stale = { syncedAt: '2026-10-05T10:00:00.000Z', lastAttemptAt: '2026-10-10T02:00:00.000Z', lastError: { code: 'token_invalid', message: 'Token expirado.' }, tokenExpiresAt: '2026-10-05T10:00:00.000Z' };
+  const db = fakeAdminDatabase({ instagramMeta: { profile: stale } });
+  const first = await runMissionsSync(db, now);
+  const second = await runMissionsSync(db, now);
+  assert.deepEqual([first.notified, second.notified], [2, 0]);
+  assert.deepEqual(['instagram_stale_2026-10-05', 'instagram_token_invalid_2026-10-09'].map((id) => db.store.get('notifications/' + id)?.refType), ['instagram', 'instagram']);
+  assert.equal((await runMissionsSync(fakeAdminDatabase(), now)).notified, 0);
 });

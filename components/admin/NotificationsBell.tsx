@@ -1,6 +1,7 @@
 import { logger } from '../../lib/logger.js';
 import React, { useEffect, useState } from 'react';
 import { Bell, X } from 'lucide-react';
+import { useRouter } from '../../lib/router';
 import { dismissAllNotifications, dismissNotification, previousDaysNotifications, runClientSync, subscribeNotifications, type AppNotification } from '../../services/missionsService';
 
 const SYNC_INTERVAL_MS = 10 * 60 * 1000;
@@ -9,6 +10,7 @@ const SYNC_INTERVAL_MS = 10 * 60 * 1000;
 export const NotificationsBell: React.FC<{ onOpenMissions: () => void }> = ({ onOpenMissions }) => {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
+  const { navigate } = useRouter();
 
   useEffect(() => {
     const sync = () => runClientSync().catch((error) => logger.error('[NotificationsBell] sincronização falhou', error));
@@ -41,7 +43,7 @@ export const NotificationsBell: React.FC<{ onOpenMissions: () => void }> = ({ on
             <ul className="max-h-80 space-y-1.5 overflow-y-auto">
               {items.map((n) => (
                 <li key={n.id} className="flex items-start gap-2 rounded-xl bg-white/5 p-2.5">
-                  <button type="button" onClick={() => { setOpen(false); onOpenMissions(); }} className="min-w-0 flex-1 text-left">
+                  <button type="button" onClick={() => { setOpen(false); if (n.refType === 'instagram') navigate('/admin/instagram'); else onOpenMissions(); }} className="min-w-0 flex-1 text-left">
                     <span className="block text-xs font-semibold text-white">{n.title}</span>
                     <span className="block truncate text-[11px] text-white/60">{n.body}</span>
                   </button>

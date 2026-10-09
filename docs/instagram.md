@@ -10,6 +10,17 @@ Espelha no Firestore o perfil e as últimas 100 publicações da conta profissio
 - Consistência: `instagramPosts` não é apagado; o painel considera só os documentos com o `syncedAt` do perfil (conjunto da última sincronização). Visualizações que falham de forma transitória ou por permissão mantêm o valor anterior, marcado como "desatualizado"; só viram `null` quando a Meta responde que a métrica não existe. O perfil registra `insights` (contagem por resultado) e `warning`.
 - O token vem de `INSTAGRAM_ACCESS_TOKEN` (somente servidor) e é renovado automaticamente a cada 30 dias.
 
+## Avisos de saúde da integração (sino do painel)
+O cron diário de missões (`/api/missions-cron`, 00:00 de Brasília, regras em `functions/instagram-alerts.js`) lê `instagramMeta/profile` e cria avisos no sino, uma vez por episódio (ID determinístico; descartado não volta). O clique leva para `/admin/instagram`. Como roda no cron de missões, também pega o caso de a própria sincronização do Instagram parar de rodar.
+
+| Aviso | Quando | O que fazer |
+|---|---|---|
+| Token perto de expirar | `tokenExpiresAt` a 15 dias ou menos (saudável: a renovação a cada 30 dias deixa sempre ~30+) | Gerar token novo (passo 4 abaixo) e atualizar `INSTAGRAM_ACCESS_TOKEN` na Vercel |
+| Token inválido | último erro da sincronização é `token_invalid` (avisa 1x por dia de tentativa) | O mesmo |
+| Instagram sem sincronizar | 3 dias ou mais sem sincronização bem-sucedida (1x por episódio) | Ver o último erro no painel e os logs de `/api/instagram-sync` |
+
+Limite: se o token nunca teve a expiração gravada (`tokenExpiresAt` vazio, porque a primeira renovação falhou), o aviso de expiração não dispara; os outros dois continuam valendo.
+
 ## Configuração externa (necessária; não feita pelo código)
 1. Conta do Instagram do Herói da Cidade deve ser **Profissional** (Comercial ou Criador).
 2. Em developers.facebook.com: criar um app (tipo Business) e adicionar o produto **Instagram → API setup with Instagram login**.
