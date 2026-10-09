@@ -2,12 +2,19 @@
 
 Serviços da categoria **Presencial** usam o formulário manual de evento em Kanban → Novo pedido / Editar pedido
 (`components/admin/EventOrderFields.tsx`, regras em `services/eventForm.js`). A leitura de PDF foi removida.
+Campos opcionais: data de nascimento e PCD/PNE (`eventForm.birthDate` / `pcd`); o PCD aparece na descrição do Google Agenda quando "Sim".
 Pedidos antigos e os criados pelo ManyChat não mudam: continuam sendo faturados pelo valor do pedido na conclusão.
 
 Dados do formulário ficam em `orders/{id}.eventForm` (+ `childName`, `eventDate`); `content` recebe um resumo legível.
 Valor de entrada = 50% do total até ser editado à mão; depois disso é preservado (botão "Recalcular 50%").
 
 Pedidos presenciais criados pelo ManyChat (só cliente e WhatsApp) entram como rascunho (`eventDraft`); ver `docs/manychat-integration.md`. O formulário do evento completa o pedido, e a entrada é lançada nesse momento.
+
+## Importar formulário (PDF) e vídeos com desconto
+
+No Novo pedido de um serviço Presencial, **Importar formulário (PDF)** lê o PDF do "Formulário da Missão" (Google Forms impresso) no navegador (`pdfjs-dist`, sem OCR; `services/eventFormImport.js`) e só preenche o formulário; nada é criado até **Criar Pedido**. Preenche: aniversariante, nascimento, data, horário, local, nome do responsável (cliente, se vazio) e os vídeos. **Não lê** o que é opção marcada no PDF (tipo do evento/#formulário, PCD, autorização de imagem, teias extras) nem o WhatsApp, que o formulário não traz: continuam manuais.
+
+Seção **Vídeos com desconto**: cada vídeo marcado (Especial de Aniversário, Convite) cria, depois do evento, um pedido próprio com **R$ 0,00** (o valor já está no total do evento), pago hoje, com o status inicial e o prazo do serviço. O serviço é achado pelo título (`Vídeo Especial de Aniversário`, `Vídeo Convite`) e precisa estar ativo e configurado. Se o evento for criado e um vídeo falhar, o aviso diz qual criar à mão. Esses pedidos não geram lançamento no livro de eventos.
 
 ## Financeiro
 

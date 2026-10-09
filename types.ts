@@ -107,6 +107,10 @@ export interface EventForm {
   observations: string;
   /** "#formulário": tipo/identificação do evento; compõe o título no Google Agenda. */
   formType: string;
+  /** 'YYYY-MM-DD'; '' ou ausente = não informado (opcional). */
+  birthDate?: string;
+  /** Criança com necessidade especial (PCD/PNE); null ou ausente = não informado (opcional). */
+  pcd?: boolean | null;
 }
 
 export type FirestoreOrder = Order;

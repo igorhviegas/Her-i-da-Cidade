@@ -102,6 +102,7 @@ export function eventDescription(order, client) {
     `👤 Cliente: ${client.name}`,
     `📱 WhatsApp: ${client.whatsapp}`,
     `📸 Autorização do uso de imagem: ${f.imageAuthorization ? 'Sim' : 'Não'}`,
+    ...(f.pcd === true ? ['♿ Necessidade especial (PCD/PNE): Sim'] : []),
     `🕸️ Teia extra: ${f.extraWeb ? f.extraWeb : 'Não'}`,
     `📝 Observações: ${f.observations || '—'}`,
   ].join('\n');

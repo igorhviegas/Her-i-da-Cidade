@@ -48,6 +48,9 @@ export function validateEventForm(form) {
   const cost = String(form.cost ?? '').trim() === '' ? null : money(form.cost);
   if (cost === undefined || (cost === null && String(form.cost ?? '').trim() !== '')) return { error: 'Informe um custo válido.' };
   if (!text(form.formType)) return { error: 'Informe o #formulário (tipo do evento).' };
+  // Campos opcionais do formulário do cliente.
+  const birthDate = text(form.birthDate);
+  if (birthDate && !isValidDateInput(birthDate)) return { error: 'Informe uma data de nascimento válida ou deixe em branco.' };
   return {
     value: {
       childName: text(form.childName),
@@ -61,6 +64,8 @@ export function validateEventForm(form) {
       cost,
       observations: text(form.observations),
       formType: text(form.formType),
+      birthDate,
+      pcd: form.pcd === 'yes' ? true : form.pcd === 'no' ? false : null,
     },
   };
 }

@@ -37,7 +37,7 @@ interface OrdersModalsProps {
   setOrderActionError: (message: string) => void;
   setTeleprompterView: (view: OrderView | null) => void;
   setConsumptionView: (view: OrderView | null) => void;
-  handleOrderCreated: () => Promise<void>;
+  handleOrderCreated: (order?: unknown, warning?: string) => Promise<void>;
   handleOrderSaved: (order: Order, client: Client, service: Service) => void;
   handleStatusChange: (orderId: string, status: OrderStatus) => Promise<boolean>;
   handleSendToCalendar: (orderId: string) => Promise<void>;

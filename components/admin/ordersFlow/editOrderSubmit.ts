@@ -139,6 +139,7 @@ export function buildEventUpdates(eventValues: EventValues): Partial<Order> {
     eventForm: {
       eventTime: eventValues.eventTime, location: eventValues.location, imageAuthorization: eventValues.imageAuthorization, extraWeb: eventValues.extraWeb,
       totalValue: eventValues.totalValue, entryValue: eventValues.entryValue, cost: eventValues.cost, observations: eventValues.observations, formType: eventValues.formType,
+      birthDate: eventValues.birthDate, pcd: eventValues.pcd,
     },
   } : {};
 }

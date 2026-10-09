@@ -26,8 +26,16 @@ test('formulário válido vira valores tipados e normalizados', () => {
   assert.equal(error, undefined);
   assert.deepEqual(value, {
     childName: 'Pedro', eventDate: '2026-10-10', eventTime: '14:00', location: 'Rua A, 10', imageAuthorization: true, extraWeb: 1,
-    totalValue: 1000, entryValue: 500, cost: 150, observations: '', formType: 'Aniversário',
+    totalValue: 1000, entryValue: 500, cost: 150, observations: '', formType: 'Aniversário', birthDate: '', pcd: null,
   });
+});
+
+test('data de nascimento e PCD são opcionais; data inválida é recusada', () => {
+  const ok = validateEventForm({ ...valid, birthDate: '2019-12-19', pcd: 'yes' }).value;
+  assert.equal(ok.birthDate, '2019-12-19');
+  assert.equal(ok.pcd, true);
+  assert.equal(validateEventForm({ ...valid, pcd: 'no' }).value.pcd, false);
+  assert.match(validateEventForm({ ...valid, birthDate: '2019-02-31' }).error, /nascimento/i);
 });
 
 test('campos obrigatórios e valores inválidos são recusados com mensagem', () => {

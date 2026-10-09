@@ -12,10 +12,14 @@ export interface EventFormValues {
   cost: number | null;
   observations: string;
   formType: string;
+  birthDate: string;
+  pcd: boolean | null;
 }
 export interface EventFormInput {
   childName: string; eventDate: string; eventTime: string; location: string; imageAuthorization: '' | 'yes' | 'no';
   extraWeb: string; totalValue: string; entryValue: string; cost: string; observations: string; formType: string;
+  /** Opcionais: 'YYYY-MM-DD' ou ''; '' | 'yes' | 'no'. */
+  birthDate?: string; pcd?: '' | 'yes' | 'no';
 }
 export const EXTRA_WEB_OPTIONS: number[];
 export function roundMoney(value: number): number;
