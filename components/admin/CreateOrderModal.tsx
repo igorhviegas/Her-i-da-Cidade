@@ -7,7 +7,7 @@ import { emptyVideoAddons, ImportFormButton, VideoAddonsSection } from './EventV
 import type { Order } from '../../types';
 import { buildDeliveryOptions, computeTotal, dateFromInput, deriveServiceState, priceFromService } from './ordersFlow/createOrderHelpers';
 import type { CreateOrderInitialValues } from './ordersFlow/createOrderHelpers';
-import { buildCreateOrderInput, buildVideoOrderInput, validateClientAndService, validateOrderDetails, validateVideoOrders } from './ordersFlow/createOrderSubmit';
+import { buildCreateOrderInput, createVideoOrders, validateClientAndService, validateOrderDetails, validateVideoOrders } from './ordersFlow/createOrderSubmit';
 import { ClientSection, CreateOrderError, CreateOrderFooter, CreateOrderHeader, OrderSection, ServiceSection, ValuesSection } from './ordersFlow/CreateOrderSections';
 import { useClientFields, useOrderFields, useOrderServices } from './ordersFlow/useCreateOrderFields';
 
@@ -67,15 +67,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
       const client = await createClient({ name: basics.cleanName, whatsapp: whatsapp.trim() });
       const order = await createOrder(buildCreateOrderInput({ ...details, clientId: client.id, selectedService, initialStatus, eventDate, deliveryDays, content, totalPaid, initialValues }));
       // Os vídeos nascem depois do evento (principal): se algum falhar, o evento já existe, então avisamos em vez de reabrir o formulário.
-      const failed: string[] = [];
-      for (const video of videos) {
-        try {
-          await createOrder(buildVideoOrderInput({ ...video, clientId: client.id, eventDate: details.eventValues.eventDate }));
-        } catch {
-          failed.push(video.service.title);
-        }
-      }
-      await onCreated(order, failed.length ? `Evento criado, mas não foi possível criar o pedido de: ${failed.join(', ')}. Crie manualmente em Novo pedido.` : undefined);
+      await onCreated(order, await createVideoOrders(videos, client.id, details.eventValues.eventDate));
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Não foi possível criar o pedido.');
       setSubmitting(false);
