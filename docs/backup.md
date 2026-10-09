@@ -19,8 +19,8 @@ firebase use heroi-da-cidade
 # diário, guardado por 7 dias
 firebase firestore:backups:schedules:create --database "(default)" --recurrence DAILY --retention 7d
 
-# semanal (domingo), guardado por 14 semanas (máximo permitido)
-firebase firestore:backups:schedules:create --database "(default)" --recurrence WEEKLY --day-of-week SUN --retention 14w
+# semanal (domingo; o dia vai por extenso, "SUN" é recusado), guardado por 14 semanas (máximo permitido)
+firebase firestore:backups:schedules:create --database "(default)" --recurrence WEEKLY --day-of-week SUNDAY --retention 14w
 
 # conferir
 firebase firestore:backups:schedules:list --database "(default)"
@@ -33,6 +33,8 @@ firebase firestore:backups:list
 ```
 
 Depois, crie um **alerta de orçamento** no Google Cloud (Faturamento → Orçamentos e alertas, por exemplo R$ 20/mês) para não ter surpresa.
+
+> **Estado:** as duas agendas foram criadas em 09/10/2026 (diária com 7 dias de retenção; semanal aos domingos com 14 semanas).
 
 ## Custo
 O armazenamento é cobrado por GiB de cada backup e a restauração por GiB do backup (a tabela de preços que achei, da edição Enterprise, indica ~US$ 0,03 por GiB-mês e US$ 0,20 por GiB restaurado; confirme na [página de preços](https://firebase.google.com/docs/firestore/enterprise/pricing)). Veja o tamanho real do banco em Firebase Console → Firestore → Uso; um CRM deste porte deve custar centavos por mês.
