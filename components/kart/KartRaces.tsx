@@ -2,14 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { ChevronDown, Timer, TriangleAlert } from 'lucide-react';
 import { formatLap } from '../../services/kart.js';
 import { extraRaces, officialRaces } from '../../services/kartRanking.js';
-import type { KartRace } from '../../services/kartService';
+import type { KartRace, KartVideo } from '../../services/kartService';
 import { RaceResults } from './KartRaceResults';
 import { MEDAL_STYLE, WeatherIcon, card, formatDate, plural } from './kartUi';
 
 const fastestOf = (race: KartRace) => race.results.filter((r) => r.bestLapMs).sort((a, b) => (a.bestLapMs ?? 0) - (b.bestLapMs ?? 0))[0];
 
 /** Cartão de uma corrida que abre e fecha mostrando o resultado. */
-const RaceCard: React.FC<{ race: KartRace; title: string; scored: boolean; open: boolean; onToggle: () => void }> = ({ race, title, scored, open, onToggle }) => {
+const RaceCard: React.FC<{ race: KartRace; title: string; scored: boolean; open: boolean; onToggle: () => void; video?: KartVideo }> = ({ race, title, scored, open, onToggle, video }) => {
   const fastest = fastestOf(race);
   return (
     <li className={`${card} overflow-hidden`}>
@@ -24,12 +24,12 @@ const RaceCard: React.FC<{ race: KartRace; title: string; scored: boolean; open:
         {fastest && <span className="shrink-0 text-right text-xs text-white/50"><Timer className="ml-auto h-3.5 w-3.5" /><span className="font-bold tabular-nums text-white/80">{formatLap(fastest.bestLapMs)}</span></span>}
         <ChevronDown className={`h-5 w-5 shrink-0 text-white/40 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && <RaceResults race={race} scored={scored} />}
+      {open && <RaceResults race={race} scored={scored} video={video} />}
     </li>
   );
 };
 
-export const KartRaces: React.FC<{ races: KartRace[] }> = ({ races }) => {
+export const KartRaces: React.FC<{ races: KartRace[]; videos: Map<string, KartVideo> }> = ({ races, videos }) => {
   const list = useMemo(() => officialRaces(races).reverse(), [races]);
   const extras = useMemo(() => extraRaces(races), [races]);
   const [open, setOpen] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export const KartRaces: React.FC<{ races: KartRace[] }> = ({ races }) => {
   return (
     <div className="space-y-6">
       {list.length === 0 ? <p className={`${card} px-5 py-8 text-center text-white/50`}>Nenhuma corrida registrada ainda.</p> : (
-        <ol className="space-y-2">{list.map((race) => <RaceCard key={race.id} race={race} title={`Corrida ${race.number}`} scored open={open === race.id} onToggle={() => toggle(race.id)} />)}</ol>
+        <ol className="space-y-2">{list.map((race) => <RaceCard key={race.id} race={race} title={`Corrida ${race.number}`} scored open={open === race.id} onToggle={() => toggle(race.id)} video={videos.get(race.id)} />)}</ol>
       )}
 
       <section className="space-y-3">
@@ -55,7 +55,7 @@ export const KartRaces: React.FC<{ races: KartRace[] }> = ({ races }) => {
             </div>
             {extras.length === 0
               ? <p className={`${card} px-5 py-6 text-center text-white/50`}>Nenhuma corrida fora do campeonato registrada.</p>
-              : <ol className="space-y-2">{extras.map((race) => <RaceCard key={race.id} race={race} title="Fora do campeonato" scored={false} open={open === race.id} onToggle={() => toggle(race.id)} />)}</ol>}
+              : <ol className="space-y-2">{extras.map((race) => <RaceCard key={race.id} race={race} title="Fora do campeonato" scored={false} open={open === race.id} onToggle={() => toggle(race.id)} video={videos.get(race.id)} />)}</ol>}
           </>
         )}
       </section>

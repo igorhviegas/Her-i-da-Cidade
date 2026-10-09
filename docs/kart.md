@@ -12,6 +12,7 @@ Classificação, perfis dos pilotos, histórico de corridas e vídeos do campeon
 - **Pódio:** aparece nos dois rankings (pontos e melhor volta). Cada piloto do pódio e cada linha da lista mostram corridas, vitórias e pódios do período.
 - **Melhor volta:** ranking por piloto no período. Volta na chuva é sinalizada (nuvem) e **não vale como recorde da pista** (o card "Recorde da pista" só considera piso seco).
 - **Corridas fora do campeonato (avulsas):** sessões em que o piloto vai sozinho (ou com amigos) tentar baixar a volta. **Não dão pontos, vitórias nem pódios e não contam nas corridas do piloto**, mas **valem para o ranking de melhor volta e para o recorde da pista**. No ranking padrão (últimas 10) entram as avulsas desde a data da corrida mais antiga do período; em "Todo o período" e por ano, as do intervalo. Ficam no fim da aba Corridas, atrás de um botão vermelho com o aviso, e também no perfil do piloto.
+- **Campeões** (`/kart/campeoes`): o campeão de cada ano é o 1º em pontos no ano (ranking por ano, mesmas regras). Só ano **encerrado** (anterior ao ano corrente) dá título; o ano corrente aparece "em andamento" com o líder atual. A página lista os 3 primeiros de cada ano e "Maiores campeões"; o perfil mostra o selo de campeão com os anos.
 - **Perfil do piloto** (`/kart/piloto/{id}`): ouro/prata/bronze conforme a posição no **ranking padrão (últimas 10)**; mostra pontos e corridas das últimas 10, vitórias, pódios, recorde de volta (inclui avulsas), gráfico de forma e o histórico completo, em que cada corrida abre o resultado como na aba Corridas.
 
 ## Dados (Firestore)
@@ -22,7 +23,7 @@ Leitura pública, escrita só de administradores (`firestore.rules` e a cópia `
 |---|---|
 | `kartPilots/{id}` | `name`, `aliases[]`, `active`. O `id` é o nome sem acento, em minúsculas e com hífens. |
 | `kartRaces/{data}-{hhmm}` | `date`, `heat`, `weather` (`dry`/`rain`), `extra` (true = fora do campeonato), `results[]` = `{ pilotId, name, pos, racePos, bestLapMs, laps }`. Importar o mesmo PDF de novo substitui a corrida. Avulsas têm id `extra-{data}-{hhmm ou código}`. |
-| `kartVideos/{id}` | `title`, `youtubeId`, `kind` (`tip`/`race`), `order`, `active`. |
+| `kartVideos/{id}` | `title`, `youtubeId`, `kind` (`tip`/`race`), `order`, `active`, `raceId` (opcional: corrida a que o vídeo pertence). |
 
 O número da corrida ("Corrida 12") **não é gravado**: é a posição cronológica entre as corridas oficiais. O nome exibido vem do cadastro de pilotos, então renomear um piloto vale para o histórico todo.
 
@@ -30,7 +31,7 @@ O número da corrida ("Corrida 12") **não é gravado**: é a posição cronoló
 
 Admin → Kart → Corridas → **Escolher PDFs** (aceita vários de uma vez). O PDF é lido no navegador (`services/pdfImportBrowser.ts`, sem OCR; os relatórios do LapTime têm texto nativo) e interpretado por `parseTimingReport` (`services/kart.js`), que cobre os dois formatos do kartódromo (`TimingOfficialReport` e `*_CRD`). Bateria com menos de 3 inscritos vem marcada como **fora do campeonato** (dá para desmarcar/marcar em qualquer PDF). Cuidado: o recorde da pista vale para qualquer sessão avulsa, então não importe uma bateria de outra categoria (ex.: Super Kart) como avulsa. A tela de conferência mostra data, bateria, os inscritos reclassificados e a lista dos descartados; **clima (seco/chuva) não vem no PDF**, então é escolhido ali.
 
-O nome do relatório é o nome completo (ex.: `LEMUEL KESSELEH`). Um piloto casa quando **todos os termos** do nome cadastrado (ou de um apelido) estão no nome do PDF, sem acento e ignorando "de/da/do". Se alguém fica de fora por grafia diferente, cadastre um apelido em Admin → Kart → Pilotos.
+O nome do relatório é o nome completo (ex.: `LEMUEL KESSELEH`). Um piloto casa quando **todos os termos** do nome cadastrado (ou de um apelido) estão no nome do PDF, sem acento e ignorando "de/da/do". Se alguém fica de fora por grafia diferente, cadastre um apelido em Admin → Kart → Pilotos. Quem aparece no PDF mas ainda não é inscrito pode ser **inscrito na própria prévia**: abra "fora do campeonato (descartados)", clique em **Inscrever** ao lado do nome (o nome vem sugerido do relatório e pode ser encurtado) e a prévia se recalcula na hora, sem reimportar.
 
 Os PDFs originais ficam arquivados em `docs/kart/resultados/oficiais/AAAA-MM-DD_HHMM.pdf` (e `fora-do-campeonato/` para baterias sem inscritos suficientes).
 
@@ -40,7 +41,7 @@ Admin → Kart → Corridas → **Lançar corrida manualmente** (para corridas s
 
 ## Vídeos
 
-Admin → Kart → Vídeos: cole o link do YouTube (watch, youtu.be, shorts, embed), dê um título e escolha **Dicas** ou **Corridas completas**. Toca na própria página com `youtube-nocookie.com`.
+Admin → Kart → Vídeos: cole o link do YouTube (watch, youtu.be, shorts, embed), dê um título e escolha **Dicas** ou **Corridas completas**. Toca na própria página com `youtube-nocookie.com`. Em vídeos de **Corrida completa** dá para escolher a corrida: o resultado dela (aba Corridas e histórico do perfil) ganha o botão **Assistir à corrida**, que abre `/kart/videos?v={id}` já tocando. Corrida com mais de um vídeo usa o primeiro pela ordem.
 
 ## Testes
 

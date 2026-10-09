@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ChevronDown, Crown, Flame, Flag, Medal as MedalIcon, Timer, TriangleAlert } from 'lucide-react';
 import { formatLap } from '../../services/kart.js';
 import { pilotProfile, recentForm, RECENT_RACES, type ExtraRow, type HistoryRow as HistoryRowData } from '../../services/kartRanking.js';
-import type { KartPilot, KartRace } from '../../services/kartService';
+import type { KartPilot, KartRace, KartVideo } from '../../services/kartService';
 import { RaceResults } from './KartRaceResults';
 import { KartLink, MEDAL_STYLE, WeatherIcon, card, formatDate, plural, type Medal } from './kartUi';
 
@@ -32,7 +32,7 @@ const FormChart: React.FC<{ pilotId: string; races: KartRace[]; barClass: string
 };
 
 /** Linha do histórico que abre o resultado completo da corrida (igual à aba Corridas). */
-const HistoryRow: React.FC<{ h: HistoryRowData; isRecord: boolean; race: KartRace | undefined; pilotId: string }> = ({ h, isRecord, race, pilotId }) => {
+const HistoryRow: React.FC<{ h: HistoryRowData; isRecord: boolean; race: KartRace | undefined; pilotId: string; video?: KartVideo }> = ({ h, isRecord, race, pilotId, video }) => {
   const [open, setOpen] = useState(false);
   return (
     <li className={`${card} overflow-hidden`}>
@@ -48,13 +48,13 @@ const HistoryRow: React.FC<{ h: HistoryRowData; isRecord: boolean; race: KartRac
         </span>
         <ChevronDown className={`h-5 w-5 shrink-0 text-white/40 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && race && <RaceResults race={race} scored highlight={pilotId} />}
+      {open && race && <RaceResults race={race} scored highlight={pilotId} video={video} />}
     </li>
   );
 };
 
 /** Sessão fora do campeonato do piloto: sem pontos, só a volta. */
-const ExtraRowItem: React.FC<{ e: ExtraRow; isRecord: boolean; race: KartRace | undefined; pilotId: string }> = ({ e, isRecord, race, pilotId }) => {
+const ExtraRowItem: React.FC<{ e: ExtraRow; isRecord: boolean; race: KartRace | undefined; pilotId: string; video?: KartVideo }> = ({ e, isRecord, race, pilotId, video }) => {
   const [open, setOpen] = useState(false);
   return (
     <li className="overflow-hidden rounded-2xl border border-red-500/30 bg-red-500/5">
@@ -66,17 +66,17 @@ const ExtraRowItem: React.FC<{ e: ExtraRow; isRecord: boolean; race: KartRace | 
         <span className={`flex shrink-0 items-center gap-1 text-lg font-black italic tabular-nums ${isRecord ? 'text-red-300' : ''}`}><Timer className="h-4 w-4" />{formatLap(e.bestLapMs)}</span>
         <ChevronDown className={`h-5 w-5 shrink-0 text-white/40 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && race && <RaceResults race={race} scored={false} highlight={pilotId} />}
+      {open && race && <RaceResults race={race} scored={false} highlight={pilotId} video={video} />}
     </li>
   );
 };
 
-export const KartPilotPage: React.FC<{ pilot: KartPilot | undefined; races: KartRace[] }> = ({ pilot, races }) => {
+export const KartPilotPage: React.FC<{ pilot: KartPilot | undefined; races: KartRace[]; videos: Map<string, KartVideo> }> = ({ pilot, races, videos }) => {
   const profile = useMemo(() => (pilot ? pilotProfile(pilot.id, races) : null), [pilot, races]);
   if (!pilot || !profile) return <p className={`${card} px-5 py-8 text-center text-white/60`}>Piloto não encontrado. <KartLink to="/kart" className="font-bold text-white underline">Voltar ao ranking</KartLink></p>;
 
   const medal = profile.medal ? MEDAL_STYLE[profile.medal] : null;
-  const { recent, overall, record, history, extras } = profile;
+  const { recent, overall, record, history, extras, titles } = profile;
   const byId = new Map(races.map((r) => [r.id, r]));
   const wins = overall?.wins ?? 0;
 
@@ -92,6 +92,7 @@ export const KartPilotPage: React.FC<{ pilot: KartPilot | undefined; races: Kart
                   {profile.medal ? `${profile.medal}º no campeonato · ${medal?.label}` : 'Piloto do campeonato'}
                 </p>
                 <h2 className="mt-1 break-words text-3xl font-black italic leading-tight">{pilot.name}</h2>
+                {titles.length > 0 && <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1 text-xs font-bold text-amber-200"><Crown className="h-3.5 w-3.5" />{titles.length === 1 ? 'Campeão' : `${titles.length}× campeão`} · {titles.join(', ')}</p>}
               </div>
               {profile.medal === 1 ? <Crown className="h-10 w-10 shrink-0 text-amber-300" /> : medal ? <MedalIcon className={`h-10 w-10 shrink-0 ${medal.text}`} /> : null}
             </div>
@@ -116,7 +117,7 @@ export const KartPilotPage: React.FC<{ pilot: KartPilot | undefined; races: Kart
         <h3 className="mb-2 flex items-center gap-2 px-1 text-sm font-bold uppercase tracking-widest text-white/60"><Flag className="h-4 w-4" />Histórico de corridas</h3>
         {history.length === 0 ? <p className={`${card} px-5 py-6 text-center text-white/50`}>Ainda sem corridas oficiais.</p> : (
           <ol className="space-y-2">
-            {history.map((h) => <HistoryRow key={h.raceId} h={h} race={byId.get(h.raceId)} pilotId={pilot.id} isRecord={!!record && h.raceId === record.raceId} />)}
+            {history.map((h) => <HistoryRow key={h.raceId} h={h} race={byId.get(h.raceId)} video={videos.get(h.raceId)} pilotId={pilot.id} isRecord={!!record && h.raceId === record.raceId} />)}
           </ol>
         )}
       </section>
@@ -126,7 +127,7 @@ export const KartPilotPage: React.FC<{ pilot: KartPilot | undefined; races: Kart
           <h3 className="mb-2 flex items-center gap-2 px-1 text-sm font-bold uppercase tracking-widest text-red-300"><TriangleAlert className="h-4 w-4" />Fora do campeonato</h3>
           <p className="mb-2 px-1 text-xs text-red-200/80">Estas sessões não contam pontos, vitórias nem pódios. Valem só para o recorde de melhor volta.</p>
           <ol className="space-y-2">
-            {extras.map((e) => <ExtraRowItem key={e.raceId} e={e} race={byId.get(e.raceId)} pilotId={pilot.id} isRecord={!!record && e.raceId === record.raceId} />)}
+            {extras.map((e) => <ExtraRowItem key={e.raceId} e={e} race={byId.get(e.raceId)} video={videos.get(e.raceId)} pilotId={pilot.id} isRecord={!!record && e.raceId === record.raceId} />)}
           </ol>
         </section>
       )}

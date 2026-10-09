@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Play } from 'lucide-react';
+import { useRouter } from '../../lib/router';
 import { KART_VIDEO_KINDS, type KartVideo, type KartVideoKind } from '../../services/kartVideos.js';
 import { card } from './kartUi';
 
@@ -8,6 +9,11 @@ const sortVideos = (a: KartVideo, b: KartVideo) => a.order - b.order;
 export const KartVideos: React.FC<{ videos: KartVideo[] | null }> = ({ videos }) => {
   const [kind, setKind] = useState<KartVideoKind>('tip');
   const [playing, setPlaying] = useState<string | null>(null);
+  const wanted = new URLSearchParams(useRouter().search).get('v'); // /kart/videos?v=ID abre esse vídeo (botão "Assistir" das corridas)
+  useEffect(() => {
+    const target = wanted ? videos?.find((v) => v.id === wanted) : undefined;
+    if (target) { setKind(target.kind); setPlaying(target.id); }
+  }, [wanted, videos]);
   if (videos === null) return <p className="px-1 text-sm text-white/50">Carregando…</p>;
 
   const active = videos.filter((v) => v.active !== false && v.youtubeId);

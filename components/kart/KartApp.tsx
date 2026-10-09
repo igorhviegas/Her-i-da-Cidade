@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
-import { ChevronLeft, Flag, Trophy, CirclePlay } from 'lucide-react';
+import { ChevronLeft, Crown, Flag, Trophy, CirclePlay } from 'lucide-react';
 import { useRouter } from '../../lib/router';
 import { useKartPilots, useKartRaces, useKartVideos } from '../../services/kartService';
+import { videosByRace } from '../../services/kartVideos.js';
+import { KartChampions } from './KartChampions';
 import { KartPilotPage } from './KartPilotPage';
 import { KartRaces } from './KartRaces';
 import { KartRanking } from './KartRanking';
@@ -13,6 +15,7 @@ import { CheckeredBar, KartLink } from './kartUi';
 const TABS = [
   { to: '/kart', label: 'Ranking', icon: Trophy },
   { to: '/kart/corridas', label: 'Corridas', icon: Flag },
+  { to: '/kart/campeoes', label: 'Campeões', icon: Crown },
   { to: '/kart/videos', label: 'Vídeos', icon: CirclePlay },
 ] as const;
 
@@ -27,6 +30,9 @@ export const KartApp: React.FC = () => {
     const names = new Map((pilots ?? []).map((p) => [p.id, p.name]));
     return (races ?? []).map((race) => ({ ...race, results: race.results.map((r) => ({ ...r, name: names.get(r.pilotId) ?? r.name })) }));
   }, [pilots, races]);
+
+  const raceVideos = useMemo(() => videosByRace(videos), [videos]);
+  const names = useMemo(() => new Map((pilots ?? []).map((p) => [p.id, p.name])), [pilots]);
 
   const parts = path.split('/').filter(Boolean); // ['kart', 'piloto', id]
   const section = parts[1] ?? '';
@@ -49,14 +55,15 @@ export const KartApp: React.FC = () => {
 
       <main className="mx-auto max-w-2xl px-4 pt-4">
         {loading ? <p className="px-1 text-sm text-white/50">Carregando…</p>
-          : isPilot ? <KartPilotPage pilot={pilots.find((p) => p.id === pilotId)} races={named} />
-          : section === 'corridas' ? <KartRaces races={named} />
+          : isPilot ? <KartPilotPage pilot={pilots.find((p) => p.id === pilotId)} races={named} videos={raceVideos} />
+          : section === 'corridas' ? <KartRaces races={named} videos={raceVideos} />
+          : section === 'campeoes' ? <KartChampions races={named} names={names} />
           : section === 'videos' ? <KartVideos videos={videos} />
           : <KartRanking races={named} pilots={pilots} />}
       </main>
 
       <nav aria-label="Seções do campeonato" className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#070B14]/95 backdrop-blur" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        <ul className="mx-auto grid max-w-2xl grid-cols-3">
+        <ul className="mx-auto grid max-w-2xl grid-cols-4">
           {TABS.map(({ to, label, icon: Icon }) => {
             const active = to === '/kart' ? section === '' || isPilot : section === to.split('/')[2];
             return (

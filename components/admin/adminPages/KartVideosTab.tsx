@@ -2,17 +2,29 @@ import React, { useState } from 'react';
 import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2 } from 'lucide-react';
 import { newId } from '../../../services/agentContent.js';
 import { KART_VIDEO_KINDS, youtubeId, type KartVideoKind } from '../../../services/kartVideos.js';
-import { deleteKartVideo, saveKartVideo, useKartVideos, type KartVideo } from '../../../services/kartService';
+import { extraRaces, officialRaces } from '../../../services/kartRanking.js';
+import { deleteKartVideo, saveKartVideo, useKartRaces, useKartVideos, type KartRace, type KartVideo } from '../../../services/kartService';
 import { card, iconBtn, input, Loading, type Run } from './agentShared';
 
 const KINDS = Object.keys(KART_VIDEO_KINDS) as KartVideoKind[];
+const brDate = (iso: string) => iso.split('-').reverse().join('/');
+
+/** Escolha da corrida a que o vídeo pertence (opcional): corridas do campeonato (mais recente primeiro) e depois as avulsas. */
+const RacePicker: React.FC<{ races: KartRace[]; value: string; onChange: (raceId: string) => void; label: string }> = ({ races, value, onChange, label }) => (
+  <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)} className={input}>
+    <option value="">Sem corrida vinculada</option>
+    {[...officialRaces(races).reverse().map((r) => ({ id: r.id, text: `Corrida ${r.number} · ${brDate(r.date)}` })), ...extraRaces(races).map((r) => ({ id: r.id, text: `Fora do campeonato · ${brDate(r.date)}` }))].map((o) => <option key={o.id} value={o.id}>{o.text}</option>)}
+  </select>
+);
 
 export const KartVideosTab: React.FC<{ run: Run }> = ({ run }) => {
   const videos = useKartVideos();
+  const races = useKartRaces();
+  const [raceId, setRaceId] = useState('');
   const [title, setTitle] = useState('');
   const [link, setLink] = useState('');
   const [kind, setKind] = useState<KartVideoKind>('tip');
-  if (videos === null) return <Loading />;
+  if (videos === null || races === null) return <Loading />;
 
   const id = youtubeId(link);
   const sorted = [...videos].sort((a, b) => a.order - b.order);
@@ -20,7 +32,7 @@ export const KartVideosTab: React.FC<{ run: Run }> = ({ run }) => {
 
   const add = async () => {
     if (!id || !title.trim()) return;
-    if (await run(() => saveKartVideo({ id: newId(), title, youtubeId: id, kind, order: nextOrder, active: true }), 'Vídeo adicionado.')) { setTitle(''); setLink(''); }
+    if (await run(() => saveKartVideo({ id: newId(), title, youtubeId: id, kind, order: nextOrder, active: true, raceId: kind === 'race' ? raceId : '' }), 'Vídeo adicionado.')) { setTitle(''); setLink(''); setRaceId(''); }
   };
   // Troca a ordem com o vizinho dentro da mesma categoria.
   const move = (video: KartVideo, delta: -1 | 1) => {
@@ -37,6 +49,12 @@ export const KartVideosTab: React.FC<{ run: Run }> = ({ run }) => {
         <input aria-label="Link do YouTube" value={link} onChange={(e) => setLink(e.target.value)} placeholder="Cole o link do YouTube" className={input} />
         {link.trim() && !id && <p className="text-sm text-red-300">Não reconheci esse link como um vídeo do YouTube.</p>}
         {id && <img src={`https://i.ytimg.com/vi/${id}/mqdefault.jpg`} alt="" className="h-24 rounded-lg" />}
+        {kind === 'race' && (
+          <div>
+            <RacePicker races={races} value={raceId} onChange={setRaceId} label="Corrida deste vídeo" />
+            <p className="mt-1 text-xs text-white/45">Vinculando, o resultado dessa corrida ganha o botão "Assistir à corrida" (no site e no perfil dos pilotos).</p>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           {KINDS.map((k) => <button key={k} type="button" onClick={() => setKind(k)} aria-pressed={kind === k} className={`rounded-xl px-4 py-2 text-sm font-semibold ${kind === k ? 'bg-blue-600 text-white' : 'bg-white/5 text-white/60'}`}>{KART_VIDEO_KINDS[k]}</button>)}
           <button type="submit" disabled={!id || !title.trim()} className="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-40"><Plus className="h-4 w-4" />Adicionar</button>
@@ -52,7 +70,10 @@ export const KartVideosTab: React.FC<{ run: Run }> = ({ run }) => {
             {group.map((v, i) => (
               <div key={v.id} className={`${card} flex items-center gap-3 p-2.5 ${v.active === false ? 'opacity-50' : ''}`}>
                 <img src={`https://i.ytimg.com/vi/${v.youtubeId}/default.jpg`} alt="" className="h-12 w-16 shrink-0 rounded object-cover" />
-                <input aria-label="Título do vídeo" defaultValue={v.title} onBlur={(e) => { const t = e.target.value.trim(); if (t && t !== v.title) run(() => saveKartVideo({ ...v, title: t })); }} className={`${input} min-w-0 flex-1`} />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <input aria-label="Título do vídeo" defaultValue={v.title} onBlur={(e) => { const t = e.target.value.trim(); if (t && t !== v.title) run(() => saveKartVideo({ ...v, title: t })); }} className={input} />
+                  {k === 'race' && <RacePicker races={races} value={v.raceId ?? ''} onChange={(rid) => run(() => saveKartVideo({ ...v, raceId: rid }), 'Corrida do vídeo atualizada.')} label="Corrida deste vídeo" />}
+                </div>
                 <button type="button" aria-label="Subir" disabled={i === 0} onClick={() => move(v, -1)} className={iconBtn}><ArrowUp className="h-4 w-4" /></button>
                 <button type="button" aria-label="Descer" disabled={i === group.length - 1} onClick={() => move(v, 1)} className={iconBtn}><ArrowDown className="h-4 w-4" /></button>
                 <button type="button" aria-label={v.active === false ? 'Mostrar no site' : 'Ocultar do site'} onClick={() => run(() => saveKartVideo({ ...v, active: v.active === false }))} className={iconBtn}>{v.active === false ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>

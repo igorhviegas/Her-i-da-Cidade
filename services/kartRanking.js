@@ -18,6 +18,23 @@ export function officialRaces(races) {
 
 export const raceYears = (races) => [...new Set(officialRaces(races).map((r) => Number(r.date.slice(0, 4))))].sort((a, b) => b - a);
 
+/**
+ * Campeões por ano, do mais recente para o mais antigo: [{ year, races, done, top: [3 primeiros] }].
+ * `done` = ano encerrado (anterior a `currentYear`): só nele o 1º lugar é campeão; o ano corrente mostra o líder.
+ */
+export function yearlyChampions(races, currentYear = new Date().getFullYear()) {
+  return raceYears(races).map((year) => ({
+    year, races: racesInScope(races, { type: 'year', year }).length, done: year < currentYear, top: standings(races, { type: 'year', year }).slice(0, 3),
+  }));
+}
+
+/** Anos em que cada piloto foi campeão (só anos encerrados): Map pilotId → [anos, do mais recente]. */
+export function titlesByPilot(champions) {
+  const map = new Map();
+  for (const c of champions) if (c.done && c.top[0]) map.set(c.top[0].pilotId, [...(map.get(c.top[0].pilotId) ?? []), c.year]);
+  return map;
+}
+
 /** scope: { type: 'recent' } (últimas 10) | { type: 'all' } | { type: 'year', year }. */
 export function racesInScope(races, scope = { type: 'recent' }) {
   const all = officialRaces(races);
@@ -94,7 +111,7 @@ export function trackRecord(races, scope) {
  * `history` = todas as corridas oficiais dele, da mais recente para a mais antiga; `extras` = sessões fora do campeonato.
  * `record` = melhor volta dele em qualquer uma (campeonato ou avulsa).
  */
-export function pilotProfile(pilotId, races) {
+export function pilotProfile(pilotId, races, currentYear = new Date().getFullYear()) {
   const recent = standings(races, { type: 'recent' }).find((r) => r.pilotId === pilotId) ?? null;
   const overall = standings(races, { type: 'all' }).find((r) => r.pilotId === pilotId) ?? null;
   const history = officialRaces(races).flatMap((race) => {
@@ -110,6 +127,7 @@ export function pilotProfile(pilotId, races) {
   return {
     medal: recent && recent.rank <= 3 ? recent.rank : null,
     recent, overall, history, extras, record,
+    titles: titlesByPilot(yearlyChampions(races, currentYear)).get(pilotId) ?? [],
     recentPoints: recent?.points ?? 0, recentRaces: recent?.races ?? 0,
   };
 }
