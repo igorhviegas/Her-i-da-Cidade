@@ -208,5 +208,20 @@ assert.deepEqual(await getDoc(doc(db, 'financeEntries', `evt-${A}-adjrev-2`)).th
 assert.deepEqual(await getDoc(doc(db, 'financeEntries', `evt-${A}-entry`)).then((s) => s.exists()), false);
 step('excluir o pedido remove entrada, parcelas, custo e ajustes');
 
+// 10. histórico de etapas: cada mudança de status vira { from, to, at }; repetir o status ou editar outro campo não registra nada
+const { eventForm: _ef, childName: _cn, ...plainOrder } = input();
+const staged = await orders.createOrder(plainOrder);
+assert.equal((await orderDoc(staged.id)).stageHistory, undefined);
+await orders.updateOrder(staged.id, { status: 'recording' });
+await orders.updateOrder(staged.id, { status: 'recording' }); // mesmo status: sem entrada nova
+await orders.updateOrder(staged.id, { content: 'outro texto' }); // outro campo: sem entrada nova
+await orders.updateOrder(staged.id, { status: 'editing' });
+await orders.updateOrder(staged.id, { status: 'completed' });
+await orders.updateOrder(staged.id, { status: 'editing' }); // reabrir também conta
+const history = (await orderDoc(staged.id)).stageHistory;
+assert.deepEqual(history.map((h) => [h.from, h.to]), [['scheduled', 'recording'], ['recording', 'editing'], ['editing', 'completed'], ['completed', 'editing']]);
+assert.ok(history.every((h, i) => typeof h.at.toMillis === 'function' && (i === 0 || h.at.toMillis() >= history[i - 1].at.toMillis())));
+step('histórico de etapas: uma entrada por mudança de status, na ordem; repetição e outras edições não registram');
+
 await vite.close(); await env.cleanup();
 console.log('E2E OK');

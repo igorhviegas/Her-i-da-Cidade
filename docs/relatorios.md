@@ -22,7 +22,7 @@ Recortes: este mês, últimos 90 dias, este ano ou tudo. **Só entram os custos 
 ## Operação
 - **Agora, em andamento:** pedidos por etapa, atrasados (prazo ao cliente em dia anterior a hoje) e os que vencem em até 2 dias. Compara por dia de calendário, como o Kanban.
 - **Entregas no período:** entregues com prazo, % no prazo, atraso médio dos atrasados, tempo médio do pagamento à conclusão e a lista dos mais atrasados. Pedidos sem prazo ao cliente (eventos, roteiros internos) ficam de fora.
-- **Tempo parado em cada etapa do Kanban ainda não é medido:** o sistema não guardava a data de cada mudança de etapa.
+- **Tempo em cada etapa do Kanban:** média das etapas já encerradas (Agendado, Gravação, Edição, Entrega) e os pedidos parados há mais tempo na etapa atual. Vem de `orders/{id}.stageHistory`, que `updateOrder` grava a cada mudança de etapa (`{ from, to, at }`; repetir o status ou editar outro campo não grava; reabrir conta). Só pedidos criados a partir de `STAGE_TRACKING_SINCE` (`services/reports.js`, 10/10/2026) são medidos: antes dessa data as mudanças não eram guardadas. Tempo em Concluído não é etapa de trabalho. A hora vem do aparelho de quem mudou a etapa (`serverTimestamp` não vale dentro de array).
 
 ## Sazonalidade
 Faturamento médio por mês do ano, só com **meses completos** (o mês em andamento fica fora das médias, mas aparece na tabela por ano com `*`). Mês sem faturamento conta zero. A classificação compara cada mês com o **mês típico (mediana)**, não com a média, para que poucos meses muito fortes não façam o resto parecer fraco: ≥ 115% = Forte, ≤ 85% = Fraco. Com menos de 12 meses de histórico a tela avisa que pode ser acaso.
@@ -33,5 +33,4 @@ Faturamento médio por mês do ano, só com **meses completos** (o mês em andam
 - Pedidos internos de roteiro não entram.
 
 ## Ainda não feito
-- **Tempo parado em cada etapa do Kanban:** exige gravar a data de cada mudança de etapa a partir de agora (o histórico anterior não existe).
 - **Relatório mensal em PDF** (receita, custos, serviços, Instagram e Fit), com aviso no sino no dia 1º e PDF pelo botão de imprimir do navegador.

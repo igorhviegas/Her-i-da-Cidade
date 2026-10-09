@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildRevenueEntries } from './financeCalculations.js';
-import { activeHealth, clientRetention, dailyBreakdown, deliveryPerformance, eventProfitability, periodRange, periodTotals, presetRange, seasonality, serviceBreakdown, serviceProfitability, shiftPeriod } from './reports.js';
+import { ACTIVE_STAGES, activeHealth, clientRetention, dailyBreakdown, deliveryPerformance, eventProfitability, periodRange, periodTotals, presetRange, seasonality, serviceBreakdown, serviceProfitability, shiftPeriod, stageDwell } from './reports.js';
 
 const at = (iso) => new Date(`${iso}T12:00:00`); // meio-dia local: sem virar o dia por fuso
 const order = (id, over = {}) => ({ id, status: 'completed', clientId: 'c1', serviceId: 's1', totalPaid: 100, completedAt: at('2026-10-05'), ...over });
@@ -167,4 +167,30 @@ test('activeHealth: contagem por etapa, atrasados do mais antigo ao mais novo e 
   assert.deepEqual(h.overdue.map((x) => [x.order.id, x.lateDays]), [['a', 3], ['b', 1]]);
   assert.equal(h.dueSoon, 2); // vence hoje (c) e em 2 dias (d); e (3 dias) e f (sem prazo) ficam de fora
   assert.equal(h.total, 6);
+});
+
+test('stageDwell: tempo médio por etapa encerrada e pedidos parados na etapa atual; só pedidos criados desde o início da medição', () => {
+  const since = new Date('2026-10-10T00:00:00-03:00');
+  const day = (n) => new Date(since.getTime() + (n + 0.5) * 86_400_000); // n dias depois do início, ao meio-dia
+  const h = (from, to, n) => ({ from, to, at: day(n) });
+  const now = day(5);
+  const done = { id: 'A', status: 'completed', createdAt: day(0), stageHistory: [h('scheduled', 'recording', 1), h('recording', 'editing', 3), h('editing', 'completed', 4)] };
+  const stuckOrder = { id: 'B', status: 'editing', createdAt: day(0), stageHistory: [h('scheduled', 'recording', 1), h('recording', 'editing', 2)] };
+  const legacy = { id: 'C', status: 'editing', createdAt: new Date('2026-10-01T12:00:00-03:00'), stageHistory: [h('recording', 'editing', 1)] }; // anterior à medição
+  const untouched = { id: 'D', status: 'scheduled', createdAt: day(4) }; // criado e nunca mudou de etapa: só conta o tempo parado
+  const result = stageDwell([done, stuckOrder, legacy, untouched, { id: 'L', ledger: true, status: 'completed' }], now, since);
+  assert.equal(result.trackedOrders, 3);
+  assert.deepEqual(result.stages.map((s) => [s.status, s.samples, s.avgDays]), [['scheduled', 2, 1], ['recording', 2, 1.5], ['editing', 1, 1], ['delivery', 0, null]]);
+  assert.deepEqual(result.stuck.map((s) => [s.order.id, s.status, s.days]), [['B', 'editing', 3], ['D', 'scheduled', 1]]);
+});
+
+test('stageDwell: reabrir conta a etapa de volta, tempo em Concluído não é etapa de trabalho e histórico incoerente não gera parado', () => {
+  const since = new Date('2026-10-10T00:00:00-03:00');
+  const day = (n) => new Date(since.getTime() + n * 86_400_000);
+  const reopened = { id: 'R', status: 'editing', createdAt: day(0), stageHistory: [{ from: 'scheduled', to: 'editing', at: day(1) }, { from: 'editing', to: 'completed', at: day(2) }, { from: 'completed', to: 'editing', at: day(10) }] };
+  const broken = { id: 'X', status: 'recording', createdAt: day(0), stageHistory: [{ from: 'scheduled', to: 'editing', at: day(1) }] }; // estado atual não bate com a última mudança
+  const result = stageDwell([reopened, broken], day(12), since);
+  assert.deepEqual(result.stages.map((s) => [s.status, s.samples, s.avgDays]), [['scheduled', 2, 1], ['recording', 0, null], ['editing', 1, 1], ['delivery', 0, null]]);
+  assert.deepEqual(result.stuck.map((s) => [s.order.id, s.days]), [['R', 2]]); // editing de novo desde o dia 10; 'X' é ignorado
+  assert.deepEqual(stageDwell([], day(1), since), { trackedOrders: 0, stages: ACTIVE_STAGES.map((status) => ({ status, samples: 0, avgDays: null })), stuck: [] });
 });
