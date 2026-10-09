@@ -14,6 +14,8 @@ Pedidos presenciais criados pelo ManyChat (só cliente e WhatsApp) entram como r
 
 No Novo pedido de um serviço Presencial, **Importar formulário (PDF)** lê o PDF do "Formulário da Missão" (Google Forms impresso) no navegador (`pdfjs-dist`, sem OCR; `services/eventFormImport.js`) e só preenche o formulário; nada é criado até **Criar Pedido**. Preenche: aniversariante, nascimento, data, horário, local, nome do responsável (cliente, se vazio) e os vídeos. **Não lê** o que é opção marcada no PDF (tipo do evento/#formulário, PCD, autorização de imagem, teias extras) nem o WhatsApp, que o formulário não traz: continuam manuais.
 
+O mesmo botão e a seção de vídeos existem em **Editar pedido** de eventos (inclusive o rascunho do ManyChat): ao editar, o importador **nunca altera cliente nem WhatsApp**, só os campos do evento, e os vídeos marcados viram pedidos ao salvar.
+
 Seção **Vídeos com desconto**: cada vídeo marcado (Especial de Aniversário, Convite) cria, depois do evento, um pedido próprio com **R$ 0,00** (o valor já está no total do evento), pago hoje, com o status inicial e o prazo do serviço. O serviço é achado pelo título (`Vídeo Especial de Aniversário`, `Vídeo Convite`) e precisa estar ativo e configurado. Se o evento for criado e um vídeo falhar, o aviso diz qual criar à mão. Esses pedidos não geram lançamento no livro de eventos.
 
 ## Financeiro

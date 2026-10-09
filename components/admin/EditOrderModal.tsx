@@ -1,8 +1,10 @@
 import React, { FormEvent, useState } from 'react';
 import { updateOrder } from '../../services/ordersService';
 import { EventOrderFields } from './EventOrderFields';
+import { emptyVideoAddons, ImportFormButton, VideoAddonsSection } from './EventVideoAddons';
 import type { Client, Order, Service } from '../../types';
 import { EditClientSection, EditOrderError, EditOrderFooter, EditOrderHeader, EditOrderNotices, EditOrderSection, EditValuesSection } from './ordersFlow/EditOrderSections';
+import { createVideoOrders, validateVideoOrders } from './ordersFlow/createOrderSubmit';
 import { buildEventUpdates, buildOrderUpdates, buildUpdatedOrder, computeEditChanges, resolveUpdatedClient, validateEditBasics, validateEditNumbers, validateEditWhatsApp } from './ordersFlow/editOrderSubmit';
 import { useEditOrderFields, useEditOrderServices, useEventAdjustment } from './ordersFlow/useEditOrderFields';
 
@@ -16,6 +18,7 @@ interface EditOrderModalProps {
 
 export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, service, onClose, onSaved }) => {
   const [saving, setSaving] = useState(false);
+  const [videoAddons, setVideoAddons] = useState(emptyVideoAddons);
   const { services, loadingServices, error, setError } = useEditOrderServices(order, service);
   const fields = useEditOrderFields(order, client);
   const { name, whatsapp, serviceId, paidDate, eventDate, deliveryDays, content, servicePrice, rushFee, totalPaid, eventState, setEventState } = fields;
@@ -33,6 +36,9 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
     if (!contact) return;
     const numbers = validateEditNumbers({ deliveryDays, servicePrice, rushFee, totalPaid, content, setError });
     if (!numbers) return;
+    const eventValues = basics.eventValidation?.value;
+    const videos = eventValues ? validateVideoOrders({ addons: videoAddons, services, event: eventValues, setFormError: setError }) : [];
+    if (!videos) return;
 
     if (adjustment && !window.confirm(`Salvar vai lançar no Financeiro, na data de hoje: ${describeAdjustment()}.\nOs lançamentos anteriores continuam como estão (histórico preservado). Confirmar?`)) return;
     setSaving(true);
@@ -44,7 +50,9 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
       const changes = computeEditChanges(saveContext);
       const eventUpdates = buildEventUpdates(saveContext.eventValues);
       await updateOrder(order.id, buildOrderUpdates(saveContext, changes, eventUpdates));
+      const warning = eventValues ? await createVideoOrders(videos, updatedClient.id, eventValues.eventDate) : undefined;
       onSaved(buildUpdatedOrder(saveContext, changes, eventUpdates), updatedClient, basics.selectedService);
+      if (warning) window.alert(warning);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar as alterações do pedido.');
       setSaving(false);
@@ -60,7 +68,13 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
             <EditOrderError error={error} />
             <EditClientSection fields={fields} saving={saving} />
             <EditOrderNotices order={order} isDraft={isDraft} isEventOrder={isEventOrder} adjustment={adjustment} describeAdjustment={describeAdjustment} />
-            {isEventOrder ? <EventOrderFields value={eventState} onChange={setEventState} disabled={saving} /> : (
+            {isEventOrder ? (
+              <>
+                <ImportFormButton event={eventState} addons={videoAddons} disabled={saving} onEvent={setEventState} onAddons={setVideoAddons} />
+                <EventOrderFields value={eventState} onChange={setEventState} disabled={saving} />
+                <VideoAddonsSection value={videoAddons} onChange={setVideoAddons} disabled={saving} />
+              </>
+            ) : (
               <>
                 <EditOrderSection fields={fields} services={services} loadingServices={loadingServices} saving={saving} />
                 <EditValuesSection fields={fields} saving={saving} />

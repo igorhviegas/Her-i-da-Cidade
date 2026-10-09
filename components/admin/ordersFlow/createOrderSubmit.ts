@@ -1,5 +1,5 @@
 import { normalizeWhatsApp } from '../../../services/clientsService';
-import type { createOrder } from '../../../services/ordersService';
+import { createOrder } from '../../../services/ordersService';
 import { eventContentSummary, validateEventForm } from '../../../services/eventForm.js';
 import { buildVideoContents, findVideoService, VIDEO_KINDS } from '../../../services/eventVideos.js';
 import type { VideoAddons, VideoKind } from '../../../services/eventVideos.js';
@@ -175,4 +175,17 @@ export function buildVideoOrderInput({ clientId, eventDate, service, status, con
     source: 'manual',
     ...(status === 'completed' ? { completedAt: now } : {}),
   };
+}
+
+/** Cria os pedidos de vídeo um a um; devolve o aviso (quais falharam) ou undefined. O evento já existe, então uma falha não desfaz nada. */
+export async function createVideoOrders(videos: PlannedVideo[], clientId: string, eventDate: string): Promise<string | undefined> {
+  const failed: string[] = [];
+  for (const video of videos) {
+    try {
+      await createOrder(buildVideoOrderInput({ ...video, clientId, eventDate }));
+    } catch {
+      failed.push(video.service.title);
+    }
+  }
+  return failed.length ? `Evento salvo, mas não foi possível criar o pedido de: ${failed.join(', ')}. Crie manualmente em Novo pedido.` : undefined;
 }
