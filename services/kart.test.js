@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildResults, formatLap, isOfficial, matchPilot, parseLap, parseTimingReport, pointsFor } from './kart.js';
+import { buildResults, formatLap, isOfficial, matchPilot, parseLap, parseLapInput, parseTimingReport, pointsFor } from './kart.js';
 import { DEFAULT_KART_PILOTS } from './kartPilots.js';
 import { lapRanking, officialRaces, pilotProfile, standings, trackRecord } from './kartRanking.js';
 import { youtubeId } from './kartVideos.js';
@@ -15,6 +15,11 @@ test('tempos de volta: leitura e formatação', () => {
   assert.equal(parseLap('lixo'), null);
   assert.equal(formatLap(73169), '1:13.169');
   assert.equal(formatLap(null), '—');
+});
+
+test('tempo digitado à mão aceita os formatos comuns e recusa lixo', () => {
+  assert.deepEqual(['1:13.169', '1.13.169', '1:13,169', '1:14.20', ' 1:11.3 '].map(parseLapInput), [73169, 73169, 73169, 74200, 71300]);
+  assert.deepEqual(['', '1:75.000', 'abc', '73'].map(parseLapInput), [null, null, null, null]);
 });
 
 test('pontos: 25, 22, 20, 19… até 0', () => {

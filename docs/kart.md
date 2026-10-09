@@ -32,6 +32,10 @@ O nome do relatório é o nome completo (ex.: `LEMUEL KESSELEH`). Um piloto casa
 
 Os PDFs originais ficam arquivados em `docs/kart/resultados/oficiais/AAAA-MM-DD_HHMM.pdf` (e `fora-do-campeonato/` para baterias sem inscritos suficientes).
 
+## Lançar ou corrigir uma corrida à mão
+
+Admin → Kart → Corridas → **Lançar corrida manualmente** (para corridas sem PDF). Informe data, horário da bateria (opcional) e clima, depois adicione os inscritos **na ordem de chegada entre eles** (setas reordenam) com a melhor volta de cada um, se tiver (`1:13.169`, `1.13.169` ou `1:14.20`). Precisa de 3 ou mais pilotos. O lápis na lista de corridas salvas reabre o mesmo formulário para corrigir uma corrida (inclusive as importadas); mudar a data ou o horário move a corrida em vez de duplicá-la.
+
 ## Vídeos
 
 Admin → Kart → Vídeos: cole o link do YouTube (watch, youtu.be, shorts, embed), dê um título e escolha **Dicas** ou **Corridas completas**. Toca na própria página com `youtube-nocookie.com`.
