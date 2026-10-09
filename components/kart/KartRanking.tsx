@@ -3,6 +3,7 @@ import { Crown, Search, Timer, Trophy } from 'lucide-react';
 import { formatLap, norm } from '../../services/kart.js';
 import { lapRanking, racesInScope, raceYears, standings, trackRecord, type KartScope } from '../../services/kartRanking.js';
 import type { KartPilot, KartRace } from '../../services/kartService';
+import { KartScoringInfo } from './KartScoringInfo';
 import { KartLink, MEDAL_STYLE, WeatherIcon, card, formatDate, medalOf, plural, type Medal } from './kartUi';
 
 type Mode = 'points' | 'laps';
@@ -116,9 +117,12 @@ export const KartRanking: React.FC<{ races: KartRace[]; pilots: KartPilot[] }> =
         <p className={`${card} px-5 py-8 text-center text-white/50`}>Ainda não há corridas neste período.</p>
       ) : (
         <>
-          <p className="px-1 text-xs text-white/50">
-            {mode === 'points' ? 'Pontos' : 'Melhor volta'} · {periodLabel} · {plural(inScope.length, 'corrida', 'corridas')}
-            {mode === 'laps' && ' · inclui corridas fora do campeonato (avulsas) · nuvem = volta na chuva'}
+          <p className="flex items-center gap-1.5 px-1 text-xs text-white/50">
+            <span>
+              {mode === 'points' ? 'Pontos' : 'Melhor volta'} · {periodLabel} · {plural(inScope.length, 'corrida', 'corridas')}
+              {mode === 'laps' && ' · inclui corridas fora do campeonato (avulsas) · nuvem = volta na chuva'}
+            </span>
+            {mode === 'points' && <KartScoringInfo />}
           </p>
           <Podium lines={lines} />
           <ol className="space-y-2">{lines.slice(lines.length >= 3 ? 3 : 0).map((l) => <li key={l.pilotId}><Row line={l} /></li>)}</ol>
