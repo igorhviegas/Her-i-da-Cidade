@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { ArrowDown, ArrowUp, CloudRain, Sun, Trash2, X } from 'lucide-react';
+import { newId } from '../../../services/agentContent.js';
 import { MIN_OFFICIAL_PILOTS, formatLap, parseLapInput, pointsFor } from '../../../services/kart.js';
 import { deleteKartRace, raceDocId, saveKartRace, type KartPilot, type KartRace } from '../../../services/kartService';
 import { card, iconBtn, input, type Run } from './agentShared';
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 interface Entry { pilotId: string; name: string; lap: string }
 
@@ -13,22 +16,25 @@ export const KartRaceForm: React.FC<{ pilots: KartPilot[]; race: KartRace | null
   const [date, setDate] = useState(race?.date ?? '');
   const [time, setTime] = useState(race ? (/\d{1,2}:\d{2}/.exec(race.heat)?.[0] ?? '') : '');
   const [weather, setWeather] = useState<'dry' | 'rain'>(race?.weather ?? 'dry');
+  const [extra, setExtra] = useState(!!race?.extra);
   const [entries, setEntries] = useState<Entry[]>(() => toEntries(race));
 
   const free = pilots.filter((p) => !entries.some((e) => e.pilotId === p.id)).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  const badLap = (e: Entry) => e.lap.trim() !== '' && parseLapInput(e.lap) === null;
+  const badLap = (e: Entry) => (e.lap.trim() !== '' || extra) && parseLapInput(e.lap) === null;
+  const minPilots = extra ? 1 : MIN_OFFICIAL_PILOTS;
   const problem = !date ? 'Informe a data da corrida.'
-    : entries.length < MIN_OFFICIAL_PILOTS ? `Adicione ao menos ${MIN_OFFICIAL_PILOTS} pilotos inscritos.`
-    : entries.some(badLap) ? 'Há uma melhor volta inválida (use 1:13.169).' : '';
+    : entries.length < minPilots ? `Adicione ao menos ${plural(minPilots, 'piloto inscrito', 'pilotos inscritos')}.`
+    : entries.some(badLap) ? (extra ? 'Informe a melhor volta de cada piloto (ex.: 1:13.169).' : 'Há uma melhor volta inválida (use 1:13.169).') : '';
 
   const update = (i: number, patch: Partial<Entry>) => setEntries((prev) => prev.map((e, j) => (j === i ? { ...e, ...patch } : e)));
   const move = (i: number, delta: -1 | 1) => setEntries((prev) => { const next = [...prev]; [next[i], next[i + delta]] = [next[i + delta], next[i]]; return next; });
 
   const save = async () => {
-    const id = raceDocId(date, time);
-    const results = entries.map((e, i) => ({ pilotId: e.pilotId, name: e.name, pos: i + 1, racePos: null, bestLapMs: parseLapInput(e.lap), laps: 0 }));
+    const id = extra ? (race?.extra ? race.id : `extra-${date}-${newId()}`) : raceDocId(date, time);
+    const ordered = extra ? [...entries].sort((a, b) => (parseLapInput(a.lap) ?? Infinity) - (parseLapInput(b.lap) ?? Infinity)) : entries; // avulsa: ordem pela volta
+    const results = ordered.map((e, i) => ({ pilotId: e.pilotId, name: e.name, pos: i + 1, racePos: null, bestLapMs: parseLapInput(e.lap), laps: 0 }));
     const ok = await run(async () => {
-      await saveKartRace({ id, date, heat: time ? `Bateria ${time}` : 'Bateria', weather, results });
+      await saveKartRace({ id, date, heat: `${extra ? 'Avulsa' : 'Bateria'}${time ? ` ${time}` : ''}`, weather, extra, results });
       if (race && race.id !== id) await deleteKartRace(race.id); // data/horário mudou: não deixa a corrida antiga duplicada
     }, race ? 'Corrida atualizada.' : 'Corrida lançada.');
     if (ok) onClose();
@@ -40,6 +46,11 @@ export const KartRaceForm: React.FC<{ pilots: KartPilot[]; race: KartRace | null
         <p className="font-bold text-white">{race ? 'Editar corrida' : 'Lançar corrida manualmente'}</p>
         <button type="button" onClick={onClose} aria-label="Fechar" className={iconBtn}><X className="h-4 w-4" /></button>
       </div>
+
+      <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm ${extra ? 'border-red-500/60 bg-red-500/10' : 'border-white/10 bg-white/5'}`}>
+        <input type="checkbox" checked={extra} onChange={(e) => setExtra(e.target.checked)} className="mt-0.5 h-4 w-4 accent-red-600" />
+        <span><b className="text-white">Corrida fora do campeonato</b><span className="block text-white/60">Não dá pontos, vitórias nem pódios; vale só para o recorde de melhor volta da pista (ex.: ir sozinho tentar bater a volta). Aceita 1 piloto ou mais.</span></span>
+      </label>
 
       <div className="grid gap-2 sm:grid-cols-3">
         <label className="text-xs text-white/50">Data<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${input} mt-1`} /></label>
@@ -54,19 +65,19 @@ export const KartRaceForm: React.FC<{ pilots: KartPilot[]; race: KartRace | null
       </div>
 
       <div className="space-y-1.5">
-        <p className="text-xs text-white/50">Ordem de chegada entre os inscritos (1º no topo) e melhor volta de cada um</p>
+        <p className="text-xs text-white/50">{extra ? 'Pilotos da sessão e a melhor volta de cada um (a ordem é pela volta)' : 'Ordem de chegada entre os inscritos (1º no topo) e melhor volta de cada um'}</p>
         {entries.map((e, i) => (
           <div key={e.pilotId} className="flex items-center gap-2 rounded-xl bg-white/5 px-2 py-1.5">
-            <span className="w-7 text-center text-lg font-black tabular-nums text-white/60">{i + 1}</span>
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold">{e.name}<span className="ml-2 text-xs font-normal text-white/40">{pointsFor(i + 1)} pts</span></span>
+            {!extra && <span className="w-7 text-center text-lg font-black tabular-nums text-white/60">{i + 1}</span>}
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold">{e.name}{!extra && <span className="ml-2 text-xs font-normal text-white/40">{pointsFor(i + 1)} pts</span>}</span>
             <input aria-label={`Melhor volta de ${e.name}`} value={e.lap} onChange={(ev) => update(i, { lap: ev.target.value })} placeholder="1:13.169" inputMode="decimal" className={`${input} w-28 shrink-0 ${badLap(e) ? 'border-red-500/70' : ''}`} />
-            <button type="button" aria-label="Subir" disabled={i === 0} onClick={() => move(i, -1)} className={iconBtn}><ArrowUp className="h-4 w-4" /></button>
-            <button type="button" aria-label="Descer" disabled={i === entries.length - 1} onClick={() => move(i, 1)} className={iconBtn}><ArrowDown className="h-4 w-4" /></button>
+            {!extra && <button type="button" aria-label="Subir" disabled={i === 0} onClick={() => move(i, -1)} className={iconBtn}><ArrowUp className="h-4 w-4" /></button>}
+            {!extra && <button type="button" aria-label="Descer" disabled={i === entries.length - 1} onClick={() => move(i, 1)} className={iconBtn}><ArrowDown className="h-4 w-4" /></button>}
             <button type="button" aria-label={`Remover ${e.name}`} onClick={() => setEntries((prev) => prev.filter((_, j) => j !== i))} className={`${iconBtn} hover:text-red-300`}><Trash2 className="h-4 w-4" /></button>
           </div>
         ))}
         <select aria-label="Adicionar piloto" value="" disabled={free.length === 0} onChange={(ev) => { const p = pilots.find((x) => x.id === ev.target.value); if (p) setEntries((prev) => [...prev, { pilotId: p.id, name: p.name, lap: '' }]); }} className={input}>
-          <option value="">{free.length ? `+ Adicionar piloto na posição ${entries.length + 1}…` : 'Todos os pilotos já foram adicionados'}</option>
+          <option value="">{free.length ? (extra ? '+ Adicionar piloto…' : `+ Adicionar piloto na posição ${entries.length + 1}…`) : 'Todos os pilotos já foram adicionados'}</option>
           {free.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
       </div>

@@ -7,6 +7,8 @@ export interface KartRace {
   /** Ex.: 'Bateria 16:50' */
   heat: string;
   weather: 'dry' | 'rain';
+  /** Sessão fora do campeonato (ex.: ir sozinho bater a melhor volta): não pontua, mas conta para o recorde de volta. */
+  extra?: boolean;
   results: KartResult[];
 }
 export interface TimingRow { racePos: number | null; kart: string; name: string; bestLapMs: number | null; laps: number }

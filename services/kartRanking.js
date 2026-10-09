@@ -5,6 +5,9 @@ import { isOfficial, pointsFor } from './kart.js';
 /** Quantas corridas oficiais mais recentes formam o ranking padrão. */
 export const RECENT_RACES = 10;
 
+/** Sessões fora do campeonato (não pontuam), da mais recente para a mais antiga. */
+export const extraRaces = (races) => races.filter((r) => r.extra && r.results?.length).sort((a, b) => b.date.localeCompare(a.date) || String(b.heat).localeCompare(String(a.heat)));
+
 /** Corridas oficiais em ordem cronológica, já numeradas ("Corrida 1" = a mais antiga). */
 export function officialRaces(races) {
   return [...races]
@@ -48,30 +51,48 @@ export function standings(races, scope) {
     .map((row, i) => ({ ...row, rank: i + 1 }));
 }
 
-/** Ranking de melhor volta: [{ rank, pilotId, name, bestLapMs, races, raceId, date, rain }]. Volta na chuva é sinalizada (`rain`). */
+/** Corridas do período + sessões avulsas dentro do mesmo intervalo de datas (as avulsas valem só para a volta, nunca para pontos). */
+function lapRaces(races, scope = { type: 'recent' }) {
+  const champ = racesInScope(races, scope);
+  const extras = extraRaces(races);
+  if (scope.type === 'all') return [...champ, ...extras];
+  if (scope.type === 'year') return [...champ, ...extras.filter((r) => r.date.startsWith(String(scope.year)))];
+  return [...champ, ...extras.filter((r) => r.date >= (champ[0]?.date ?? ''))];
+}
+
+/**
+ * Ranking de melhor volta: [{ rank, pilotId, name, bestLapMs, races, extras, wins, podiums, raceId, date, rain, extra }].
+ * Inclui sessões avulsas; `races` conta só corridas do campeonato, `extras` as avulsas. Volta na chuva é sinalizada (`rain`).
+ */
 export function lapRanking(races, scope) {
+  const table = new Map(standings(races, scope).map((s) => [s.pilotId, s]));
   const byPilot = new Map();
-  for (const race of racesInScope(races, scope)) {
+  for (const race of lapRaces(races, scope)) {
     for (const r of race.results) {
-      const row = byPilot.get(r.pilotId) ?? { pilotId: r.pilotId, name: r.name, bestLapMs: null, races: 0, raceId: '', date: '', rain: false };
-      row.races += 1;
+      const row = byPilot.get(r.pilotId) ?? { pilotId: r.pilotId, name: r.name, bestLapMs: null, races: 0, extras: 0, wins: 0, podiums: 0, raceId: '', date: '', rain: false, extra: false };
+      if (race.extra) row.extras += 1; else row.races += 1;
       if (r.bestLapMs && (row.bestLapMs === null || r.bestLapMs < row.bestLapMs)) {
-        Object.assign(row, { bestLapMs: r.bestLapMs, raceId: race.id, date: race.date, rain: race.weather === 'rain' });
+        Object.assign(row, { bestLapMs: r.bestLapMs, raceId: race.id, date: race.date, rain: race.weather === 'rain', extra: !!race.extra });
       }
       byPilot.set(r.pilotId, row);
     }
   }
-  return [...byPilot.values()].filter((r) => r.bestLapMs !== null).sort(byLap).map((row, i) => ({ ...row, rank: i + 1 }));
+  return [...byPilot.values()]
+    .filter((r) => r.bestLapMs !== null)
+    .map((r) => ({ ...r, wins: table.get(r.pilotId)?.wins ?? 0, podiums: table.get(r.pilotId)?.podiums ?? 0 }))
+    .sort(byLap)
+    .map((row, i) => ({ ...row, rank: i + 1 }));
 }
 
-/** Recorde da pista no período: a melhor volta em piso seco (na chuva o tempo não é comparável); null se não houver. */
+/** Recorde da pista no período (inclui sessões avulsas): a melhor volta em piso seco (na chuva o tempo não é comparável); null se não houver. */
 export function trackRecord(races, scope) {
   return lapRanking(races, scope).filter((r) => !r.rain)[0] ?? null;
 }
 
 /**
  * Perfil do piloto. `medal` = 1, 2 ou 3 conforme a posição no ranking padrão (últimas 10 corridas), senão null.
- * `history` = todas as corridas oficiais dele, da mais recente para a mais antiga.
+ * `history` = todas as corridas oficiais dele, da mais recente para a mais antiga; `extras` = sessões fora do campeonato.
+ * `record` = melhor volta dele em qualquer uma (campeonato ou avulsa).
  */
 export function pilotProfile(pilotId, races) {
   const recent = standings(races, { type: 'recent' }).find((r) => r.pilotId === pilotId) ?? null;
@@ -80,10 +101,15 @@ export function pilotProfile(pilotId, races) {
     const r = race.results.find((x) => x.pilotId === pilotId);
     return r ? [{ raceId: race.id, number: race.number, date: race.date, heat: race.heat, weather: race.weather, pos: r.pos, points: pointsFor(r.pos), bestLapMs: r.bestLapMs, field: race.results.length }] : [];
   }).reverse();
-  const record = history.filter((h) => h.bestLapMs).sort(byLap)[0] ?? null;
+  const extras = extraRaces(races).flatMap((race) => {
+    const r = race.results.find((x) => x.pilotId === pilotId);
+    return r ? [{ raceId: race.id, date: race.date, heat: race.heat, weather: race.weather, bestLapMs: r.bestLapMs, field: race.results.length }] : [];
+  });
+  const laps = [...history.map((h) => ({ raceId: h.raceId, date: h.date, bestLapMs: h.bestLapMs, extra: false })), ...extras.map((e) => ({ raceId: e.raceId, date: e.date, bestLapMs: e.bestLapMs, extra: true }))];
+  const record = laps.filter((l) => l.bestLapMs).sort(byLap)[0] ?? null;
   return {
     medal: recent && recent.rank <= 3 ? recent.rank : null,
-    recent, overall, history, record,
+    recent, overall, history, extras, record,
     recentPoints: recent?.points ?? 0, recentRaces: recent?.races ?? 0,
   };
 }

@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
-import { Crown, Flame, Flag, Medal as MedalIcon, Timer } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ChevronDown, Crown, Flame, Flag, Medal as MedalIcon, Timer, TriangleAlert } from 'lucide-react';
 import { formatLap } from '../../services/kart.js';
-import { pilotProfile, recentForm, RECENT_RACES, type HistoryRow as HistoryRowData } from '../../services/kartRanking.js';
+import { pilotProfile, recentForm, RECENT_RACES, type ExtraRow, type HistoryRow as HistoryRowData } from '../../services/kartRanking.js';
 import type { KartPilot, KartRace } from '../../services/kartService';
+import { RaceResults } from './KartRaceResults';
 import { KartLink, MEDAL_STYLE, WeatherIcon, card, formatDate, plural, type Medal } from './kartUi';
 
 const Stat: React.FC<{ label: string; value: React.ReactNode; hint?: string }> = ({ label, value, hint }) => (
@@ -30,26 +31,53 @@ const FormChart: React.FC<{ pilotId: string; races: KartRace[]; barClass: string
   );
 };
 
-const HistoryRow: React.FC<{ h: HistoryRowData; isRecord: boolean }> = ({ h, isRecord }) => (
-  <li className={`${card} flex items-center gap-3 px-3 py-3`}>
-    <span className={`w-11 shrink-0 text-center text-2xl font-black italic tabular-nums ${h.pos <= 3 ? MEDAL_STYLE[h.pos as Medal].text : 'text-white/45'}`}>P{h.pos}</span>
-    <span className="min-w-0 flex-1">
-      <span className="block text-sm font-bold">Corrida {h.number} <span className="font-normal text-white/50">· {formatDate(h.date)}</span></span>
-      <span className="flex items-center gap-1.5 text-xs text-white/50"><WeatherIcon weather={h.weather} className="h-3.5 w-3.5" />{h.heat} · {h.field} inscritos</span>
-    </span>
-    <span className="shrink-0 text-right">
-      <span className="block text-lg font-black italic tabular-nums">{h.points} <span className="text-xs font-semibold not-italic text-white/45">pts</span></span>
-      <span className={`flex items-center justify-end gap-1 text-xs tabular-nums ${isRecord ? 'font-bold text-red-300' : 'text-white/50'}`}><Timer className="h-3 w-3" />{formatLap(h.bestLapMs)}</span>
-    </span>
-  </li>
-);
+/** Linha do histórico que abre o resultado completo da corrida (igual à aba Corridas). */
+const HistoryRow: React.FC<{ h: HistoryRowData; isRecord: boolean; race: KartRace | undefined; pilotId: string }> = ({ h, isRecord, race, pilotId }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className={`${card} overflow-hidden`}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center gap-3 px-3 py-3 text-left">
+        <span className={`w-11 shrink-0 text-center text-2xl font-black italic tabular-nums ${h.pos <= 3 ? MEDAL_STYLE[h.pos as Medal].text : 'text-white/45'}`}>P{h.pos}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-bold">Corrida {h.number} <span className="font-normal text-white/50">· {formatDate(h.date)}</span></span>
+          <span className="flex items-center gap-1.5 text-xs text-white/50"><WeatherIcon weather={h.weather} className="h-3.5 w-3.5" />{h.heat} · {h.field} inscritos</span>
+        </span>
+        <span className="shrink-0 text-right">
+          <span className="block text-lg font-black italic tabular-nums">{h.points} <span className="text-xs font-semibold not-italic text-white/45">pts</span></span>
+          <span className={`flex items-center justify-end gap-1 text-xs tabular-nums ${isRecord ? 'font-bold text-red-300' : 'text-white/50'}`}><Timer className="h-3 w-3" />{formatLap(h.bestLapMs)}</span>
+        </span>
+        <ChevronDown className={`h-5 w-5 shrink-0 text-white/40 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && race && <RaceResults race={race} scored highlight={pilotId} />}
+    </li>
+  );
+};
+
+/** Sessão fora do campeonato do piloto: sem pontos, só a volta. */
+const ExtraRowItem: React.FC<{ e: ExtraRow; isRecord: boolean; race: KartRace | undefined; pilotId: string }> = ({ e, isRecord, race, pilotId }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="overflow-hidden rounded-2xl border border-red-500/30 bg-red-500/5">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center gap-3 px-3 py-3 text-left">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-bold">{formatDate(e.date)} <span className="font-normal text-white/50">· {e.heat}</span></span>
+          <span className="flex items-center gap-1.5 text-xs text-white/50"><WeatherIcon weather={e.weather} className="h-3.5 w-3.5" />{plural(e.field, 'piloto', 'pilotos')}</span>
+        </span>
+        <span className={`flex shrink-0 items-center gap-1 text-lg font-black italic tabular-nums ${isRecord ? 'text-red-300' : ''}`}><Timer className="h-4 w-4" />{formatLap(e.bestLapMs)}</span>
+        <ChevronDown className={`h-5 w-5 shrink-0 text-white/40 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && race && <RaceResults race={race} scored={false} highlight={pilotId} />}
+    </li>
+  );
+};
 
 export const KartPilotPage: React.FC<{ pilot: KartPilot | undefined; races: KartRace[] }> = ({ pilot, races }) => {
   const profile = useMemo(() => (pilot ? pilotProfile(pilot.id, races) : null), [pilot, races]);
   if (!pilot || !profile) return <p className={`${card} px-5 py-8 text-center text-white/60`}>Piloto não encontrado. <KartLink to="/kart" className="font-bold text-white underline">Voltar ao ranking</KartLink></p>;
 
   const medal = profile.medal ? MEDAL_STYLE[profile.medal] : null;
-  const { recent, overall, record, history } = profile;
+  const { recent, overall, record, history, extras } = profile;
+  const byId = new Map(races.map((r) => [r.id, r]));
   const wins = overall?.wins ?? 0;
 
   return (
@@ -70,7 +98,7 @@ export const KartPilotPage: React.FC<{ pilot: KartPilot | undefined; races: Kart
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <Stat label={`Pontos · últimas ${RECENT_RACES}`} value={profile.recentPoints} hint={plural(profile.recentRaces, 'corrida', 'corridas')} />
-              <Stat label="Recorde de volta" value={record?.bestLapMs ? formatLap(record.bestLapMs) : '—'} hint={record ? formatDate(record.date) : undefined} />
+              <Stat label="Recorde de volta" value={record?.bestLapMs ? formatLap(record.bestLapMs) : '—'} hint={record ? `${formatDate(record.date)}${record.extra ? ' · fora do campeonato' : ''}` : undefined} />
               <Stat label="Vitórias" value={wins} hint="no total" />
               <Stat label="Pódios" value={overall?.podiums ?? 0} hint={`em ${plural(overall?.races ?? 0, 'corrida', 'corridas')}`} />
             </div>
@@ -88,10 +116,20 @@ export const KartPilotPage: React.FC<{ pilot: KartPilot | undefined; races: Kart
         <h3 className="mb-2 flex items-center gap-2 px-1 text-sm font-bold uppercase tracking-widest text-white/60"><Flag className="h-4 w-4" />Histórico de corridas</h3>
         {history.length === 0 ? <p className={`${card} px-5 py-6 text-center text-white/50`}>Ainda sem corridas oficiais.</p> : (
           <ol className="space-y-2">
-            {history.map((h) => <HistoryRow key={h.raceId} h={h} isRecord={!!record && h.raceId === record.raceId} />)}
+            {history.map((h) => <HistoryRow key={h.raceId} h={h} race={byId.get(h.raceId)} pilotId={pilot.id} isRecord={!!record && h.raceId === record.raceId} />)}
           </ol>
         )}
       </section>
+
+      {extras.length > 0 && (
+        <section>
+          <h3 className="mb-2 flex items-center gap-2 px-1 text-sm font-bold uppercase tracking-widest text-red-300"><TriangleAlert className="h-4 w-4" />Fora do campeonato</h3>
+          <p className="mb-2 px-1 text-xs text-red-200/80">Estas sessões não contam pontos, vitórias nem pódios. Valem só para o recorde de melhor volta.</p>
+          <ol className="space-y-2">
+            {extras.map((e) => <ExtraRowItem key={e.raceId} e={e} race={byId.get(e.raceId)} pilotId={pilot.id} isRecord={!!record && e.raceId === record.raceId} />)}
+          </ol>
+        </section>
+      )}
 
       {recent === null && history.length > 0 && <p className="px-1 text-xs text-white/40">Este piloto não correu nas últimas {RECENT_RACES} corridas, por isso não aparece no ranking padrão.</p>}
     </div>
