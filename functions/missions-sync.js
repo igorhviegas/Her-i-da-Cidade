@@ -1,11 +1,17 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { addDays, buildNotifications, dateKey, syncRecurringTasks } from './missions-core.js';
 import { EVENT_MISSION_SOURCE, syncEventMissions } from './event-missions.js';
+import { buildInstagramAlerts } from './instagram-alerts.js';
 
 const toStored = (data) => Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v instanceof Date ? Timestamp.fromDate(v) : v]));
 const docs = (snapshot) => snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-/** Rotina da meia-noite (Brasília): gera ocorrências do dia, marca perdidas e cria avisos de missões/tarefas. */
+/** Perfil do Instagram para os avisos de saúde da integração; falha de leitura nunca derruba os avisos de missões. */
+async function readInstagramProfile(database) {
+  try { return (await database.collection('instagramMeta').doc('profile').get()).data(); } catch { return undefined; }
+}
+
+/** Rotina da meia-noite (Brasília): gera ocorrências do dia, marca perdidas e cria avisos de missões/tarefas e do Instagram. */
 export async function runMissionsSync(database, now = new Date()) {
   const store = {
     listActiveTasks: async () => docs(await database.collection('recurringTasks').where('status', '==', 'active').get()),
@@ -29,7 +35,8 @@ export async function runMissionsSync(database, now = new Date()) {
     database.collection('taskOccurrences').where('date', '>=', addDays(dateKey(now), -1)).get().then(docs),
   ]);
   let notified = 0;
-  for (const item of buildNotifications({ missions, occurrences: recent }, now)) {
+  const alerts = buildInstagramAlerts(await readInstagramProfile(database), now);
+  for (const item of [...buildNotifications({ missions, occurrences: recent }, now), ...alerts]) {
     const { id, ...fields } = item;
     try {
       await database.collection('notifications').doc(id).create({ ...fields, dismissed: false, createdAt: Timestamp.fromDate(now) });
