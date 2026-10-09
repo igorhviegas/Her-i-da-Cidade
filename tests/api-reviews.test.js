@@ -36,11 +36,11 @@ test('sucesso: manda chave só no header, devolve nota, total e avaliações com
   assert.match(res.headers['cache-control'], /s-maxage=86400/);
 });
 
-test('falha do Google vira 502 genérico, sem cache e sem vazar detalhe', async () => {
-  for (const status of [403, 404, 429, 500]) {
+test('falha do Google vira 502 com só o código, sem cache e sem vazar detalhe', async () => {
+  for (const [status, code] of [[403, 'auth'], [404, 'not_found'], [429, 'rate_limited'], [500, 'api_error']]) {
     const res = await call({ method: 'GET' }, { env: ENV, fetchImpl: google(status, { error: { message: 'SEGREDO-DA-CHAVE' } }) });
-    assert.deepEqual([res.statusCode, res.headers['cache-control'], JSON.stringify(res.body).includes('SEGREDO')], [502, 'no-store', false]);
+    assert.deepEqual([res.statusCode, res.headers['cache-control'], res.body, JSON.stringify(res.body).includes('SEGREDO')], [502, 'no-store', { ok: false, error: { code } }, false]);
   }
   const offline = await call({ method: 'GET' }, { env: ENV, fetchImpl: async () => { throw new Error('rede'); } });
-  assert.equal(offline.statusCode, 502);
+  assert.deepEqual([offline.statusCode, offline.body.error.code], [502, 'unavailable']);
 });
