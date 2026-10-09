@@ -41,6 +41,10 @@ test('falha do Google vira 502 com só o código, sem cache e sem vazar detalhe'
     const res = await call({ method: 'GET' }, { env: ENV, fetchImpl: google(status, { error: { message: 'SEGREDO-DA-CHAVE' } }) });
     assert.deepEqual([res.statusCode, res.headers['cache-control'], res.body, JSON.stringify(res.body).includes('SEGREDO')], [502, 'no-store', { ok: false, error: { code } }, false]);
   }
+  const chaveInvalida = { error: { status: 'INVALID_ARGUMENT', details: [{ reason: 'API_KEY_INVALID' }] } };
+  assert.equal((await call({ method: 'GET' }, { env: ENV, fetchImpl: google(400, chaveInvalida) })).body.error.code, 'auth');
+  const placeInvalido = { error: { status: 'INVALID_ARGUMENT', message: 'Invalid place id' } };
+  assert.equal((await call({ method: 'GET' }, { env: ENV, fetchImpl: google(400, placeInvalido) })).body.error.code, 'invalid_place');
   const offline = await call({ method: 'GET' }, { env: ENV, fetchImpl: async () => { throw new Error('rede'); } });
   assert.deepEqual([offline.statusCode, offline.body.error.code], [502, 'unavailable']);
 });

@@ -18,6 +18,13 @@ export function readReviewsConfig(env = process.env) {
 
 const ERROR_BY_STATUS = { 400: 'auth', 401: 'auth', 403: 'auth', 404: 'not_found', 429: 'rate_limited' };
 
+/** 400 do Google é chave inválida (API_KEY_INVALID) ou Place ID malformado (INVALID_ARGUMENT sem esse motivo). */
+const errorCode = (status, error) => {
+  const keyInvalid = JSON.stringify(error?.details ?? []).includes('API_KEY_INVALID');
+  if (status === 400 && error?.status === 'INVALID_ARGUMENT' && !keyInvalid) return 'invalid_place';
+  return ERROR_BY_STATUS[status] ?? 'api_error';
+};
+
 const finiteOrNull = (value) => (value != null && Number.isFinite(Number(value)) ? Number(value) : null);
 
 const toReview = (r) => ({
@@ -40,7 +47,7 @@ async function getPlace({ apiKey, placeId, fetchImpl }) {
     throw new ReviewsError('unavailable');
   }
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new ReviewsError(ERROR_BY_STATUS[response.status] ?? 'api_error', { status: response.status, message: body?.error?.message });
+  if (!response.ok) throw new ReviewsError(errorCode(response.status, body?.error), { status: response.status, message: body?.error?.message });
   return body;
 }
 

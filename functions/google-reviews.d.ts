@@ -1,4 +1,4 @@
-export type ReviewsErrorCode = 'unavailable' | 'auth' | 'not_found' | 'rate_limited' | 'api_error';
+export type ReviewsErrorCode = 'unavailable' | 'auth' | 'invalid_place' | 'not_found' | 'rate_limited' | 'api_error';
 export class ReviewsError extends Error { code: ReviewsErrorCode; detail?: unknown; constructor(code: ReviewsErrorCode, detail?: unknown); }
 
 export interface ReviewsConfig { apiKey: string; placeId: string }

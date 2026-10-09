@@ -18,4 +18,4 @@ O carrossel da home mostra as avaliações **reais** do Google (nota, total e as
 
 - A API devolve no máximo **5** avaliações por consulta (as mais relevantes, escolhidas pelo Google); a nota e o total são do local inteiro.
 - Sem `GOOGLE_PLACE_ID` ou sem chave, `/api/reviews` responde 503 e o site mostra só o link.
-- Os logs da Vercel (`[Reviews] Google: <código>`) trazem o motivo: `auth` (chave sem a Places API), `not_found` (Place ID errado), `rate_limited`, `api_error`, `unavailable`.
+- Os logs da Vercel (`[Reviews] Google: <código>`) trazem o motivo: `auth` (chave sem a Places API ou inválida), `invalid_place` (Place ID malformado: cole só o ID, sem espaços nem URL), `not_found` (Place ID não existe), `rate_limited`, `api_error`, `unavailable`.
