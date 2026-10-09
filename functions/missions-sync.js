@@ -2,6 +2,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { addDays, buildNotifications, dateKey, syncRecurringTasks } from './missions-core.js';
 import { EVENT_MISSION_SOURCE, syncEventMissions } from './event-missions.js';
 import { buildInstagramAlerts } from './instagram-alerts.js';
+import { buildReportNotice } from './report-notice.js';
 
 const toStored = (data) => Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v instanceof Date ? Timestamp.fromDate(v) : v]));
 const docs = (snapshot) => snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -36,7 +37,7 @@ export async function runMissionsSync(database, now = new Date()) {
   ]);
   let notified = 0;
   const alerts = buildInstagramAlerts(await readInstagramProfile(database), now);
-  for (const item of [...buildNotifications({ missions, occurrences: recent }, now), ...alerts]) {
+  for (const item of [...buildNotifications({ missions, occurrences: recent }, now), ...alerts, buildReportNotice(now)]) {
     const { id, ...fields } = item;
     try {
       await database.collection('notifications').doc(id).create({ ...fields, dismissed: false, createdAt: Timestamp.fromDate(now) });
