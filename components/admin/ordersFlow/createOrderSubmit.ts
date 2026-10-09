@@ -1,9 +1,11 @@
 import { normalizeWhatsApp } from '../../../services/clientsService';
 import type { createOrder } from '../../../services/ordersService';
 import { eventContentSummary, validateEventForm } from '../../../services/eventForm.js';
-import type { OrderStatus, Service } from '../../../types';
+import { buildVideoContents, findVideoService, VIDEO_KINDS } from '../../../services/eventVideos.js';
+import type { VideoAddons, VideoKind } from '../../../services/eventVideos.js';
+import type { OrderStatus, ProductionType, Service } from '../../../types';
 import type { EventFormState } from '../EventOrderFields';
-import { dateFromInput, fail, inputAmount } from './createOrderHelpers';
+import { dateFromInput, deriveServiceState, fail, inputAmount } from './createOrderHelpers';
 import type { CreateOrderInitialValues } from './createOrderHelpers';
 
 type SetFormError = (message: string) => void;
@@ -112,6 +114,7 @@ export function buildCreateOrderInput({ clientId, selectedService, initialStatus
     eventForm: {
       eventTime: eventValues.eventTime, location: eventValues.location, imageAuthorization: eventValues.imageAuthorization, extraWeb: eventValues.extraWeb,
       totalValue: eventValues.totalValue, entryValue: eventValues.entryValue, cost: eventValues.cost, observations: eventValues.observations, formType: eventValues.formType,
+      birthDate: eventValues.birthDate, pcd: eventValues.pcd,
     },
   } : {
     clientId,
@@ -127,5 +130,49 @@ export function buildCreateOrderInput({ clientId, selectedService, initialStatus
     productionType: selectedService.productionType,
     source: 'manual',
     ...(completed ? { completedAt: new Date() } : {}),
+  };
+}
+
+interface VideoOrdersInput {
+  addons: VideoAddons;
+  services: Service[];
+  event: { eventDate: string; eventTime: string; location: string };
+  setFormError: SetFormError;
+}
+
+interface PlannedVideo { service: Service; status: OrderStatus; content: string }
+
+/** Valida os vídeos marcados (dados + serviço existente e configurado) e devolve o serviço e o conteúdo de cada pedido a criar. */
+export function validateVideoOrders({ addons, services, event, setFormError }: VideoOrdersInput): PlannedVideo[] | undefined {
+  const contents = buildVideoContents(addons, event);
+  if (contents.error) return fail(setFormError, contents.error);
+  const planned: PlannedVideo[] = [];
+  for (const [kind, content] of Object.entries(contents.value) as Array<[VideoKind, string]>) {
+    const service = findVideoService(services, kind);
+    if (!service) return fail(setFormError, `Serviço "${VIDEO_KINDS[kind].title}" não encontrado entre os serviços ativos. Desmarque o vídeo ou cadastre o serviço.`);
+    const { serviceConfigured, initialStatus } = deriveServiceState(service);
+    if (!serviceConfigured || !initialStatus) return fail(setFormError, `O serviço "${service.title}" ainda não tem configuração de pedido (geração, tipo de produção e status inicial).`);
+    planned.push({ service, status: initialStatus, content });
+  }
+  return planned;
+}
+
+/** Pedido do vídeo contratado com o evento: sem valor (já está no total do evento), pago na data da criação. */
+export function buildVideoOrderInput({ clientId, eventDate, service, status, content }: PlannedVideo & { clientId: string; eventDate: string }): Parameters<typeof createOrder>[0] {
+  const now = new Date();
+  return {
+    clientId,
+    serviceId: service.id,
+    status,
+    paidAt: now,
+    eventDate: dateFromInput(eventDate),
+    ...(service.defaultDeliveryDays !== undefined ? { deliveryDays: service.defaultDeliveryDays } : {}),
+    content,
+    servicePrice: 0,
+    rushFee: 0,
+    totalPaid: 0,
+    productionType: service.productionType as ProductionType,
+    source: 'manual',
+    ...(status === 'completed' ? { completedAt: now } : {}),
   };
 }

@@ -3,16 +3,18 @@ import { createClient } from '../../services/clientsService';
 import { createOrder } from '../../services/ordersService';
 import { calculateOrderDeadlines } from '../../services/orderDates';
 import { EventOrderFields } from './EventOrderFields';
+import { emptyVideoAddons, ImportFormButton, VideoAddonsSection } from './EventVideoAddons';
 import type { Order } from '../../types';
 import { buildDeliveryOptions, computeTotal, dateFromInput, deriveServiceState, priceFromService } from './ordersFlow/createOrderHelpers';
 import type { CreateOrderInitialValues } from './ordersFlow/createOrderHelpers';
-import { buildCreateOrderInput, validateClientAndService, validateOrderDetails } from './ordersFlow/createOrderSubmit';
+import { buildCreateOrderInput, buildVideoOrderInput, validateClientAndService, validateOrderDetails, validateVideoOrders } from './ordersFlow/createOrderSubmit';
 import { ClientSection, CreateOrderError, CreateOrderFooter, CreateOrderHeader, OrderSection, ServiceSection, ValuesSection } from './ordersFlow/CreateOrderSections';
 import { useClientFields, useOrderFields, useOrderServices } from './ordersFlow/useCreateOrderFields';
 
 interface CreateOrderModalProps {
   onClose: () => void;
-  onCreated: (order: Order) => Promise<void>;
+  /** `warning`: o evento foi criado, mas algum pedido de vídeo não (a mensagem diz qual). */
+  onCreated: (order: Order, warning?: string) => Promise<void>;
   initialValues?: CreateOrderInitialValues;
 }
 
@@ -23,6 +25,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
   const fields = useOrderFields(initialValues);
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [videoAddons, setVideoAddons] = useState(emptyVideoAddons);
   const { name, whatsapp } = clientFields;
   const { paidDate, eventDate, deliveryDays, content, servicePrice, rushFee, totalPaid, eventState, setEventState, setServicePrice, setRushFee, setTotalPaid, setDeliveryDays } = fields;
 
@@ -54,6 +57,8 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
     if (!basics) return;
     const details = validateOrderDetails({ isEvent, eventState, paidDate, servicePrice, rushFee, content, deliveryDays, setFormError });
     if (!details) return;
+    const videos = isEvent && details.eventValues ? validateVideoOrders({ addons: videoAddons, services, event: details.eventValues, setFormError }) : [];
+    if (!videos) return;
 
     setSubmitting(true);
     try {
@@ -61,7 +66,16 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
       // Assim, mudanças locais no nome não alteram o cadastro de cliente existente.
       const client = await createClient({ name: basics.cleanName, whatsapp: whatsapp.trim() });
       const order = await createOrder(buildCreateOrderInput({ ...details, clientId: client.id, selectedService, initialStatus, eventDate, deliveryDays, content, totalPaid, initialValues }));
-      await onCreated(order);
+      // Os vídeos nascem depois do evento (principal): se algum falhar, o evento já existe, então avisamos em vez de reabrir o formulário.
+      const failed: string[] = [];
+      for (const video of videos) {
+        try {
+          await createOrder(buildVideoOrderInput({ ...video, clientId: client.id, eventDate: details.eventValues.eventDate }));
+        } catch {
+          failed.push(video.service.title);
+        }
+      }
+      await onCreated(order, failed.length ? `Evento criado, mas não foi possível criar o pedido de: ${failed.join(', ')}. Crie manualmente em Novo pedido.` : undefined);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Não foi possível criar o pedido.');
       setSubmitting(false);
@@ -90,7 +104,13 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
               onServiceChange={handleServiceChange}
             />
 
-            {isEvent ? <EventOrderFields value={eventState} onChange={setEventState} disabled={submitting} /> : (
+            {isEvent ? (
+              <>
+                <ImportFormButton event={eventState} addons={videoAddons} clientName={name} disabled={submitting} onEvent={setEventState} onAddons={setVideoAddons} onClientName={clientFields.setName} />
+                <EventOrderFields value={eventState} onChange={setEventState} disabled={submitting} />
+                <VideoAddonsSection value={videoAddons} onChange={setVideoAddons} disabled={submitting} />
+              </>
+            ) : (
               <>
                 <OrderSection fields={fields} selectedService={selectedService} deliveryOptions={buildDeliveryOptions(selectedService)} deadlinePreview={deadlinePreview} />
                 <ValuesSection fields={fields} initialValues={initialValues} total={total} />

@@ -7,7 +7,7 @@ export interface EventFormState extends EventFormInput { entryTouched: boolean }
 
 export const emptyEventForm = (): EventFormState => ({
   childName: '', eventDate: '', eventTime: '', location: '', imageAuthorization: '', extraWeb: '0',
-  totalValue: '', entryValue: '', cost: '', observations: '', formType: '', entryTouched: false,
+  totalValue: '', entryValue: '', cost: '', observations: '', formType: '', birthDate: '', pcd: '', entryTouched: false,
 });
 
 function dateInput(value: any): string {
@@ -24,6 +24,7 @@ export function eventFormFromOrder(order: Pick<Order, 'eventForm' | 'childName' 
     childName: order.childName ?? '', eventDate: dateInput(order.eventDate), eventTime: f.eventTime, location: f.location,
     imageAuthorization: f.imageAuthorization ? 'yes' : 'no', extraWeb: String(f.extraWeb), totalValue: String(f.totalValue),
     entryValue: String(f.entryValue), cost: f.cost === null || f.cost === undefined ? '' : String(f.cost), observations: f.observations, formType: f.formType,
+    birthDate: f.birthDate ?? '', pcd: f.pcd === true ? 'yes' : f.pcd === false ? 'no' : '',
     entryTouched: roundMoney(f.entryValue) !== defaultEntry(f.totalValue),
   };
 }
@@ -50,6 +51,14 @@ export const EventOrderFields: React.FC<{ value: EventFormState; onChange: (next
           <label className={labelClass}>#formulário *<input required value={value.formType} onChange={(e) => set({ formType: e.target.value })} disabled={disabled} className={inputClass} placeholder="Ex.: Aniversário" /></label>
           <label className={labelClass}>Data do evento *<input required type="date" value={value.eventDate} onChange={(e) => set({ eventDate: e.target.value })} disabled={disabled} className={inputClass} /></label>
           <label className={labelClass}>Horário de início *<input required type="time" value={value.eventTime} onChange={(e) => set({ eventTime: e.target.value })} disabled={disabled} className={inputClass} /></label>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className={labelClass}>Data de nascimento<input type="date" value={value.birthDate ?? ''} onChange={(e) => set({ birthDate: e.target.value })} disabled={disabled} className={inputClass} /></label>
+          <label className={labelClass}>Necessidade especial (PCD/PNE)
+            <select value={value.pcd ?? ''} onChange={(e) => set({ pcd: e.target.value as '' | 'yes' | 'no' })} disabled={disabled} className={inputClass}>
+              <option value="">Não informado</option><option value="no">Não</option><option value="yes">Sim</option>
+            </select>
+          </label>
         </div>
         <label className={labelClass}>Local *<input required value={value.location} onChange={(e) => set({ location: e.target.value })} disabled={disabled} className={inputClass} placeholder="Endereço ou local do evento" /></label>
         <div className="grid gap-3 sm:grid-cols-2">

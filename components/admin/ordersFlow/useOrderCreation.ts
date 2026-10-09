@@ -7,10 +7,10 @@ export const useOrderCreation = (loadOrders: (options?: { silent?: boolean }) =>
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateSource, setDuplicateSource] = useState<OrderView | null>(null);
 
-  const handleOrderCreated = async () => {
+  const handleOrderCreated = async (_order?: unknown, warning?: string) => {
     setCreateOpen(false);
     setDuplicateSource(null);
-    setSuccess('Pedido criado com sucesso.');
+    setSuccess(warning ?? 'Pedido criado com sucesso.');
     void loadOrders({ silent: true });
   };
 
