@@ -9,7 +9,7 @@ import { FinanceStatementTab } from './adminPages/FinanceStatementTab';
 import { FinanceReportsTab } from './adminPages/FinanceReportsTab';
 import { FinanceSummaryTab } from './adminPages/FinanceSummaryTab';
 import { FinanceHeader, FinanceOtherTabs, FinanceStatus, TABS, type FinanceTab } from './adminPages/FinanceChrome';
-import { useFinanceStatement, useMonthSelection, useNameLookups, type Loaded } from './adminPages/financePageHooks';
+import { useFinanceStatement, useMonthSelection, useNameLookups, useReportLink, type Loaded } from './adminPages/financePageHooks';
 
 export const AdminFinancePage: React.FC = () => {
   const { navigate } = useRouter();
@@ -18,6 +18,7 @@ export const AdminFinancePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<FinanceTab>('summary');
+  const reportMonth = useReportLink(() => setTab('reports')); // aviso do sino: /admin/financeiro?relatorio=AAAA-MM
   const { monthKey, setMonthKey, selectedDay, setSelectedDay } = useMonthSelection(() => monthKeyOf(new Date()));
 
   // Despesas e patrimônio: leitura sob demanda (poucos documentos).
@@ -104,7 +105,7 @@ export const AdminFinancePage: React.FC = () => {
               kindFilter={kindFilter} onKindFilter={setKindFilter} onOpenOrders={() => navigate('/admin/pedidos')} />
           )}
 
-          {tab === 'reports' && <FinanceReportsTab entries={entries} costs={costs} orders={orders ?? []} expenses={data.expenses} clients={clients} services={services} />}
+          {tab === 'reports' && <FinanceReportsTab entries={entries} costs={costs} orders={orders ?? []} expenses={data.expenses} clients={clients} services={services} openMonth={reportMonth} />}
 
           <FinanceOtherTabs tab={tab} expenses={data.expenses} assets={data.assets} videoCost={view.editing} eventCost={view.eventCost} monthKey={monthKey} onChanged={reloadCollections} entries={entries} nameOf={serviceName} />
         </>

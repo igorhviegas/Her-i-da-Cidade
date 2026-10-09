@@ -3,6 +3,8 @@ import { getClientById } from '../../../services/clientsService';
 import { getServiceById } from '../../../services/servicesService';
 import { extractBirthdayPerson } from '../../../services/orderReference.js';
 import { buildStatement, type Asset, type FixedExpense, type RevenueEntry } from '../../../services/financeCalculations.js';
+import { isMonthKey } from '../../../services/monthlyReport.js';
+import { useRouter } from '../../../lib/router';
 import type { Client, Service } from '../../../types';
 
 export type Lookup<T> = Map<string, T | null>;
@@ -60,4 +62,15 @@ export function useFinanceStatement({ data, entries, costs, monthKey, clients, s
   }, [statement, clients, services, search, newestFirst, kindFilter]);
 
   return { statement, statementRows, search, setSearch, newestFirst, setNewestFirst, kindFilter, setKindFilter };
+}
+
+/**
+ * Aviso do sino "Relatório de <mês> pronto": /admin/financeiro?relatorio=AAAA-MM. Devolve o mês pedido (ou null) e chama
+ * `onOpen` sempre que o link muda, para a página abrir a aba Relatórios.
+ */
+export function useReportLink(onOpen: () => void): string | null {
+  const { search } = useRouter();
+  const month = useMemo(() => { const value = new URLSearchParams(search).get('relatorio'); return isMonthKey(value) ? value : null; }, [search]);
+  useEffect(() => { if (month) onOpen(); }, [month]); // eslint-disable-line react-hooks/exhaustive-deps -- onOpen é um setState da página (estável)
+  return month;
 }

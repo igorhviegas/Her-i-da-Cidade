@@ -40,7 +40,8 @@ test('rotina agendada: gera a ocorrência do dia e o aviso uma única vez, mesmo
   const first = await runMissionsSync(db, now);
   const second = await runMissionsSync(db, now);
   assert.equal(first.created, 1);
-  assert.equal(first.notified, 1);
+  assert.equal(first.notified, 2); // tarefa de hoje + aviso do relatório mensal (setembro)
+  assert.deepEqual([db.store.get('notifications/monthly_report_2026-09')?.refType, db.store.get('notifications/monthly_report_2026-09')?.dismissed], ['report', false]);
   assert.deepEqual([second.created, second.notified], [0, 0]);
   assert.equal(db.store.get('taskOccurrences/t1_2026-10-01').status, 'pending');
   assert.equal(db.store.get('notifications/task_today_t1_2026-10-01').dismissed, false);
@@ -70,7 +71,7 @@ test('rotina agendada cria os avisos de saúde do Instagram uma única vez e nã
   const db = fakeAdminDatabase({ instagramMeta: { profile: stale } });
   const first = await runMissionsSync(db, now);
   const second = await runMissionsSync(db, now);
-  assert.deepEqual([first.notified, second.notified], [2, 0]);
+  assert.deepEqual([first.notified, second.notified], [3, 0]); // 2 avisos do Instagram + o do relatório mensal
   assert.deepEqual(['instagram_stale_2026-10-05', 'instagram_token_invalid_2026-10-09'].map((id) => db.store.get('notifications/' + id)?.refType), ['instagram', 'instagram']);
-  assert.equal((await runMissionsSync(fakeAdminDatabase(), now)).notified, 0);
+  assert.equal((await runMissionsSync(fakeAdminDatabase(), now)).notified, 1); // sem perfil do Instagram (e sem erro): só o aviso do relatório mensal
 });
