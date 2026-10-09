@@ -59,18 +59,18 @@ export function useAgentPlayer(tracks: AgentTrack[]) {
     else audio.pause();
   }, [playTrack]);
 
-  /** Recomeça a música do 00:00 e toca (a atual volta ao início; as outras perdem a posição guardada). */
+  /** Volta a música ao 00:00 sem tocar: a atual é pausada; as outras só perdem a posição guardada. */
   const restart = useCallback((track: AgentTrack) => {
     positions.current.delete(track.id);
     setStartedIds((ids) => ids.filter((id) => id !== track.id));
     const audio = audioRef.current;
     if (audio && currentIdRef.current === track.id) {
+      audio.pause();
       audio.currentTime = 0;
       setProgress(0);
       setElapsed(0);
-      audio.play().catch(() => setError('Não foi possível tocar esta música. Toque em play para tentar de novo.'));
-    } else playTrack(track);
-  }, [playTrack]);
+    }
+  }, []);
 
   const step = useCallback((delta: -1 | 1) => {
     // Anterior/próxima andam só pelas músicas principais; os efeitos (parents) são tocados direto pela lista.

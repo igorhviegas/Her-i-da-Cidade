@@ -75,7 +75,7 @@ export const SearchBox: React.FC<{ value: string; onChange: (v: string) => void;
 );
 
 export const RestartButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
-  <button onClick={onClick} aria-label="Recomeçar do início" title="Recomeçar do início" className={`${btn} flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-pink-400/50 bg-pink-500/15 text-pink-200`}><RotateCcw className="h-5 w-5" /></button>
+  <button onClick={onClick} aria-label="Voltar ao início (sem tocar)" title="Voltar ao início (sem tocar)" className={`${btn} flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-pink-400/50 bg-pink-500/15 text-pink-200`}><RotateCcw className="h-5 w-5" /></button>
 );
 
 export const PlayerButtons: React.FC<{ player: Player; size: 'sm' | 'lg' }> = ({ player, size }) => {
