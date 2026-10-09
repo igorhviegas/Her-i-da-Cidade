@@ -1,5 +1,5 @@
 import { logger } from '../../lib/logger.js';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarCheck, CheckCircle2, ChevronDown, Flame, ListTodo, Loader2, Plus, RefreshCw, Repeat, Target } from 'lucide-react';
 import { addDays, dateKey, taskStreak } from '../../functions/missions-core.js';
 import {
@@ -35,36 +35,55 @@ export const AdminMissionsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
+  const loadSeq = useRef(0);
+
+  /**
+   * `sync` (abrir a página e "Atualizar"): gera ocorrências/avisos e espera as metas. Depois de uma ação (concluir, editar...) só as listas
+   * baratas são relidas antes de liberar a tela; as metas (leitura pesada) chegam em segundo plano.
+   */
+  const reload = useCallback(async ({ sync = false }: { sync?: boolean } = {}) => {
+    const seq = ++loadSeq.current;
     setError(null);
     setWarning(null);
     const now = new Date();
     const today = dateKey(now);
-    // A sincronização (gerar ocorrências e avisos) é complementar: se falhar, as listas ainda carregam e o erro vira um aviso.
-    try {
-      await runClientSync(now);
-    } catch (err) {
-      logger.error('[AdminMissionsPage] Falha na sincronização:', err);
-      setWarning('Não foi possível sincronizar as tarefas de hoje agora; exibindo os dados já salvos. Use Atualizar para tentar de novo.');
+    const goalsPromise = loadGoals(now);
+    goalsPromise.catch(() => undefined); // tratado abaixo; evita rejeição não tratada enquanto a sincronização roda
+    const applyGoals = (goals: PromiseSettledResult<GoalView[]>) => {
+      if (seq !== loadSeq.current) return; // um recarregamento mais novo já assumiu
+      if (goals.status === 'fulfilled') { setData((current) => ({ ...current, goals: goals.value })); return; }
+      logger.error('[AdminMissionsPage] Falha ao carregar metas:', goals.reason);
+      setError((current) => current ?? 'Não foi possível carregar: metas. O restante foi exibido normalmente.');
+    };
+    if (sync) {
+      // A sincronização é complementar: se falhar, as listas ainda carregam e o erro vira um aviso.
+      try {
+        await runClientSync(now, goalsPromise);
+      } catch (err) {
+        logger.error('[AdminMissionsPage] Falha na sincronização:', err);
+        setWarning('Não foi possível sincronizar as tarefas de hoje agora; exibindo os dados já salvos. Use Atualizar para tentar de novo.');
+      }
     }
     // Cada bloco carrega de forma independente: uma falha não esconde os demais, que mantêm o último valor conhecido.
-    const [missions, tasks, occurrences, goals] = await Promise.allSettled([listMissions(now), listTasks(), listOccurrencesSince(addDays(today, -60)), loadGoals(now)]);
+    const [missions, tasks, occurrences] = await Promise.allSettled([listMissions(now), listTasks(), listOccurrencesSince(addDays(today, -60))]);
     setData((current) => ({
+      ...current,
       missions: missions.status === 'fulfilled' ? missions.value : current.missions,
       tasks: tasks.status === 'fulfilled' ? tasks.value : current.tasks,
       occurrences: occurrences.status === 'fulfilled' ? occurrences.value : current.occurrences,
-      goals: goals.status === 'fulfilled' ? goals.value : current.goals,
       today,
     }));
-    const failed = [['missões', missions], ['tarefas', tasks], ['ocorrências', occurrences], ['metas', goals]].filter(([, r]) => (r as PromiseSettledResult<unknown>).status === 'rejected');
+    const failed = [['missões', missions], ['tarefas', tasks], ['ocorrências', occurrences]].filter(([, r]) => (r as PromiseSettledResult<unknown>).status === 'rejected');
     if (failed.length) {
       failed.forEach(([name, r]) => logger.error(`[AdminMissionsPage] Falha ao carregar ${name}:`, (r as PromiseRejectedResult).reason));
       setError(`Não foi possível carregar: ${failed.map(([name]) => name).join(', ')}. O restante foi exibido normalmente.`);
     }
     setLoading(false);
+    const goalsSettled = Promise.allSettled([goalsPromise]).then(([goals]) => applyGoals(goals));
+    if (sync) await goalsSettled;
   }, []);
 
-  useEffect(() => { void reload(); }, [reload]);
+  useEffect(() => { void reload({ sync: true }); }, [reload]);
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'missions', label: 'To-do list', icon: ListTodo },
@@ -79,7 +98,7 @@ export const AdminMissionsPage: React.FC = () => {
           <h2 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">Missões</h2>
           <p className="text-xs text-white/50">Missões, tarefas recorrentes e metas do dia a dia.</p>
         </div>
-        <button type="button" onClick={() => { setLoading(true); void reload(); }} disabled={loading} className={ghostButton}>
+        <button type="button" onClick={() => { setLoading(true); void reload({ sync: true }); }} disabled={loading} className={ghostButton}>
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />Atualizar
         </button>
       </div>

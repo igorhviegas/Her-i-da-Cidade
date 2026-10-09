@@ -3,7 +3,7 @@ import { toDate } from '../orders/orderView';
 import type { OrderView } from '../orders/orderView';
 
 /** Criação de pedido e "Duplicar pedido" (valores iniciais derivados do pedido de origem). */
-export const useOrderCreation = (loadOrders: () => Promise<void>, setSuccess: (message: string) => void) => {
+export const useOrderCreation = (loadOrders: (options?: { silent?: boolean }) => Promise<void>, setSuccess: (message: string) => void) => {
   const [createOpen, setCreateOpen] = useState(false);
   const [duplicateSource, setDuplicateSource] = useState<OrderView | null>(null);
 
@@ -11,7 +11,7 @@ export const useOrderCreation = (loadOrders: () => Promise<void>, setSuccess: (m
     setCreateOpen(false);
     setDuplicateSource(null);
     setSuccess('Pedido criado com sucesso.');
-    await loadOrders();
+    void loadOrders({ silent: true });
   };
 
   const duplicateInitialValues = useMemo(() => {

@@ -10,6 +10,8 @@ interface UseOrderStatusArgs {
   orders: OrderView[];
   completedOrders: OrderView[];
   loadOrders: (options?: { silent?: boolean }) => Promise<void>;
+  setOrders: React.Dispatch<React.SetStateAction<OrderView[]>>;
+  setCompletedOrders: React.Dispatch<React.SetStateAction<OrderView[]>>;
   setSelectedOrder: React.Dispatch<React.SetStateAction<OrderView | null>>;
   setEditOrderOpen: (open: boolean) => void;
   setOrderActionError: (message: string) => void;
@@ -17,7 +19,7 @@ interface UseOrderStatusArgs {
 }
 
 /** Mudança de status do pedido (com a conferência de materiais dos eventos presenciais). */
-export const useOrderStatus = ({ orders, completedOrders, loadOrders, setSelectedOrder, setEditOrderOpen, setOrderActionError, setSuccess }: UseOrderStatusArgs) => {
+export const useOrderStatus = ({ orders, completedOrders, loadOrders, setOrders, setCompletedOrders, setSelectedOrder, setEditOrderOpen, setOrderActionError, setSuccess }: UseOrderStatusArgs) => {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
   const [consumptionView, setConsumptionView] = useState<OrderView | null>(null);
 
@@ -34,6 +36,20 @@ export const useOrderStatus = ({ orders, completedOrders, loadOrders, setSelecte
     setSelectedOrder(view);
     setEditOrderOpen(true);
     return false;
+  };
+
+  /**
+   * Reflete a mudança na hora (o card troca de coluna sem esperar o Firestore) e reconcilia em segundo plano, sem spinner:
+   * campos calculados no servidor (datas de conclusão, custo de edição) chegam na releitura silenciosa.
+   */
+  const applyStatusLocally = (orderId: string, status: OrderStatus) => {
+    const source = [...orders, ...completedOrders].find(({ order }) => order.id === orderId);
+    if (source) {
+      const updated: OrderView = { ...source, order: { ...source.order, status, ...(status === 'completed' ? { completedAt: new Date() } : {}) } };
+      setOrders((current) => [...current.filter(({ order }) => order.id !== orderId), ...(status === 'completed' ? [] : [updated])]);
+      setCompletedOrders((current) => [...current.filter(({ order }) => order.id !== orderId), ...(status === 'completed' ? [updated] : [])]);
+    }
+    void loadOrders({ silent: true });
   };
 
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {
@@ -53,7 +69,7 @@ export const useOrderStatus = ({ orders, completedOrders, loadOrders, setSelecte
       setSuccess(status === 'completed'
         ? 'Pedido marcado como concluído.'
         : `Pedido movido para ${STATUS_LABELS[status].toLocaleLowerCase('pt-BR')}.`);
-      await loadOrders();
+      applyStatusLocally(orderId, status);
       return true;
     } catch (actionError) {
       setOrderActionError(actionError instanceof Error ? actionError.message : 'Não foi possível atualizar o pedido.');
@@ -63,5 +79,5 @@ export const useOrderStatus = ({ orders, completedOrders, loadOrders, setSelecte
     }
   };
 
-  return { updatingOrderId, consumptionView, setConsumptionView, requireEventCost, handleStatusChange };
+  return { updatingOrderId, consumptionView, setConsumptionView, requireEventCost, handleStatusChange, applyStatusLocally };
 };
