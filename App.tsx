@@ -23,6 +23,7 @@ const SOCIAL_IMAGE = 'https://www.heroidacidade.com/images/spider.PNG';
 const SITE_NAME = 'O Herói da Cidade';
 
 const AgentApp = lazy(() => import('./components/agente/AgentApp').then(({ AgentApp: component }) => ({ default: component })));
+const KartApp = lazy(() => import('./components/kart/KartApp').then(({ KartApp: component }) => ({ default: component })));
 const AdminApp = lazy(() => import('./components/admin/AdminApp').then(({ AdminApp: component }) => ({ default: component })));
 
 function setMeta(attribute: 'name' | 'property', key: string, content: string) {
@@ -50,12 +51,13 @@ const AppContent: React.FC = () => {
   const isAdmin = path.startsWith('/admin');
   const isVideos = path === '/videos' || path.startsWith('/videos/');
   const isAgent = path === '/agente-hdc' || path.startsWith('/agente-hdc/');
+  const isKart = path === '/kart' || path.startsWith('/kart/');
   const isCall = path === '/agendar-chamada';
   const isFaq = path === '/duvidas' || path.startsWith('/duvidas/');
   const faqSlug = isFaq ? decodeURIComponent(path.split('/').filter(Boolean)[1] ?? '') : '';
   // Serviço aberto em /duvidas/{slug}: undefined = carregando, null = inexistente ou sem dúvidas (não indexar).
   const [faqService, setFaqService] = useState<Service | null | undefined>(undefined);
-  const homeContent = useHomeContent(!isAdmin && !isVideos && !isAgent && !isCall && !isFaq);
+  const homeContent = useHomeContent(!isAdmin && !isVideos && !isAgent && !isKart && !isCall && !isFaq);
 
   // Ícone do iOS ("Adicionar à Tela de Início") próprio da plataforma de streaming e da área do agente
   const iosIcon = isVideos ? '/images/modules/streaming.png' : isAgent ? '/images/modules/agente-hdc.png' : null;
@@ -71,8 +73,9 @@ const AppContent: React.FC = () => {
     const structuredDataId = 'site-seo-structured-data';
     const existingStructuredData = document.getElementById(structuredDataId);
 
-    if (isAdmin || isAgent) {
+    if (isAdmin || isAgent || isKart) {
       if (isAgent) document.title = 'Agente HDC';
+      if (isKart) document.title = 'Campeonato Viegas Kart';
       setMeta('name', 'robots', 'noindex, nofollow');
       document.querySelector('link[rel="canonical"]')?.remove();
       document.querySelector('meta[name="description"]')?.remove();
@@ -145,7 +148,7 @@ const AppContent: React.FC = () => {
       document.head.appendChild(script);
     }
     script.textContent = JSON.stringify(structuredData);
-  }, [isAdmin, isAgent, isVideos, isCall, isFaq, faqSlug, faqService, homeContent.seoTitle, homeContent.seoDescription]);
+  }, [isAdmin, isAgent, isKart, isVideos, isCall, isFaq, faqSlug, faqService, homeContent.seoTitle, homeContent.seoDescription]);
 
   if (isAdmin) {
     return (
@@ -160,6 +163,15 @@ const AppContent: React.FC = () => {
     return (
       <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#070B14] text-sm text-white/60">Carregando...</div>}>
         <AgentApp />
+      </Suspense>
+    );
+  }
+
+  // Campeonato Viegas Kart: link compartilhável, fora do Google (noindex)
+  if (isKart) {
+    return (
+      <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#070B14] text-sm text-white/60">Carregando...</div>}>
+        <KartApp />
       </Suspense>
     );
   }

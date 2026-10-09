@@ -480,6 +480,20 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Campeonato Viegas Kart (/kart, sem login): classificação, perfis e vídeos com leitura pública; só administradores editam.
+    match /kartPilots/{pilotId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /kartRaces/{raceId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /kartVideos/{videoId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // =========================================================
     // ADMINS
     // =========================================================
