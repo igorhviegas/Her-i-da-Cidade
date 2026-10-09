@@ -3,7 +3,7 @@ import type { Client, Order, Service } from '../../../types';
 import type { RevenueEntry } from '../../../services/financeCalculations.js';
 import { toDate } from '../../../services/financeCalculations.js';
 import { subscribeActiveOrders } from '../../../services/ordersService';
-import { ACTIVE_STAGES, activeHealth, deliveryPerformance, presetRange, type Preset } from '../../../services/reports.js';
+import { ACTIVE_STAGES, STAGE_TRACKING_SINCE, activeHealth, deliveryPerformance, presetRange, stageDwell, type Preset } from '../../../services/reports.js';
 import { cardClass, formatDate } from '../financeFormat';
 import { Kpi } from './FinanceKpi';
 import { useNameLookups, type Lookup } from './financePageHooks';
@@ -12,6 +12,8 @@ import { PresetChips } from './ReportsPresets';
 const STAGE_LABEL: Record<string, string> = { scheduled: 'Agendado', recording: 'Gravação', editing: 'Edição', delivery: 'Entrega' };
 const pct = (value: number | null) => (value === null ? '—' : `${Math.round(value * 100)}%`);
 const days = (value: number | null) => (value === null ? '—' : `${value.toFixed(1).replace('.', ',')} dias`);
+/** Menos de 1 dia em horas; senão em dias (parar 6 h numa etapa não é "0,3 dia"). */
+const span = (value: number) => (value < 1 ? `${Math.max(1, Math.round(value * 24))} h` : days(value));
 const asEntries = (orders: Order[]) => orders.map((order) => ({ order })) as unknown as RevenueEntry[]; // useNameLookups só lê order.clientId/serviceId
 
 interface Props { completed: Order[]; clients: Lookup<Client>; services: Lookup<Service> }
@@ -45,6 +47,7 @@ export const ReportsOperations: React.FC<Props> = ({ completed, clients: pageCli
 
   const health = useMemo(() => (active ? activeHealth(active) : null), [active]);
   const delivery = useMemo(() => deliveryPerformance(completed, presetRange(preset)), [completed, preset]);
+  const dwell = useMemo(() => stageDwell([...completed, ...(active ?? [])]), [completed, active]);
   // Nomes dos pedidos em andamento; os que a página já conhece não são buscados de novo.
   const known = useMemo(() => ({ clients: pageClients, services: pageServices }), [pageClients, pageServices]);
   const activeNames = useNameLookups(useMemo(() => asEntries(active ?? []), [active]), [], known);
@@ -82,7 +85,31 @@ export const ReportsOperations: React.FC<Props> = ({ completed, clients: pageCli
       <div className={cardClass}>
         <h3 className="mb-3 text-sm font-bold text-white">Entregues com atraso no período</h3>
         <LateList rows={delivery.late} clients={clients} services={services} empty="Nenhuma entrega atrasada no período." suffix="depois do prazo" />
-        <p className="mt-4 border-t border-white/10 pt-3 text-xs text-white/45">O tempo parado em cada etapa do Kanban ainda não é medido: o sistema não guardava a data de cada mudança de etapa. O prazo é comparado por dia, como no Kanban.</p>
+      </div>
+
+      <div className={cardClass}>
+        <h3 className="mb-1 text-sm font-bold text-white">Tempo em cada etapa do Kanban</h3>
+        <p className="mb-3 text-xs text-white/50">Medido só nos pedidos criados desde {formatDate(STAGE_TRACKING_SINCE)} (antes, a data de cada mudança de etapa não era guardada). {dwell.trackedOrders} pedido(s) medido(s). Média das etapas já encerradas.</p>
+        {dwell.trackedOrders === 0 ? <p className="text-sm text-white/45">Ainda sem dados: aparece conforme os pedidos novos mudam de etapa.</p> : (
+          <>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {dwell.stages.map((stage) => <Kpi key={stage.status} label={STAGE_LABEL[stage.status]} value={stage.avgDays === null ? '—' : span(stage.avgDays)} hint={`${stage.samples} passagem(ns)`} />)}
+            </div>
+            {dwell.stuck.length > 0 && (
+              <div className="mt-4">
+                <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-white/50">Parados há mais tempo na etapa atual</h4>
+                <ul className="divide-y divide-white/5 text-sm">
+                  {dwell.stuck.slice(0, 5).map(({ order, status, days: stuckDays }) => (
+                    <li key={order.id} className="flex items-center justify-between gap-3 py-2">
+                      <span className="min-w-0 truncate text-white">{services.get(order.serviceId)?.title || 'Serviço'} <span className="text-xs text-white/50">· {clients.get(order.clientId)?.name || 'Cliente'}</span></span>
+                      <span className="shrink-0 text-xs font-semibold text-amber-200">{STAGE_LABEL[status]} há {span(stuckDays)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

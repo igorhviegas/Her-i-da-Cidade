@@ -291,3 +291,50 @@ export function activeHealth(active, now = new Date()) {
   }
   return { total: active.length, byStatus, overdue: overdue.sort((a, b) => b.lateDays - a.lateDays), dueSoon };
 }
+
+// ---------------------------------------------------------------- tempo em cada etapa do Kanban
+
+// updateOrder passou a gravar `stageHistory` (cada mudança de etapa) e pedidos criados a partir desta data têm o histórico completo.
+// Pedidos anteriores não tiveram suas mudanças guardadas: o tempo em cada etapa deles é desconhecido e fica de fora.
+export const STAGE_TRACKING_SINCE = new Date('2026-10-10T00:00:00-03:00');
+
+const ms = (value) => toDate(value)?.getTime() ?? null;
+
+/** Tempo (ms) em cada etapa de UM pedido medido: { closed: [{ status, ms }], open: { status, ms } | null }. null se o pedido não é medido. */
+function stageSpans(order, nowMs, sinceMs) {
+  const created = ms(order.createdAt);
+  if (created === null || created < sinceMs) return null;
+  const history = (Array.isArray(order.stageHistory) ? order.stageHistory : [])
+    .map((h) => ({ from: h.from, to: h.to, at: ms(h.at) })).filter((h) => h.at !== null).sort((a, b) => a.at - b.at);
+  const closed = [];
+  let start = created;
+  for (const h of history) {
+    if (ACTIVE_STAGES.includes(h.from)) closed.push({ status: h.from, ms: Math.max(0, h.at - start) }); // 'completed' não é etapa de trabalho
+    start = h.at;
+  }
+  const current = history.length ? history[history.length - 1].to : order.status;
+  const open = order.status !== 'completed' && current === order.status && ACTIVE_STAGES.includes(current) ? { status: current, ms: Math.max(0, nowMs - start) } : null;
+  return { closed, open };
+}
+
+/**
+ * Tempo médio em cada etapa (só etapas já encerradas) e os pedidos em andamento há mais tempo na etapa atual.
+ * `orders` = concluídos e em andamento; só entram os criados desde STAGE_TRACKING_SINCE.
+ */
+export function stageDwell(orders, now = new Date(), since = STAGE_TRACKING_SINCE) {
+  const totals = Object.fromEntries(ACTIVE_STAGES.map((status) => [status, { ms: 0, samples: 0 }]));
+  const stuck = [];
+  let tracked = 0;
+  for (const order of orders) {
+    const spans = order.ledger ? null : stageSpans(order, now.getTime(), since.getTime());
+    if (!spans) continue;
+    tracked += 1;
+    for (const span of spans.closed) { totals[span.status].ms += span.ms; totals[span.status].samples += 1; }
+    if (spans.open) stuck.push({ order, status: spans.open.status, days: spans.open.ms / DAY_MS });
+  }
+  return {
+    trackedOrders: tracked,
+    stages: ACTIVE_STAGES.map((status) => ({ status, samples: totals[status].samples, avgDays: totals[status].samples ? totals[status].ms / totals[status].samples / DAY_MS : null })),
+    stuck: stuck.sort((a, b) => b.days - a.days),
+  };
+}

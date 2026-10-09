@@ -39,3 +39,11 @@ export function deliveryPerformance(orders: any[], range: PeriodRange): {
 };
 export const ACTIVE_STAGES: string[];
 export function activeHealth(active: any[], now?: Date): { total: number; byStatus: Record<string, number>; overdue: { order: any; lateDays: number }[]; dueSoon: number };
+
+export const STAGE_TRACKING_SINCE: Date;
+export interface StageDwell {
+  trackedOrders: number;
+  stages: { status: string; samples: number; avgDays: number | null }[];
+  stuck: { order: any; status: string; days: number }[];
+}
+export function stageDwell(orders: any[], now?: Date, since?: Date): StageDwell;
