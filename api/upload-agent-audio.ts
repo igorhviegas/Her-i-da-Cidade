@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import multer from 'multer';
 import type { Request, Response } from 'express';
 import { authorizeAdminRequest } from '../functions/admin-auth.js';
+import { handleKartPdfUpload } from '../functions/kart-pdf-upload.js';
 
 // Arquivos de api/ não podem importar outros de api/ (a função falha ao carregar na Vercel): helpers locais.
 const BLOB_STORE_ID = process.env.BLOB_STORE_ID || 'store_ZlySBsEZT51qmJ7I';
@@ -37,6 +38,8 @@ function detectAudio(buffer: Buffer): { mime: string; ext: string } | null {
 
 /** Upload de áudio do /agente-hdc (somente administradores): envia ao Vercel Blob e devolve a URL pública. */
 export function handleAgentAudioUpload(req: Request, res: Response): void {
+  // /api/upload-kart-pdf (PDF das corridas do /kart) chega aqui por rewrite em vercel.json: o plano Hobby limita as funções de api/ a 12.
+  if (req.query?.kind === 'kart-pdf') { handleKartPdfUpload(req, res); return; }
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
   if (req.method !== 'POST') { jsonError(res, 405, 'Método não permitido.'); return; }
 

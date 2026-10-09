@@ -12,6 +12,8 @@ export interface ExtraRow { raceId: string; date: string; heat: string; weather:
 export interface PilotProfile { medal: 1 | 2 | 3 | null; recent: StandingRow | null; overall: StandingRow | null; history: HistoryRow[]; extras: ExtraRow[]; titles: number[]; record: { raceId: string; date: string; bestLapMs: number; extra: boolean } | null; recentPoints: number; recentRaces: number }
 
 export function extraRaces(races: KartRace[]): KartRace[];
+export interface LapPoint { raceId: string; date: string; heat: string; ms: number; rain: boolean; extra: boolean; pb: boolean }
+export function lapHistory(races: KartRace[], pilotId: string): LapPoint[];
 export function officialRaces(races: KartRace[]): NumberedRace[];
 export function raceYears(races: KartRace[]): number[];
 export function racesInScope(races: KartRace[], scope?: KartScope): NumberedRace[];
@@ -21,4 +23,4 @@ export function trackRecord(races: KartRace[], scope?: KartScope): LapRow | null
 export function pilotProfile(pilotId: string, races: KartRace[], currentYear?: number): PilotProfile;
 export function yearlyChampions(races: KartRace[], currentYear?: number): YearChampions[];
 export function titlesByPilot(champions: YearChampions[]): Map<string, number[]>;
-export function recentForm(pilotId: string, races: KartRace[]): { raceId: string; number: number; points: number | null; pos: number | null }[];
+export function recentForm(pilotId: string, races: KartRace[]): { raceId: string; number: number; date: string; points: number | null; pos: number | null }[];

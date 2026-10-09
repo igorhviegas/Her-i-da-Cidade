@@ -4,6 +4,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { handleThumbnailUpload } from "./api/upload-thumbnail";
 import { handleAgentAudioUpload } from "./api/upload-agent-audio";
+import { handleKartPdfUpload } from "./functions/kart-pdf-upload.js";
 import { handleManyChatWebhook } from "./api/manychat";
 import { handleMissionsCron } from "./api/missions-cron";
 import { handleAlexa } from "./api/alexa";
@@ -40,6 +41,11 @@ async function startServer() {
   // Upload de áudio do /agente-hdc (administrador autenticado)
   app.all("/api/upload-agent-audio", (req, res) => {
     handleAgentAudioUpload(req, res);
+  });
+
+  // Upload do PDF original das corridas do /kart (administrador autenticado)
+  app.all("/api/upload-kart-pdf", (req, res) => {
+    handleKartPdfUpload(req, res);
   });
 
   // ManyChat Webhook endpoint
