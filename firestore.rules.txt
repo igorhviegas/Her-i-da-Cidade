@@ -8,12 +8,16 @@ service cloud.firestore {
     // =========================================================
 
     // Um usuário é administrador somente se existir um documento
-    // com seu UID na coleção /admins.
+    // com seu UID na coleção /admins e ele não estiver desativado
+    // (active == false). Documento sem o campo active continua valendo.
     function isAdmin() {
       return request.auth != null
         && exists(
           /databases/$(database)/documents/admins/$(request.auth.uid)
-        );
+        )
+        && get(
+          /databases/$(database)/documents/admins/$(request.auth.uid)
+        ).data.get('active', true) != false;
     }
 
     function orderDocumentPath(orderId) {

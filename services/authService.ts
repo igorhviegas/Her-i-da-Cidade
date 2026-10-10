@@ -125,11 +125,13 @@ export async function checkAdminAuthorization(uid: string, email?: string | null
       return data.active !== false;
     }
 
-    // Se o usuário está autenticado no Firebase Auth (área administrativa privada), autoriza
-    return true;
+    // Sem documento em 'admins' as regras do Firestore negam tudo: não é administrador.
+    return false;
   } catch (error) {
     logger.warn("[AuthService] Erro ao verificar documento na coleção 'admins':", error);
-    return true;
+    // Administrador desativado (active == false) não consegue nem ler o próprio documento: permission-denied.
+    // Falha de rede não nega o acesso aqui; os dados continuam protegidos pelas regras do Firestore.
+    return (error as { code?: string })?.code !== "permission-denied";
   }
 }
 

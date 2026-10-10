@@ -240,3 +240,22 @@ test('financeEntries: ajustes têm ID com sequência, valor com sinal (nunca zer
   await assertFails(setDoc(doc(adminDb, path('adjrev', 7)), adj('adjrev', 7, { type: 'expense' }))); // tipo incoerente
   await assertFails(setDoc(doc(adminDb, 'financeEntries/evt-ev4-entry'), ledgerData('ev4', 'entry', { amount: -5 }))); // entrada continua >= 0
 });
+
+test('admin desativado (active: false) perde leitura e escrita; ativo ou sem o campo continuam valendo', async () => {
+  await env.withSecurityRulesDisabled(async (context) => {
+    const adminDb = context.firestore();
+    await setDoc(doc(adminDb, 'admins/active-admin'), { role: 'admin', active: true });
+    await setDoc(doc(adminDb, 'admins/disabled-admin'), { role: 'admin', active: false });
+    await setDoc(doc(adminDb, 'orders/deactivation-probe'), { status: 'completed' });
+  });
+  const disabled = env.authenticatedContext('disabled-admin').firestore();
+  const active = env.authenticatedContext('active-admin').firestore();
+  const legacy = env.authenticatedContext('admin-user').firestore(); // documento sem o campo active
+
+  await assertFails(getDoc(doc(disabled, 'orders/deactivation-probe')));
+  await assertFails(getDoc(doc(disabled, 'admins/disabled-admin'))); // nem o próprio documento
+  await assertFails(setDoc(doc(disabled, 'services/s-disabled'), { title: 'x' }));
+  await assertSucceeds(getDoc(doc(active, 'orders/deactivation-probe')));
+  await assertSucceeds(setDoc(doc(active, 'services/s-active'), { title: 'x' }));
+  await assertSucceeds(getDoc(doc(legacy, 'orders/deactivation-probe')));
+});
