@@ -3,6 +3,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { handleThumbnailUpload } from "./api/upload-thumbnail";
+import { handleKartPdfUpload } from "./functions/kart-pdf-upload.js";
 import { handleManyChatWebhook } from "./api/manychat";
 import { handleAlexa } from "./api/alexa";
 import { handleInstagramSync } from "./api/instagram-sync";
@@ -32,6 +33,11 @@ async function startServer() {
   // Vercel Blob upload (administrador autenticado): imagem por padrão, ?kind=audio para áudio do /agente-hdc
   app.all("/api/upload-thumbnail", (req, res) => {
     handleThumbnailUpload(req, res);
+  });
+
+  // Upload do PDF original das corridas do /kart (administrador autenticado)
+  app.all("/api/upload-kart-pdf", (req, res) => {
+    handleKartPdfUpload(req, res);
   });
 
   // ManyChat Webhook endpoint

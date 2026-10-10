@@ -5,6 +5,7 @@ import { officialRaces } from '../../../services/kartRanking.js';
 import { deleteKartRace, saveKartRace, useKartPilots, useKartRaces, type KartRace } from '../../../services/kartService';
 import { card, iconBtn, Loading, type Run } from './agentShared';
 import { KartImport } from './KartImport';
+import { KartNextForm } from './KartNextForm';
 import { KartRaceForm } from './KartRaceForm';
 
 const brDate = (iso: string) => iso.split('-').reverse().join('/');
@@ -20,6 +21,8 @@ export const KartRacesTab: React.FC<{ run: Run }> = ({ run }) => {
 
   return (
     <div className="space-y-6">
+      <KartNextForm run={run} />
+
       {editing ? (
         <KartRaceForm key={editing === 'new' ? 'new' : editing.id} pilots={pilots} race={editing === 'new' ? null : editing} run={run} onClose={() => setEditing(null)} />
       ) : (

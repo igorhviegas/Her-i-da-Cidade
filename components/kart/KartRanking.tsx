@@ -1,20 +1,22 @@
 import React, { useMemo, useState } from 'react';
-import { Crown, Search, Timer, Trophy } from 'lucide-react';
+import { Crown, Search, Swords, Timer, Trophy } from 'lucide-react';
 import { formatLap, norm } from '../../services/kart.js';
-import { lapRanking, racesInScope, raceYears, standings, trackRecord, type KartScope } from '../../services/kartRanking.js';
+import { lapRanking, racesInScope, raceYears, standings, trackRecord } from '../../services/kartRanking.js';
+import { rankingStory } from '../../services/kartShare.js';
+import type { UpcomingRace } from '../../services/kartNext.js';
 import type { KartPilot, KartRace } from '../../services/kartService';
+import { KartNextCard } from './KartNextCard';
+import { PeriodPills, periodText, toScope, type ScopeKey } from './KartPeriod';
 import { KartScoringInfo } from './KartScoringInfo';
+import { ShareImageButton } from './ShareImageButton';
 import { KartLink, MEDAL_STYLE, WeatherIcon, card, formatDate, medalOf, plural, type Medal } from './kartUi';
 
 type Mode = 'points' | 'laps';
-type ScopeKey = 'recent' | 'all' | `y${number}`;
 
 interface Line { pilotId: string; name: string; rank: number; races: number; wins: number; podiums: number; extras?: number; big: string; sub?: string; rain?: boolean }
 
 /** "12 corridas · 5 vitórias · 8 pódios" (em duas linhas no pódio). */
 const stats = (l: Line) => [plural(l.races, 'corrida', 'corridas'), plural(l.wins, 'vitória', 'vitórias'), plural(l.podiums, 'pódio', 'pódios')];
-
-const toScope = (key: ScopeKey): KartScope => (key === 'recent' ? { type: 'recent' } : key === 'all' ? { type: 'all' } : { type: 'year', year: Number(key.slice(1)) });
 
 const Podium: React.FC<{ lines: Line[] }> = ({ lines }) => {
   if (lines.length < 3) return null;
@@ -56,11 +58,7 @@ const Row: React.FC<{ line: Line }> = ({ line }) => {
   );
 };
 
-const Pill: React.FC<{ active: boolean; onClick: () => void; children: React.ReactNode }> = ({ active, onClick, children }) => (
-  <button type="button" onClick={onClick} aria-pressed={active} className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition-colors ${active ? 'bg-white text-[#070B14]' : 'border border-white/15 text-white/70 hover:text-white'}`}>{children}</button>
-);
-
-export const KartRanking: React.FC<{ races: KartRace[]; pilots: KartPilot[] }> = ({ races, pilots }) => {
+export const KartRanking: React.FC<{ races: KartRace[]; pilots: KartPilot[]; next?: UpcomingRace | null }> = ({ races, pilots, next }) => {
   const [mode, setMode] = useState<Mode>('points');
   const [scopeKey, setScopeKey] = useState<ScopeKey>('recent');
   const [query, setQuery] = useState('');
@@ -76,9 +74,11 @@ export const KartRanking: React.FC<{ races: KartRace[]; pilots: KartPilot[] }> =
 
   const found = query.trim() ? pilots.filter((p) => p.active !== false && norm(p.name).includes(norm(query.trim()))) : null;
   const periodLabel = scopeKey === 'recent' ? `últimas ${inScope.length} corridas` : scopeKey === 'all' ? 'todo o período' : scopeKey.slice(1);
+  const story = () => rankingStory({ mode, periodLabel: periodText(scopeKey, inScope.length), lines });
 
   return (
     <div className="space-y-4">
+      {next && <KartNextCard next={next} />}
       {record && (
         <KartLink to={`/kart/piloto/${record.pilotId}`} className="relative block overflow-hidden rounded-2xl border border-red-500/30 bg-gradient-to-br from-[#2A0A0F] via-[#150B18] to-[#0D1527] p-5">
           <Timer className="absolute -right-3 -top-3 h-24 w-24 rotate-12 text-white/5" />
@@ -88,11 +88,7 @@ export const KartRanking: React.FC<{ races: KartRace[]; pilots: KartPilot[] }> =
         </KartLink>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Período">
-        <Pill active={scopeKey === 'recent'} onClick={() => setScopeKey('recent')}>Últimas 10</Pill>
-        <Pill active={scopeKey === 'all'} onClick={() => setScopeKey('all')}>Todo o período</Pill>
-        {years.map((y) => <Pill key={y} active={scopeKey === `y${y}`} onClick={() => setScopeKey(`y${y}`)}>{y}</Pill>)}
-      </div>
+      <PeriodPills value={scopeKey} onChange={setScopeKey} years={years} />
 
       <div className="grid grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-[#0D1527] p-1" role="group" aria-label="Tipo de ranking">
         {([['points', 'Pontos', Trophy], ['laps', 'Melhor volta', Timer]] as const).map(([id, label, Icon]) => (
@@ -107,6 +103,8 @@ export const KartRanking: React.FC<{ races: KartRace[]; pilots: KartPilot[] }> =
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar piloto pelo nome" className="w-full rounded-2xl border border-white/10 bg-[#0D1527] py-3 pl-10 pr-4 text-[15px] placeholder:text-white/35 focus:border-red-500/60 focus:outline-none" />
       </label>
+
+      <KartLink to="/kart/confronto" className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-[#0D1527] py-3 text-sm font-bold text-white/80 hover:border-white/30 hover:text-white"><Swords className="h-4 w-4 text-red-400" />Comparar pilotos</KartLink>
 
       {found ? (
         <ul className="space-y-2">
@@ -123,6 +121,7 @@ export const KartRanking: React.FC<{ races: KartRace[]; pilots: KartPilot[] }> =
               {mode === 'laps' && ' · inclui corridas fora do campeonato (avulsas) · nuvem = volta na chuva'}
             </span>
             {mode === 'points' && <KartScoringInfo />}
+            <ShareImageButton label={`Compartilhar o ranking (imagem para o Story)`} fileName={`ranking-${mode === 'points' ? 'pontos' : 'voltas'}`} build={story} className="ml-auto flex h-9 w-9 items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white" />
           </p>
           <Podium lines={lines} />
           <ol className="space-y-2">{lines.slice(lines.length >= 3 ? 3 : 0).map((l) => <li key={l.pilotId}><Row line={l} /></li>)}</ol>

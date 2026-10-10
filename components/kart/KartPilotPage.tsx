@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, Crown, Flame, Flag, Medal as MedalIcon, Timer, TriangleAlert } from 'lucide-react';
+import { ChevronDown, Crown, Flame, Flag, Medal as MedalIcon, Swords, Timer, TriangleAlert } from 'lucide-react';
 import { formatLap } from '../../services/kart.js';
-import { pilotProfile, recentForm, RECENT_RACES, type ExtraRow, type HistoryRow as HistoryRowData } from '../../services/kartRanking.js';
+import { lapHistory, pilotProfile, recentForm, RECENT_RACES, type ExtraRow, type HistoryRow as HistoryRowData, type LapPoint } from '../../services/kartRanking.js';
 import type { KartPilot, KartRace, KartVideo } from '../../services/kartService';
+import { KartLapChart } from './KartLapChart';
 import { RaceResults } from './KartRaceResults';
 import { KartLink, MEDAL_STYLE, WeatherIcon, card, formatDate, plural, type Medal } from './kartUi';
 
@@ -14,24 +15,51 @@ const Stat: React.FC<{ label: string; value: React.ReactNode; hint?: string }> =
   </div>
 );
 
-/** Pontos de cada uma das últimas 10 corridas do campeonato (corrida em que o piloto não correu aparece vazia). */
-const FormChart: React.FC<{ pilotId: string; races: KartRace[]; barClass: string }> = ({ pilotId, races, barClass }) => {
+const BAR: Record<number, string> = { 1: 'bg-amber-400', 2: 'bg-slate-300', 3: 'bg-orange-500' };
+const POS_TEXT: Record<number, string> = { 1: 'text-amber-300', 2: 'text-slate-200', 3: 'text-orange-300' };
+const shortDate = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+
+/** Uma coluna por corrida das últimas 10 do campeonato: posição no topo, barra (altura = pontos, cor = posição) e a data embaixo. */
+const FormChart: React.FC<{ pilotId: string; races: KartRace[] }> = ({ pilotId, races }) => {
   const form = useMemo(() => recentForm(pilotId, races), [pilotId, races]);
   return (
-    <div className="flex h-24 items-end gap-1.5" role="img" aria-label="Pontos nas últimas corridas do campeonato">
-      {form.map((f) => (
-        <div key={f.raceId} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1" title={f.points === null ? `Corrida ${f.number}: não correu` : `Corrida ${f.number}: P${f.pos}, ${f.points} pts`}>
-          {f.points === null
-            ? <div className="h-1 w-full rounded bg-white/10" />
-            : <div className={`w-full rounded-t ${barClass}`} style={{ height: `${Math.max(8, (f.points / 25) * 100)}%` }} />}
-          <span className="text-[9px] text-white/40">{f.number}</span>
-        </div>
-      ))}
+    <div>
+      <ol className="flex items-end gap-1" aria-label="Posição e pontos nas últimas corridas do campeonato">
+        {form.map((f) => (
+          <li key={f.raceId} className="flex min-w-0 flex-1 flex-col items-center gap-1" title={f.points === null ? `Corrida ${f.number}: não correu` : `Corrida ${f.number}: P${f.pos}, ${f.points} pontos`}>
+            <span className={`text-[11px] font-black ${f.pos === null ? 'text-white/25' : POS_TEXT[f.pos] ?? 'text-white/70'}`}>{f.pos === null ? '—' : `P${f.pos}`}</span>
+            <div className="flex h-24 w-full items-end">
+              {f.points === null || f.pos === null
+                ? <div className="h-1 w-full rounded bg-white/10" />
+                : <div className={`flex w-full items-start justify-center rounded-t ${BAR[f.pos] ?? 'bg-sky-500'}`} style={{ height: `${Math.max(16, (f.points / 25) * 100)}%` }}><span className="mt-0.5 text-[10px] font-black text-black/70">{f.points}</span></div>}
+            </div>
+            <span className="text-[9px] tabular-nums text-white/45">{shortDate(f.date)}</span>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-3 text-[11px] leading-relaxed text-white/45">Cada coluna é uma corrida (mais antiga à esquerda). Número na barra = pontos; a altura vai até 25 (vitória). Cor: ouro P1, prata P2, bronze P3, azul as demais. Traço = não correu.</p>
     </div>
   );
 };
 
 /** Linha do histórico que abre o resultado completo da corrida (igual à aba Corridas). */
+const LAP_COLOR: Record<number, string> = { 1: '#fbbf24', 2: '#cbd5e1', 3: '#fb923c' };
+
+/** Frase-resumo acima do gráfico: de quanto a volta caiu desde a primeira registrada em pista seca. */
+const LapSummary: React.FC<{ laps: LapPoint[] }> = ({ laps }) => {
+  const dry = laps.filter((l) => !l.rain);
+  if (dry.length === 0) return null;
+  const first = dry[0].ms;
+  const best = Math.min(...dry.map((l) => l.ms));
+  return (
+    <p className="mb-3 text-sm text-white/70">
+      {dry.length === 1 ? <>Primeira volta registrada: <b className="text-white">{formatLap(first)}</b></> : first === best
+        ? <>Recorde pessoal: <b className="text-white">{formatLap(best)}</b>, a primeira volta registrada.</>
+        : <>De <b className="text-white">{formatLap(first)}</b> para <b className="text-white">{formatLap(best)}</b>: <b className="text-emerald-300">{((first - best) / 1000).toFixed(1).replace('.', ',')} s mais rápido</b> que a primeira volta registrada.</>}
+    </p>
+  );
+};
+
 const HistoryRow: React.FC<{ h: HistoryRowData; isRecord: boolean; race: KartRace | undefined; pilotId: string; video?: KartVideo }> = ({ h, isRecord, race, pilotId, video }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -73,6 +101,7 @@ const ExtraRowItem: React.FC<{ e: ExtraRow; isRecord: boolean; race: KartRace | 
 
 export const KartPilotPage: React.FC<{ pilot: KartPilot | undefined; races: KartRace[]; videos: Map<string, KartVideo> }> = ({ pilot, races, videos }) => {
   const profile = useMemo(() => (pilot ? pilotProfile(pilot.id, races) : null), [pilot, races]);
+  const laps = useMemo(() => (pilot ? lapHistory(races, pilot.id) : []), [pilot, races]);
   if (!pilot || !profile) return <p className={`${card} px-5 py-8 text-center text-white/60`}>Piloto não encontrado. <KartLink to="/kart" className="font-bold text-white underline">Voltar ao ranking</KartLink></p>;
 
   const medal = profile.medal ? MEDAL_STYLE[profile.medal] : null;
@@ -109,8 +138,15 @@ export const KartPilotPage: React.FC<{ pilot: KartPilot | undefined; races: Kart
 
       <section className={`${card} p-4`}>
         <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-white/60"><Flame className="h-4 w-4" />Forma nas últimas {RECENT_RACES} corridas</h3>
-        <FormChart pilotId={pilot.id} races={races} barClass={medal ? medal.bar : 'bg-red-500'} />
-        <p className="mt-2 text-[11px] text-white/40">Altura = pontos da corrida (25 é a vitória). Traço = não correu.</p>
+        <FormChart pilotId={pilot.id} races={races} />
+      </section>
+
+      <KartLink to={`/kart/confronto?p=${pilot.id}`} className={`${card} flex items-center justify-center gap-2 py-3 text-sm font-bold text-white/80 hover:border-white/30 hover:text-white`}><Swords className="h-4 w-4 text-red-400" />Comparar com outros pilotos</KartLink>
+
+      <section className={`${card} p-4`}>
+        <h3 className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-white/60"><Timer className="h-4 w-4" />Evolução da melhor volta</h3>
+        <LapSummary laps={laps} />
+        <KartLapChart series={[{ id: pilot.id, name: pilot.name, color: LAP_COLOR[profile.medal ?? 0] ?? '#ef4444', points: laps }]} />
       </section>
 
       <section>

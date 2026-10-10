@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import multer from 'multer';
 import type { Request, Response } from 'express';
 import { authorizeAdminRequest } from '../functions/admin-auth.js';
+import { handleKartPdfUpload } from '../functions/kart-pdf-upload.js';
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 // A Vercel limita o corpo da requisição a 4,5 MB; 4 MB deixa folga para o multipart.
@@ -70,10 +71,11 @@ async function getUploadOptions(mimetype: string) {
 
 /**
  * Upload para o Vercel Blob (somente administradores). Padrão: imagem (thumbnail de vídeo ou imagem de serviço);
- * `?kind=audio`: áudio do /agente-hdc. Fica em uma só função porque a Vercel limita o número de funções em api/.
+ * `?kind=audio`: áudio do /agente-hdc; `?kind=kart-pdf`: PDF das corridas do /kart (rewrite /api/upload-kart-pdf em vercel.json). Fica em uma só função porque a Vercel limita o número de funções em api/.
  * Endpoint Node da Vercel/Express: o multipart precisa ser consumido por multer antes do put.
  */
 export function handleThumbnailUpload(req: Request, res: Response): void {
+  if (req.query?.kind === 'kart-pdf') { handleKartPdfUpload(req, res); return; }
   if (req.method === 'OPTIONS') {
     res.status(204).end();
     return;

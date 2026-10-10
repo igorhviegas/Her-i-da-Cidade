@@ -107,6 +107,23 @@ export function trackRecord(races, scope) {
 }
 
 /**
+ * Evolução da melhor volta do piloto, da corrida mais antiga para a mais nova (campeonato e avulsas):
+ * [{ raceId, date, heat, ms, rain, extra, pb }]. `pb` = bateu o recorde pessoal em pista seca (na chuva o tempo não é comparável).
+ */
+export function lapHistory(races, pilotId) {
+  const all = [...officialRaces(races), ...extraRaces(races)].sort((a, b) => a.date.localeCompare(b.date) || String(a.heat).localeCompare(String(b.heat)));
+  let best = Infinity;
+  return all.flatMap((race) => {
+    const r = race.results.find((x) => x.pilotId === pilotId);
+    if (!r?.bestLapMs) return [];
+    const rain = race.weather === 'rain';
+    const pb = !rain && r.bestLapMs < best;
+    if (pb) best = r.bestLapMs;
+    return [{ raceId: race.id, date: race.date, heat: race.heat, ms: r.bestLapMs, rain, extra: !!race.extra, pb }];
+  });
+}
+
+/**
  * Perfil do piloto. `medal` = 1, 2 ou 3 conforme a posição no ranking padrão (últimas 10 corridas), senão null.
  * `history` = todas as corridas oficiais dele, da mais recente para a mais antiga; `extras` = sessões fora do campeonato.
  * `record` = melhor volta dele em qualquer uma (campeonato ou avulsa).
@@ -136,6 +153,6 @@ export function pilotProfile(pilotId, races, currentYear = new Date().getFullYea
 export function recentForm(pilotId, races) {
   return officialRaces(races).slice(-RECENT_RACES).map((race) => {
     const r = race.results.find((x) => x.pilotId === pilotId);
-    return { raceId: race.id, number: race.number, points: r ? pointsFor(r.pos) : null, pos: r?.pos ?? null };
+    return { raceId: race.id, number: race.number, date: race.date, points: r ? pointsFor(r.pos) : null, pos: r?.pos ?? null };
   });
 }

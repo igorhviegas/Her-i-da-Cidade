@@ -59,8 +59,8 @@ const AppContent: React.FC = () => {
   const [faqService, setFaqService] = useState<Service | null | undefined>(undefined);
   const homeContent = useHomeContent(!isAdmin && !isVideos && !isAgent && !isKart && !isCall && !isFaq);
 
-  // Ícone do iOS ("Adicionar à Tela de Início") próprio da plataforma de streaming e da área do agente
-  const iosIcon = isVideos ? '/images/modules/streaming.png' : isAgent ? '/images/modules/agente-hdc.png' : null;
+  // Ícone do iOS ("Adicionar à Tela de Início") próprio da plataforma de streaming, da área do agente e do campeonato de kart
+  const iosIcon = isVideos ? '/images/modules/streaming.png' : isAgent ? '/images/modules/agente-hdc.png' : isKart ? '/images/modules/kart.png' : null;
   useEffect(() => {
     const link = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
     if (!link || !iosIcon) return;
