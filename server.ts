@@ -3,13 +3,10 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { handleThumbnailUpload } from "./api/upload-thumbnail";
-import { handleAgentAudioUpload } from "./api/upload-agent-audio";
 import { handleKartPdfUpload } from "./functions/kart-pdf-upload.js";
 import { handleManyChatWebhook } from "./api/manychat";
-import { handleMissionsCron } from "./api/missions-cron";
 import { handleAlexa } from "./api/alexa";
 import { handleInstagramSync } from "./api/instagram-sync";
-import { handleGoogleCalendar } from "./api/google-calendar";
 import { handleCalendarEvents } from "./api/calendar-events";
 import { handleVideoCall } from "./api/video-call";
 import { handleTravelRoute } from "./api/travel-route";
@@ -33,14 +30,9 @@ async function startServer() {
     handleReviews(req, res);
   });
 
-  // Vercel Blob Thumbnail Upload endpoint
+  // Vercel Blob upload (administrador autenticado): imagem por padrão, ?kind=audio para áudio do /agente-hdc
   app.all("/api/upload-thumbnail", (req, res) => {
     handleThumbnailUpload(req, res);
-  });
-
-  // Upload de áudio do /agente-hdc (administrador autenticado)
-  app.all("/api/upload-agent-audio", (req, res) => {
-    handleAgentAudioUpload(req, res);
   });
 
   // Upload do PDF original das corridas do /kart (administrador autenticado)
@@ -53,22 +45,12 @@ async function startServer() {
     handleManyChatWebhook(req, res);
   });
 
-  // Missions daily sync (Vercel Cron in production; manual call with CRON_SECRET locally)
-  app.all("/api/missions-cron", (req, res) => {
-    handleMissionsCron(req, res);
-  });
-
-  // Alexa Skill: cria missões a partir de lembretes por voz
+  // Instagram: sincronização (cron GET / admin POST); GET ?job=missions roda a rotina diária de missões
   app.all("/api/instagram-sync", (req, res) => {
     handleInstagramSync(req, res);
   });
 
-  // Google Agenda: envio manual de pedidos de evento (administrador autenticado)
-  app.all("/api/google-calendar", (req, res) => {
-    handleGoogleCalendar(req, res);
-  });
-
-  // Calendário: listar/criar/editar/excluir eventos da agenda (administrador autenticado)
+  // Calendário: listar/criar/editar/excluir eventos e enviar pedidos (action 'sync') à agenda (administrador autenticado)
   app.all("/api/calendar-events", (req, res) => {
     handleCalendarEvents(req, res);
   });
@@ -88,6 +70,7 @@ async function startServer() {
     handleFitIngest(req, res);
   });
 
+  // Alexa Skill: cria missões a partir de lembretes por voz
   app.all("/api/alexa", (req, res) => {
     handleAlexa(req, res);
   });

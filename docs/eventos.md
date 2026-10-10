@@ -42,7 +42,7 @@ Pedidos de evento têm um livro imutável `financeEntries` (regras em `firestore
 
 ## Google Agenda (envio manual)
 
-Botão **Enviar para Google Agenda** nos detalhes do pedido → `POST /api/google-calendar` (`api/google-calendar.ts`,
+Botão **Enviar para Google Agenda** nos detalhes do pedido → `POST /api/calendar-events` com `{ action: 'sync', orderId }` (`api/calendar-events.ts`,
 `functions/google-calendar.js`). O servidor valida o administrador, lê o pedido salvo e chama a Calendar API v3 com uma
 conta de serviço; só responde sucesso depois da confirmação do Google. O ID do evento é derivado do ID do pedido, então
 reenviar atualiza o mesmo evento (e `orders/{id}.googleCalendar` guarda `eventId`, `calendarId`, `htmlLink`, `syncedAt`).

@@ -1,6 +1,6 @@
 // Upload do relatório original (PDF) de uma corrida do /kart, somente administradores: envia ao Vercel Blob e devolve a URL pública.
 // Fica fora de api/ de propósito: o plano Hobby da Vercel limita o total de funções (12) e api/ já está no limite.
-// É atendido por api/upload-agent-audio.ts (rewrite /api/upload-kart-pdf → ?kind=kart-pdf em vercel.json) e, no dev, direto por server.ts.
+// É atendido por api/upload-thumbnail.ts (rewrite /api/upload-kart-pdf → ?kind=kart-pdf em vercel.json) e, no dev, direto por server.ts.
 import { logger } from '../lib/logger.js';
 import { put } from '@vercel/blob';
 import { getVercelOidcToken } from '@vercel/oidc';

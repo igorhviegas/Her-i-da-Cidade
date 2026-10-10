@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/missions-cron",
+      "path": "/api/instagram-sync?job=missions",
       "schedule": "0 3 * * *"
     },
     {
@@ -27,7 +27,7 @@
     },
     {
       "source": "/api/upload-kart-pdf",
-      "destination": "/api/upload-agent-audio?kind=kart-pdf"
+      "destination": "/api/upload-thumbnail?kind=kart-pdf"
     }
   ]
 }

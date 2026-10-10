@@ -40,7 +40,7 @@ Os PDFs originais ficam arquivados em `docs/kart/resultados/oficiais/AAAA-MM-DD_
 
 Cada corrida tem página própria, `/kart/corrida/{id}`, aberta pelo ícone ↗ da lista (a lista continua simples, com o resultado expansível). A página mostra data, pista, vencedor, melhor volta, o vídeo vinculado e o resultado completo, e tem o botão **Baixar PDF original** e o de **Compartilhar**.
 
-O PDF fica no Vercel Blob (`/api/upload-kart-pdf`, só administradores, até 4 MB, valida `%PDF-`) e o link vai em `pdfUrl`. A lógica está em `functions/kart-pdf-upload.js`; **não é uma função nova em `api/`**: o plano Hobby da Vercel limita `api/` a 12 funções (já estava no limite e o deploy falhou com 13), então `vercel.json` reescreve `/api/upload-kart-pdf` para `api/upload-agent-audio.ts?kind=kart-pdf`, que repassa ao módulo. Ele é enviado **ao importar**. Para anexar o PDF a corridas já salvas, importe os PDFs de novo: o clima e o tipo (avulsa) da corrida salva são mantidos, só o PDF é acrescentado. Corridas lançadas à mão não têm PDF.
+O PDF fica no Vercel Blob (`/api/upload-kart-pdf`, só administradores, até 4 MB, valida `%PDF-`) e o link vai em `pdfUrl`. A lógica está em `functions/kart-pdf-upload.js`; **não é uma função nova em `api/`**: o plano Hobby da Vercel limita `api/` a 12 funções (o deploy falhou com 13; hoje são 9), então `vercel.json` reescreve `/api/upload-kart-pdf` para `api/upload-thumbnail.ts?kind=kart-pdf`, que repassa ao módulo. Ele é enviado **ao importar**. Para anexar o PDF a corridas já salvas, importe os PDFs de novo: o clima e o tipo (avulsa) da corrida salva são mantidos, só o PDF é acrescentado. Corridas lançadas à mão não têm PDF.
 
 ## Próxima corrida
 
