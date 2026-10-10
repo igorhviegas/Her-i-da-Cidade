@@ -4,13 +4,13 @@ import { getVercelOidcToken } from '@vercel/oidc';
 import crypto from 'crypto';
 import multer from 'multer';
 import type { Request, Response } from 'express';
+import { authorizeAdminRequest } from '../functions/admin-auth.js';
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+// A Vercel limita o corpo da requisição a 4,5 MB; 4 MB deixa folga para o multipart.
+// ponytail: arquivos maiores exigiriam upload direto do navegador (handleUpload), que não aceita o OIDC usado aqui.
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const BLOB_STORE_ID = process.env.BLOB_STORE_ID || 'store_ZlySBsEZT51qmJ7I';
-const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || '';
-const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY || '';
-const FIRESTORE_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID || process.env.VITE_FIRESTORE_DATABASE_ID || '(default)';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -36,49 +36,13 @@ function extensionFor(mimetype: string): string {
   return 'jpg';
 }
 
-async function verifyFirebaseIdToken(idToken: string): Promise<string | null> {
-  if (!FIREBASE_API_KEY) throw new Error('Firebase API key não configurada.');
-
-  const response = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(FIREBASE_API_KEY)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
-    },
-  );
-
-  if (response.status === 400 || response.status === 401) return null;
-  if (!response.ok) throw new Error('Firebase Authentication indisponível.');
-
-  const result = await response.json() as { users?: Array<{ localId?: string }> };
-  return result.users?.[0]?.localId || null;
-}
-
-async function isAdminInFirestore(idToken: string, uid: string): Promise<boolean> {
-  if (!FIREBASE_PROJECT_ID) throw new Error('Firebase project ID não configurado.');
-
-  const documentUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(FIREBASE_PROJECT_ID)}` +
-    `/databases/${encodeURIComponent(FIRESTORE_DATABASE_ID)}/documents/admins/${encodeURIComponent(uid)}`;
-  const response = await fetch(documentUrl, {
-    headers: { Authorization: `Bearer ${idToken}` },
-  });
-
-  if (response.status === 403 || response.status === 404) return false;
-  if (!response.ok) throw new Error('Firestore indisponível.');
-  return true;
-}
-
-async function authorizeAdminRequest(req: Request): Promise<'unauthenticated' | 'forbidden' | 'authorized'> {
-  const authorization = req.headers.authorization;
-  const match = authorization?.match(/^Bearer\s+([^\s]+)$/i);
-  if (!match) return 'unauthenticated';
-
-  const idToken = match[1];
-  const uid = await verifyFirebaseIdToken(idToken);
-  if (!uid) return 'unauthenticated';
-
-  return await isAdminInFirestore(idToken, uid) ? 'authorized' : 'forbidden';
+// Só formatos que o Safari do iPhone toca: MP3, M4A/MP4 (AAC) e WAV.
+function detectAudio(buffer: Buffer): { mime: string; ext: string } | null {
+  if (buffer.length >= 3 && buffer.toString('ascii', 0, 3) === 'ID3') return { mime: 'audio/mpeg', ext: 'mp3' };
+  if (buffer.length >= 2 && buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0) return { mime: 'audio/mpeg', ext: 'mp3' };
+  if (buffer.length >= 12 && buffer.toString('ascii', 4, 8) === 'ftyp') return { mime: 'audio/mp4', ext: 'm4a' };
+  if (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WAVE') return { mime: 'audio/wav', ext: 'wav' };
+  return null;
 }
 
 function jsonError(res: Response, status: number, error: string): void {
@@ -105,8 +69,9 @@ async function getUploadOptions(mimetype: string) {
 }
 
 /**
- * Endpoint Node da Vercel/Express. O runtime de Functions entrega req/res
- * Node; portanto o multipart precisa ser consumido por multer antes do put.
+ * Upload para o Vercel Blob (somente administradores). Padrão: imagem (thumbnail de vídeo ou imagem de serviço);
+ * `?kind=audio`: áudio do /agente-hdc. Fica em uma só função porque a Vercel limita o número de funções em api/.
+ * Endpoint Node da Vercel/Express: o multipart precisa ser consumido por multer antes do put.
  */
 export function handleThumbnailUpload(req: Request, res: Response): void {
   if (req.method === 'OPTIONS') {
@@ -118,6 +83,8 @@ export function handleThumbnailUpload(req: Request, res: Response): void {
     jsonError(res, 405, 'Método não permitido.');
     return;
   }
+
+  const isAudio = req.query?.kind === 'audio';
 
   void (async () => {
     let authorization: 'unauthenticated' | 'forbidden' | 'authorized';
@@ -133,55 +100,71 @@ export function handleThumbnailUpload(req: Request, res: Response): void {
       return;
     }
     if (authorization === 'forbidden') {
-      jsonError(res, 403, 'Somente administradores podem enviar imagens.');
+      jsonError(res, 403, `Somente administradores podem enviar ${isAudio ? 'áudios' : 'imagens'}.`);
       return;
     }
 
     upload.single('file')(req, res, async (parseError) => {
-    if (parseError) {
-      const message = parseError instanceof multer.MulterError && parseError.code === 'LIMIT_FILE_SIZE'
-        ? 'O arquivo excede o limite máximo permitido de 4 MB.'
-        : 'Não foi possível processar o arquivo enviado.';
-      jsonError(res, 400, message);
-      return;
-    }
-
-    const file = req.file;
-    if (!file?.buffer) {
-      jsonError(res, 400, 'Nenhum arquivo de imagem foi enviado.');
-      return;
-    }
-    const detectedMimeType = detectImageMimeType(file.buffer);
-    if (!detectedMimeType || !ALLOWED_MIME_TYPES.has(detectedMimeType) || file.mimetype !== detectedMimeType) {
-      jsonError(res, 400, 'Formato de arquivo não suportado. Formatos aceitos: JPG, JPEG, PNG e WEBP.');
-      return;
-    }
-
-    const purpose = req.body?.purpose;
-    if (purpose !== undefined && purpose !== 'services' && purpose !== 'service-image') {
-      jsonError(res, 400, 'Tipo de imagem não suportado.');
-      return;
-    }
-    const blobFolder = purpose === 'services' || purpose === 'service-image' ? 'services/images' : 'videos/thumbnails';
-
-    const timeout = setTimeout(() => {
-      if (!res.headersSent) {
-        jsonError(res, 500, 'Não foi possível concluir o upload da imagem. Tente novamente.');
+      if (parseError) {
+        const tooBig = parseError instanceof multer.MulterError && parseError.code === 'LIMIT_FILE_SIZE';
+        jsonError(res, 400, !tooBig
+          ? 'Não foi possível processar o arquivo enviado.'
+          : isAudio
+            ? 'O arquivo excede o limite de 4 MB. Comprima o áudio (MP3 128 kbps) ou use o campo de link.'
+            : 'O arquivo excede o limite máximo permitido de 4 MB.');
+        return;
       }
-    }, 25_000);
 
-    try {
-      const pathname = `${blobFolder}/${crypto.randomUUID()}.${extensionFor(file.mimetype)}`;
-      const blob = await put(pathname, file.buffer, await getUploadOptions(file.mimetype));
-      if (!res.headersSent) res.status(201).json({ success: true, url: blob.url });
-    } catch (error) {
-      logger.error('[upload-thumbnail] Falha no Vercel Blob:', error);
-      if (!res.headersSent) {
-        jsonError(res, 500, 'Não foi possível enviar a imagem. Tente novamente.');
+      const file = req.file;
+      if (!file?.buffer) {
+        jsonError(res, 400, isAudio ? 'Nenhum arquivo de áudio foi enviado.' : 'Nenhum arquivo de imagem foi enviado.');
+        return;
       }
-    } finally {
-      clearTimeout(timeout);
-    }
+
+      if (isAudio) {
+        const audio = detectAudio(file.buffer);
+        if (!audio) { jsonError(res, 400, 'Formato não suportado. Formatos aceitos: MP3, M4A e WAV.'); return; }
+        try {
+          const blob = await put(`agente/audio/${crypto.randomUUID()}.${audio.ext}`, file.buffer, await getUploadOptions(audio.mime));
+          if (!res.headersSent) res.status(201).json({ success: true, url: blob.url });
+        } catch (error) {
+          logger.error('[upload-audio] Falha no Vercel Blob:', error);
+          if (!res.headersSent) jsonError(res, 500, 'Não foi possível enviar o áudio. Tente novamente.');
+        }
+        return;
+      }
+
+      const detectedMimeType = detectImageMimeType(file.buffer);
+      if (!detectedMimeType || !ALLOWED_MIME_TYPES.has(detectedMimeType) || file.mimetype !== detectedMimeType) {
+        jsonError(res, 400, 'Formato de arquivo não suportado. Formatos aceitos: JPG, JPEG, PNG e WEBP.');
+        return;
+      }
+
+      const purpose = req.body?.purpose;
+      if (purpose !== undefined && purpose !== 'services' && purpose !== 'service-image') {
+        jsonError(res, 400, 'Tipo de imagem não suportado.');
+        return;
+      }
+      const blobFolder = purpose === 'services' || purpose === 'service-image' ? 'services/images' : 'videos/thumbnails';
+
+      const timeout = setTimeout(() => {
+        if (!res.headersSent) {
+          jsonError(res, 500, 'Não foi possível concluir o upload da imagem. Tente novamente.');
+        }
+      }, 25_000);
+
+      try {
+        const pathname = `${blobFolder}/${crypto.randomUUID()}.${extensionFor(file.mimetype)}`;
+        const blob = await put(pathname, file.buffer, await getUploadOptions(file.mimetype));
+        if (!res.headersSent) res.status(201).json({ success: true, url: blob.url });
+      } catch (error) {
+        logger.error('[upload-thumbnail] Falha no Vercel Blob:', error);
+        if (!res.headersSent) {
+          jsonError(res, 500, 'Não foi possível enviar a imagem. Tente novamente.');
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
     });
   })();
 }

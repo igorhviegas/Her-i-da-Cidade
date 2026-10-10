@@ -340,7 +340,7 @@ Todas as chamadas abaixo usam `curl.exe` (com `.exe`, para não cair no alias do
 | Variável | Para quê | Tipo | Observação |
 |---|---|---|---|
 | `INSTAGRAM_ACCESS_TOKEN` | Token do Instagram | **Secreta** | **Obrigatória.** Provavelmente não existe ainda. |
-| `CRON_SECRET` | Autentica o cron | **Secreta** | **Obrigatória.** Já é usada por `/api/missions-cron`; se existir, **não altere** (a Vercel a envia como `Authorization: Bearer` nas chamadas do cron [DOC]). |
+| `CRON_SECRET` | Autentica o cron | **Secreta** | **Obrigatória.** Já é usada por `/api/instagram-sync?job=missions`; se existir, **não altere** (a Vercel a envia como `Authorization: Bearer` nas chamadas do cron [DOC]). |
 | `FIREBASE_SERVICE_ACCOUNT_KEY` *(ou `FIREBASE_CLIENT_EMAIL` + `FIREBASE_PRIVATE_KEY`)* | Gravar no Firestore (Admin SDK) | **Secreta** | **Obrigatória.** Provavelmente já existe (ManyChat/missões). |
 | `FIREBASE_PROJECT_ID` ou `VITE_FIREBASE_PROJECT_ID` | Validar administrador | Pública | Pelo menos uma. Esperado: `heroi-da-cidade`. |
 | `FIREBASE_API_KEY` ou `VITE_FIREBASE_API_KEY` | Validar o ID token do administrador | Pública (chave web do Firebase) | Pelo menos uma. |
@@ -372,7 +372,7 @@ Todas as chamadas abaixo usam `curl.exe` (com `.exe`, para não cair no alias do
 **Etapa 17 — Conferir plano, duração e cron**
 - **Onde:** Settings → **Cron Jobs** (lista os crons) e Settings → **Functions**.
 - **Passo a passo:**
-  1. Em **Cron Jobs**, depois do deploy, devem aparecer `/api/missions-cron` (`0 3 * * *`) e `/api/instagram-sync` (`0 9 * * *`).
+  1. Em **Cron Jobs**, depois do deploy, devem aparecer `/api/instagram-sync?job=missions` (`0 3 * * *`) e `/api/instagram-sync` (`0 9 * * *`).
   2. Plano: veja o selo do plano no seletor de time (canto superior esquerdo) ou em Settings → Billing. **Hobby**: cron no máximo 1x/dia (a configuração atual **respeita**), com horário impreciso dentro da hora [DOC]. A duração máxima de função no Hobby é de 300 s com fluid compute (padrão) [DOC]; o código pede 60 s, o que é permitido. Se o deploy for **recusado** por causa de `maxDuration`, anote a mensagem (não edite `vercel.json` sem me avisar).
 - **Conclusão:** os dois crons aparecem e o deploy foi aceito.
 

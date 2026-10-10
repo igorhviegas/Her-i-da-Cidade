@@ -11,7 +11,7 @@ Espelha no Firestore o perfil e as últimas 100 publicações da conta profissio
 - O token vem de `INSTAGRAM_ACCESS_TOKEN` (somente servidor) e é renovado automaticamente a cada 30 dias.
 
 ## Avisos de saúde da integração (sino do painel)
-O cron diário de missões (`/api/missions-cron`, 00:00 de Brasília, regras em `functions/instagram-alerts.js`) lê `instagramMeta/profile` e cria avisos no sino, uma vez por episódio (ID determinístico; descartado não volta). O clique leva para `/admin/instagram`. Como roda no cron de missões, também pega o caso de a própria sincronização do Instagram parar de rodar.
+O cron diário de missões (`/api/instagram-sync?job=missions`, 00:00 de Brasília, regras em `functions/instagram-alerts.js`) lê `instagramMeta/profile` e cria avisos no sino, uma vez por episódio (ID determinístico; descartado não volta). O clique leva para `/admin/instagram`. Como roda no cron de missões, também pega o caso de a própria sincronização do Instagram parar de rodar.
 
 | Aviso | Quando | O que fazer |
 |---|---|---|

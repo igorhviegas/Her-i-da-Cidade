@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/missions-cron",
+      "path": "/api/instagram-sync?job=missions",
       "schedule": "0 3 * * *"
     },
     {

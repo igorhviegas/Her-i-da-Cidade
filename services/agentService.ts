@@ -102,7 +102,7 @@ export async function reorderAgentDocs(name: typeof AGENT_STEPS_COLLECTION | typ
 
 export const MAX_AUDIO_MB = 4;
 
-/** Envia o áudio para /api/upload-agent-audio (Vercel Blob, só administradores) e devolve a URL pública. */
+/** Envia o áudio para /api/upload-thumbnail?kind=audio (Vercel Blob, só administradores) e devolve a URL pública. */
 export async function uploadAgentAudio(file: File): Promise<string> {
   const user = auth?.currentUser;
   if (!user) throw new Error('Faça login como administrador para enviar áudios.');
@@ -114,7 +114,7 @@ export async function uploadAgentAudio(file: File): Promise<string> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 90_000);
   try {
-    const response = await fetch('/api/upload-agent-audio', {
+    const response = await fetch('/api/upload-thumbnail?kind=audio', {
       method: 'POST',
       headers: { Authorization: `Bearer ${await user.getIdToken()}` },
       body: formData,

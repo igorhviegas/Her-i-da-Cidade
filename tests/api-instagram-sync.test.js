@@ -209,7 +209,7 @@ test('token: renovação com resposta incompleta ou com erro mantém o token atu
 test('vercel.json agenda o cron do Instagram e mantém o de missões', async () => {
   const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
   assert.ok(config.crons.some((c) => c.path === '/api/instagram-sync' && c.schedule === '0 9 * * *'));
-  assert.ok(config.crons.some((c) => c.path === '/api/missions-cron'));
+  assert.ok(config.crons.some((c) => c.path === '/api/instagram-sync?job=missions'));
 });
 
 test('admin-auth: valida ID token e o documento admins/{uid} (fetch simulado)', async () => {
@@ -280,7 +280,7 @@ test('vercel.json: sincronização à meia-noite de Brasília (03:00 UTC) além 
   const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
   const schedules = config.crons.filter((c) => c.path === '/api/instagram-sync').map((c) => c.schedule).sort();
   assert.deepEqual(schedules, ['0 3 * * *', '0 9 * * *']);
-  assert.ok(config.crons.some((c) => c.path === '/api/missions-cron' && c.schedule === '0 3 * * *'));
+  assert.ok(config.crons.some((c) => c.path === '/api/instagram-sync?job=missions' && c.schedule === '0 3 * * *'));
 });
 
 test('Principal: widget do Instagram só lê o Firestore; o aviso "Em preparação" foi removido; demais widgets preservados', async () => {

@@ -4,6 +4,7 @@ import type { Request, Response } from 'express';
 import { getAdminFirestore } from '../functions/firebase-admin.js';
 import { authorizeAdminRequest } from '../functions/admin-auth.js';
 import { InstagramSyncError, runInstagramSync } from '../functions/instagram-sync.js';
+import { runMissionsSync } from '../functions/missions-sync.js';
 
 type Auth = 'unauthenticated' | 'forbidden' | 'authorized';
 
@@ -11,12 +12,13 @@ const STATUS_BY_CODE: Record<string, number> = { not_configured: 503, token_inva
 
 /**
  * GET  + `Authorization: Bearer $CRON_SECRET` -> sincronização agendada (Vercel Cron, 1x/dia).
+ * GET  idem com `?job=missions` -> rotina diária de missões (antiga /api/missions-cron; aqui porque a Vercel limita as funções em api/).
  * POST + ID token do Firebase de um administrador -> sincronização manual (com intervalo mínimo de 60 s).
  */
 export async function handleInstagramSync(
   req: Request | any,
   res: Response | any,
-  deps: { secret?: string; authorize?: (req: Request) => Promise<Auth>; run?: (manual: boolean) => Promise<unknown> } = {},
+  deps: { secret?: string; authorize?: (req: Request) => Promise<Auth>; run?: (manual: boolean) => Promise<unknown>; runMissions?: () => Promise<unknown> } = {},
 ) {
   const send = (status: number, body: unknown) => {
     res.setHeader?.('Cache-Control', 'no-store');
@@ -39,6 +41,15 @@ export async function handleInstagramSync(
     const supplied = Buffer.from(typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : '');
     const expected = Buffer.from(secret);
     if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) return fail(401, 'unauthorized', 'Credencial ausente ou inválida.');
+  }
+
+  if (!manual && req.query?.job === 'missions') {
+    try {
+      return send(200, { ok: true, ...(await (deps.runMissions ?? (() => runMissionsSync(getAdminFirestore())))() as object) });
+    } catch (error) {
+      logger.error('[Missions Cron] Falha na rotina de missões:', error instanceof Error ? error.message : String(error));
+      return fail(500, 'internal_error', 'A rotina de missões falhou; consulte os logs.');
+    }
   }
 
   try {

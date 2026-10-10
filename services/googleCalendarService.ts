@@ -12,10 +12,10 @@ export async function sendOrderToGoogleCalendar(orderId: string): Promise<Calend
   if (!user) throw new Error('Faça login como administrador.');
   let response: Response;
   try {
-    response = await fetch('/api/google-calendar', {
+    response = await fetch('/api/calendar-events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
-      body: JSON.stringify({ orderId }),
+      body: JSON.stringify({ action: 'sync', orderId }),
     });
   } catch {
     throw new Error('Sem conexão com o servidor. O evento NÃO foi enviado ao Google Agenda.');
