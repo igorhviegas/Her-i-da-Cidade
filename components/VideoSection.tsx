@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useRouter } from '../lib/router';
 import type { HomeSection } from '../types/homeContent';
 
-export const VideoSection: React.FC<{ section: HomeSection }> = ({ section }) => {
+/** `showBadges={false}` esconde a faixa de selos acima do título (a home mantém o padrão). */
+export const VideoSection: React.FC<{ section: HomeSection; showBadges?: boolean }> = ({ section, showBadges = true }) => {
   const { navigate } = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -33,7 +34,7 @@ export const VideoSection: React.FC<{ section: HomeSection }> = ({ section }) =>
 
       <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         {/* Badges da plataforma */}
-        <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
+        {showBadges && <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-500/15 border border-blue-400/25 text-blue-400 text-xs font-bold uppercase tracking-wider shadow-sm">
             <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
             {section.subtitle}
@@ -42,7 +43,7 @@ export const VideoSection: React.FC<{ section: HomeSection }> = ({ section }) =>
             <span className="h-1.5 w-1.5 rounded-full bg-fuchsia-300" />
             Novidade exclusiva!
           </span>
-        </div>
+        </div>}
 
         {/* Título principal */}
         <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">

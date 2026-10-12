@@ -34,7 +34,8 @@ import {
   Activity,
   ClipboardCheck,
   Dumbbell,
-  Flag
+  Flag,
+  QrCode
 } from 'lucide-react';
 
 // Módulos reorganizáveis (ordem padrão). "Principal" é fixo no topo e fica fora desta lista.
@@ -47,6 +48,7 @@ const NAV_ITEMS: NavItem<AdminTab>[] = [
   { id: 'clients', label: 'Clientes', icon: UserCheck },
   { id: 'videos', label: 'Vídeos', icon: Video },
   { id: 'categories', label: 'Categorias', icon: Layers },
+  { id: 'clientarea', label: 'Página dos clientes', icon: QrCode },
   { id: 'services', label: 'Serviços', icon: Sparkles },
   { id: 'content', label: 'Conteúdo', icon: FileText },
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -59,7 +61,7 @@ const NAV_ITEMS: NavItem<AdminTab>[] = [
 ];
 const NAV_GROUPS: NavGroup<AdminTab>[] = [
   { key: 'crm', label: 'CRM', icon: Briefcase, ids: ['orders', 'missions', 'finance', 'instagram', 'scripts', 'clients'] },
-  { key: 'streaming', label: 'Streaming', icon: Tv, ids: ['videos', 'categories'] },
+  { key: 'streaming', label: 'Streaming', icon: Tv, ids: ['videos', 'categories', 'clientarea'] },
   { key: 'pessoal', label: 'Pessoal', icon: Activity, ids: ['fit', 'fitcheckins', 'fittreinos', 'kart'] },
   { key: 'ajustes', label: 'Ajustes', icon: SlidersHorizontal, ids: ['services', 'content', 'dashboard', 'settings', 'agent'] },
 ];
@@ -103,6 +105,8 @@ const tabFromPath = (path: string): AdminTab =>
       ? 'fittreinos'
       : path === '/admin/kart'
       ? 'kart'
+      : path === '/admin/pagina-clientes'
+      ? 'clientarea'
       : path === '/admin/dashboard'
       ? 'dashboard'
       : path === '/admin/perfil'
@@ -147,6 +151,8 @@ const syncTabFromPath = (path: string, setCurrentTab: (tab: AdminTab) => void) =
       setCurrentTab('fittreinos');
     } else if (path === '/admin/kart') {
       setCurrentTab('kart');
+    } else if (path === '/admin/pagina-clientes') {
+      setCurrentTab('clientarea');
     } else if (path === '/admin/dashboard') {
       setCurrentTab('dashboard');
     } else if (path === '/admin/perfil') {
@@ -193,6 +199,8 @@ const navigateToTab = (tabId: AdminTab, navigate: (to: string) => void) => {
       navigate('/admin/fit/treinos');
     } else if (tabId === 'kart') {
       navigate('/admin/kart');
+    } else if (tabId === 'clientarea') {
+      navigate('/admin/pagina-clientes');
     } else if (tabId === 'dashboard') {
       navigate('/admin/dashboard');
     } else if (tabId === 'profile') {
@@ -217,7 +225,7 @@ export const AdminDashboard: React.FC = () => {
     const link = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
     if (!link) return;
     const original = link.getAttribute('href') ?? '';
-    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes', '/admin/agendamento-chamadas': 'calendario', '/admin/perfil': 'principal', '/admin/fit': 'principal', '/admin/fit/checkins': 'principal', '/admin/fit/treinos': 'principal' } as Record<string, string>)[path] ?? path.split('/')[2];
+    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes', '/admin/pagina-clientes': 'streaming', '/admin/agendamento-chamadas': 'calendario', '/admin/perfil': 'principal', '/admin/fit': 'principal', '/admin/fit/checkins': 'principal', '/admin/fit/treinos': 'principal' } as Record<string, string>)[path] ?? path.split('/')[2];
     if (slug) link.setAttribute('href', `/images/modules/${slug}.png`);
     return () => link.setAttribute('href', original);
   }, [path]);
