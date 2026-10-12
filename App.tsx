@@ -5,6 +5,7 @@ import { PublicSite } from './components/PublicSite';
 import { VideoCatalog } from './components/VideoCatalog';
 import { VideoCallPage } from './components/VideoCallPage';
 import { ServiceFaqPages } from './components/ServiceFaqPages';
+import { ClientsPage } from './components/ClientsPage';
 import type { Service } from './types';
 import { useHomeContent } from './services/homeContentService';
 
@@ -53,11 +54,13 @@ const AppContent: React.FC = () => {
   const isAgent = path === '/agente-hdc' || path.startsWith('/agente-hdc/');
   const isKart = path === '/kart' || path.startsWith('/kart/');
   const isCall = path === '/agendar-chamada';
+  // Página exclusiva de quem recebeu o personagem na festa (QR do certificado); link compartilhável, fora do Google (noindex)
+  const isClients = path === '/clientes' || path === '/clientes/';
   const isFaq = path === '/duvidas' || path.startsWith('/duvidas/');
   const faqSlug = isFaq ? decodeURIComponent(path.split('/').filter(Boolean)[1] ?? '') : '';
   // Serviço aberto em /duvidas/{slug}: undefined = carregando, null = inexistente ou sem dúvidas (não indexar).
   const [faqService, setFaqService] = useState<Service | null | undefined>(undefined);
-  const homeContent = useHomeContent(!isAdmin && !isVideos && !isAgent && !isKart && !isCall && !isFaq);
+  const homeContent = useHomeContent(!isAdmin && !isVideos && !isAgent && !isKart && !isCall && !isFaq && !isClients);
 
   // Ícone do iOS ("Adicionar à Tela de Início") próprio da plataforma de streaming, da área do agente e do campeonato de kart
   const iosIcon = isVideos ? '/images/modules/streaming.png' : isAgent ? '/images/modules/agente-hdc.png' : isKart ? '/images/modules/kart.png' : null;
@@ -73,9 +76,10 @@ const AppContent: React.FC = () => {
     const structuredDataId = 'site-seo-structured-data';
     const existingStructuredData = document.getElementById(structuredDataId);
 
-    if (isAdmin || isAgent || isKart) {
+    if (isAdmin || isAgent || isKart || isClients) {
       if (isAgent) document.title = 'Agente HDC';
       if (isKart) document.title = 'Campeonato Viegas Kart';
+      if (isClients) document.title = 'Herói da Cidade | Acesso exclusivo';
       setMeta('name', 'robots', 'noindex, nofollow');
       document.querySelector('link[rel="canonical"]')?.remove();
       document.querySelector('meta[name="description"]')?.remove();
@@ -148,7 +152,7 @@ const AppContent: React.FC = () => {
       document.head.appendChild(script);
     }
     script.textContent = JSON.stringify(structuredData);
-  }, [isAdmin, isAgent, isKart, isVideos, isCall, isFaq, faqSlug, faqService, homeContent.seoTitle, homeContent.seoDescription]);
+  }, [isAdmin, isAgent, isKart, isClients, isVideos, isCall, isFaq, faqSlug, faqService, homeContent.seoTitle, homeContent.seoDescription]);
 
   if (isAdmin) {
     return (
@@ -175,6 +179,8 @@ const AppContent: React.FC = () => {
       </Suspense>
     );
   }
+
+  if (isClients) return <ClientsPage />;
 
   // Página pública de agendamento de Vídeo Chamada (link compartilhável; substitui o link do Calendly)
   if (isCall) return <VideoCallPage />;

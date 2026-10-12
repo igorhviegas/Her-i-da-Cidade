@@ -15,6 +15,7 @@ import { AdminInstagramPage } from '../AdminInstagramPage';
 import { AdminAgentPage } from '../AdminAgentPage';
 import { AdminProfilePage } from '../AdminProfilePage';
 import { AdminKartPage } from '../AdminKartPage';
+import { AdminClientAreaPage } from '../AdminClientAreaPage';
 import { AdminFitPage } from '../AdminFitPage';
 import { AdminFitCheckinsPage } from '../AdminFitCheckinsPage';
 import { AdminFitWorkoutsPage } from '../AdminFitWorkoutsPage';
@@ -62,5 +63,6 @@ export const AdminTabContentSecondary: React.FC<AdminTabContentProps> = ({ curre
     {currentTab === 'fitcheckins' && <AdminFitCheckinsPage />}
     {currentTab === 'fittreinos' && <AdminFitWorkoutsPage />}
     {currentTab === 'kart' && <AdminKartPage />}
+    {currentTab === 'clientarea' && <AdminClientAreaPage />}
   </>
 );
