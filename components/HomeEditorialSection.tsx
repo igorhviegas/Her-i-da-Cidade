@@ -11,7 +11,7 @@ export const HomeEditorialSection: React.FC<Props> = ({ section }) => {
   if (section.sectionType === 'image-text') {
     return (
       <section className="py-16 sm:py-24 px-4 sm:px-6">
-        <div className="mx-auto grid max-w-7xl items-center gap-10 md:grid-cols-2">
+        <div className="mx-auto grid grid-cols-1 max-w-7xl items-center gap-10 md:grid-cols-2">
           {imageUrl && <img src={imageUrl} alt={section.title} loading="lazy" className="aspect-video w-full rounded-2xl border border-white/10 object-cover" />}
           <div className="space-y-5">
             {section.subtitle && <p className="text-xs font-black uppercase tracking-[0.3em] text-blue-400">{section.subtitle}</p>}

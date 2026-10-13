@@ -22,7 +22,7 @@ export const StockMaterialForm: React.FC<StockMaterialFormProps> = ({ mode, form
     <form onSubmit={onSubmit} className={`${cardClass} space-y-3`}>
       <h3 className="text-sm font-bold text-white">{formTitle(mode)}</h3>
       {showMaterialFields && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className={labelClass}>Nome *<input required value={form.name} onChange={(e) => set({ name: e.target.value })} className={inputClass} /></label>
           <label className={labelClass}>Categoria *<input required value={form.category} onChange={(e) => set({ category: e.target.value })} className={inputClass} /></label>
           <label className={labelClass}>Unidade de medida *<input required value={form.unit} onChange={(e) => set({ unit: e.target.value })} className={inputClass} placeholder="unidade, pacote…" /></label>
@@ -34,14 +34,14 @@ export const StockMaterialForm: React.FC<StockMaterialFormProps> = ({ mode, form
         </div>
       )}
       {mode.kind === 'entry' && (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className={labelClass}>Quantidade *<input required type="number" inputMode="numeric" min="1" step="1" value={form.quantity} onChange={(e) => set({ quantity: e.target.value })} className={inputClass} /></label>
           <label className={labelClass}>Data *<input required type="date" value={form.date} onChange={(e) => set({ date: e.target.value })} className={inputClass} /></label>
           <label className={labelClass}>Observação<input value={form.note} onChange={(e) => set({ note: e.target.value })} className={inputClass} placeholder="Ex.: compra na loja X" /></label>
         </div>
       )}
       {mode.kind === 'adjust' && (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className={labelClass}>Saldo contado * <span className="font-normal text-white/40">(atual: {mode.material.balance})</span><input required type="number" inputMode="numeric" min="0" step="1" value={form.newBalance} onChange={(e) => set({ newBalance: e.target.value })} className={inputClass} /></label>
           <label className={labelClass}>Data *<input required type="date" value={form.date} onChange={(e) => set({ date: e.target.value })} className={inputClass} /></label>
           <label className={labelClass}>Motivo *<input required value={form.note} onChange={(e) => set({ note: e.target.value })} className={inputClass} placeholder="Ex.: contagem do inventário" /></label>

@@ -42,20 +42,20 @@ interface OrderDetailsHeaderProps {
 const OrderDetailsHeader: React.FC<OrderDetailsHeaderProps> = ({ selectedOrder, titleColor, isUpdatingSelectedOrder, updatingOrderId, deletingOrderId, setSelectedOrder, setEditOrderOpen, setDuplicateSource }) => {
   const { client, service } = selectedOrder;
   return (
-    <header className="sticky top-0 flex items-start justify-between gap-4 border-b border-white/10 bg-[#0D1527]/95 px-5 py-4 backdrop-blur sm:px-6">
+    <header className="sticky top-0 flex items-start justify-between gap-3 border-b border-white/10 bg-[#0D1527]/95 px-4 py-4 backdrop-blur sm:gap-4 sm:px-6">
       <div className="min-w-0">
         <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-300">Detalhes do pedido</p>
-        <h2 id="order-details-title" className={`mt-1 break-words text-2xl font-extrabold leading-tight ${titleColor}`}>{client?.name || 'Cliente não encontrado'}</h2>
+        <h2 id="order-details-title" className={`mt-1 break-words text-xl font-extrabold leading-tight sm:text-2xl ${titleColor}`}>{client?.name || 'Cliente não encontrado'}</h2>
         <p className={`mt-0.5 break-words text-sm font-semibold ${titleColor}`}>{service?.title || 'Serviço não encontrado'}</p>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         <button type="button" onClick={() => { setDuplicateSource(selectedOrder); setSelectedOrder(null); }} disabled={Boolean(updatingOrderId || deletingOrderId)} aria-label="Duplicar pedido" title="Duplicar pedido" className="rounded-lg border border-white/10 p-2 text-white/70 hover:bg-white/5 disabled:opacity-50">
           <Copy className="h-4 w-4" />
         </button>
         <button type="button" onClick={() => setEditOrderOpen(true)} disabled={Boolean(updatingOrderId || deletingOrderId)} aria-label="Editar pedido" title="Editar pedido" className="rounded-lg border border-blue-500/25 bg-blue-500/10 p-2 text-blue-200 hover:bg-blue-500/20 disabled:opacity-50">
           <Pencil className="h-4 w-4" />
         </button>
-        <button type="button" onClick={() => setSelectedOrder(null)} disabled={isUpdatingSelectedOrder} aria-label="Fechar detalhes" title="Fechar" className="ml-2 rounded-lg p-2 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-40"><X className="h-5 w-5" /></button>
+        <button type="button" onClick={() => setSelectedOrder(null)} disabled={isUpdatingSelectedOrder} aria-label="Fechar detalhes" title="Fechar" className="rounded-lg p-2 text-white/55 sm:ml-2 hover:bg-white/10 hover:text-white disabled:opacity-40"><X className="h-5 w-5" /></button>
       </div>
     </header>
   );
@@ -183,7 +183,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           {orderActionError && <p role="alert" className="rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-sm text-red-200">{orderActionError}</p>}
           <OrderStatusSelect order={order} isUpdatingSelectedOrder={isUpdatingSelectedOrder} handleStatusChange={handleStatusChange} />
 
-          <dl className="grid gap-x-5 sm:grid-cols-2">
+          <dl className="grid grid-cols-1 gap-x-5 sm:grid-cols-2">
             {detailRows.map(([label, value]) => (
               <div key={label} className="min-w-0 border-b border-white/[0.07] py-2.5">
                 <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/40">{label}</dt>
@@ -213,7 +213,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
           <details className="group border-t border-white/[0.07] pt-3">
             <summary className="cursor-pointer select-none text-[11px] font-semibold uppercase tracking-[0.12em] text-white/35 hover:text-white/60">Informações técnicas</summary>
-            <dl className="mt-2 grid gap-x-5 sm:grid-cols-2">
+            <dl className="mt-2 grid grid-cols-1 gap-x-5 sm:grid-cols-2">
               {technicalRows.map(([label, value]) => (
                 <div key={label} className="min-w-0 py-1.5">
                   <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/40">{label}</dt>

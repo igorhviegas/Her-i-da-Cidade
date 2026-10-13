@@ -128,7 +128,7 @@ export const FinanceManychat: React.FC<{ entries: RevenueEntry[]; monthKey: stri
             <Kpi label="Em quem fechou / sem venda" value={`${brl(view.link.spendSold)} / ${brl(view.link.spendNoSale)}`} hint="cliente cadastrado com pedido no mês × demais contatos" />
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <section className={cardClass}>
               <h3 className="mb-3 text-sm font-bold text-white">Por dia · {monthLabel(monthKey)}</h3>
               <SpendBars step={5} format={brl} items={view.days.map((d) => ({ key: `${monthKey}-${pad(d.day)}`, label: `${pad(d.day)}/${monthKey.slice(5)} · ${d.count} msg`, tick: String(d.day), value: d.total }))} />

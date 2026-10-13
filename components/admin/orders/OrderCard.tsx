@@ -40,8 +40,8 @@ const OrderCardInfo: React.FC<OrderCardInfoProps> = ({ order, client, service, s
   return (
     <>
       <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-white/35">Pedido {formatOrderReference(order, allOrderRecords)}</p>
-      <h4 className="truncate text-sm font-bold text-white">{client?.name || 'Cliente não encontrado'}</h4>
-      <p className={`mt-0.5 truncate text-xs ${colorClasses ? `font-semibold ${colorClasses.title}` : 'text-white/55'}`}>{service?.title || 'Serviço não encontrado'}</p>
+      <h4 className="line-clamp-2 break-words text-sm font-bold text-white">{client?.name || 'Cliente não encontrado'}</h4>
+      <p className={`mt-0.5 line-clamp-2 break-words text-xs ${colorClasses ? `font-semibold ${colorClasses.title}` : 'text-white/55'}`}>{service?.title || 'Serviço não encontrado'}</p>
       {childName && <p className="mt-0.5 truncate text-xs text-white/70">Criança: <span className="font-semibold text-white/90">{childName}</span></p>}
       {order.scriptId && <p className="mt-1 truncate text-[11px] text-blue-200/75"><span className="mr-1 rounded bg-blue-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">Roteiro</span>{script?.title || 'Roteiro não encontrado'}</p>}
     </>

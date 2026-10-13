@@ -95,7 +95,7 @@ export const VideoAddonsSection: React.FC<{ value: VideoAddons; onChange: (next:
       )}
       <label className="flex items-center gap-2 text-sm text-white"><input type="checkbox" checked={value.invite} onChange={(e) => set({ invite: e.target.checked })} disabled={disabled} />{VIDEO_KINDS.invite.label}</label>
       {value.invite && (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className={`${labelClass} sm:col-span-2`}>Nome do aniversariante *<input value={value.inviteName} onChange={(e) => set({ inviteName: e.target.value })} disabled={disabled} className={inputClass} /></label>
           <label className={labelClass}>Idade<input inputMode="numeric" value={value.inviteAge} onChange={(e) => set({ inviteAge: e.target.value.replace(/\D/g, '') })} disabled={disabled} className={inputClass} placeholder="Ex.: 7" /></label>
           <label className={labelClass}>Horário no convite<input type="time" value={value.inviteTime} onChange={(e) => set({ inviteTime: e.target.value })} disabled={disabled} className={inputClass} /></label>

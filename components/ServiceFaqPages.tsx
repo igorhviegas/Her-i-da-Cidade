@@ -69,7 +69,7 @@ export const ServiceFaqPages: React.FC<{ slug?: string; onResolved?: (service: S
         {withFaq.length === 0 ? (
           <p className="mt-10 text-sm text-white/50">Ainda não há dúvidas cadastradas.</p>
         ) : (
-          <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {withFaq.map((s) => (
               <li key={s.id}>
                 <Link href={`/duvidas/${slugify(s.title)}`} className="group flex min-h-24 items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-3 transition-colors hover:border-white/30 hover:bg-white/10">

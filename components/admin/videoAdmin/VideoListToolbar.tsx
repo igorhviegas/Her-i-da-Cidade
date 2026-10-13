@@ -96,14 +96,14 @@ const VideoFilterControls: React.FC<VideoFilterControlsProps> = ({
   sortBy,
   onSortByChange,
 }) => (
-  <div className="flex flex-wrap items-center gap-3">
+  <div className="flex min-w-0 max-w-full flex-wrap items-center gap-3">
     {/* Filtro por Categoria */}
-    <div className="flex items-center gap-1.5">
-      <span className="text-white/50 font-medium">Categoria:</span>
+    <div className="flex min-w-0 max-w-full items-center gap-1.5">
+      <span className="shrink-0 text-white/50 font-medium">Categoria:</span>
       <select
         value={selectedCategory}
         onChange={(e) => onSelectedCategoryChange(e.target.value)}
-        className="bg-[#070B14] border border-white/10 rounded-xl px-3 py-1.5 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+        className="min-w-0 max-w-full flex-1 bg-[#070B14] border border-white/10 rounded-xl px-3 py-1.5 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
       >
         <option value="Todas">Todas ({videosCount})</option>
         {existingCategories.map((cat) => (
@@ -127,12 +127,12 @@ const VideoFilterControls: React.FC<VideoFilterControlsProps> = ({
     </button>
 
     {/* Ordenação */}
-    <div className="flex items-center gap-1.5">
-      <span className="text-white/50 font-medium">Ordenar por:</span>
+    <div className="flex min-w-0 max-w-full items-center gap-1.5">
+      <span className="shrink-0 text-white/50 font-medium">Ordenar por:</span>
       <select
         value={sortBy}
         onChange={(e) => onSortByChange(e.target.value as SortOption)}
-        className="bg-[#070B14] border border-white/10 rounded-xl px-3 py-1.5 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+        className="min-w-0 max-w-full flex-1 bg-[#070B14] border border-white/10 rounded-xl px-3 py-1.5 text-white focus:outline-none focus:border-blue-500 cursor-pointer"
       >
         <option value="order">Ordem de exibição</option>
         <option value="title-asc">Ordem alfabética A–Z</option>
@@ -178,7 +178,7 @@ const VideoResultsAndViewToggle: React.FC<VideoResultsAndViewToggleProps> = ({
       <button
         type="button"
         onClick={() => onViewModeChange('grid')}
-        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
+        className={`flex items-center gap-1 px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
           viewMode === 'grid'
             ? 'bg-blue-600 text-white shadow-sm'
             : 'text-white/50 hover:text-white'
@@ -192,7 +192,7 @@ const VideoResultsAndViewToggle: React.FC<VideoResultsAndViewToggleProps> = ({
       <button
         type="button"
         onClick={() => onViewModeChange('list')}
-        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
+        className={`flex items-center gap-1 px-3 py-1.5 sm:px-2.5 sm:py-1 rounded-lg font-bold text-xs transition-colors cursor-pointer ${
           viewMode === 'list'
             ? 'bg-blue-600 text-white shadow-sm'
             : 'text-white/50 hover:text-white'

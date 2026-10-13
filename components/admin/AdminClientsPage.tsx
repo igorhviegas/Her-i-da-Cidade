@@ -100,15 +100,15 @@ export const AdminClientsPage: React.FC = () => {
   const selected = rows.find(({ client }) => client.id === selectedClientId) || null;
 
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <section className="w-full animate-in fade-in duration-200">
       {selected ? (
         <>
           <button type="button" onClick={() => setSelectedClientId(null)} className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-blue-300 hover:text-blue-200"><ArrowLeft className="h-4 w-4" /> Voltar aos clientes</button>
           <div className="mb-6 rounded-2xl border border-white/10 bg-[#0B1120] p-5 sm:p-6">
             <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-300">Perfil do cliente</p>
-            <h2 className="mt-2 text-2xl font-extrabold text-white">{selected.client.name}</h2>
+            <h2 className="mt-2 break-words text-2xl font-extrabold text-white">{selected.client.name}</h2>
             <p className="mt-1 text-sm text-white/60">{selected.client.whatsapp || 'WhatsApp não informado'}</p>
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Metric label="Cadastrado em" value={formatDate(selected.client.createdAt)} />
               <Metric label="Pedidos" value={String(selected.orders.length)} />
               <Metric label="Total gasto" value={money(selected.spent)} />
@@ -118,7 +118,7 @@ export const AdminClientsPage: React.FC = () => {
             <div className="border-b border-white/10 px-5 py-4"><h3 className="font-bold text-white">Histórico de pedidos</h3></div>
             {selected.orders.length === 0 ? <p className="p-8 text-center text-sm text-white/45">Este cliente ainda não possui pedidos.</p> : (
               <div className="divide-y divide-white/5">
-                {selected.orders.map((order) => <button key={order.id} type="button" onClick={() => navigate(`/admin/pedidos?orderId=${encodeURIComponent(order.id)}`)} className="grid w-full gap-2 px-5 py-4 text-left transition-colors hover:bg-white/[0.03] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                {selected.orders.map((order) => <button key={order.id} type="button" onClick={() => navigate(`/admin/pedidos?orderId=${encodeURIComponent(order.id)}`)} className="grid grid-cols-1 w-full gap-2 px-5 py-4 text-left transition-colors hover:bg-white/[0.03] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <span className="min-w-0"><span className="block truncate text-sm font-semibold text-white"><span className="mr-2 text-white/40">{formatOrderReference(order, orders)}</span>{serviceNames.get(order.serviceId) || `Serviço indisponível (${order.serviceId})`}</span><span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/45"><span>Pedido: {formatDate(order.createdAt)}</span>{order.paidAt && <span>Pago: {formatDate(order.paidAt)}</span>}{order.customerDueDate && <span>Prazo: {formatDate(order.customerDueDate)}</span>}</span></span>
                   <span className="flex items-center justify-between gap-4 sm:justify-end"><span className="text-sm font-bold text-emerald-300">{validPaidAmount(order) !== null ? money(validPaidAmount(order)) : 'Pago não registrado'}</span><span className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-white/65">{statusNames[order.status] || order.status}</span></span>
                 </button>)}
@@ -139,8 +139,8 @@ export const AdminClientsPage: React.FC = () => {
           <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0B1120]">
             <div className="hidden grid-cols-[minmax(0,1.5fr)_minmax(140px,1fr)_120px_150px_150px] gap-4 border-b border-white/10 bg-white/[0.02] px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-white/40 md:grid"><span>Cliente</span><span>WhatsApp</span><span>Pedidos</span><span>Total gasto</span><span>Último pedido</span></div>
             {loading ? <div className="p-12 text-center text-sm text-white/45">Carregando clientes…</div> : visibleRows.length === 0 ? <div className="p-12 text-center"><Users className="mx-auto h-8 w-8 text-white/20" /><p className="mt-3 text-sm text-white/45">{search ? 'Nenhum cliente encontrado.' : 'Nenhum cliente cadastrado.'}</p></div> : visibleRows.map((row) => (
-              <button key={row.client.id} type="button" onClick={() => setSelectedClientId(row.client.id)} className="grid w-full gap-2 border-b border-white/5 px-5 py-4 text-left transition-colors last:border-0 hover:bg-white/[0.03] md:grid-cols-[minmax(0,1.5fr)_minmax(140px,1fr)_120px_150px_150px] md:items-center md:gap-4">
-                <span className="truncate text-sm font-semibold text-white">{row.client.name}</span><span className="text-sm text-white/55">{row.client.whatsapp || '—'}</span><span className="text-xs text-white/45 md:text-sm md:text-white/65">{row.orders.length} pedidos</span><span className="text-sm font-semibold text-emerald-300">{money(row.spent)}</span><span className="inline-flex items-center gap-1.5 text-xs text-white/45"><CalendarDays className="h-3.5 w-3.5" />{row.lastOrder ? formatDate(row.lastOrder) : '—'}</span>
+              <button key={row.client.id} type="button" onClick={() => setSelectedClientId(row.client.id)} className="grid grid-cols-1 w-full gap-2 border-b border-white/5 px-5 py-4 text-left transition-colors last:border-0 hover:bg-white/[0.03] md:grid-cols-[minmax(0,1.5fr)_minmax(140px,1fr)_120px_150px_150px] md:items-center md:gap-4">
+                <span className="line-clamp-2 break-words text-sm font-semibold text-white">{row.client.name}</span><span className="text-sm text-white/55">{row.client.whatsapp || '—'}</span><span className="text-xs text-white/45 md:text-sm md:text-white/65">{row.orders.length} pedidos</span><span className="text-sm font-semibold text-emerald-300">{money(row.spent)}</span><span className="inline-flex items-center gap-1.5 text-xs text-white/45"><CalendarDays className="h-3.5 w-3.5" />{row.lastOrder ? formatDate(row.lastOrder) : '—'}</span>
               </button>
             ))}
           </div>

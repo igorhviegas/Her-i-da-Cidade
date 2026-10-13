@@ -62,7 +62,7 @@ export const ReportsOperations: React.FC<Props> = ({ completed, clients: pageCli
         {!error && !health && <p className="text-sm text-white/45">Carregando…</p>}
         {health && (
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-3">
               <Kpi label="Em andamento" value={String(health.total)} />
               <Kpi label="Atrasados" value={String(health.overdue.length)} tone={health.overdue.length ? 'text-red-300' : 'text-emerald-300'} hint="Prazo ao cliente vencido" />
               <Kpi label="Vencem em 2 dias" value={String(health.dueSoon)} tone={health.dueSoon ? 'text-amber-200' : 'text-white'} hint="Inclui hoje" />

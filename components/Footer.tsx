@@ -48,7 +48,7 @@ export const Footer: React.FC = () => {
   return (
     <footer id="contact" className="bg-black pt-24 pb-12 border-t border-white/5">
       <div className="max-w-7xl mx-auto px-6">
-        <div className="grid md:grid-cols-2 gap-16 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-16 mb-16">
           <div className="flex flex-col">
             <div className="flex items-center gap-2 mb-8">
               <div className="w-10 h-10 bg-[#0072d2] rounded-full flex items-center justify-center shadow-lg shadow-blue-600/10 overflow-hidden">

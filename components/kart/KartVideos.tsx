@@ -49,7 +49,7 @@ export const KartVideos: React.FC<{ videos: KartVideo[] | null }> = ({ videos })
       {list.length === 0 ? (
         <p className={`${card} px-5 py-8 text-center text-white/50`}>Ainda não há vídeos desta categoria.</p>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {list.map((v) => (
             <li key={v.id}>
               <button type="button" onClick={() => { setPlaying(v.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className={`${card} group block w-full overflow-hidden text-left transition-colors hover:border-white/30 ${v.id === playing ? 'border-red-500/60' : ''}`}>

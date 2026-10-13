@@ -53,7 +53,7 @@ export const InstagramAudit: React.FC<{ current: InstagramPost[] }> = ({ current
       ) : (
         <>
           <p className="mt-1 text-xs text-white/50">Múltiplo = {METRIC_LABEL[audit.metric]} da publicação ÷ mediana da conta ({fmt(audit.median)}). Sem alcance, compartilhamentos nem retenção na API: leia como indício, não como causa.</p>
-          <div className="mt-4 grid gap-6 md:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
             <Ranking title="Mais acima da mediana" items={audit.top} metric={audit.metric} />
             <Ranking title="Mais abaixo da mediana" items={audit.bottom} metric={audit.metric} />
             <Groups title="Por tipo (mediana dos múltiplos)" groups={audit.groups.kind} label={(key) => KIND_LABEL[key] ?? key} />

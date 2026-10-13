@@ -81,7 +81,7 @@ export const AdminFitCheckinsPage: React.FC = () => {
 
       <form onSubmit={submitCheckin} className={`${cardClass} space-y-3`}>
         <h3 className="text-sm font-bold text-white">Registrar check-in</h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className={labelClass}>Tipo
             <select className={inputClass} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as CheckinKind })}>
               {(Object.keys(CHECKIN_KINDS) as CheckinKind[]).map((k) => <option key={k} value={k}>{CHECKIN_KINDS[k]}</option>)}

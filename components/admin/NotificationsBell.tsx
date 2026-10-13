@@ -54,7 +54,7 @@ export const NotificationsBell: React.FC<{ onOpenMissions: () => void }> = ({ on
         {items.length > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">{items.length > 9 ? '9+' : items.length}</span>}
       </button>
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-white/10 bg-[#0D1527] p-3 shadow-2xl">
+        <div className="fixed inset-x-4 top-[4.5rem] z-30 rounded-2xl border border-white/10 bg-[#0D1527] p-3 shadow-2xl sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80">
           <div className="mb-2 flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-white/60">Avisos</span>
             {items.length > 0 && (
@@ -65,7 +65,7 @@ export const NotificationsBell: React.FC<{ onOpenMissions: () => void }> = ({ on
             )}
           </div>
           {items.length === 0 ? <p className="py-4 text-center text-xs text-white/40">Nenhum aviso.</p> : (
-            <ul className="max-h-80 space-y-1.5 overflow-y-auto">
+            <ul className="max-h-[60vh] space-y-1.5 overflow-y-auto overscroll-contain sm:max-h-80">
               {items.map((n) => {
                 const { icon: Icon, badge, card } = LOOKS[n.type] ?? DEFAULT_LOOK;
                 return (

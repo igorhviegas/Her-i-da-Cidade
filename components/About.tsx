@@ -13,7 +13,7 @@ export const About: React.FC<{ section: HomeSection }> = ({ section }) => {
 
   return (
     <section id="about" className="py-24 bg-gradient-to-b from-[#0B1929] to-black border-y border-white/5">
-      <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-16 items-center">
+      <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
         <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-blue-900/10 group">
           <img 
             src={section.imageUrl || "https://disciplinary-peach-obfj8i7gqu.edgeone.app/profissional%201.jpeg"}

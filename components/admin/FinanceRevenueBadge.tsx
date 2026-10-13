@@ -26,7 +26,7 @@ export const FinanceRevenueBadge: React.FC = () => {
 
   return (
     <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 py-1 pl-2 pr-1" title="Faturamento do mês atual (serviços concluídos, pagos ou não)">
-      <Coins className="h-3.5 w-3.5 shrink-0 text-amber-300" aria-hidden />
+      <Coins className="hidden h-3.5 w-3.5 shrink-0 text-amber-300 min-[360px]:block" aria-hidden />
       <span className="whitespace-nowrap text-xs font-bold tabular-nums text-white/90" aria-live="polite">
         {failed ? '—' : total === null ? '…' : hidden ? 'R$ ••••' : formatMoney(total)}
       </span>

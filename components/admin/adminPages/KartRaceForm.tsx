@@ -52,7 +52,7 @@ export const KartRaceForm: React.FC<{ pilots: KartPilot[]; race: KartRace | null
         <span><b className="text-white">Corrida fora do campeonato</b><span className="block text-white/60">Não dá pontos, vitórias nem pódios; vale só para o recorde de melhor volta da pista (ex.: ir sozinho tentar bater a volta). Aceita 1 piloto ou mais.</span></span>
       </label>
 
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <label className="text-xs text-white/50">Data<input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={`${input} mt-1`} /></label>
         <label className="text-xs text-white/50">Horário da bateria (opcional)<input type="time" value={time} onChange={(e) => setTime(e.target.value)} className={`${input} mt-1`} /></label>
         <fieldset className="text-xs text-white/50">Pista

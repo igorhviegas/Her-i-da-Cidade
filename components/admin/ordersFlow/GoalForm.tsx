@@ -43,7 +43,7 @@ export const GoalForm: React.FC<{ goal: GoalView | null; onClose: () => void; on
     <form onSubmit={submit} className={`${cardClass} space-y-3`}>
       <label className={labelClass}>Título<input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} required className={inputClass} /></label>
       <label className={labelClass}>Descrição<textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} maxLength={1000} className={inputClass} /></label>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <label className={labelClass}>Período
           <select value={period} onChange={(e) => setPeriod(e.target.value as GoalPeriod)} className={inputClass}><option value="daily">Diário</option><option value="weekly">Semanal</option><option value="monthly">Mensal</option></select>
         </label>

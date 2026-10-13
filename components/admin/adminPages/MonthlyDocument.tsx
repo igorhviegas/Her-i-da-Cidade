@@ -122,9 +122,9 @@ export const MonthlyDocument: React.FC<{ data: MonthlyData }> = ({ data }) => {
       <Section title="Serviços">
         {data.services.length === 0 ? <p className="text-sm text-slate-500">Sem faturamento no mês.</p> : (
           <table className="w-full text-sm">
-            <thead><tr className="text-left text-[11px] uppercase tracking-wider text-slate-500"><th className="pb-1 font-semibold">Serviço</th><th className="pb-1 text-right font-semibold">Qtd</th><th className="pb-1 text-right font-semibold">Faturamento</th><th className="pb-1 text-right font-semibold">%</th></tr></thead>
+            <thead><tr className="text-left text-[11px] uppercase tracking-wider text-slate-500"><th className="pb-1 font-semibold">Serviço</th><th className="pb-1 pl-3 text-right font-semibold">Qtd</th><th className="pb-1 pl-3 text-right font-semibold">Faturamento</th><th className="pb-1 pl-3 text-right font-semibold">%</th></tr></thead>
             <tbody className="divide-y divide-slate-100">
-              {data.services.map((s) => <tr key={s.serviceId}><td className="py-1">{s.name}</td><td className="py-1 text-right tabular-nums">{s.count}</td><td className="py-1 text-right tabular-nums">{formatMoney(s.revenue)}</td><td className="py-1 text-right tabular-nums text-slate-500">{pct(s.share)}</td></tr>)}
+              {data.services.map((s) => <tr key={s.serviceId}><td className="py-1">{s.name}</td><td className="py-1 pl-3 text-right tabular-nums">{s.count}</td><td className="py-1 pl-3 text-right tabular-nums">{formatMoney(s.revenue)}</td><td className="py-1 pl-3 text-right tabular-nums text-slate-500">{pct(s.share)}</td></tr>)}
             </tbody>
           </table>
         )}

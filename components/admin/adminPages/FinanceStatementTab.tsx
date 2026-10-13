@@ -71,7 +71,7 @@ export const FinanceStatementTab: React.FC<FinanceStatementTabProps> = ({ statem
           className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${kindFilter === id ? (id === 'in' ? 'bg-emerald-600 text-white' : id === 'out' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white') : 'text-white/60 hover:text-white'}`}>{label}</button>
       ))}
     </div>
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-3">
       <Kpi label="Entradas" value={formatMoney(statement.totalIn)} tone="text-emerald-300" />
       <Kpi label="Saídas" value={formatMoney(statement.totalOut)} tone="text-red-300" />
       <Kpi label="Saldo do mês" value={formatMoney(statement.balance)} tone={statement.balance >= 0 ? 'text-white' : 'text-red-300'} />

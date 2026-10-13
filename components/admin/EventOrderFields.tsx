@@ -46,13 +46,13 @@ export const EventOrderFields: React.FC<{ value: EventFormState; onChange: (next
     <>
       <section className="space-y-3 border-t border-white/10 pt-4">
         <h3 className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-blue-300">Evento</h3>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className={labelClass}>Nome da criança *<input required value={value.childName} onChange={(e) => set({ childName: e.target.value })} disabled={disabled} className={inputClass} placeholder="Aniversariante" /></label>
           <label className={labelClass}>#formulário *<input required value={value.formType} onChange={(e) => set({ formType: e.target.value })} disabled={disabled} className={inputClass} placeholder="Ex.: Aniversário" /></label>
           <label className={labelClass}>Data do evento *<input required type="date" value={value.eventDate} onChange={(e) => set({ eventDate: e.target.value })} disabled={disabled} className={inputClass} /></label>
           <label className={labelClass}>Horário de início *<input required type="time" value={value.eventTime} onChange={(e) => set({ eventTime: e.target.value })} disabled={disabled} className={inputClass} /></label>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className={labelClass}>Data de nascimento<input type="date" value={value.birthDate ?? ''} onChange={(e) => set({ birthDate: e.target.value })} disabled={disabled} className={inputClass} /></label>
           <label className={labelClass}>Necessidade especial (PCD/PNE)
             <select value={value.pcd ?? ''} onChange={(e) => set({ pcd: e.target.value as '' | 'yes' | 'no' })} disabled={disabled} className={inputClass}>
@@ -61,7 +61,7 @@ export const EventOrderFields: React.FC<{ value: EventFormState; onChange: (next
           </label>
         </div>
         <label className={labelClass}>Local *<input required value={value.location} onChange={(e) => set({ location: e.target.value })} disabled={disabled} className={inputClass} placeholder="Endereço ou local do evento" /></label>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset className={labelClass} disabled={disabled}>
             <legend>Autorização de uso de imagem *</legend>
             <div className="mt-1.5 flex gap-4 rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm text-white">
@@ -80,7 +80,7 @@ export const EventOrderFields: React.FC<{ value: EventFormState; onChange: (next
 
       <section className="space-y-3 border-t border-white/10 pt-4">
         <h3 className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-blue-300">Valores</h3>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <label className={labelClass}>Valor total *<input required type="number" min="0" step="0.01" value={value.totalValue} onChange={(e) => setTotal(e.target.value)} disabled={disabled} className={inputClass} placeholder="0,00" /></label>
           <label className={labelClass}>Valor de entrada *<input required type="number" min="0" step="0.01" value={value.entryValue} onChange={(e) => set({ entryValue: e.target.value, entryTouched: true })} disabled={disabled} className={inputClass} placeholder="50% do total" /></label>
           <label className={labelClass}>Custo<input type="number" min="0" step="0.01" value={value.cost} onChange={(e) => set({ cost: e.target.value })} disabled={disabled} className={inputClass} placeholder="Informar até concluir" /></label>

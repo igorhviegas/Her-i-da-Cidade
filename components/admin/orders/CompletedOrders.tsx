@@ -39,7 +39,7 @@ export const CompletedOrders: React.FC<CompletedOrdersProps> = ({
         </button>
       </div>
       {!completedOpen ? null : filteredCompletedOrders.length > 0 ? (
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {filteredCompletedOrders.map(({ order, client, service, script }) => {
             const birthdayPerson = extractBirthdayPerson(order);
             return (

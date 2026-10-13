@@ -23,7 +23,7 @@ const MissionChecklist: React.FC<{ m: Mission; busyId: string | null; run: RunAc
         <ul className="space-y-1">
           {m.checklist.map((item) => (
             <li key={item.id}>
-              <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <label className="flex cursor-pointer items-center gap-2 py-1 text-sm">
                 <input type="checkbox" checked={item.done} disabled={busyId === m.id} onChange={(e) => void run(m.id, () => toggleChecklistItem(m.id, item.id, e.target.checked))} className="h-4 w-4 shrink-0" />
                 <span className={item.done ? 'text-white/40 line-through' : 'text-white/85'}>{item.text}</span>
               </label>
@@ -46,18 +46,20 @@ export const MissionRow: React.FC<MissionRowProps> = ({ m, busyId, run, onEdit }
   const overdue = !!m.dueAt && m.dueAt < new Date();
   return (
     <li className={`${cardClass} flex items-start gap-3`}>
-      <button type="button" title="Concluir missão" disabled={busyId === m.id} onClick={() => run(m.id, () => completeMission(m.id))} className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-white/30 text-transparent transition-colors hover:border-emerald-400 hover:text-emerald-400 disabled:opacity-50">
+      <button type="button" title="Concluir missão" disabled={busyId === m.id} onClick={() => run(m.id, () => completeMission(m.id))} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-white/30 text-transparent transition-colors hover:border-emerald-400 hover:text-emerald-400 disabled:opacity-50 sm:mt-0.5 sm:h-6 sm:w-6">
         {busyId === m.id ? <Loader2 className="h-3 w-3 animate-spin text-white" /> : <Check className="h-3.5 w-3.5" />}
       </button>
       <div className="min-w-0 flex-1">
-        <p className="font-semibold text-white">{m.title}</p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="min-w-0 break-words pt-1 font-semibold text-white sm:pt-0">{m.title}</p>
+          <div className="flex shrink-0 gap-1">
+            <button type="button" title="Editar" onClick={() => onEdit(m)} className={ghostButton}><Pencil className="h-3.5 w-3.5" /></button>
+            <button type="button" title="Excluir" disabled={busyId === m.id} onClick={() => { if (confirm(`Excluir a missão "${m.title}"?`)) void run(m.id, () => deleteMission(m.id)); }} className={`${ghostButton} hover:!bg-red-500/20 hover:!text-red-300`}><Trash2 className="h-3.5 w-3.5" /></button>
+          </div>
+        </div>
         {m.description && <p className="mt-0.5 whitespace-pre-line text-xs text-white/60">{m.description}</p>}
         <MissionMeta m={m} overdue={overdue} />
         <MissionChecklist m={m} busyId={busyId} run={run} />
-      </div>
-      <div className="flex shrink-0 gap-1">
-        <button type="button" title="Editar" onClick={() => onEdit(m)} className={ghostButton}><Pencil className="h-3.5 w-3.5" /></button>
-        <button type="button" title="Excluir" disabled={busyId === m.id} onClick={() => { if (confirm(`Excluir a missão "${m.title}"?`)) void run(m.id, () => deleteMission(m.id)); }} className={`${ghostButton} hover:!bg-red-500/20 hover:!text-red-300`}><Trash2 className="h-3.5 w-3.5" /></button>
       </div>
     </li>
   );

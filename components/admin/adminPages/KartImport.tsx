@@ -92,7 +92,7 @@ const DraftCard: React.FC<{ draft: Draft; pilots: KartPilot[]; exists: boolean; 
 
       {!draft.error && (
         <>
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <label className="text-xs text-white/50">Data da corrida<input type="date" value={draft.date} onChange={(e) => onChange({ ...draft, date: e.target.value })} className={`${input} mt-1`} /></label>
             <fieldset className="text-xs text-white/50">Pista
               <div className="mt-1 grid grid-cols-2 gap-1">
@@ -109,7 +109,7 @@ const DraftCard: React.FC<{ draft: Draft; pilots: KartPilot[]; exists: boolean; 
           </label>
           {exists && <p className="rounded-lg bg-blue-500/10 px-3 py-2 text-sm text-blue-200">Esta corrida já está salva: salvar de novo substitui o resultado.</p>}
 
-          <ol className="grid gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
+          <ol className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
             {results.map((r) => (
               <li key={r.pilotId} className="flex items-baseline gap-2"><span className="w-6 text-right font-black tabular-nums text-white/50">{r.pos}</span><span className="min-w-0 flex-1 truncate">{r.name}</span><span className="text-xs tabular-nums text-white/45">P{r.racePos ?? 'NC'} · {formatLap(r.bestLapMs)}</span></li>
             ))}

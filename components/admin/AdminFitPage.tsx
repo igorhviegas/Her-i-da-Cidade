@@ -67,7 +67,7 @@ export const AdminFitPage: React.FC = () => {
           <div className="flex rounded-xl border border-white/10 bg-white/5 p-0.5" role="group" aria-label="Período">
             {RANGES.map((r) => (
               <button key={r} type="button" onClick={() => setRange(r)} aria-pressed={range === r}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${range === r ? 'bg-blue-600 text-white' : 'text-white/60 hover:text-white'}`}>{r} dias</button>
+                className={`rounded-lg px-3 py-2 text-xs font-semibold sm:py-1.5 transition ${range === r ? 'bg-blue-600 text-white' : 'text-white/60 hover:text-white'}`}>{r} dias</button>
             ))}
           </div>
           <button type="button" onClick={() => void load()} disabled={loading} className={ghostBtn} aria-label="Atualizar">
@@ -101,7 +101,7 @@ export const AdminFitPage: React.FC = () => {
             <h3 className="mb-3 text-sm font-bold text-white">Passos por dia</h3>
             <DailyBars days={view.dates} values={view.steps} unit="passos" label="Passos por dia" />
           </section>
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <section className={cardClass}>
               <h3 className="mb-3 text-sm font-bold text-white">Distância caminhada/corrida (km)</h3>
               <DailyBars days={view.dates} values={view.km} unit="km" decimals={1} label="Distância por dia" color="#10b981" />

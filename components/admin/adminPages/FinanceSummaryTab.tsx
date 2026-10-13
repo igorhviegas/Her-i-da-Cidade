@@ -94,7 +94,7 @@ export const FinanceSummaryTab: React.FC<FinanceSummaryTabProps> = ({ view, mont
   <div className="space-y-6">
     <SummaryKpis view={view} monthKey={monthKey} />
 
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <section className={cardClass}>
         <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-white"><TrendingUp className="h-4 w-4 text-blue-400" />Evolução mensal (12 meses)</h3>
         <MonthlyBars series={view.series} selected={monthKey} />

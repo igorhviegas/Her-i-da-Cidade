@@ -46,7 +46,7 @@ export const BackToTop: React.FC = () => {
            <path d="M2 0 Q -5 250 2 500 Q 9 750 2 1000" stroke="rgba(255,255,255,0.4)" strokeWidth="1" fill="none" className="animate-web-wiggle" />
         </svg>
       </div>
-      <button onClick={scrollToTop} aria-label="Voltar ao topo" className={`fixed bottom-28 right-8 z-[60] w-14 h-14 bg-[#0072d2]/20 backdrop-blur-xl border border-blue-400/40 rounded-full flex items-center justify-center transition-all duration-500 hover:scale-115 active:scale-90 group shadow-[0_0_30px_rgba(0,114,210,0.3)] ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
+      <button onClick={scrollToTop} aria-label="Voltar ao topo" className={`fixed bottom-24 right-5 sm:bottom-28 sm:right-8 z-[60] w-14 h-14 bg-[#0072d2]/20 backdrop-blur-xl border border-blue-400/40 rounded-full flex items-center justify-center transition-all duration-500 hover:scale-115 active:scale-90 group shadow-[0_0_30px_rgba(0,114,210,0.3)] ${isVisible ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
         <div className="absolute inset-0 bg-blue-500 rounded-full opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
         <div className={`relative transition-transform duration-300 ${isShooting ? '-translate-y-12 scale-150 rotate-12' : 'group-hover:-translate-y-1'}`}>
           <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7 text-white" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

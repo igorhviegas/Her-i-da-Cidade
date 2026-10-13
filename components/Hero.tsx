@@ -24,7 +24,7 @@ export const Hero: React.FC<{ section: HomeSection }> = ({ section }) => {
       </div>
 
       {/* Content Area */}
-      <div className="relative z-20 w-full max-w-7xl mx-auto px-6 sm:px-12 md:px-20 pb-16 sm:pb-0 flex flex-col items-start text-left">
+      <div className="relative z-20 w-full max-w-7xl mx-auto px-6 sm:px-12 md:px-20 pb-28 sm:pb-0 flex flex-col items-start text-left">
         <div className="inline-block px-4 py-1.5 bg-blue-500/10 backdrop-blur-xl rounded-full border border-blue-400/30 mb-6 shadow-[0_0_20px_rgba(59,130,246,0.1)] animate-fade-in-up">
           <span className="text-[9px] sm:text-xs font-black tracking-[0.4em] uppercase text-blue-400 drop-shadow-sm">{section.subtitle || 'Serviços Exclusivos'}</span>
         </div>

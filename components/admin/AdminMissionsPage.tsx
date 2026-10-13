@@ -160,7 +160,7 @@ const DaySummary: React.FC<{ data: MissionsData }> = ({ data }) => {
       {activeGoals.length > 0 && (
         <div className={cardClass}>
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/50">Metas em andamento</p>
-          <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
             {activeGoals.map((g) => (
               <div key={g.id} className="flex items-center gap-3">
                 <span className="min-w-0 flex-1 truncate text-xs text-white/80">{g.title}</span>

@@ -41,8 +41,8 @@ export const VideoCardThumb: React.FC<VideoCardPartProps> = ({ video, isFeatured
 
 export const VideoCardInfo: React.FC<VideoCardPartProps> = ({ video, isFeatured }) => (
   <div className="flex-1 min-w-0">
-    <div className="flex items-center gap-2 mb-1">
-      <h3 className="text-lg font-bold text-white truncate">{video.title}</h3>
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
+      <h3 className="min-w-0 max-w-full break-words text-base sm:text-lg font-bold text-white line-clamp-2">{video.title}</h3>
       {video.needsReview && <span className="px-1.5 py-0.5 bg-sky-500/20 text-sky-300 border border-sky-500/40 rounded font-black tracking-wide text-[9px] uppercase flex-shrink-0">Importado - revisar</span>}
     </div>
     <p className="text-sm text-white/60 line-clamp-2">{video.description}</p>

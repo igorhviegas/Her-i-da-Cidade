@@ -74,7 +74,7 @@ export const FinanceAssets: React.FC<{ assets: Asset[]; onChanged: () => Promise
       {editing && (
         <form onSubmit={submit} className={`${cardClass} space-y-3`}>
           <h3 className="text-sm font-bold text-white">{editing === 'new' ? 'Novo item do patrimônio' : `Editar ${editing.name}`}</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className={labelClass}>Nome do item *<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass} /></label>
             <label className={labelClass}>Categoria *<input required list="asset-categories" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputClass} /></label>
             <datalist id="asset-categories">{categories.map((c) => <option key={c} value={c} />)}</datalist>

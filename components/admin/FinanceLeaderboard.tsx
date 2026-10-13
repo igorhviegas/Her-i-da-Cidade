@@ -40,7 +40,7 @@ const Ranking: React.FC<{ title: string; by: 'count' | 'revenue'; entries: Reven
 export const FinanceLeaderboard: React.FC<{ entries: RevenueEntry[]; nameOf: (serviceId: string) => string }> = ({ entries, nameOf }) => (
   <div className="space-y-4">
     <p className="text-xs text-white/50">Considera pedidos concluídos, pela data do evento. Faturamento é o valor registrado nos pedidos, sem despesas.</p>
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <Ranking title="Ranking serviço mais pedido" by="count" entries={entries} nameOf={nameOf} />
       <Ranking title="Ranking de faturamento" by="revenue" entries={entries} nameOf={nameOf} />
     </div>

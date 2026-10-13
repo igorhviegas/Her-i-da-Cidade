@@ -109,7 +109,7 @@ export const InstagramHighlights: React.FC<HighlightsProps> = ({ period, onPerio
         ))}
       </div>
     </div>
-    <div className="grid gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       {([['Mais curtidas', 'likes'], ['Mais visualizações', 'views'], ['Mais comentários', 'comments']] as const).map(([title, metric]) => (
         <Highlight key={metric} title={title} post={topPost(periodPosts, metric)} metric={metric} empty={periodPosts.length ? 'Sem dados disponíveis' : 'Nenhuma publicação no período'} />
       ))}

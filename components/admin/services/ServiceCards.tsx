@@ -74,7 +74,7 @@ export const ServiceCards: React.FC<ServiceCardsProps> = ({
                 <span className="text-[11px] text-white/40 font-medium">Ordem:</span>
                 <button
                   onClick={() => handleQuickOrderChange(service, -1)}
-                  className="p-0.5 text-white/60 hover:text-white"
+                  className="p-2 sm:p-0.5 text-white/60 hover:text-white"
                   title="Diminuir ordem"
                 >
                   <ChevronDown className="w-3.5 h-3.5" />
@@ -84,7 +84,7 @@ export const ServiceCards: React.FC<ServiceCardsProps> = ({
                 </span>
                 <button
                   onClick={() => handleQuickOrderChange(service, 1)}
-                  className="p-0.5 text-white/60 hover:text-white"
+                  className="p-2 sm:p-0.5 text-white/60 hover:text-white"
                   title="Aumentar ordem"
                 >
                   <ChevronUp className="w-3.5 h-3.5" />
