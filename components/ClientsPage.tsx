@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Mic } from 'lucide-react';
 import { Link } from '../lib/router';
 import { useSiteConfig } from '../services/siteConfigService';
+import { PRIVACY_PATH } from '../services/privacy.js';
 import { subscribeToVideos } from '../services/videosService';
 import { pickFeaturedVideos, resolveClientsConfig } from '../services/clientsPage.js';
 import type { Video } from '../types';
@@ -119,6 +120,7 @@ export const ClientsPage: React.FC = () => {
       <footer className="flex flex-col items-center gap-1 px-4 pb-8 pt-4 text-xs text-white/40">
         <InstagramLink className="text-white/55" alwaysShowHandle />
         <Link href="/" className="font-semibold text-white/55 hover:text-white">O Herói da Cidade</Link>
+        <Link href={PRIVACY_PATH} className="underline hover:text-white/70">Política de Privacidade</Link>
       </footer>
 
       {audioOpen && <AudioRequestModal onClose={() => setAudioOpen(false)} />}

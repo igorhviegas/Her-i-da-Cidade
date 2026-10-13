@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BadgeCheck, Lock, MessageCircle } from 'lucide-react';
 import { Link } from '../lib/router';
 import { useSiteConfig } from '../services/siteConfigService';
+import { PRIVACY_PATH } from '../services/privacy.js';
 import { VideoCallBooking, renderBold, type PublicConfig } from './VideoCallBooking';
 
 const INSTAGRAM_URL = 'https://www.instagram.com/oheroidacidade/';
@@ -64,7 +65,7 @@ export const VideoCallPage: React.FC = () => {
               {phone ?? 'WhatsApp oficial'}
             </a>
           </div>
-          <p className="mt-4 text-center text-[11px] text-white/30">© Herói da Cidade · <Link href="/" className="underline hover:text-white/60">heroidacidade.com</Link></p>
+          <p className="mt-4 text-center text-[11px] text-white/30">© Herói da Cidade · <Link href="/" className="underline hover:text-white/60">heroidacidade.com</Link> · <Link href={PRIVACY_PATH} className="underline hover:text-white/60">Privacidade</Link></p>
         </footer>
       </div>
     </main>

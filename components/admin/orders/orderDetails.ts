@@ -33,7 +33,7 @@ function buildEventRows({ order, client, service }: OrderView, event: NonNullabl
     ['Local', event.location],
     ['Data de nascimento', event.birthDate ? event.birthDate.split('-').reverse().join('/') : '—'],
     ['Necessidade especial (PCD/PNE)', event.pcd === true ? 'Sim' : event.pcd === false ? 'Não' : '—'],
-    ['Autorização de uso de imagem', event.imageAuthorization ? 'Sim' : 'Não'],
+    ['Autorização para divulgar imagens nas redes sociais', event.imageAuthorization ? 'Sim' : 'Não'],
     ['Teia extra', event.extraWeb ? String(event.extraWeb) : 'Não'],
     ['Valor total', formatMoney(event.totalValue)],
     ['Valor de entrada', formatMoney(event.entryValue)],

@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, MessageCircle, X } from 'lucide-react';
 import { wallTime } from '../../functions/video-call-time.js';
+import { AUDIO_PRIVACY_NOTE, PRIVACY_PATH } from '../../services/privacy.js';
 import {
   AUDIO_MESSAGE_MAX,
   AUDIO_NAME_MAX,
@@ -121,7 +122,7 @@ export const AudioRequestModal: React.FC<{ onClose: () => void }> = ({ onClose }
             </div>
 
             <div>
-              <label htmlFor={`${uid}-name`} className="mb-1.5 block text-sm font-semibold text-white/85">Nome da criança</label>
+              <label htmlFor={`${uid}-name`} className="mb-1.5 block text-sm font-semibold text-white/85">Primeiro nome da criança</label>
               <input
                 id={`${uid}-name`}
                 type="text"
@@ -133,7 +134,7 @@ export const AudioRequestModal: React.FC<{ onClose: () => void }> = ({ onClose }
                 onBlur={() => touch('childName')}
                 aria-invalid={Boolean(visibleError('childName'))}
                 aria-describedby={`${uid}-name-error`}
-                placeholder="Ex.: Maria Eduarda"
+                placeholder="Ex.: Maria"
                 className={inputClass}
               />
               <FieldError id={`${uid}-name-error`} message={visibleError('childName')} />
@@ -162,6 +163,8 @@ export const AudioRequestModal: React.FC<{ onClose: () => void }> = ({ onClose }
             </div>
 
             <Notice />
+
+            <p className="text-xs leading-relaxed text-white/55">{AUDIO_PRIVACY_NOTE} <a href={PRIVACY_PATH} target="_blank" rel="noopener noreferrer" className="font-semibold text-purple-300 underline hover:text-purple-200">Política de Privacidade</a>.</p>
 
             <label className="flex cursor-pointer items-start gap-3 text-sm leading-snug text-white/90">
               <input

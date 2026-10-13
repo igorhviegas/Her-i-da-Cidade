@@ -2,6 +2,7 @@ import React from 'react';
 import { localSlot } from '../../functions/video-call-time.js';
 import type { BookingFormState, CalendarData } from './useVideoCallBooking';
 import type { Booked, Day, PublicConfig, Step } from './videoCallShared';
+import { BOOKING_DETAILS_HINT, BOOKING_PRIVACY_NOTE, PRIVACY_PATH } from '../../services/privacy.js';
 import { MONTHS, PhoneField, Rich, WEEKDAYS, box, brDate, field, heading, hint, label, longDate, primary, shortDay } from './videoCallShared';
 
 interface SlotSummaryProps { showLocal: boolean; timeZone: string; date: string; time: string }
@@ -57,12 +58,15 @@ const FormStep: React.FC<FormStepProps> = ({ form, confirmText, error, onSubmit 
       </fieldset>
       {!sameNumber && <PhoneField title="WhatsApp que vai receber a chamada" country={callCountry} number={values.callWhatsapp} onCountry={setCallCountry} onNumber={(callWhatsapp) => setValues({ ...values, callWhatsapp })} />}
       <div className="grid grid-cols-[1fr_7rem] gap-3">
-        <label className={label}>Nome da criança<input required maxLength={100} value={values.childName} onChange={(e) => setValues({ ...values, childName: e.target.value })} className={field} /></label>
+        <label className={label}>Primeiro nome da criança<input required maxLength={100} value={values.childName} onChange={(e) => setValues({ ...values, childName: e.target.value })} className={field} /></label>
         <label className={label}>Idade<input required maxLength={20} placeholder="Ex.: 5 anos" value={values.childAge} onChange={(e) => setValues({ ...values, childAge: e.target.value })} className={field} /></label>
       </div>
       <label className={label}>Tema principal da ligação<input required maxLength={200} value={values.theme} onChange={(e) => setValues({ ...values, theme: e.target.value })} className={field} /></label>
-      <label className={label}>Detalhes que ajudam na chamada (opcional)<textarea rows={3} maxLength={1000} value={values.details} onChange={(e) => setValues({ ...values, details: e.target.value })} className={field} /></label>
+      <label className={label}>Detalhes que ajudam na chamada (opcional)<textarea rows={3} maxLength={1000} value={values.details} onChange={(e) => setValues({ ...values, details: e.target.value })} className={field} />
+        <span className={hint}>{BOOKING_DETAILS_HINT}</span>
+      </label>
       <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3"><Rich text={confirmText} /></div>
+      <p className="text-xs leading-relaxed text-white/50">{BOOKING_PRIVACY_NOTE} <a href={PRIVACY_PATH} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-300 underline hover:text-blue-200">Política de Privacidade</a>.</p>
       {error && <p role="alert" className="text-sm font-semibold text-red-300">{error}</p>}
       <button type="submit" disabled={submitting} className="min-h-12 w-full rounded-xl bg-emerald-500 px-4 text-sm font-extrabold uppercase tracking-wide text-white hover:bg-emerald-400 disabled:opacity-60">
         {submitting ? 'Reservando...' : 'Prosseguir para pagamento no WhatsApp'}

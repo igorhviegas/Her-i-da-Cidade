@@ -276,7 +276,8 @@ export async function createVideoCallBooking({ database, input, nowMs = Date.now
       servicePrice: settings.price, rushFee: 0, totalPaid: 0, productionType: evaluation.productionType,
       source: 'booking', technicalPurchaseId: orderRef.id, createdAt: FieldValue.serverTimestamp(),
     });
-    transaction.set(slotRef, { orderId: orderRef.id, startsAtMs: slotInstant(form.date, form.time), whatsappNormalized: form.whatsapp, createdAt: FieldValue.serverTimestamp() });
+    // A trava não guarda o telefone (minimização): quem precisa do número lê o pedido (videoCall.whatsapp).
+    transaction.set(slotRef, { orderId: orderRef.id, startsAtMs: slotInstant(form.date, form.time), createdAt: FieldValue.serverTimestamp() });
     transaction.set(pendingRef, { orderId: orderRef.id, slotId: id });
   });
 
@@ -336,7 +337,9 @@ export async function expireUnpaidBookings({ database, nowMs = Date.now(), confi
       const [fresh, slot] = await Promise.all([transaction.get(document.ref), transaction.get(slotRef)]);
       if (!fresh.exists || fresh.get('paymentPending') !== true) return false;
       const ownsSlot = slot.exists && slot.get('orderId') === document.id;
-      const pendingRef = ownsSlot && slot.get('whatsappNormalized') ? database.collection(PENDING).doc(bookingKey(String(slot.get('whatsappNormalized')))) : null;
+      // Travas antigas ainda trazem o telefone; as novas não. O pedido (videoCall.whatsapp) é a fonte.
+      const phone = call.whatsapp ?? slot.get('whatsappNormalized');
+      const pendingRef = ownsSlot && phone ? database.collection(PENDING).doc(bookingKey(String(phone))) : null;
       const pending = pendingRef ? await transaction.get(pendingRef) : null;
       transaction.delete(document.ref);
       if (ownsSlot) transaction.delete(slotRef);

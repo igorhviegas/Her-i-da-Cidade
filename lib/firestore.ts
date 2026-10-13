@@ -42,17 +42,16 @@ export interface FirestoreErrorInfo {
  */
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
   const currentAuth = auth?.currentUser;
+  // Sem e-mail no erro/log: o objeto vai para o console e para a mensagem exibida (minimização de dados pessoais).
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
       userId: currentAuth?.uid,
-      email: currentAuth?.email,
       emailVerified: currentAuth?.emailVerified,
       isAnonymous: currentAuth?.isAnonymous,
       tenantId: currentAuth?.tenantId,
       providerInfo: currentAuth?.providerData?.map((p) => ({
         providerId: p.providerId,
-        email: p.email,
       })) || [],
     },
     operationType,

@@ -6,6 +6,8 @@ import { VideoCatalog } from './components/VideoCatalog';
 import { VideoCallPage } from './components/VideoCallPage';
 import { ServiceFaqPages } from './components/ServiceFaqPages';
 import { ClientsPage } from './components/ClientsPage';
+import { PrivacyPage } from './components/PrivacyPage';
+import { PRIVACY_PATH } from './services/privacy.js';
 import type { Service } from './types';
 import { useHomeContent } from './services/homeContentService';
 
@@ -18,6 +20,9 @@ const CALL_TITLE = 'Agendar Vídeo Chamada | Herói da Cidade';
 const CALL_DESCRIPTION = 'Escolha o dia e o horário da Vídeo Chamada ao Vivo com o Homem-Aranha.';
 const CALL_URL = 'https://www.heroidacidade.com/agendar-chamada';
 const FAQ_TITLE = 'Dúvidas sobre os serviços | Herói da Cidade';
+const PRIVACY_TITLE = 'Política de Privacidade | Herói da Cidade';
+const PRIVACY_DESCRIPTION = 'Como o Herói da Cidade trata os dados pessoais de clientes e responsáveis, inclusive de crianças, e como exercer seus direitos.';
+const PRIVACY_URL = `https://www.heroidacidade.com${PRIVACY_PATH}`;
 const FAQ_DESCRIPTION = 'Tire suas dúvidas sobre pagamento, prazos e como funcionam os serviços do Herói da Cidade.';
 const VIDEO_URL = 'https://www.heroidacidade.com/videos';
 const SOCIAL_IMAGE = 'https://www.heroidacidade.com/images/spider.PNG';
@@ -57,10 +62,11 @@ const AppContent: React.FC = () => {
   // Página exclusiva de quem recebeu o personagem na festa (QR do certificado); link compartilhável, fora do Google (noindex)
   const isClients = path === '/clientes' || path === '/clientes/';
   const isFaq = path === '/duvidas' || path.startsWith('/duvidas/');
+  const isPrivacy = path === PRIVACY_PATH || path === `${PRIVACY_PATH}/`;
   const faqSlug = isFaq ? decodeURIComponent(path.split('/').filter(Boolean)[1] ?? '') : '';
   // Serviço aberto em /duvidas/{slug}: undefined = carregando, null = inexistente ou sem dúvidas (não indexar).
   const [faqService, setFaqService] = useState<Service | null | undefined>(undefined);
-  const homeContent = useHomeContent(!isAdmin && !isVideos && !isAgent && !isKart && !isCall && !isFaq && !isClients);
+  const homeContent = useHomeContent(!isAdmin && !isVideos && !isAgent && !isKart && !isCall && !isFaq && !isClients && !isPrivacy);
 
   // Ícone do iOS ("Adicionar à Tela de Início") próprio da plataforma de streaming, da área do agente e do campeonato de kart
   const iosIcon = isVideos ? '/images/modules/streaming.png' : isAgent ? '/images/modules/agente-hdc.png' : isKart ? '/images/modules/kart.png' : null;
@@ -92,9 +98,9 @@ const AppContent: React.FC = () => {
     const faqPageDescription = faqService?.faq
       ? `Dúvidas sobre ${faqService.title}: ${faqService.faq.map((item) => item.title).join(', ')}.`.slice(0, 300)
       : FAQ_DESCRIPTION;
-    const title = isCall ? CALL_TITLE : isVideos ? VIDEO_TITLE : isFaq ? faqPageTitle : homeContent.seoTitle || HOME_TITLE;
-    const description = isCall ? CALL_DESCRIPTION : isVideos ? VIDEO_DESCRIPTION : isFaq ? faqPageDescription : homeContent.seoDescription || HOME_DESCRIPTION;
-    const url = isCall ? CALL_URL : isVideos ? VIDEO_URL : isFaq ? `${HOME_URL}duvidas${faqSlug ? `/${encodeURIComponent(faqSlug)}` : ''}` : HOME_URL;
+    const title = isCall ? CALL_TITLE : isVideos ? VIDEO_TITLE : isPrivacy ? PRIVACY_TITLE : isFaq ? faqPageTitle : homeContent.seoTitle || HOME_TITLE;
+    const description = isCall ? CALL_DESCRIPTION : isVideos ? VIDEO_DESCRIPTION : isPrivacy ? PRIVACY_DESCRIPTION : isFaq ? faqPageDescription : homeContent.seoDescription || HOME_DESCRIPTION;
+    const url = isCall ? CALL_URL : isVideos ? VIDEO_URL : isPrivacy ? PRIVACY_URL : isFaq ? `${HOME_URL}duvidas${faqSlug ? `/${encodeURIComponent(faqSlug)}` : ''}` : HOME_URL;
 
     document.title = title;
     setMeta('name', 'description', description);
@@ -113,7 +119,7 @@ const AppContent: React.FC = () => {
     setMeta('name', 'twitter:description', description);
     setMeta('name', 'twitter:image', SOCIAL_IMAGE);
 
-    if (isVideos || isFaq) {
+    if (isVideos || isFaq || isPrivacy) {
       existingStructuredData?.remove();
       return;
     }
@@ -152,7 +158,7 @@ const AppContent: React.FC = () => {
       document.head.appendChild(script);
     }
     script.textContent = JSON.stringify(structuredData);
-  }, [isAdmin, isAgent, isKart, isClients, isVideos, isCall, isFaq, faqSlug, faqService, homeContent.seoTitle, homeContent.seoDescription]);
+  }, [isAdmin, isAgent, isKart, isClients, isVideos, isCall, isFaq, isPrivacy, faqSlug, faqService, homeContent.seoTitle, homeContent.seoDescription]);
 
   if (isAdmin) {
     return (
@@ -181,6 +187,9 @@ const AppContent: React.FC = () => {
   }
 
   if (isClients) return <ClientsPage />;
+
+  // Política de Privacidade (LGPD): linkada no rodapé e nos formulários públicos
+  if (isPrivacy) return <PrivacyPage />;
 
   // Página pública de agendamento de Vídeo Chamada (link compartilhável; substitui o link do Calendly)
   if (isCall) return <VideoCallPage />;

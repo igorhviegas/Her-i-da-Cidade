@@ -25,6 +25,13 @@ Módulo admin **Agendamento de chamadas**: `/admin/agendamento-chamadas`, filho 
 - **O convite da agenda é manual.** O Google não aceita convites feitos por conta de serviço sem delegação em todo o domínio (recurso do Google Workspace; testado em produção), então o sistema não tenta convidar ninguém. Depois do pagamento, copie o e-mail do pedido ou do evento e adicione o cliente como convidado direto no Google Agenda.
 - A confirmação do pagamento pelo ManyChat (`/api/manychat` → `markVideoCallEventPaid`) só troca título, cor e descrição do mesmo evento.
 
+## Privacidade (LGPD)
+
+- O formulário traz uma linha de aviso (`BOOKING_PRIVACY_NOTE`, `services/privacy.js`) com o link para `/privacidade` em nova aba (não perde o que foi digitado). Sem caixa de consentimento: a base é a execução do serviço pedido.
+- Pede o **primeiro** nome da criança e a idade; o campo "detalhes" tem uma dica para só informar o que ajuda a adaptar a chamada.
+- A trava `videoCallSlots` não guarda mais o telefone (ele fica só no pedido). Travas criadas antes dessa mudança ainda têm o campo `whatsappNormalized`; a exclusão por prazo continua funcionando para elas.
+- Ver inventário e pendências em `docs/lgpd.md`.
+
 ## Telefone com DDI
 
 - O WhatsApp é informado em duas partes: país/DDI (lista em `services/phoneCountries.js`, **Brasil +55 por padrão**) e número. O número da chamada, quando é outro, tem o seu próprio DDI.
