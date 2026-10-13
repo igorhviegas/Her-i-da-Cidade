@@ -1,12 +1,13 @@
 // Pedido de áudio personalizado da página /clientes: validação do formulário e mensagem do WhatsApp. Funções puras.
-// Não há registro no servidor: o pedido chega pelo WhatsApp e quem grava o áudio controla o que já foi feito.
+// Não há registro no servidor: o pedido chega pelo WhatsApp e quem grava o áudio controla internamente o que já foi feito
+// (um áudio gratuito por cliente; o aviso ao cliente é só texto).
 
 /** WhatsApp comercial que recebe o pedido: DDI 55 + DDD 31 + número, só dígitos (formato do wa.me). */
 export const AUDIO_WHATSAPP_NUMBER = '5531997462823';
 export const AUDIO_MESSAGE_MAX = 500;
 export const AUDIO_MESSAGE_MIN = 5;
 export const AUDIO_NAME_MAX = 60;
-export const AUDIO_NOTICE = 'Atenção: os áudios são gravados pelo próprio Herói da Cidade, no horário em que ele estiver no estúdio. A solicitação não significa que o áudio será gravado ou enviado imediatamente.';
+export const AUDIO_NOTICE = 'Atenção: cada cliente tem direito a um único áudio gratuito. Os áudios são gravados pelo próprio Herói da Cidade, no horário em que ele estiver no estúdio. A solicitação não significa que o áudio será gravado ou enviado imediatamente.';
 
 const EARLIEST_DATE = '2020-01-01';
 
@@ -64,7 +65,6 @@ export function buildWhatsAppMessage({ eventDate, childName, message }) {
     `Nome da criança: ${childName}`,
     'Mensagem desejada:',
     message,
-    'Estou ciente de que o áudio será gravado pelo próprio Herói da Cidade no horário em que ele estiver no estúdio.',
   ].join('\n');
 }
 

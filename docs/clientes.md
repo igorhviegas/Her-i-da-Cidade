@@ -35,7 +35,8 @@ Sem servidor e sem registro: o formulário só prepara a mensagem e abre o Whats
 
 - Fluxo: formulário (data, nome, texto, aviso e aceite) → revisão → WhatsApp com a mensagem pronta. O botão fica desabilitado enquanto algo estiver inválido.
 - Validação em `services/audioRequest.js`: data real e não futura; nome só com letras; texto de 5 a 500 caracteres; aceite obrigatório.
-- A mensagem (`buildWhatsAppMessage`) é codificada com `encodeURIComponent`: acentos, pontuação e quebras de linha chegam inteiros.
+- **Aviso** (`AUDIO_NOTICE`, no formulário e na revisão): cada cliente tem direito a um único áudio gratuito; os áudios são gravados pelo Herói no estúdio e a solicitação não garante gravação ou envio imediatos. É só texto: o controle de quem já recebeu o áudio é interno, sem sistema no site.
+- A mensagem (`buildWhatsAppMessage`: olá, data do evento, nome da criança e a mensagem desejada) é codificada com `encodeURIComponent`: acentos, pontuação e quebras de linha chegam inteiros.
 - A janela do WhatsApp abre no próprio toque; a tela final repete o botão por segurança. O site nunca diz que a mensagem foi enviada: ela só chega depois que o cliente toca em enviar no WhatsApp.
 - Nada é gravado no Firestore nem registrado em log.
 
