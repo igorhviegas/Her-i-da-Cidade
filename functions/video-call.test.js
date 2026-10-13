@@ -142,6 +142,8 @@ test('reserva cria pedido aguardando pagamento com todos os dados, trava e vínc
   const client = database.docs.get(`clients/${order.clientId}`);
   assert.deepEqual([client.name, client.whatsappNormalized], ['Maria', '5531999990001']);
   assert.equal(order.videoCall.bookedAtMs, NOW);
+  // minimização: a trava do horário não guarda o telefone do cliente (ele fica só no pedido)
+  assert.deepEqual(Object.keys(database.docs.get('videoCallSlots/2026-10-12_2000')).sort(), ['createdAt', 'orderId', 'startsAtMs']);
   // mensagem exclusiva do agendamento, no número do serviço (o texto antigo do link é trocado)
   const url = new URL(result.whatsappUrl);
   assert.equal(url.origin + url.pathname, 'https://wa.me/5531999044206');
@@ -344,6 +346,16 @@ test('pré-agendamento sem pagamento no prazo é excluído: pedido, trava e even
   assert.equal(database.count('videoCallPending/'), 0);
   assert.equal(database.count('clients/'), 2); // cliente e índice ficam
   await book(database, form()); // mesmo horário e mesmo WhatsApp podem reservar de novo
+});
+
+test('trava antiga (com telefone) e pedido sem videoCall.whatsapp: a exclusão por prazo ainda remove o pré-agendamento', async () => {
+  const database = seeded();
+  const { orderId } = await book(database, form());
+  const order = database.docs.get(`orders/${orderId}`);
+  Reflect.deleteProperty(order.videoCall, 'whatsapp');
+  database.docs.get('videoCallSlots/2026-10-12_2000').whatsappNormalized = '5531999990001';
+  assert.equal(await expireUnpaidBookings({ database, nowMs: NOW + 72 * HOUR, deleteEvent: async () => {}, logger: quietLogger }), 1);
+  assert.equal(database.count('videoCallPending/'), 0);
 });
 
 test('reserva paga nunca é excluída pelo prazo; falha ao apagar o evento não impede a exclusão', async () => {

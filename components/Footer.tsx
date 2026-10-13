@@ -1,5 +1,7 @@
 import React from "react";
 import { useSiteConfig } from "../services/siteConfigService";
+import { Link } from "../lib/router";
+import { PRIVACY_PATH } from "../services/privacy.js";
 
 const spider = "/images/spider.PNG";
 
@@ -136,6 +138,7 @@ export const Footer: React.FC = () => {
                     Contato Direto
                   </a>
                 </li>
+                <li><Link href={PRIVACY_PATH} className="hover:text-white transition-colors">Política de Privacidade</Link></li>
               </ul>
             </div>
           </div>

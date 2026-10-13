@@ -53,21 +53,23 @@ export const EventOrderFields: React.FC<{ value: EventFormState; onChange: (next
           <label className={labelClass}>Horário de início *<input required type="time" value={value.eventTime} onChange={(e) => set({ eventTime: e.target.value })} disabled={disabled} className={inputClass} /></label>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <label className={labelClass}>Data de nascimento<input type="date" value={value.birthDate ?? ''} onChange={(e) => set({ birthDate: e.target.value })} disabled={disabled} className={inputClass} /></label>
-          <label className={labelClass}>Necessidade especial (PCD/PNE)
+          <label className={labelClass}>Data de nascimento (opcional)<input type="date" value={value.birthDate ?? ''} onChange={(e) => set({ birthDate: e.target.value })} disabled={disabled} className={inputClass} /></label>
+          <label className={labelClass}>Necessidade especial (PCD/PNE), opcional
             <select value={value.pcd ?? ''} onChange={(e) => set({ pcd: e.target.value as '' | 'yes' | 'no' })} disabled={disabled} className={inputClass}>
               <option value="">Não informado</option><option value="no">Não</option><option value="yes">Sim</option>
             </select>
+            <span className="mt-1 block text-[11px] font-normal text-white/40">Dado de saúde: registre só o que a família informou e o que ajuda a adaptar a atuação.</span>
           </label>
         </div>
         <label className={labelClass}>Local *<input required value={value.location} onChange={(e) => set({ location: e.target.value })} disabled={disabled} className={inputClass} placeholder="Endereço ou local do evento" /></label>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <fieldset className={labelClass} disabled={disabled}>
-            <legend>Autorização de uso de imagem *</legend>
+            <legend>Autorização para divulgar imagens nas redes sociais *</legend>
             <div className="mt-1.5 flex gap-4 rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm text-white">
               <label className="flex items-center gap-2"><input type="radio" name="image-auth" required checked={value.imageAuthorization === 'yes'} onChange={() => set({ imageAuthorization: 'yes' })} />Sim</label>
               <label className="flex items-center gap-2"><input type="radio" name="image-auth" checked={value.imageAuthorization === 'no'} onChange={() => set({ imageAuthorization: 'no' })} />Não</label>
             </div>
+            <span className="mt-1 block text-[11px] font-normal text-white/40">Copie a resposta do responsável no formulário da festa. Só vale para redes sociais; outros usos pedem nova autorização.</span>
           </fieldset>
           <label className={labelClass}>Teia extra
             <select value={value.extraWeb} onChange={(e) => set({ extraWeb: e.target.value })} disabled={disabled} className={inputClass}>

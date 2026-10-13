@@ -39,6 +39,7 @@ Sem servidor e sem registro: o formulário só prepara a mensagem e abre o Whats
 - A mensagem (`buildWhatsAppMessage`: olá, data do evento, nome da criança e a mensagem desejada) é codificada com `encodeURIComponent`: acentos, pontuação e quebras de linha chegam inteiros.
 - A janela do WhatsApp abre no próprio toque; a tela final repete o botão por segurança. O site nunca diz que a mensagem foi enviada: ela só chega depois que o cliente toca em enviar no WhatsApp.
 - Nada é gravado no Firestore nem registrado em log.
+- **Privacidade:** o formulário traz `AUDIO_PRIVACY_NOTE` (`services/privacy.js`) com o link para `/privacidade`, que também está no rodapé da página. O campo pede o **primeiro** nome da criança. Ver `docs/lgpd.md`.
 
 ## Deploy
 
