@@ -63,7 +63,6 @@ test('mensagem do WhatsApp segue o modelo e preserva acentos, pontuação e queb
     'Mensagem desejada:',
     'Linha 1: “ótimo”!',
     'Linha 2 & 3?',
-    'Estou ciente de que o áudio será gravado pelo próprio Herói da Cidade no horário em que ele estiver no estúdio.',
   ].join('\n'));
 });
 
@@ -75,8 +74,14 @@ test('link do WhatsApp: número correto, texto codificado e reversível', () => 
   assert.ok(!url.search.includes('\n') && !url.search.includes(' '));
 });
 
-test('aviso: gravação pelo Herói no estúdio, sem promessa de prazo e sem regra de uso único', () => {
+test('aviso: um único áudio gratuito por cliente, gravação no estúdio e sem promessa de prazo', () => {
+  assert.match(AUDIO_NOTICE, /^Atenção: cada cliente tem direito a um único áudio gratuito. /);
   assert.match(AUDIO_NOTICE, /gravados pelo próprio Herói da Cidade, no horário em que ele estiver no estúdio./);
   assert.match(AUDIO_NOTICE, /A solicitação não significa que o áudio será gravado ou enviado imediatamente.$/);
-  assert.doesNotMatch(`${AUDIO_NOTICE} ${buildWhatsAppMessage({ eventDate: '2026-10-10', childName: 'Ana', message: 'Oi Ana!' })}`, /uma vez|única|unica/i);
+});
+
+test('mensagem do WhatsApp não leva o aviso nem o "Estou ciente"', () => {
+  const text = buildWhatsAppMessage({ eventDate: '2026-10-10', childName: 'Ana', message: 'Oi Ana!' });
+  assert.doesNotMatch(text, /Estou ciente|gratuito|estúdio/);
+  assert.equal(text.split(String.fromCharCode(10)).at(-1), 'Oi Ana!');
 });
