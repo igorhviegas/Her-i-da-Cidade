@@ -360,7 +360,7 @@ export const ExercisesTab: React.FC<{ uid: string; exercises: Exercise[]; reload
       ) : (
         <div className={`${cardClass} space-y-3`}>
           <h3 className="text-sm font-bold text-white">{editing === 'new' ? 'Novo exercício' : 'Editar exercício'}</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className={labelClass}>Nome
               <input className={inputClass} value={form.name} maxLength={80} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="ex.: Leg press" />
             </label>

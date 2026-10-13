@@ -71,7 +71,7 @@ export const AdminCalendarPage: React.FC = () => {
         </div>
         <div className="flex gap-1 rounded-xl border border-white/10 bg-[#0B1120] p-1">
           {VIEWS.map(({ id, label }) => (
-            <button key={id} type="button" onClick={() => setView(id)} aria-pressed={view === id} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${view === id ? 'bg-blue-600 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}>{label}</button>
+            <button key={id} type="button" onClick={() => setView(id)} aria-pressed={view === id} className={`rounded-lg px-3 py-2 text-xs font-semibold sm:py-1.5 transition-colors ${view === id ? 'bg-blue-600 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}>{label}</button>
           ))}
         </div>
       </div>

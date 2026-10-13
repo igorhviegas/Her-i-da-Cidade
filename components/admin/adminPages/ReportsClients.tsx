@@ -19,14 +19,14 @@ export const ReportsClients: React.FC<{ entries: RevenueEntry[]; clients: Lookup
 
   const list = (rows: ClientRetentionRow[], empty: string, lastLabel: string) => (rows.length === 0 ? <p className="text-sm text-white/45">{empty}</p> : (
     <table className="w-full text-sm">
-      <thead><tr className="text-left text-[11px] uppercase tracking-wider text-white/45"><th className="pb-2 font-semibold">Cliente</th><th className="pb-2 text-right font-semibold">Pedidos</th><th className="pb-2 text-right font-semibold">Total</th><th className="pb-2 text-right font-semibold">{lastLabel}</th></tr></thead>
+      <thead><tr className="text-left text-[11px] uppercase tracking-wider text-white/45"><th className="pb-2 font-semibold">Cliente</th><th className="pb-2 pl-3 text-right font-semibold">Pedidos</th><th className="pb-2 pl-3 text-right font-semibold">Total</th><th className="pb-2 pl-3 text-right font-semibold">{lastLabel}</th></tr></thead>
       <tbody className="divide-y divide-white/5">
         {rows.map((r) => (
           <tr key={r.clientId}>
             <td className="py-2 pr-3"><span className="block text-white">{name(r.clientId)}</span>{phone(r.clientId) && <span className="block text-xs text-white/45">{phone(r.clientId)}</span>}</td>
-            <td className="py-2 text-right tabular-nums text-white/70">{r.orders}</td>
-            <td className="py-2 text-right tabular-nums text-white">{formatMoney(r.revenue)}</td>
-            <td className="py-2 text-right text-xs text-white/55">{formatDate(r.lastDate)}</td>
+            <td className="py-2 pl-3 text-right tabular-nums text-white/70">{r.orders}</td>
+            <td className="py-2 pl-3 text-right tabular-nums text-white">{formatMoney(r.revenue)}</td>
+            <td className="py-2 pl-3 text-right text-xs text-white/55">{formatDate(r.lastDate)}</td>
           </tr>
         ))}
       </tbody>

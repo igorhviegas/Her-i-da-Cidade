@@ -223,7 +223,7 @@ export const AdminHomePage: React.FC<{ onNavigate: (tab: 'finance' | 'missions' 
             <button type="button" onClick={() => setOrder(null)} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium text-white/50 hover:bg-white/5 hover:text-white/80"><RotateCcw className="h-3 w-3" aria-hidden />Restaurar padrão</button>
           )}
           <button type="button" onClick={() => setEditing((v) => !v)} aria-pressed={editing}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${editing ? 'bg-blue-600 text-white' : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'}`}>
+            className={`rounded-lg px-3 py-2 text-xs font-semibold sm:py-1.5 transition-colors ${editing ? 'bg-blue-600 text-white' : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'}`}>
             {editing ? 'Concluir' : 'Reorganizar'}
           </button>
         </div>

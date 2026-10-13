@@ -190,7 +190,7 @@ const Settings: React.FC = () => {
 
       <section className={`${cardClass} space-y-4`}>
         <h3 className="font-bold text-white">Valor e prazos</h3>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {NUMBER_FIELDS.map(({ key, label, hint }) => (
             <label key={key} className={labelClass}>{label}
               <input inputMode="decimal" value={draft[key]} onChange={(e) => set({ [key]: e.target.value })} className={inputClass} />
@@ -205,7 +205,7 @@ const Settings: React.FC = () => {
           <h3 className="font-bold text-white">Dias e horários</h3>
           <p className="text-xs text-white/50">Horários de início (horário de Brasília), separados por vírgula. Deixe o dia vazio para não atender.</p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {WEEKDAYS.map((name, day) => (
             <label key={name} className={labelClass}>{name}
               <input placeholder="Sem atendimento" value={draft.weekly[day]} onChange={(e) => set({ weekly: draft.weekly.map((value, i) => (i === day ? e.target.value : value)) })} className={inputClass} />

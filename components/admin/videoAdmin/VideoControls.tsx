@@ -70,22 +70,24 @@ export const OrderControl: React.FC<OrderControlProps> = ({ video, onOrderChange
         onBlur={handleOrderInput}
         className="w-8 text-xs text-center bg-transparent border-none text-white focus:outline-none"
       />
-      <div className="flex flex-col">
+      <div className="flex sm:flex-col">
         <button
           type="button"
           onClick={() => onOrderChange((video.order ?? 0) + 1)}
-          className="p-0.5 text-white/50 hover:text-white transition-colors"
+          className="p-2 sm:p-0.5 text-white/50 hover:text-white transition-colors"
           title="Aumentar ordem"
+          aria-label="Aumentar ordem"
         >
-          <ChevronUp className="w-3 h-3" />
+          <ChevronUp className="w-4 h-4 sm:w-3 sm:h-3" />
         </button>
         <button
           type="button"
           onClick={() => onOrderChange(Math.max(1, (video.order ?? 0) - 1))}
-          className="p-0.5 text-white/50 hover:text-white transition-colors"
+          className="p-2 sm:p-0.5 text-white/50 hover:text-white transition-colors"
           title="Diminuir ordem"
+          aria-label="Diminuir ordem"
         >
-          <ChevronDown className="w-3 h-3" />
+          <ChevronDown className="w-4 h-4 sm:w-3 sm:h-3" />
         </button>
       </div>
     </div>

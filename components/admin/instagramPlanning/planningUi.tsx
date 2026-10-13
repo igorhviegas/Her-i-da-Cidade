@@ -29,7 +29,7 @@ export const Modal: React.FC<{ title: string; onClose: () => void; children: Rea
       <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-white/10 bg-[#0D1527] p-4 shadow-2xl sm:max-w-xl sm:rounded-2xl sm:p-5">
         <div className="mb-3 flex items-start justify-between gap-3">
           <h3 className="text-base font-bold text-white">{title}</h3>
-          <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-lg p-1 text-white/60 hover:bg-white/10 hover:text-white"><X className="h-5 w-5" /></button>
+          <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-lg p-2 text-white/60 hover:bg-white/10 hover:text-white"><X className="h-5 w-5" /></button>
         </div>
         {children}
       </div>

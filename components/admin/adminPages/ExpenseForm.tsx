@@ -25,7 +25,7 @@ interface FieldsProps {
 }
 
 const InfoFields: React.FC<FieldsProps> = ({ form, setForm }) => (
-  <div className="grid gap-3 sm:grid-cols-2">
+  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
     <label className={labelClass}>Nome *<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass} /></label>
     <label className={labelClass}>Categoria *<input required list="expense-categories" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputClass} /></label>
     <datalist id="expense-categories">{CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
@@ -34,7 +34,7 @@ const InfoFields: React.FC<FieldsProps> = ({ form, setForm }) => (
 );
 
 const AmountFields: React.FC<FieldsProps & { mode: ExpenseMode }> = ({ mode, form, setForm }) => (
-  <div className="grid gap-3 sm:grid-cols-3">
+  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
     <label className={labelClass}>{mode === 'new' && !form.oneTime ? 'Valor mensal *' : 'Valor *'}<input required type="number" inputMode="decimal" min="0" step="0.01" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className={inputClass} placeholder="0,00" /></label>
     {mode === 'new' && (
       <>

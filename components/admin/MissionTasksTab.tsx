@@ -39,7 +39,7 @@ export const MissionTasksTab: React.FC<{ data: MissionsData; reload: () => Promi
             {todays.map((o) => (
               <li key={o.id} className={`${cardClass} flex items-center gap-3`}>
                 {o.status === 'completed' ? <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-400" />
-                  : <button type="button" title="Concluir" disabled={busyId === o.id || o.status !== 'pending'} onClick={() => run(o.id, () => completeOccurrence(o.id))} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-white/30 text-transparent hover:border-emerald-400 hover:text-emerald-400 disabled:opacity-50">
+                  : <button type="button" title="Concluir" disabled={busyId === o.id || o.status !== 'pending'} onClick={() => run(o.id, () => completeOccurrence(o.id))} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-white/30 text-transparent hover:border-emerald-400 hover:text-emerald-400 disabled:opacity-50 sm:h-6 sm:w-6">
                     {busyId === o.id ? <Loader2 className="h-3 w-3 animate-spin text-white" /> : <Check className="h-3.5 w-3.5" />}
                   </button>}
                 <div className="min-w-0 flex-1">
@@ -67,13 +67,13 @@ export const MissionTasksTab: React.FC<{ data: MissionsData; reload: () => Promi
         {data.tasks.length === 0 && !editing && <p className={`${cardClass} text-center text-sm text-white/50`}>Nenhuma tarefa cadastrada.</p>}
         <ul className="space-y-2">
           {data.tasks.map((t) => (
-            <li key={t.id} className={`${cardClass} flex items-start gap-3 ${t.status === 'paused' ? 'opacity-60' : ''}`}>
+            <li key={t.id} className={`${cardClass} flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3 ${t.status === 'paused' ? 'opacity-60' : ''}`}>
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-white">{t.title} <span className="ml-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/60">{FREQUENCY_LABELS[t.frequency]}{t.status === 'paused' ? ' · pausada' : ''}</span></p>
+                <p className="break-words font-semibold text-white">{t.title} <span className="ml-1 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/60">{FREQUENCY_LABELS[t.frequency]}{t.status === 'paused' ? ' · pausada' : ''}</span></p>
                 {t.description && <p className="mt-0.5 text-xs text-white/60">{t.description}</p>}
                 <p className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-white/60"><span>{describe(t)}</span><DifficultyStars value={t.difficulty} /></p>
               </div>
-              <div className="flex shrink-0 gap-1">
+              <div className="flex shrink-0 gap-1 self-end sm:self-auto">
                 <button type="button" title={t.status === 'active' ? 'Pausar' : 'Retomar'} disabled={busyId === t.id} onClick={() => run(t.id, () => setTaskStatus(t.id, t.status === 'active' ? 'paused' : 'active'))} className={ghostButton}>{t.status === 'active' ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}</button>
                 <button type="button" title="Editar" onClick={() => setEditing(t)} className={ghostButton}><Pencil className="h-3.5 w-3.5" /></button>
                 <button type="button" title="Excluir" disabled={busyId === t.id} onClick={() => { if (confirm(`Excluir a tarefa "${t.title}"? O histórico de ocorrências já concluídas ou perdidas é mantido.`)) void run(t.id, () => deleteTask(t.id)); }} className={`${ghostButton} hover:!bg-red-500/20 hover:!text-red-300`}><Trash2 className="h-3.5 w-3.5" /></button>

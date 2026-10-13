@@ -90,13 +90,13 @@ export const WhatsAppCard: React.FC<WhatsAppCardProps> = ({ loading, whatsappUrl
         
         {/* Input Field */}
         <div>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2">
             <label htmlFor="whatsappUrl" className="text-xs font-bold uppercase tracking-wider text-white/80">
               Link do WhatsApp
             </label>
-            <div className="flex items-center gap-2 text-xs text-white/40">
-              <HelpCircle className="w-3.5 h-3.5" />
-              <span>Ex: https://wa.me/5531999044206</span>
+            <div className="flex min-w-0 max-w-full items-center gap-2 text-xs text-white/40">
+              <HelpCircle className="w-3.5 h-3.5 shrink-0" />
+              <span className="min-w-0 break-all">Ex: https://wa.me/5531999044206</span>
             </div>
           </div>
 

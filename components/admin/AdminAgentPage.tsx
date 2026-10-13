@@ -120,7 +120,7 @@ const StepEditor: React.FC<{
 
       {open && (
         <div className="space-y-4 border-t border-white/10 p-4">
-          <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_8rem]">
             <label className="text-xs font-semibold text-white/60">Título<input className={`${input} mt-1`} value={draft.title} onChange={(e) => set({ title: e.target.value })} /></label>
             <label className="text-xs font-semibold text-white/60">Rótulo<input className={`${input} mt-1`} value={draft.kicker ?? ''} placeholder="Etapa 1" onChange={(e) => set({ kicker: e.target.value })} /></label>
           </div>
@@ -203,7 +203,7 @@ const TracksTab: React.FC<{ run: Run }> = ({ run }) => {
           <input ref={fileRef} type="file" multiple accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/wav,.mp3,.m4a,.wav" className="hidden" onChange={(e) => onFiles(e.target.files)} />
           <span className="text-xs text-white/50">MP3, M4A ou WAV, até {MAX_AUDIO_MB} MB cada (formatos que tocam no iPhone).</span>
         </div>
-        <div className="grid gap-2 sm:grid-cols-[1fr_2fr_auto]">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_2fr_auto]">
           <input className={input} placeholder="Nome (para link externo)" value={linkTitle} onChange={(e) => setLinkTitle(e.target.value)} />
           <input className={input} placeholder="https://… link direto do arquivo de áudio (para arquivos maiores)" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} />
           <button onClick={addLink} disabled={!linkTitle.trim() || !/^https:\/\//i.test(linkUrl.trim())} className="rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-40">Adicionar link</button>

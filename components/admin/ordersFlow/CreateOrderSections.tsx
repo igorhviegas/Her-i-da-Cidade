@@ -36,7 +36,7 @@ export const ClientSection: React.FC<{ client: ClientFields }> = ({ client }) =>
   return (
     <section className="space-y-3">
       <h3 className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-blue-300">Cliente</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className={labelClass}>Nome *<input required value={name} onChange={(event) => setName(event.target.value)} className={inputClass} placeholder="Nome do cliente" /></label>
         <label className={labelClass}>WhatsApp *<input required type="tel" value={whatsapp} onChange={(event) => { if (lookupState === 'found') setName(''); setWhatsapp(event.target.value); if (lookupState !== 'idle') setLookupState('idle'); setLookupMessage(''); }} onBlur={handleWhatsAppBlur} className={inputClass} placeholder="(31) 99999-9999" /></label>
       </div>
@@ -88,7 +88,7 @@ export const OrderSection: React.FC<OrderSectionProps> = ({ fields, selectedServ
   return (
     <section className="space-y-3 border-t border-white/10 pt-4">
       <h3 className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-blue-300">Pedido</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className={labelClass}>Data do pagamento *<input required type="date" value={paidDate} onChange={(event) => setPaidDate(event.target.value)} className={inputClass} /></label>
         <label className={labelClass}>Data do evento/entrega<input type="date" value={eventDate} onChange={(event) => setEventDate(event.target.value)} className={inputClass} /></label>
         <label className={labelClass}>Prazo contratado
@@ -115,7 +115,7 @@ export const ValuesSection: React.FC<ValuesSectionProps> = ({ fields, initialVal
   return (
     <section className="space-y-3 border-t border-white/10 pt-4">
       <h3 className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-blue-300">Valores</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className={labelClass}>Valor do serviço *<input required type="number" min="0" step="0.01" value={servicePrice} onChange={(event) => { setServicePrice(event.target.value); setTotalPaid(''); }} className={inputClass} placeholder="0,00" /></label>
         <label className={labelClass}>Taxa de urgência<input type="number" min="0" step="0.01" value={rushFee} onChange={(event) => { setRushFee(event.target.value); setTotalPaid(''); }} className={inputClass} placeholder="0,00" /></label>
       </div>

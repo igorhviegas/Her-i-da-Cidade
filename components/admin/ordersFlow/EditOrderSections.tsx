@@ -35,7 +35,7 @@ export const EditClientSection: React.FC<EditClientSectionProps> = ({ fields, sa
   return (
     <section className="space-y-3">
       <h3 className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-blue-300">Cliente</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className={labelClass}>Nome do cliente *<input required value={name} onChange={(event) => setName(event.target.value)} disabled={saving} className={inputClass} /></label>
         <label className={labelClass}>WhatsApp *<input required type="tel" value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} disabled={saving} className={inputClass} placeholder="(31) 99999-9999" /></label>
       </div>
@@ -88,7 +88,7 @@ export const EditOrderSection: React.FC<EditOrderSectionProps> = ({ fields, serv
   return (
     <section className="space-y-3 border-t border-white/10 pt-4">
       <h3 className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-blue-300">Pedido</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className={labelClass}>Serviço *
           <select required value={serviceId} onChange={(event) => setServiceId(event.target.value)} disabled={loadingServices || saving} className={inputClass}>
             <option value="">{loadingServices ? 'Carregando serviços…' : 'Selecione um serviço'}</option>
@@ -112,7 +112,7 @@ export const EditValuesSection: React.FC<{ fields: EditFields; saving: boolean }
     <section className="space-y-3 border-t border-white/10 pt-4">
       <h3 className="text-[11px] font-extrabold uppercase tracking-[0.15em] text-blue-300">Valores registrados no pedido</h3>
       <p className="text-[11px] text-white/40">Estes valores são snapshots do pedido; alterar o serviço não modifica o preço cadastrado nele.</p>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <label className={labelClass}>Valor do serviço *<input required type="number" min="0" step="0.01" value={servicePrice} onChange={(event) => setServicePrice(event.target.value)} disabled={saving} className={inputClass} /></label>
         <label className={labelClass}>Taxa de urgência<input required type="number" min="0" step="0.01" value={rushFee} onChange={(event) => setRushFee(event.target.value)} disabled={saving} className={inputClass} /></label>
         <label className={labelClass}>Total pago *<input required type="number" min="0" step="0.01" value={totalPaid} onChange={(event) => setTotalPaid(event.target.value)} disabled={saving} className={inputClass} /></label>

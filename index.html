@@ -60,6 +60,43 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #0072d2;
       }
+      /* Campos nunca passam da largura do container: o <select> herda a largura da opção mais longa e estourava grids/linhas no celular. */
+      input,
+      select,
+      textarea {
+        max-width: 100%;
+        min-width: 0;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      /* Safari do iPhone dá zoom ao focar campo com fonte < 16px (e não volta sozinho): em toque, campos de texto têm 16px. */
+      @media (pointer: coarse) {
+        input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+        select,
+        textarea {
+          font-size: 16px !important;
+        }
+      }
+      /* iOS Safari: 100vh é a altura SEM as barras do navegador, então modais e telas cheias ficavam com o rodapé/botões escondidos
+         atrás da barra. dvh/svh acompanham a área realmente visível; navegadores sem suporte mantêm o vh do Tailwind. */
+      @supports (height: 100dvh) {
+        html .min-h-screen { min-height: 100dvh; }
+        html .h-screen { height: 100svh; }
+        html .max-h-\[98vh\] { max-height: 98dvh; }
+        html .max-h-\[94vh\] { max-height: 94dvh; }
+        html .max-h-\[92vh\] { max-height: 92dvh; }
+        html .max-h-\[90vh\] { max-height: 90dvh; }
+        html .max-h-\[88vh\] { max-height: 88dvh; }
+        html .max-h-\[75vh\] { max-height: 75dvh; }
+        html .max-h-\[72vh\] { max-height: 72dvh; }
+        html .max-h-\[62vh\] { max-height: 62dvh; }
+        html .max-h-\[60vh\] { max-height: 60dvh; }
+        @media (min-width: 640px) {
+          html .sm\:max-h-\[90vh\] { max-height: 90dvh; }
+          html .sm\:h-\[94vh\] { height: 94dvh; }
+        }
+      }
       /* Utility to hide scrollbar */
       .scrollbar-hide::-webkit-scrollbar {
         display: none;

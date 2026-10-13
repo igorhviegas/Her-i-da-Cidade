@@ -46,7 +46,7 @@ export const InstagramCampaigns: React.FC<{ campaigns: Campaign[] | undefined; t
             </div>
           </div>
           {visible.length === 0 ? <p className={`${cardClass} text-sm text-white/50`}>Nenhuma campanha ainda. Clique em “Nova campanha” para começar.</p> : (
-            <ul className="grid gap-3 sm:grid-cols-2">
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {visible.map((campaign) => {
                 const progress = campaignProgress(campaign);
                 return (

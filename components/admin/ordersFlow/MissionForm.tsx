@@ -35,7 +35,7 @@ export const MissionForm: React.FC<{ mission: Mission | null; onClose: () => voi
     <form onSubmit={submit} className={`${cardClass} space-y-3`}>
       <label className={labelClass}>Título<input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} required className={inputClass} /></label>
       <label className={labelClass}>Descrição<textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} maxLength={1000} className={inputClass} /></label>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className={labelClass}>Prazo (opcional)<input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className={inputClass} /></label>
         <label className={labelClass}>Dificuldade<DifficultySelect value={difficulty} onChange={setDifficulty} /></label>
       </div>

@@ -110,7 +110,7 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, in
           <div className="space-y-5 p-5 sm:p-6">
             {error && <p role="alert" className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-xs text-red-200"><AlertCircle className="h-4 w-4 shrink-0" />{error}</p>}
             {linkedOrderId && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] p-3 text-xs text-emerald-100"><span>Produção vinculada ao pedido {linkedOrderId}</span><button type="button" onClick={() => onOpenOrder(linkedOrderId)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold hover:bg-emerald-500/10"><ArrowUpRight className="h-3.5 w-3.5" />Abrir pedido</button></div>}
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className={labelClass}>Título *<input required maxLength={180} value={title} onChange={(event) => setTitle(event.target.value)} disabled={saving} className={inputClass} placeholder="Ex.: Chupeta — versão para cliente" /></label>
               <label className={labelClass}>Categoria / assunto
                 <input list="script-categories" value={category} onChange={(event) => setCategory(event.target.value)} disabled={saving} className={inputClass} placeholder="Escolha ou digite um assunto" />
@@ -127,7 +127,7 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, in
             </label>
             <label className={labelClass}>Conteúdo do roteiro *<textarea required value={content} onChange={(event) => setContent(event.target.value)} disabled={saving} rows={18} className={`${inputClass} min-h-[20rem] resize-y leading-6`} placeholder="Escreva ou cole o roteiro completo…" /></label>
             <label className={labelClass}>Observações e anotações<textarea value={notes} onChange={(event) => setNotes(event.target.value)} disabled={saving} rows={4} className={`${inputClass} resize-y`} placeholder="Referências, ideias para versões futuras, observações de produção…" /></label>
-            <div className="grid gap-3 border-t border-white/10 pt-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 border-t border-white/10 pt-4 sm:grid-cols-3">
               <label className={labelClass}>Status de produção<select value={productionStatus} onChange={(event) => setProductionStatus(event.target.value as ScriptProductionStatus)} disabled={saving} className={inputClass}>{productionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label className={labelClass}>Status de publicação<select value={publicationStatus} onChange={(event) => { const next = event.target.value as ScriptPublicationStatus; setPublicationStatus(next); if (next === 'published' && !publishedDate) setPublishedDate(todayInput()); }} disabled={saving} className={inputClass}>{publicationOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label className={labelClass}>Data de publicação<input type="date" value={publishedDate} onChange={(event) => setPublishedDate(event.target.value)} disabled={saving} className={inputClass} /></label>

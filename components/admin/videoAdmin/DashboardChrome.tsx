@@ -83,7 +83,8 @@ export const DashboardMobileDrawer: React.FC<DashboardMobileDrawerProps> = ({ on
         </div>
         <button
           onClick={onClose}
-          className="p-1.5 text-white/60 hover:text-white rounded-lg hover:bg-white/10"
+          aria-label="Fechar menu"
+          className="p-2 text-white/60 hover:text-white rounded-lg hover:bg-white/10"
         >
           <X className="w-5 h-5" />
         </button>
@@ -132,6 +133,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({ onOpenMenu, on
       {/* Mobile Hamburger */}
       <button
         onClick={onOpenMenu}
+        aria-label="Abrir menu"
         className="lg:hidden p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-colors"
       >
         <Menu className="w-5 h-5" />
@@ -149,7 +151,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({ onOpenMenu, on
     </div>
 
     {/* User Status & Logout */}
-    <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+    <div className="flex shrink-0 items-center gap-1.5 sm:gap-4">
       <FinanceRevenueBadge />
       <NotificationsBell onOpenMissions={onOpenMissions} />
       <ProfileMenu onOpenProfile={onOpenProfile} onLogout={onLogout} loggingOut={isLoggingOut} />

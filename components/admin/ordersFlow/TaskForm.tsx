@@ -60,7 +60,7 @@ export const TaskForm: React.FC<{ task: RecurringTask | null; onClose: () => voi
     <form onSubmit={submit} className={`${cardClass} space-y-3`}>
       <label className={labelClass}>Título<input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} required className={inputClass} /></label>
       <label className={labelClass}>Descrição<textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} maxLength={1000} className={inputClass} /></label>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <label className={labelClass}>Horário<input type="time" value={time} onChange={(e) => setTime(e.target.value)} required className={inputClass} /></label>
         <label className={labelClass}>Dificuldade<DifficultySelect value={difficulty} onChange={setDifficulty} /></label>
         <label className={labelClass}>Frequência
@@ -74,7 +74,7 @@ export const TaskForm: React.FC<{ task: RecurringTask | null; onClose: () => voi
         <div className={labelClass}>Dias da semana
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {WEEKDAYS.map((name, day) => (
-              <button key={day} type="button" onClick={() => toggleDay(day)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${weekdays.includes(day) ? 'bg-blue-600 text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}>{name}</button>
+              <button key={day} type="button" onClick={() => toggleDay(day)} className={`rounded-lg px-3 py-2 text-xs font-semibold sm:py-1.5 ${weekdays.includes(day) ? 'bg-blue-600 text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}>{name}</button>
             ))}
           </div>
         </div>

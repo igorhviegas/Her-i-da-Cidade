@@ -63,12 +63,12 @@ interface EventFormProps {
 const EventForm: React.FC<EventFormProps> = ({ event, form, set, busy, error, onSubmit, onCancel }) => (
   <form onSubmit={onSubmit} className="space-y-3">
     <label className={labelClass}>Título<input value={form.title} onChange={(e) => set('title', e.target.value)} maxLength={250} required className={inputClass} /></label>
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <label className={labelClass}>Data<input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} required className={inputClass} /></label>
       <label className="mt-6 flex items-center gap-2 text-xs font-semibold text-white/70"><input type="checkbox" checked={form.allDay} onChange={(e) => set('allDay', e.target.checked)} />Dia inteiro</label>
     </div>
     {!form.allDay && (
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className={labelClass}>Início<input type="time" value={form.startTime} onChange={(e) => set('startTime', e.target.value)} required className={inputClass} /></label>
         <label className={labelClass}>Término<input type="time" value={form.endTime} onChange={(e) => set('endTime', e.target.value)} required className={inputClass} /></label>
       </div>
@@ -118,7 +118,7 @@ export const EventDialog: React.FC<EventDialogProps> = ({ event, mode, defaultDa
       <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-white/10 bg-[#0D1527] p-5 shadow-2xl sm:rounded-2xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <h3 className="text-lg font-bold text-white">{mode === 'form' ? (event ? 'Editar evento' : 'Novo evento') : event?.title}</h3>
-          <button type="button" onClick={onClose} disabled={!!busy} aria-label="Fechar" className="rounded-lg p-1 text-white/50 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
+          <button type="button" onClick={onClose} disabled={!!busy} aria-label="Fechar" className="rounded-lg p-2 text-white/50 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
 
         {mode === 'view' && event ? (

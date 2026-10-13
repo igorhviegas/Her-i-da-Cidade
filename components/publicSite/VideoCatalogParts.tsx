@@ -19,7 +19,7 @@ export const CatalogHeader: React.FC<CatalogHeaderProps> = ({ headerRef, isNavba
     }`}
   >
     <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between md:px-8">
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
           onClick={() => onNavigateHome()}
@@ -47,7 +47,7 @@ export const CatalogHeader: React.FC<CatalogHeaderProps> = ({ headerRef, isNavba
           </svg>
           <span>Voltar</span>
         </button>
-        <h1 className="text-xl font-black tracking-tight text-white md:text-2xl whitespace-nowrap">
+        <h1 className="min-w-0 text-base font-black leading-tight tracking-tight text-white sm:text-xl sm:whitespace-nowrap md:text-2xl">
           Plataforma de vídeos
         </h1>
       </div>

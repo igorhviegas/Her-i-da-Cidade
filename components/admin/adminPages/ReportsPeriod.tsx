@@ -67,12 +67,12 @@ export const ReportsPeriod: React.FC<Props> = ({ entries, costs, expenses, clien
         <div className="flex gap-1 rounded-xl border border-white/10 bg-white/5 p-1" role="group" aria-label="Período">
           {GRANULARITIES.map((g) => (
             <button key={g} type="button" onClick={() => setGranularity(g)} aria-pressed={granularity === g}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${granularity === g ? 'bg-blue-600 text-white' : 'text-white/60 hover:text-white'}`}>{GRANULARITY_LABEL[g]}</button>
+              className={`rounded-lg px-3 py-2 text-xs font-semibold sm:py-1.5 transition ${granularity === g ? 'bg-blue-600 text-white' : 'text-white/60 hover:text-white'}`}>{GRANULARITY_LABEL[g]}</button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <button type="button" className={ghostBtn} aria-label="Período anterior" onClick={() => setAnchor(shiftPeriod(granularity, anchor, -1))}><ChevronLeft className="h-4 w-4" /></button>
-          <span className="min-w-[10rem] text-center text-sm font-semibold text-white first-letter:uppercase">{periodLabel(granularity, range, anchor)}</span>
+          <span className="min-w-0 flex-1 text-center text-sm font-semibold leading-tight text-white first-letter:uppercase sm:min-w-[10rem] sm:flex-none">{periodLabel(granularity, range, anchor)}</span>
           <button type="button" className={ghostBtn} aria-label="Próximo período" disabled={atCurrent} onClick={() => setAnchor(shiftPeriod(granularity, anchor, 1))}><ChevronRight className="h-4 w-4" /></button>
           <button type="button" className={ghostBtn} disabled={atCurrent} onClick={() => setAnchor(new Date())}>Hoje</button>
         </div>
@@ -125,10 +125,10 @@ export const ReportsPeriod: React.FC<Props> = ({ entries, costs, expenses, clien
         <h3 className="mb-3 text-sm font-bold text-white">Serviços do período</h3>
         {rows.length === 0 ? <p className="text-sm text-white/45">Sem faturamento no período.</p> : (
           <table className="w-full text-sm">
-            <thead><tr className="text-left text-[11px] uppercase tracking-wider text-white/45"><th className="pb-2 font-semibold">Serviço</th><th className="pb-2 text-right font-semibold">Qtd</th><th className="pb-2 text-right font-semibold">Faturamento</th><th className="pb-2 text-right font-semibold">%</th></tr></thead>
+            <thead><tr className="text-left text-[11px] uppercase tracking-wider text-white/45"><th className="pb-2 font-semibold">Serviço</th><th className="pb-2 pl-3 text-right font-semibold">Qtd</th><th className="pb-2 pl-3 text-right font-semibold">Faturamento</th><th className="pb-2 pl-3 text-right font-semibold">%</th></tr></thead>
             <tbody className="divide-y divide-white/5">
               {rows.map((r) => (
-                <tr key={r.serviceId}><td className="py-2 pr-3 text-white">{serviceName(r.serviceId)}</td><td className="py-2 text-right tabular-nums text-white/70">{r.count}</td><td className="py-2 text-right tabular-nums text-white">{formatMoney(r.revenue)}</td><td className="py-2 text-right tabular-nums text-white/55">{Math.round(r.share * 100)}%</td></tr>
+                <tr key={r.serviceId}><td className="py-2 pr-3 text-white">{serviceName(r.serviceId)}</td><td className="py-2 pl-3 text-right tabular-nums text-white/70">{r.count}</td><td className="py-2 pl-3 text-right tabular-nums text-white">{formatMoney(r.revenue)}</td><td className="py-2 pl-3 text-right tabular-nums text-white/55">{Math.round(r.share * 100)}%</td></tr>
               ))}
             </tbody>
           </table>

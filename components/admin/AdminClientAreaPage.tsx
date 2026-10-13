@@ -135,7 +135,7 @@ export const AdminClientAreaPage: React.FC = () => {
               {!videoValid && <p role="alert" className="mt-1.5 text-xs font-medium text-rose-300">Link não reconhecido. Use um link do YouTube ou um arquivo https://….mp4</p>}
             </div>
 
-            <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <div>
                 <label htmlFor="clients-video-orientation" className={label}>Formato do vídeo</label>
                 <select id="clients-video-orientation" value={orientation} onChange={(event) => setOrientation(event.target.value === 'vertical' ? 'vertical' : 'horizontal')} className={field}>
