@@ -1,12 +1,14 @@
 import React from 'react';
 import { CalendarPlus, Copy, Loader2, MessageCircle, Pencil, Trash2, Tv, X } from 'lucide-react';
 import { getServiceColor } from '../../../services/serviceColors.js';
+import { isInviteVideoService } from '../../../services/digitalDelivery.js';
 import { getTeleprompterText } from '../../../services/teleprompter.js';
 import type { Order, OrderStatus } from '../../../types';
 import { SERVICE_COLOR_CLASSES, STATUS_FLOW, STATUS_LABELS, toDate } from './orderView';
 import type { OrderView } from './orderView';
 import { buildContactWhatsappUrl, buildOrderRows } from './orderDetails';
 import { ClientHistoryList } from './ClientHistoryList';
+import { InviteArtPanel } from './InviteArtPanel';
 import type { CalendarState } from './useOrderCalendar';
 
 interface OrderDetailsModalProps {
@@ -202,6 +204,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               <p className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85">{order.content || '—'}</p>
             </div>
           )}
+          {isInviteVideoService(service) && <InviteArtPanel key={order.id} order={order} />}
           {event && <OrderCalendarPanel order={order} calendar={calendar} syncedAt={syncedAt} updatingOrderId={updatingOrderId} deletingOrderId={deletingOrderId} handleSendToCalendar={handleSendToCalendar} />}
 
           <details open className="border-b border-white/[0.07] pb-3">

@@ -93,6 +93,8 @@ export interface Order {
   stageHistory?: { from: OrderStatus; to: OrderStatus; at: unknown }[];
   /** Custo de edição (R$) gravado na primeira conclusão de Vídeo Personalizado; entra nas despesas do Financeiro. */
   editingCost?: number;
+  /** Campos da arte do Vídeo Convite aprovados pelo administrador (ausente = ainda na leitura automática do texto). */
+  inviteArt?: { name: string; age: string; date: string; time: string; place: string };
 }
 
 export interface EventForm {
