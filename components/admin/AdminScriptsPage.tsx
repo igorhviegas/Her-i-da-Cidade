@@ -5,7 +5,7 @@ import { sendScriptToRecording } from '../../services/scriptProductionService';
 import { useRouter } from '../../lib/router';
 import type { ContentScript } from '../../types';
 import { ScriptEditorModal } from './ScriptEditorModal';
-import { ScriptFiltersBar, ScriptRow } from './ordersFlow/ScriptLibraryParts';
+import { ScriptFiltersBar, ScriptKanban, ScriptRow } from './ordersFlow/ScriptLibraryParts';
 import { logScriptOperationError, toDate } from './ordersFlow/scriptsHelpers';
 import { useScriptEditorState, useScriptFilters, useScriptsData } from './ordersFlow/useScriptLibrary';
 
@@ -13,7 +13,8 @@ export const AdminScriptsPage: React.FC = () => {
   const { navigate } = useRouter();
   const { scripts, setScripts, categories, setCategories, loading, error, categoryLoadError } = useScriptsData();
   const [success, setSuccess] = useState('');
-  const { search, setSearch, categoryFilter, setCategoryFilter, productionFilter, setProductionFilter, publicationFilter, setPublicationFilter, categoriesInLibrary, hierarchyRows } = useScriptFilters(scripts);
+  const { search, setSearch, categoryFilter, setCategoryFilter, productionFilter, setProductionFilter, publicationFilter, setPublicationFilter, categoriesInLibrary, filtered } = useScriptFilters(scripts);
+  const [view, setView] = useState<'kanban' | 'list'>('kanban');
   const { editorOpen, setEditorOpen, editingScript, setEditingScript, initialParentScriptId, openNew, openNewChild, openEdit } = useScriptEditorState();
   const [sendingScriptId, setSendingScriptId] = useState<string | null>(null);
   const [scriptActionId, setScriptActionId] = useState<string | null>(null);
@@ -101,7 +102,12 @@ export const AdminScriptsPage: React.FC = () => {
           <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-white">Biblioteca de Roteiros</h2>
           <p className="mt-1 max-w-2xl text-sm text-white/50">Materiais permanentes para produzir vídeos, consultar referências e desenvolver novas ideias.</p>
         </div>
-        <button type="button" onClick={openNew} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/15 transition-colors hover:bg-blue-500"><Plus className="h-4 w-4" /> Novo roteiro</button>
+        <div className="flex gap-2">
+          <div role="group" aria-label="Visualização" className="flex gap-1 rounded-xl border border-white/10 bg-[#0D1527] p-1">
+            {([['kanban', 'Kanban'], ['list', 'Lista']] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setView(id)} aria-pressed={view === id} className={`rounded-lg px-3 py-2 text-xs font-semibold sm:py-1.5 transition-colors ${view === id ? 'bg-blue-600 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}>{label}</button>)}
+          </div>
+          <button type="button" onClick={openNew} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/15 transition-colors hover:bg-blue-500"><Plus className="h-4 w-4" /> Novo roteiro</button>
+        </div>
       </div>
 
       {success && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-200"><CheckCircle2 className="h-4 w-4" />{success}</div>}
@@ -113,10 +119,11 @@ export const AdminScriptsPage: React.FC = () => {
 
       {loading ? <div className="flex min-h-52 items-center justify-center gap-3 text-sm text-white/55"><Loader2 className="h-5 w-5 animate-spin text-blue-400" />Carregando roteiros…</div>
         : !error && scripts.length === 0 ? <div className="rounded-2xl border border-dashed border-white/15 bg-[#0D1527]/60 px-5 py-14 text-center"><BookOpen className="mx-auto h-8 w-8 text-white/30" /><p className="mt-3 text-base font-semibold text-white">Sua biblioteca começa aqui.</p><p className="mt-1 text-sm text-white/45">Crie roteiros que continuarão disponíveis mesmo depois de produzidos ou publicados.</p></div>
-          : !error && hierarchyRows.length === 0 ? <p className="rounded-xl border border-white/10 bg-[#0D1527] p-5 text-center text-sm text-white/55">Nenhum roteiro corresponde aos filtros escolhidos.</p>
-            : !error && <div className="space-y-3">
-              {hierarchyRows.map(({ script, depth }) => <ScriptRow key={script.id} script={script} depth={depth} scriptActionId={scriptActionId} sendingScriptId={sendingScriptId} openEdit={openEdit} openNewChild={openNewChild} onDuplicate={(item) => void handleDuplicateScript(item)} onDelete={(item) => void handleDeleteScript(item)} onSendToRecording={(item) => void handleSendToRecording(item)} onOpenOrder={(orderId) => navigate(`/admin/pedidos?orderId=${encodeURIComponent(orderId)}`)} />)}
-            </div>}
+          : !error && filtered.length === 0 ? <p className="rounded-xl border border-white/10 bg-[#0D1527] p-5 text-center text-sm text-white/55">Nenhum roteiro corresponde aos filtros escolhidos.</p>
+            : !error && (view === 'kanban' ? <ScriptKanban scripts={filtered} openEdit={openEdit} />
+              : <div className="space-y-3">
+              {filtered.map((script) => <ScriptRow key={script.id} script={script} scriptActionId={scriptActionId} sendingScriptId={sendingScriptId} openEdit={openEdit} openNewChild={openNewChild} onDuplicate={(item) => void handleDuplicateScript(item)} onDelete={(item) => void handleDeleteScript(item)} onSendToRecording={(item) => void handleSendToRecording(item)} onOpenOrder={(orderId) => navigate(`/admin/pedidos?orderId=${encodeURIComponent(orderId)}`)} />)}
+            </div>)}
 
       {editorOpen && <ScriptEditorModal script={editingScript} initialParentScriptId={initialParentScriptId} scripts={scripts} categories={categories} onClose={() => setEditorOpen(false)} onSaved={handleSaved} onSendToRecording={(script) => handleSendToRecording(script, false)} onOpenOrder={(orderId) => { setEditorOpen(false); navigate(`/admin/pedidos?orderId=${encodeURIComponent(orderId)}`); }} />}
     </section>

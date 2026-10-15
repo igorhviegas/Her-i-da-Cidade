@@ -12,11 +12,12 @@ export const useScriptTexts = (script: ContentScript | null, initialParentScript
   return { title, setTitle, category, setCategory, parentScriptId, setParentScriptId, content, setContent, notes, setNotes };
 };
 
-/** Status de produção e publicação, data de publicação e pedido vinculado. */
+/** Status de produção e publicação, datas de publicação (real e prevista) e pedido vinculado. */
 export const useScriptStatuses = (script: ContentScript | null) => {
   const [productionStatus, setProductionStatus] = useState<ScriptProductionStatus>(script?.productionStatus || 'draft');
   const [publicationStatus, setPublicationStatus] = useState<ScriptPublicationStatus>(script?.publicationStatus || 'unpublished');
   const [publishedDate, setPublishedDate] = useState(dateInput(script?.publishedAt));
+  const [plannedDate, setPlannedDate] = useState(dateInput(script?.plannedPublishAt));
   const [linkedOrderId, setLinkedOrderId] = useState(script?.orderId || '');
-  return { productionStatus, setProductionStatus, publicationStatus, setPublicationStatus, publishedDate, setPublishedDate, linkedOrderId, setLinkedOrderId };
+  return { productionStatus, setProductionStatus, publicationStatus, setPublicationStatus, publishedDate, setPublishedDate, plannedDate, setPlannedDate, linkedOrderId, setLinkedOrderId };
 };

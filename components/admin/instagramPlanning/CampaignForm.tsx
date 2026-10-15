@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { createCampaign, updateCampaign, type Templates } from '../../../services/instagramPlanningService';
+import { createCampaign, subscribeTemplates, updateCampaign, type Templates } from '../../../services/instagramPlanningService';
+import { dateKey } from '../../../functions/missions-core.js';
 import { buildTemplateSteps, CAMPAIGN_STATUSES, CATEGORIES, templateFor, validateCampaign, type Campaign, type CampaignInput } from '../../../services/instagramPlanning.js';
 import { ghostBtn, inputClass, labelClass, primaryBtn } from '../financeFormat';
 import { ErrorLine, Modal } from './planningUi';
@@ -10,8 +11,8 @@ import { TemplateEditor } from './TemplateEditor';
 const fromTemplate = (category: string, templates: Templates): RowDraft[] => buildTemplateSteps(templateFor(category, templates)).map(rowFromStep);
 
 /** Criar/editar campanha. Ao escolher a categoria numa campanha nova, as etapas padrão são carregadas (e podem ser ajustadas só nesta campanha). */
-export const CampaignForm: React.FC<{ initial: Campaign | null; templates: Templates; today: string; onClose: () => void; onSaved: (message: string) => void }> = ({ initial, templates, today, onClose, onSaved }) => {
-  const [title, setTitle] = useState(initial?.title ?? '');
+export const CampaignForm: React.FC<{ initial: Campaign | null; initialTitle?: string; templates: Templates; today: string; onClose: () => void; onSaved: (message: string) => void }> = ({ initial, initialTitle = '', templates, today, onClose, onSaved }) => {
+  const [title, setTitle] = useState(initial?.title ?? initialTitle.slice(0, 120));
   const [category, setCategory] = useState(initial?.category ?? 'new_service');
   const [launchDate, setLaunchDate] = useState(initial?.launchDate ?? '');
   const [status, setStatus] = useState<Campaign['status']>(initial?.status ?? 'planning');
@@ -92,4 +93,11 @@ export const CampaignForm: React.FC<{ initial: Campaign | null; templates: Templ
       {editingTemplate && <TemplateEditor category={category} templates={templates} today={today} onClose={() => setEditingTemplate(false)} />}
     </Modal>
   );
+};
+
+/** Nova campanha aberta fora do módulo do Instagram (ex.: a partir de um roteiro): carrega os modelos de etapas antes de montar o formulário. */
+export const NewCampaignForm: React.FC<{ initialTitle: string; onClose: () => void; onSaved: (message: string) => void }> = ({ initialTitle, onClose, onSaved }) => {
+  const [templates, setTemplates] = useState<Templates | null>(null);
+  useEffect(() => subscribeTemplates(setTemplates, () => setTemplates({})), []); // sem modelos salvos, usa as etapas padrão
+  return templates ? <CampaignForm initial={null} initialTitle={initialTitle} templates={templates} today={dateKey(new Date())} onClose={onClose} onSaved={onSaved} /> : null;
 };

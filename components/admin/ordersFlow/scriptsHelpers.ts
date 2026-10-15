@@ -7,11 +7,13 @@ export const productionLabels: Record<ScriptProductionStatus, string> = {
 export const publicationLabels: Record<ScriptPublicationStatus, string> = {
   unpublished: 'Não publicado', published: 'Publicado',
 };
+export const publishedStyle = 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200';
+/** Cores dos status de produção; nos cards do Kanban, publicado (verde) prevalece. */
 export const productionStyles: Record<ScriptProductionStatus, string> = {
   draft: 'border-slate-400/20 bg-slate-400/10 text-slate-200',
   ready: 'border-blue-400/20 bg-blue-400/10 text-blue-200',
-  in_production: 'border-amber-400/20 bg-amber-400/10 text-amber-200',
-  produced: 'border-violet-400/20 bg-violet-400/10 text-violet-200',
+  in_production: 'border-violet-400/20 bg-violet-400/10 text-violet-200',
+  produced: 'border-amber-400/20 bg-amber-400/10 text-amber-200',
 };
 
 export function toDate(value: unknown): Date | null {

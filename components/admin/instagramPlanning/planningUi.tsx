@@ -25,7 +25,7 @@ export const Modal: React.FC<{ title: string; onClose: () => void; children: Rea
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={title} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/70 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={title} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-white/10 bg-[#0D1527] p-4 shadow-2xl sm:max-w-xl sm:rounded-2xl sm:p-5">
         <div className="mb-3 flex items-start justify-between gap-3">
           <h3 className="text-base font-bold text-white">{title}</h3>

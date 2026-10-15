@@ -1,7 +1,8 @@
 import React, { FormEvent, useRef, useState } from 'react';
-import { AlertCircle, ArrowUpRight } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, CheckCircle2, Megaphone } from 'lucide-react';
 import { createContentScript, updateContentScript } from '../../services/contentScriptsService';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../../types';
+import { NewCampaignForm } from './instagramPlanning/CampaignForm';
 import { ScriptEditorFooter, ScriptEditorHeader } from './ordersFlow/ScriptEditorParts';
 import { dateFromInput, inputClass, labelClass, productionOptions, publicationOptions, todayInput } from './ordersFlow/scriptEditorHelpers';
 import { useScriptStatuses, useScriptTexts } from './ordersFlow/useScriptDraft';
@@ -20,11 +21,13 @@ interface ScriptEditorModalProps {
 export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, initialParentScriptId, scripts, categories, onClose, onSaved, onSendToRecording, onOpenOrder }) => {
   const [persistedScript, setPersistedScript] = useState(script);
   const { title, setTitle, category, setCategory, parentScriptId, setParentScriptId, content, setContent, notes, setNotes } = useScriptTexts(script, initialParentScriptId);
-  const { productionStatus, setProductionStatus, publicationStatus, setPublicationStatus, publishedDate, setPublishedDate, linkedOrderId, setLinkedOrderId } = useScriptStatuses(script);
+  const { productionStatus, setProductionStatus, publicationStatus, setPublicationStatus, publishedDate, setPublishedDate, plannedDate, setPlannedDate, linkedOrderId, setLinkedOrderId } = useScriptStatuses(script);
   const [saving, setSaving] = useState(false);
   const [sendingToProduction, setSendingToProduction] = useState(false);
   const operationLock = useRef(false);
   const [error, setError] = useState('');
+  const [campaignOpen, setCampaignOpen] = useState(false);
+  const [campaignMessage, setCampaignMessage] = useState('');
 
   const persistScript = async (): Promise<ContentScript> => {
     const input = {
@@ -35,11 +38,12 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, in
       productionStatus,
       publicationStatus,
       publishedAt: dateFromInput(publishedDate),
+      plannedPublishAt: dateFromInput(plannedDate),
       parentScriptId: parentScriptId || null,
     };
     if (persistedScript) {
       await updateContentScript(persistedScript.id, input);
-      const saved = { ...persistedScript, ...input, publishedAt: input.publishedAt || undefined, parentScriptId: input.parentScriptId || undefined };
+      const saved = { ...persistedScript, ...input, publishedAt: input.publishedAt || undefined, plannedPublishAt: input.plannedPublishAt || undefined, parentScriptId: input.parentScriptId || undefined };
       setPersistedScript(saved);
       return saved;
     }
@@ -127,15 +131,22 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, in
             </label>
             <label className={labelClass}>Conteúdo do roteiro *<textarea required value={content} onChange={(event) => setContent(event.target.value)} disabled={saving} rows={18} className={`${inputClass} min-h-[20rem] resize-y leading-6`} placeholder="Escreva ou cole o roteiro completo…" /></label>
             <label className={labelClass}>Observações e anotações<textarea value={notes} onChange={(event) => setNotes(event.target.value)} disabled={saving} rows={4} className={`${inputClass} resize-y`} placeholder="Referências, ideias para versões futuras, observações de produção…" /></label>
-            <div className="grid grid-cols-1 gap-3 border-t border-white/10 pt-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 border-t border-white/10 pt-4 sm:grid-cols-2 lg:grid-cols-4">
               <label className={labelClass}>Status de produção<select value={productionStatus} onChange={(event) => setProductionStatus(event.target.value as ScriptProductionStatus)} disabled={saving} className={inputClass}>{productionOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label className={labelClass}>Status de publicação<select value={publicationStatus} onChange={(event) => { const next = event.target.value as ScriptPublicationStatus; setPublicationStatus(next); if (next === 'published' && !publishedDate) setPublishedDate(todayInput()); }} disabled={saving} className={inputClass}>{publicationOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label className={labelClass}>Data de publicação<input type="date" value={publishedDate} onChange={(event) => setPublishedDate(event.target.value)} disabled={saving} className={inputClass} /></label>
+              <label className={labelClass}>Previsão de postagem<input type="date" value={plannedDate} onChange={(event) => setPlannedDate(event.target.value)} disabled={saving} className={inputClass} /><span className="mt-1 block text-[10px] font-normal text-white/40">Opcional. Ordena a lista de roteiros.</span></label>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-purple-400/15 bg-purple-500/[0.05] p-3">
+              <span className="text-xs text-white/60">{campaignMessage ? <span role="status" className="inline-flex items-center gap-1.5 text-emerald-200"><CheckCircle2 className="h-3.5 w-3.5" />{campaignMessage}</span> : 'Planeje a divulgação deste roteiro no Instagram.'}</span>
+              <button type="button" onClick={() => { setCampaignMessage(''); setCampaignOpen(true); }} disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg border border-purple-400/25 bg-purple-500/10 px-3 py-1.5 text-xs font-bold text-purple-100 hover:bg-purple-500/20 disabled:opacity-50"><Megaphone className="h-3.5 w-3.5" />Criar campanha</button>
             </div>
           </div>
           <ScriptEditorFooter saving={saving} sendingToProduction={sendingToProduction} showSendToRecording={productionStatus === 'ready' && !linkedOrderId} onClose={onClose} onSendToRecording={() => void handleSendToRecording()} />
         </form>
       </section>
+      {/* Fora do <form> do roteiro: o submit da campanha não pode salvar o roteiro junto. */}
+      {campaignOpen && <NewCampaignForm initialTitle={title.trim()} onClose={() => setCampaignOpen(false)} onSaved={(message) => { setCampaignOpen(false); setCampaignMessage(`${message} Acompanhe em Instagram › Campanhas.`); }} />}
     </div>
   );
 };

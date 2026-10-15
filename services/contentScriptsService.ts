@@ -20,6 +20,7 @@ export type ContentScriptInput = {
   productionStatus: ScriptProductionStatus;
   publicationStatus: ScriptPublicationStatus;
   publishedAt?: Date | null;
+  plannedPublishAt?: Date | null;
   notes: string;
   parentScriptId?: string | null;
 };
@@ -35,6 +36,7 @@ function mapScript(id: string, data: Record<string, any>): ContentScript {
     createdAt: data.createdAt,
     updatedAt: data.updatedAt,
     publishedAt: data.publishedAt,
+    plannedPublishAt: data.plannedPublishAt,
     notes: data.notes || '',
     ...(typeof data.orderId === 'string' ? { orderId: data.orderId } : {}),
     ...(typeof data.sourceScriptId === 'string' ? { sourceScriptId: data.sourceScriptId } : {}),
@@ -102,10 +104,11 @@ export async function createContentScript(input: ContentScriptInput): Promise<Co
   const clean = validate(input);
   await validateParent(undefined, clean.parentScriptId);
   const reference = doc(collection(db, CONTENT_SCRIPTS_COLLECTION));
-  const { publishedAt, parentScriptId, ...fields } = clean;
+  const { publishedAt, plannedPublishAt, parentScriptId, ...fields } = clean;
   const payload = {
     ...fields,
     ...(publishedAt ? { publishedAt } : {}),
+    ...(plannedPublishAt ? { plannedPublishAt } : {}),
     ...(parentScriptId ? { parentScriptId } : {}),
     ...(fields.productionStatus === 'ready' ? { readyAt: serverTimestamp() } : {}),
     createdAt: serverTimestamp(),
@@ -133,7 +136,7 @@ export async function updateContentScript(id: string, input: ContentScriptInput)
   if (!id) throw new Error('ID do roteiro é obrigatório.');
   const clean = validate(input);
   await validateParent(id, clean.parentScriptId);
-  const { publishedAt, parentScriptId, ...fields } = clean;
+  const { publishedAt, plannedPublishAt, parentScriptId, ...fields } = clean;
   const firestore = db;
   const scriptRef = doc(firestore, CONTENT_SCRIPTS_COLLECTION, id);
   await runTransaction(firestore, async (transaction) => {
@@ -152,6 +155,7 @@ export async function updateContentScript(id: string, input: ContentScriptInput)
     transaction.update(scriptRef, {
       ...fields,
       publishedAt: publishedAt || deleteField(),
+      plannedPublishAt: plannedPublishAt || deleteField(),
       parentScriptId: parentScriptId || deleteField(),
       ...(becomesReady ? { readyAt: serverTimestamp() } : {}),
       updatedAt: serverTimestamp(),

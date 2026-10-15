@@ -131,6 +131,8 @@ export interface ContentScript {
   createdAt?: unknown;
   updatedAt?: unknown;
   publishedAt?: unknown;
+  /** Previsão de postagem (data em que se deseja publicar); opcional. */
+  plannedPublishAt?: unknown;
   /** Primeira vez que o roteiro ficou Pronto para gravar; definido uma só vez. */
   readyAt?: unknown;
   notes: string;
