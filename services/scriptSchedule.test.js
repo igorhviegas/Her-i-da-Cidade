@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scriptPublishTime, sortByPublishDate } from './scriptSchedule.js';
+import { scriptCalendarPlans, scriptPublishTime, sortByPublishDate } from './scriptSchedule.js';
 
 const day = (d) => new Date(2026, 9, d, 12);
 const ts = (d) => ({ toDate: () => day(d) });
@@ -21,4 +21,13 @@ test('ordena por data e manda os sem data para o final', () => {
   ];
   assert.deepEqual(sortByPublishDate(list).map((s) => s.id), ['d5', 'd10', 'd20', 'sem']);
   assert.deepEqual(sortByPublishDate(list, true).map((s) => s.id), ['d20', 'd10', 'd5', 'sem']);
+});
+
+test('roteiros não publicados com previsão viram planejamento avulso no calendário', () => {
+  const plans = scriptCalendarPlans([
+    { id: 'a', title: 'Chupeta', publicationStatus: 'unpublished', plannedPublishAt: ts(20) },
+    { id: 'b', title: 'Sem data', publicationStatus: 'unpublished' },
+    { id: 'c', title: 'Já postado', publicationStatus: 'published', plannedPublishAt: day(21) },
+  ]);
+  assert.deepEqual(plans, [{ id: 'script-a', scriptId: 'a', date: '2026-10-20', title: 'Chupeta', format: 'reels' }]);
 });
