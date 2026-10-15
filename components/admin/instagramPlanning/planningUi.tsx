@@ -2,10 +2,10 @@ import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { subscribeCampaigns, subscribePlans, subscribeTemplates, type Templates } from '../../../services/instagramPlanningService';
 import type { Campaign, Plan } from '../../../services/instagramPlanning.js';
-import { listContentScripts } from '../../../services/contentScriptsService';
+import { subscribeContentScripts } from '../../../services/contentScriptsService';
 import { scriptCalendarPlans } from '../../../services/scriptSchedule.js';
 
-/** Planejamentos, campanhas e modelos de etapas em tempo real; roteiros com previsão de postagem entram como planejamento avulso (lidos ao abrir a página). `error` = alguma leitura falhou (ex.: regras ainda não publicadas). */
+/** Planejamentos, campanhas e modelos de etapas em tempo real; roteiros com previsão de postagem entram como planejamento avulso. `error` = alguma leitura falhou (ex.: regras ainda não publicadas). */
 export function useInstagramPlanning() {
   const [plans, setPlans] = useState<Plan[] | undefined>(undefined);
   const [campaigns, setCampaigns] = useState<Campaign[] | undefined>(undefined);
@@ -14,10 +14,11 @@ export function useInstagramPlanning() {
   const [error, setError] = useState(false);
   useEffect(() => {
     const onError = () => setError(true);
-    let cancelled = false;
-    listContentScripts().then((scripts) => { if (!cancelled) setScriptPlans(scriptCalendarPlans(scripts)); }).catch(onError);
-    const stops = [subscribePlans(setPlans, onError), subscribeCampaigns(setCampaigns, onError), subscribeTemplates(setTemplates, onError)];
-    return () => { cancelled = true; stops.forEach((stop) => stop()); };
+    const stops = [
+      subscribePlans(setPlans, onError), subscribeCampaigns(setCampaigns, onError), subscribeTemplates(setTemplates, onError),
+      subscribeContentScripts((scripts) => setScriptPlans(scriptCalendarPlans(scripts)), onError),
+    ];
+    return () => stops.forEach((stop) => stop());
   }, []);
   const allPlans = useMemo(() => plans && [...plans, ...scriptPlans], [plans, scriptPlans]);
   return { plans: allPlans, campaigns, templates, error };

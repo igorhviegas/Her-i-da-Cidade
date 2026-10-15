@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AlertCircle, BookOpen, CheckCircle2, Loader2, Plus } from 'lucide-react';
-import { createContentScript, deleteContentScript } from '../../services/contentScriptsService';
+import { createContentScript, deleteContentScript, saveScriptOrder } from '../../services/contentScriptsService';
+import { moveScript, sortByManualOrder } from '../../services/scriptSchedule.js';
 import { sendScriptToRecording } from '../../services/scriptProductionService';
 import { useRouter } from '../../lib/router';
 import type { ContentScript } from '../../types';
 import { ScriptEditorModal } from './ScriptEditorModal';
-import { ScriptFiltersBar, ScriptKanban, ScriptRow } from './ordersFlow/ScriptLibraryParts';
+import { ScriptFiltersBar, ScriptKanban, ScriptRow, useScriptDrag } from './ordersFlow/ScriptLibraryParts';
 import { logScriptOperationError, toDate } from './ordersFlow/scriptsHelpers';
 import { useScriptEditorState, useScriptFilters, useScriptsData } from './ordersFlow/useScriptLibrary';
 
@@ -15,6 +16,24 @@ export const AdminScriptsPage: React.FC = () => {
   const [success, setSuccess] = useState('');
   const { search, setSearch, categoryFilter, setCategoryFilter, productionFilter, setProductionFilter, publicationFilter, setPublicationFilter, categoriesInLibrary, filtered } = useScriptFilters(scripts);
   const [view, setView] = useState<'kanban' | 'list'>('kanban');
+  const [listOrder, setListOrder] = useState<'date' | 'manual'>('date');
+  const manualOrdered = useMemo(() => sortByManualOrder(filtered), [filtered]);
+  const handleMove = async (draggedId: string, targetId: string) => {
+    const updates = moveScript(scripts, draggedId, targetId);
+    if (!updates.length) return;
+    const previous = scripts;
+    const positions = new Map(updates.map(({ id, sortOrder }) => [id, sortOrder]));
+    setScripts((current) => current.map((item) => positions.has(item.id) ? { ...item, sortOrder: positions.get(item.id) } : item));
+    setActionError('');
+    try {
+      await saveScriptOrder(updates);
+    } catch (moveError) {
+      logScriptOperationError(`reordenar roteiro ${draggedId}`, moveError);
+      setScripts(previous);
+      setActionError(moveError instanceof Error ? moveError.message : 'Não foi possível salvar a nova ordem.');
+    }
+  };
+  const dragProps = useScriptDrag((draggedId, targetId) => void handleMove(draggedId, targetId));
   const { editorOpen, setEditorOpen, editingScript, setEditingScript, initialParentScriptId, openNew, openNewChild, openEdit } = useScriptEditorState();
   const [sendingScriptId, setSendingScriptId] = useState<string | null>(null);
   const [scriptActionId, setScriptActionId] = useState<string | null>(null);
@@ -120,9 +139,14 @@ export const AdminScriptsPage: React.FC = () => {
       {loading ? <div className="flex min-h-52 items-center justify-center gap-3 text-sm text-white/55"><Loader2 className="h-5 w-5 animate-spin text-blue-400" />Carregando roteiros…</div>
         : !error && scripts.length === 0 ? <div className="rounded-2xl border border-dashed border-white/15 bg-[#0D1527]/60 px-5 py-14 text-center"><BookOpen className="mx-auto h-8 w-8 text-white/30" /><p className="mt-3 text-base font-semibold text-white">Sua biblioteca começa aqui.</p><p className="mt-1 text-sm text-white/45">Crie roteiros que continuarão disponíveis mesmo depois de produzidos ou publicados.</p></div>
           : !error && filtered.length === 0 ? <p className="rounded-xl border border-white/10 bg-[#0D1527] p-5 text-center text-sm text-white/55">Nenhum roteiro corresponde aos filtros escolhidos.</p>
-            : !error && (view === 'kanban' ? <ScriptKanban scripts={filtered} openEdit={openEdit} />
+            : !error && (view === 'kanban' ? <ScriptKanban scripts={manualOrdered} openEdit={openEdit} dragFor={dragProps} />
               : <div className="space-y-3">
-              {filtered.map((script) => <ScriptRow key={script.id} script={script} scriptActionId={scriptActionId} sendingScriptId={sendingScriptId} openEdit={openEdit} openNewChild={openNewChild} onDuplicate={(item) => void handleDuplicateScript(item)} onDelete={(item) => void handleDeleteScript(item)} onSendToRecording={(item) => void handleSendToRecording(item)} onOpenOrder={(orderId) => navigate(`/admin/pedidos?orderId=${encodeURIComponent(orderId)}`)} />)}
+              <div role="group" aria-label="Ordenar lista" className="flex w-fit items-center gap-1 rounded-xl border border-white/10 bg-[#0D1527] p-1 text-xs">
+                <span className="px-2 text-white/45">Ordenar:</span>
+                {([['date', 'Data de postagem'], ['manual', 'Ordem manual']] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setListOrder(id)} aria-pressed={listOrder === id} className={`rounded-lg px-3 py-1.5 font-semibold transition-colors ${listOrder === id ? 'bg-blue-600 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}>{label}</button>)}
+              </div>
+              {listOrder === 'manual' && <p className="text-[11px] text-white/40">Arraste os roteiros para cima ou para baixo para reordenar.</p>}
+              {(listOrder === 'manual' ? manualOrdered : filtered).map((script) => <ScriptRow key={script.id} drag={listOrder === 'manual' ? dragProps(script, manualOrdered) : undefined} script={script}scriptActionId={scriptActionId} sendingScriptId={sendingScriptId} openEdit={openEdit} openNewChild={openNewChild} onDuplicate={(item) => void handleDuplicateScript(item)} onDelete={(item) => void handleDeleteScript(item)} onSendToRecording={(item) => void handleSendToRecording(item)} onOpenOrder={(orderId) => navigate(`/admin/pedidos?orderId=${encodeURIComponent(orderId)}`)} />)}
             </div>)}
 
       {editorOpen && <ScriptEditorModal script={editingScript} initialParentScriptId={initialParentScriptId} scripts={scripts} categories={categories} onClose={() => setEditorOpen(false)} onSaved={handleSaved} onSendToRecording={(script) => handleSendToRecording(script, false)} onOpenOrder={(orderId) => { setEditorOpen(false); navigate(`/admin/pedidos?orderId=${encodeURIComponent(orderId)}`); }} />}

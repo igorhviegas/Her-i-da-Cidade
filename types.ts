@@ -133,6 +133,8 @@ export interface ContentScript {
   publishedAt?: unknown;
   /** Previsão de postagem (data em que se deseja publicar); opcional. */
   plannedPublishAt?: unknown;
+  /** Posição na ordem manual (arrastar) da biblioteca; ausente = ainda sem posição (aparece no topo). */
+  sortOrder?: number;
   /** Primeira vez que o roteiro ficou Pronto para gravar; definido uma só vez. */
   readyAt?: unknown;
   notes: string;
