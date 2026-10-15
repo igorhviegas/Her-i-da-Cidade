@@ -19,12 +19,12 @@
     "lint:types": "eslint --config eslint.typed.config.mjs ."
   },
   "dependencies": {
-    "@vercel/blob": "^2.8.0",
+    "@vercel/blob": "^2.8.1",
     "@vercel/oidc": "^3.8.9",
     "express": "^5.2.1",
     "firebase": "^12.19.0",
     "fit-file-parser": "6.1.2",
-    "lucide-react": "^1.47.0",
+    "lucide-react": "^1.52.0",
     "multer": "^2.4.0",
     "papaparse": "^5.7.0",
     "pdfjs-dist": "^4.10.38",
