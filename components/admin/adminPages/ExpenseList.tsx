@@ -3,7 +3,7 @@ import { Receipt } from 'lucide-react';
 import { currentDefaultAmount, type FixedExpense } from '../../../services/financeCalculations.js';
 import { setFixedExpenseAdjustment } from '../../../services/financeService';
 import { cardClass, ghostBtn, formatMoney, monthLabel } from '../financeFormat';
-import type { ExpenseMode } from './ExpenseForm';
+import { PAYMENT_METHODS, type ExpenseMode } from './ExpenseForm';
 
 interface AutoCost { items: unknown[]; total: number }
 
@@ -45,7 +45,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({ items, videoCost, even
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-white">{expense.name}</p>
-              <p className="text-xs text-white/50">{expense.category}{expense.description ? ` · ${expense.description}` : ''}</p>
+              <p className="text-xs text-white/50">{expense.category} · {PAYMENT_METHODS[expense.paymentMethod ?? 'pix']}{expense.description ? ` · ${expense.description}` : ''}</p>
             </div>
             <div className="shrink-0 text-right">
               <p className="text-sm font-extrabold text-white">{formatMoney(amount)}</p>
