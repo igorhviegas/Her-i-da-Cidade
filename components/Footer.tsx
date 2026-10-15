@@ -3,7 +3,7 @@ import { useSiteConfig } from "../services/siteConfigService";
 import { Link } from "../lib/router";
 import { PRIVACY_PATH } from "../services/privacy.js";
 
-const spider = "/images/spider.PNG";
+const spider = "/images/logo-128.webp";
 
 export const Footer: React.FC = () => {
   const { whatsappUrl } = useSiteConfig();

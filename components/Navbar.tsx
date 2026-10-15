@@ -3,7 +3,7 @@ import { useRouter } from "../lib/router";
 import { NavbarDesktopLinks, NavbarMobilePanel } from "./publicSite/NavbarParts";
 import type { MenuItem } from "./publicSite/NavbarParts";
 
-const spider = "/images/spider.PNG";
+const spider = "/images/logo-128.webp";
 
 export const Navbar: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
