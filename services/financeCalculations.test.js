@@ -142,6 +142,12 @@ test('custo de edição: concluir sem custo grava 0, não entra no mês e não �
   assert.deepEqual(editingCostFields('3', done), {});
 });
 
+test('despesas no crédito: soma só as fixas do mês com paymentMethod credit (sem campo = Pix)', async () => {
+  const { creditExpensesForMonth } = await import('./financeCalculations.js');
+  const exp = (id, amount, paymentMethod) => ({ id, name: id, category: 'x', startMonth: '2026-01', active: true, amountHistory: { '2026-01': amount }, ...(paymentMethod ? { paymentMethod } : {}) });
+  assert.equal(creditExpensesForMonth([exp('a', 100, 'credit'), exp('b', 50, 'pix'), exp('c', 30)], '2026-10'), 100);
+});
+
 test('custo de edição: não concluído e outros serviços não geram custo', () => {
   assert.equal(monthCost([video('a')]), 0);
   assert.equal(monthCost([complete(video('b', { serviceId: '1' }), '1')]), 0);

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import type { Client, Order, Service } from '../../../types';
-import { expensesForMonth, monthKeyOf, shiftMonth, type FixedExpense, type RevenueEntry } from '../../../services/financeCalculations.js';
+import { creditExpensesForMonth, expensesForMonth, monthKeyOf, shiftMonth, type FixedExpense, type RevenueEntry } from '../../../services/financeCalculations.js';
 import { loadFitDaily } from '../../../services/fitService';
 import { loadWeights, loadCheckins } from '../../../services/fitDataService';
 import { loadFitRides } from '../../../services/fitRideService';
@@ -84,6 +84,7 @@ export const ReportsMonthly: React.FC<Props> = ({ entries, costs, orders, expens
       monthKey, partial: monthKey >= monthKeyOf(new Date()),
       totals: periodTotals(entries, costs, range), previous: periodTotals(entries, costs, previousRange),
       fixed: expensesForMonth(expenses, monthKey).total,
+      credit: creditExpensesForMonth(expenses, monthKey),
       days: dailyBreakdown(entries, range),
       services: serviceBreakdown(entries, range).slice(0, 8).map((s) => ({ ...s, name: serviceName(s.serviceId) })),
       events: eventProfitability(entries, costs, range).totals,

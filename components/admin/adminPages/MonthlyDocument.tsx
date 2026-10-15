@@ -12,6 +12,8 @@ export interface MonthlyData {
   totals: PeriodTotals;
   previous: PeriodTotals;
   fixed: number;
+  /** Parte das despesas fixas paga no crédito; o resto dos custos é Pix. */
+  credit: number;
   days: { date: Date; revenue: number; count: number }[];
   services: { serviceId: string; name: string; count: number; revenue: number; share: number }[];
   events: { count: number; revenue: number; cost: number; margin: number; marginPct: number | null };
@@ -78,7 +80,7 @@ const Fit: React.FC<{ state: Loadable<FitMonth> }> = ({ state }) => {
 
 /** Folha do relatório mensal: fundo branco, também usada na impressão (Salvar como PDF). Só dinheiro, clientes, Instagram e Fit. */
 export const MonthlyDocument: React.FC<{ data: MonthlyData }> = ({ data }) => {
-  const { totals, previous, fixed, events, clients, delivery } = data;
+  const { totals, previous, fixed, credit, events, clients, delivery } = data;
   const result = totals.result - fixed;
   const variation = variationPct(totals.revenue, previous.revenue);
   const max = Math.max(...data.days.map((d) => d.revenue), 1);
@@ -106,6 +108,7 @@ export const MonthlyDocument: React.FC<{ data: MonthlyData }> = ({ data }) => {
           <Row label="Despesas fixas" value={formatMoney(0 - fixed)} tone="text-red-600" />
           <Row label="Resultado do mês" value={formatMoney(result)} strong tone={tone(result)} />
         </dl>
+        <p className="mt-2 text-xs text-slate-500">Custos por forma de pagamento: Pix {formatMoney(totals.variableCost + fixed - credit)} · Crédito {formatMoney(credit)}</p>
       </Section>
 
       <Section title="Faturamento por dia">

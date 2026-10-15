@@ -151,6 +151,11 @@ export function expensesForMonth(expenses, monthKey) {
   return { items, total: items.reduce((sum, item) => sum + item.amount, 0) };
 }
 
+/** Despesas fixas do mês pagas no crédito. O resto dos custos (fixas no Pix, edição e eventos) é Pix. */
+export function creditExpensesForMonth(expenses, monthKey) {
+  return expensesForMonth(expenses, monthKey).items.reduce((sum, { expense, amount }) => sum + (expense.paymentMethod === 'credit' ? amount : 0), 0);
+}
+
 /** Valor padrão atual (último da história) para exibir em listas. */
 export function currentDefaultAmount(expense) {
   const last = Object.keys(expense.amountHistory || {}).sort().pop();
