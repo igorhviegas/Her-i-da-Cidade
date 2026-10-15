@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { AlertTriangle, ArrowUpRight, Copy, GripVertical, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { scriptPublishTime } from '../../../services/scriptSchedule.js';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../../../types';
 import { productionOptions } from './scriptEditorHelpers';
+import { SortableArea, SortableGroup, SortableItem } from './ScriptSortable';
 import { formatDate, productionLabels, productionStyles, publicationLabels, publishedStyle } from './scriptsHelpers';
 
 interface ScriptFiltersBarProps {
@@ -45,14 +46,14 @@ interface ScriptRowProps {
   onDelete: (script: ContentScript) => void;
   onSendToRecording: (script: ContentScript) => void;
   onOpenOrder: (orderId: string) => void;
-  /** Atributos de arrastar (só na ordem manual). */
-  drag?: React.HTMLAttributes<HTMLElement>;
+  /** Mostra a alça de arrastar (só na ordem manual). */
+  draggable?: boolean;
 }
 
-export const ScriptRow: React.FC<ScriptRowProps> = ({ script, scriptActionId, sendingScriptId, openEdit, openNewChild, onDuplicate, onDelete, onSendToRecording, onOpenOrder, drag }) => (
-  <article {...drag}>
+export const ScriptRow: React.FC<ScriptRowProps> = ({ script, scriptActionId, sendingScriptId, openEdit, openNewChild, onDuplicate, onDelete, onSendToRecording, onOpenOrder, draggable }) => (
+  <article>
     <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[#0D1527] px-3 py-2.5 transition-colors hover:border-blue-400/35 sm:flex-row sm:items-center sm:justify-between">
-      {drag && <GripVertical aria-hidden className="hidden h-4 w-4 shrink-0 cursor-grab text-white/30 sm:block" />}
+      {draggable && <GripVertical aria-hidden className="hidden h-4 w-4 shrink-0 cursor-grab text-white/30 sm:block" />}
       <button type="button" onClick={() => openEdit(script)} className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
         <span className="block truncate text-sm font-bold text-white">{script.title}</span>
         <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
@@ -82,53 +83,44 @@ const PublishDateBadge: React.FC<{ script: ContentScript }> = ({ script }) => {
   return <span className="font-semibold text-white/70">{script.publicationStatus === 'published' && script.publishedAt ? 'Publicado em' : 'Previsto para'} {formatDate(new Date(time))}</span>;
 };
 
-/** Kanban por status de produção; o card fica verde quando o roteiro já foi publicado. */
-export const ScriptKanban: React.FC<{ scripts: ContentScript[]; openEdit: (script: ContentScript) => void; dragFor: (script: ContentScript, column: ContentScript[]) => React.HTMLAttributes<HTMLElement> }> = ({ scripts, openEdit, dragFor }) => (
-  <div className="-mx-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
-    <div className="grid min-w-max grid-cols-4 gap-3 lg:min-w-0">
-      {productionOptions.map(([status, label]) => {
-        const items = scripts.filter((script) => script.productionStatus === status);
-        return (
-          <section key={status} aria-label={label} className="w-[min(72vw,270px)] lg:w-auto lg:min-w-0">
-            <header className={`mb-3 flex items-center justify-between rounded-xl border px-3 py-2.5 ${productionStyles[status]}`}>
-              <h3 className="text-xs font-extrabold uppercase tracking-[0.12em]">{label}</h3>
-              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold">{items.length}</span>
-            </header>
-            <div className="space-y-2.5">
-              {items.map((script) => (
-                <div key={script.id} {...dragFor(script, items)}>
-                <button type="button" onClick={() => openEdit(script)} className={`block w-full rounded-xl border p-3 text-left transition hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${script.publicationStatus === 'published' ? publishedStyle : productionStyles[script.productionStatus]}`}>
-                  <span className="block text-sm font-bold text-white">{script.title}</span>
-                  <span className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
-                    {script.publicationStatus === 'published' && <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 font-bold">Publicado</span>}
-                    {script.category && <span className="max-w-40 truncate text-white/55">{script.category}</span>}
-                    <PublishDateBadge script={script} />
-                  </span>
-                </button>
-                </div>
-              ))}
-              {items.length === 0 && <p className="rounded-xl border border-dashed border-white/10 px-3 py-5 text-center text-xs text-white/30">Nenhum roteiro neste status</p>}
-            </div>
-          </section>
-        );
-      })}
-    </div>
-  </div>
+/** Card do Kanban; o card fica verde quando o roteiro já foi publicado. */
+export const ScriptKanbanCard: React.FC<{ script: ContentScript; openEdit: (script: ContentScript) => void }> = ({ script, openEdit }) => (
+  <button type="button" onClick={() => openEdit(script)} className={`block w-full rounded-xl border p-3 text-left transition hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${script.publicationStatus === 'published' ? publishedStyle : productionStyles[script.productionStatus]}`}>
+    <span className="block text-sm font-bold text-white">{script.title}</span>
+    <span className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+      {script.publicationStatus === 'published' && <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 font-bold">Publicado</span>}
+      {script.category && <span className="max-w-40 truncate text-white/55">{script.category}</span>}
+      <PublishDateBadge script={script} />
+    </span>
+  </button>
 );
 
-/**
- * Arrastar para reordenar (HTML5 drag and drop; no celular o navegador não arrasta). Só aceita soltar sobre um roteiro do
- * mesmo `group` (no Kanban, a mesma coluna); `onMove` recebe o arrastado e o alvo.
- */
-export function useScriptDrag(onMove: (draggedId: string, targetId: string) => void) {
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const dragProps = (script: ContentScript, group: ContentScript[]): React.HTMLAttributes<HTMLElement> => ({
-    draggable: true,
-    className: `cursor-grab active:cursor-grabbing ${draggingId === script.id ? 'opacity-40' : ''}`,
-    onDragStart: (event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', script.id); setDraggingId(script.id); },
-    onDragEnd: () => setDraggingId(null),
-    onDragOver: (event) => { if (draggingId && draggingId !== script.id && group.some((item) => item.id === draggingId)) event.preventDefault(); },
-    onDrop: (event) => { event.preventDefault(); if (draggingId) onMove(draggingId, script.id); setDraggingId(null); },
-  });
-  return dragProps;
-}
+/** Kanban por status de produção, com arrastar para reordenar dentro da coluna e "+" para novo rascunho. */
+export const ScriptKanban: React.FC<{ scripts: ContentScript[]; openEdit: (script: ContentScript) => void; onNew: () => void; onMove: (draggedId: string, targetId: string) => void }> = ({ scripts, openEdit, onNew, onMove }) => (
+  <SortableArea onMove={onMove} renderOverlay={(id) => { const script = scripts.find((item) => item.id === id); return script ? <ScriptKanbanCard script={script} openEdit={openEdit} /> : null; }}>
+    <div className="-mx-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
+      <div className="grid min-w-max grid-cols-4 gap-3 lg:min-w-0">
+        {productionOptions.map(([status, label]) => {
+          const items = scripts.filter((script) => script.productionStatus === status);
+          return (
+            <section key={status} aria-label={label} className="w-[min(72vw,270px)] lg:w-auto lg:min-w-0">
+              <header className={`mb-3 flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 ${productionStyles[status]}`}>
+                <h3 className="text-xs font-extrabold uppercase tracking-[0.12em]">{label}</h3>
+                <span className="flex items-center gap-1.5">
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-bold">{items.length}</span>
+                  {status === 'draft' && <button type="button" onClick={onNew} aria-label="Novo roteiro" title="Novo roteiro" className="rounded-lg bg-blue-600 p-1 text-white shadow shadow-blue-600/20 transition-colors hover:bg-blue-500"><Plus className="h-3.5 w-3.5" /></button>}
+                </span>
+              </header>
+              <SortableGroup id={status} ids={items.map((script) => script.id)}>
+                <div className="space-y-2.5">
+                  {items.map((script) => <SortableItem key={script.id} id={script.id}><ScriptKanbanCard script={script} openEdit={openEdit} /></SortableItem>)}
+                  {items.length === 0 && <p className="rounded-xl border border-dashed border-white/10 px-3 py-5 text-center text-xs text-white/30">Nenhum roteiro neste status</p>}
+                </div>
+              </SortableGroup>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  </SortableArea>
+);
