@@ -17,11 +17,14 @@ O HSTS já vem da própria Vercel.
 
 ### Como ligar a CSP completa
 
-A política completa está em `Report-Only` porque `index.html` ainda carrega o Tailwind por `cdn.tailwindcss.com`, que exige `'unsafe-inline'` e libera um script de terceiro. Passos:
+A política completa continua em `Report-Only` até alguém abrir o site e o `/admin` e conferir que nada é bloqueado. O Tailwind agora é **compilado no build** (`tailwind.config.js`, `postcss.config.js`, `index.css`); o script `cdn.tailwindcss.com` foi removido do `index.html` e o `script-src` ficou só `'self'` (o único `<script>` inline é o JSON-LD, que não é executado). Passos que faltam:
 
-1. Compilar o Tailwind no build do Vite (sem o `<script>` do CDN).
-2. Remover `'unsafe-inline'` e `https://cdn.tailwindcss.com` do `script-src`.
-3. Abrir o site (e o `/admin`) com o console aberto e conferir que não aparece `[Report Only]`.
-4. Trocar o nome do cabeçalho para `Content-Security-Policy`.
+1. Abrir o site, o `/admin` e as páginas públicas (`/agendar-chamada`, `/clientes`, `/kart`, `/agente-hdc`) com o console aberto e conferir que não aparece `[Report Only]`.
+2. Trocar o nome do cabeçalho para `Content-Security-Policy`.
+
+### Tailwind compilado: o que mudou para quem edita o código
+
+- O build só enxerga nomes de classe **escritos por inteiro** no código (`bg-red-500`). Classe montada por pedaços (`` `bg-${cor}-500` ``) não é gerada: escreva o nome completo ou use `safelist` em `tailwind.config.js`. Uma varredura em 394 arquivos não achou nenhum caso hoje.
+- Classe que não existe no Tailwind não faz nada (hoje: `contrast-110`, `hover:scale-115`, `perspective-1000` e o breakpoint `xs:`), igual ao que já acontecia com o CDN.
 
 Ao incluir um serviço externo novo (embed, analytics, fonte), acrescente o domínio na diretiva certa (`script-src`, `connect-src`, `img-src`, `frame-src`...).
