@@ -67,7 +67,7 @@ export const ClientsPage: React.FC = () => {
           <span aria-hidden />
           <Link href="/" aria-label="Herói da Cidade: ir para o site" className="flex items-center gap-2">
             <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[#0072d2] shadow-lg shadow-blue-600/30">
-              <img src="/images/spider.PNG" alt="" className="h-full w-full scale-125 object-cover" />
+              <img src="/images/logo-128.webp" alt="" className="h-full w-full scale-125 object-cover" />
             </span>
             <span className="text-base font-bold tracking-tight">Herói da Cidade</span>
           </Link>
