@@ -1,10 +1,12 @@
 import React, { useMemo } from 'react';
+import { MessageCircle } from 'lucide-react';
 import type { Client } from '../../../types';
 import type { RevenueEntry } from '../../../services/financeCalculations.js';
 import { clientRetention, type ClientRetentionRow } from '../../../services/reports.js';
 import { cardClass, formatDate, formatMoney } from '../financeFormat';
 import { Kpi } from './FinanceKpi';
 import type { Lookup } from './financePageHooks';
+import { buildClientWhatsAppUrl, reactivationMessage } from '../../../services/clientMessages.js';
 
 const pct = (value: number | null) => (value === null ? '—' : `${Math.round(value * 100)}%`);
 /** Mediana de dias entre pedidos em linguagem corrida (o negócio tem ciclo anual: aniversário). */
@@ -17,9 +19,16 @@ export const ReportsClients: React.FC<{ entries: RevenueEntry[]; clients: Lookup
 
   if (report.clients === 0) return <p className={`${cardClass} text-sm text-white/50`}>Ainda não há clientes com serviços concluídos.</p>;
 
-  const list = (rows: ClientRetentionRow[], empty: string, lastLabel: string) => (rows.length === 0 ? <p className="text-sm text-white/45">{empty}</p> : (
+  /** Botão que abre o WhatsApp do cliente com a mensagem pronta (nunca envia sozinho); sem telefone válido, nada aparece. */
+  const whatsappLink = (id: string, message: (name: string) => string) => {
+    const client = clients.get(id);
+    const url = client ? buildClientWhatsAppUrl(client.whatsapp, message(client.name)) : null;
+    return url ? <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20"><MessageCircle className="h-3.5 w-3.5" aria-hidden />Chamar</a> : null;
+  };
+
+  const list = (rows: ClientRetentionRow[], empty: string, lastLabel: string, message?: (name: string) => string) => (rows.length === 0 ? <p className="text-sm text-white/45">{empty}</p> : (
     <table className="w-full text-sm">
-      <thead><tr className="text-left text-[11px] uppercase tracking-wider text-white/45"><th className="pb-2 font-semibold">Cliente</th><th className="pb-2 pl-3 text-right font-semibold">Pedidos</th><th className="pb-2 pl-3 text-right font-semibold">Total</th><th className="pb-2 pl-3 text-right font-semibold">{lastLabel}</th></tr></thead>
+      <thead><tr className="text-left text-[11px] uppercase tracking-wider text-white/45"><th className="pb-2 font-semibold">Cliente</th><th className="pb-2 pl-3 text-right font-semibold">Pedidos</th><th className="pb-2 pl-3 text-right font-semibold">Total</th><th className="pb-2 pl-3 text-right font-semibold">{lastLabel}</th>{message && <th className="pb-2 pl-3" />}</tr></thead>
       <tbody className="divide-y divide-white/5">
         {rows.map((r) => (
           <tr key={r.clientId}>
@@ -27,6 +36,7 @@ export const ReportsClients: React.FC<{ entries: RevenueEntry[]; clients: Lookup
             <td className="py-2 pl-3 text-right tabular-nums text-white/70">{r.orders}</td>
             <td className="py-2 pl-3 text-right tabular-nums text-white">{formatMoney(r.revenue)}</td>
             <td className="py-2 pl-3 text-right text-xs text-white/55">{formatDate(r.lastDate)}</td>
+            {message && <td className="py-2 pl-3 text-right">{whatsappLink(r.clientId, message)}</td>}
           </tr>
         ))}
       </tbody>
@@ -45,7 +55,7 @@ export const ReportsClients: React.FC<{ entries: RevenueEntry[]; clients: Lookup
       <div className={cardClass}>
         <h3 className="mb-1 text-sm font-bold text-white">Hora de reativar</h3>
         <p className="mb-3 text-xs text-white/50">Clientes cuja última compra foi há 10 a 14 meses: perto do próximo aniversário. Maior valor primeiro.</p>
-        {list(report.winback, 'Ninguém na janela de 10 a 14 meses agora.', 'Última compra')}
+        {list(report.winback, 'Ninguém na janela de 10 a 14 meses agora.', 'Última compra', reactivationMessage)}
       </div>
       <div className={cardClass}>
         <h3 className="mb-3 text-sm font-bold text-white">Melhores clientes</h3>

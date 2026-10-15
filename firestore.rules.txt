@@ -389,6 +389,11 @@ service cloud.firestore {
 
     // Shared sequence: each increment must be +1 and point to the numbered
     // order created in the same atomic transaction. Initial creation starts at 1.
+    // Telemetria das rotinas agendadas (cartão "Saúde do sistema"): só o servidor grava (o Admin SDK ignora as regras); administradores leem.
+    match /systemStatus/{id} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
     match /systemCounters/{counterId} {
       allow read: if counterId == 'globalOrderSequence' && isAdmin();
       allow create: if counterId == 'globalOrderSequence'
