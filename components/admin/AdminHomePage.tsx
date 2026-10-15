@@ -11,6 +11,7 @@ import { dateKey } from '../../functions/missions-core.js';
 import type { Order } from '../../types';
 import { Widget, Loading, Empty, ErrorState, type Load } from './adminPages/homeWidgetParts';
 import { DeliveriesWidget } from './adminPages/DeliveriesWidget';
+import { SystemHealthWidget } from './adminPages/SystemHealthWidget';
 import { formatMoney } from './financeFormat';
 import { subscribeInstagramProfile, type InstagramProfile } from '../../services/instagramService';
 import { DeltaText } from './AdminInstagramPage';
@@ -175,7 +176,7 @@ const AppointmentsWidget: React.FC<{ now: Date; onOpen: (query?: string) => void
 
 // ------------------------------------------------------------------------ página
 
-const WIDGET_IDS = ['appointments', 'finance', 'tasks', 'instagram', 'deliveries'] as const;
+const WIDGET_IDS = ['appointments', 'finance', 'tasks', 'instagram', 'deliveries', 'health'] as const;
 type WidgetId = (typeof WIDGET_IDS)[number];
 
 /** Ordem dos widgets por administrador (uid), salva neste navegador; ids desconhecidos são ignorados e widgets novos entram no fim. */
@@ -207,6 +208,7 @@ export const AdminHomePage: React.FC<{ onNavigate: (tab: 'finance' | 'missions' 
     tasks: { label: 'Tarefas', node: <TasksWidget now={now} onOpen={() => onNavigate('missions')} /> },
     instagram: { label: 'Instagram', node: <InstagramWidget now={now} onOpen={() => onNavigate('instagram')} /> },
     deliveries: { label: 'Entregas', node: <DeliveriesWidget now={now} onOpen={() => onNavigate('orders')} onOpenOrder={(id) => navigate(`/admin/pedidos?orderId=${encodeURIComponent(id)}`)} /> },
+    health: { label: 'Saúde do sistema', node: <SystemHealthWidget now={now} /> },
   };
   const arrow = 'flex h-7 w-7 items-center justify-center rounded-lg text-white/80 hover:bg-white/15 disabled:opacity-30 disabled:hover:bg-transparent';
 

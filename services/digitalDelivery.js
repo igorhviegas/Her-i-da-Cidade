@@ -44,13 +44,20 @@ export function buildDeliveryMessage(order, service) {
   return `Olááá! 🕸️ Aqui está o vídeo para ${name || 'seu pequeno herói'}! 🥰 Espero que gostem, foi feito com muito carinho pelo Homem-Aranha!`;
 }
 
-/** Link wa.me com a mensagem de entrega, ou null se o telefone for inválido. Nunca envia sozinho. */
-export function buildDeliveryWhatsAppUrl(whatsapp, order, service) {
+/** Telefone no formato do wa.me (só dígitos, com o código do país), ou null se for inválido. */
+export function whatsappPhone(whatsapp) {
   const raw = String(whatsapp ?? '').trim();
   const digits = raw.replace(/\D/g, '');
   // Com "+" o número já está completo (código do país incluído): vale para clientes internacionais. Sem "+", a regra brasileira de sempre.
   const international = raw.startsWith('+') && !/^55\d{10,11}$/.test(digits);
   const phone = international || !(digits.length === 10 || digits.length === 11) ? digits : `55${digits}`;
   if (!(international ? /^[1-9]\d{7,14}$/.test(phone) : /^55\d{10,11}$/.test(phone))) return null;
+  return phone;
+}
+
+/** Link wa.me com a mensagem de entrega, ou null se o telefone for inválido. Nunca envia sozinho. */
+export function buildDeliveryWhatsAppUrl(whatsapp, order, service) {
+  const phone = whatsappPhone(whatsapp);
+  if (!phone) return null;
   return `https://wa.me/${phone}?text=${encodeURIComponent(buildDeliveryMessage(order, service))}`;
 }

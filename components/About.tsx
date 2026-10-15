@@ -1,4 +1,5 @@
 import React from 'react';
+import { localImageUrl } from "../services/localImages.js";
 import { useSiteConfig, buildWhatsAppLink } from '../services/siteConfigService';
 import type { HomeSection } from '../types/homeContent';
 
@@ -16,7 +17,7 @@ export const About: React.FC<{ section: HomeSection }> = ({ section }) => {
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
         <div className="relative aspect-video rounded-2xl overflow-hidden border border-white/10 shadow-2xl shadow-blue-900/10 group">
           <img 
-            src={section.imageUrl || "https://disciplinary-peach-obfj8i7gqu.edgeone.app/profissional%201.jpeg"}
+            src={localImageUrl(section.imageUrl) || "/images/site/sobre.webp"}
             alt={section.title || "Homem-Aranha em apresentação ao vivo"}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
           />

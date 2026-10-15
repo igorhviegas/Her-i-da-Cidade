@@ -4,4 +4,5 @@ export function isVideoCallService(service?: DeliveryService): boolean;
 export const VIDEO_CALL_DEFAULT_MESSAGE: string;
 export function isInviteVideoService(service?: DeliveryService): boolean;
 export function buildDeliveryMessage(order?: DeliveryOrder, service?: DeliveryService): string;
+export function whatsappPhone(whatsapp?: string | null): string | null;
 export function buildDeliveryWhatsAppUrl(whatsapp?: string | null, order?: DeliveryOrder, service?: DeliveryService): string | null;

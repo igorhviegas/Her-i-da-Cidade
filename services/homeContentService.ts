@@ -43,7 +43,7 @@ export const DEFAULT_HOME_SECTIONS: HomeSection[] = [
     id: 'home-about', internalName: 'Sobre nós', sectionType: 'about',
     title: 'Criando Memórias\nQue Nunca Serão Esquecidas', subtitle: 'Sobre nós',
     description: 'O Herói da Cidade nasceu do sonho de um menino apaixonado pelo "Amigão da Vizinhança", de se tornar um super heroi desde pequeno. Como a principal função de um herói é ajudar as pesssoas, Igor Viegas (nosso Homem-Aranha) descobriu uma maneira divertida de fazer isso. Com os vídeos educativos, conquistou milhares de seguidores e ajudou diversas famílias com as tarefas mais difíceis do desenvolvimento infanti. Somos especializados em entretenimento lúdico e educacional de alta qualidade exclusivamente com o Homem-Aranha.\n\nFora das telinhas, o heroi da Cidade atua em festas infantis com o personagem Homem-Aranha em toda região metropolitana de Belo Horizonte em minas Gerais, incluindo Betim, Contagem, Nova Lima, Lagoa Santa, Igarapé, Ribeirão das neves e muito mais. Fazemos com que até os mais velhos se questionem se o Homem-Aranha realmente existe; Incorporamos os valores, a voz e a presença do herói mais querido. Nosso compromisso é com a emoção genuína e a criação de memórias que duram a vida toda.',
-    imageUrl: 'https://disciplinary-peach-obfj8i7gqu.edgeone.app/profissional%201.jpeg', buttonText: 'Fale com nossa equipe', active: true, order: 3,
+    imageUrl: '/images/site/sobre.webp', buttonText: 'Fale com nossa equipe', active: true, order: 3,
   },
   {
     id: 'home-booking', internalName: 'Agendamento', sectionType: 'booking',

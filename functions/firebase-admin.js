@@ -1,6 +1,6 @@
 // Firestore Admin para rotas /api, com as mesmas variáveis de ambiente do ManyChat.
 // Fica fora de api/ de propósito: na Vercel, uma função de api/ que importa outra de api/ (./x.ts) falha ao carregar (FUNCTION_INVOCATION_FAILED).
-import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { applicationDefault, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
 /** Aceita JSON ou Base64, com ou sem aspas externas. Nunca inclui o conteúdo da chave nas mensagens de erro. */
@@ -41,4 +41,20 @@ export function getAdminFirestore(env = process.env) {
     options = { projectId: fallbackProjectId }; // credenciais padrão do ambiente (ADC/emulador)
   }
   return (instance = getFirestore(initializeApp(options)));
+}
+
+/** Há credencial explícita configurada (chave de serviço, arquivo ADC ou emulador)? Rotinas de telemetria só escrevem se houver. */
+export function hasAdminCredentials(env = process.env) {
+  return Boolean(env.FIREBASE_SERVICE_ACCOUNT_KEY || (env.FIREBASE_CLIENT_EMAIL && env.FIREBASE_PRIVATE_KEY) || env.GOOGLE_APPLICATION_CREDENTIALS || env.FIRESTORE_EMULATOR_HOST);
+}
+
+/** Token OAuth da mesma conta de serviço do Admin SDK (para chamar APIs do Google que o SDK não cobre, como a lista de backups). */
+export async function getAdminAccessToken(env = process.env) {
+  getAdminFirestore(env);
+  const app = getApps()[0];
+  // Sem credencial explícita não tenta o "padrão do ambiente" (o SDK procuraria o servidor de metadados do Google e demoraria a falhar).
+  if (!hasAdminCredentials(env)) throw new Error('Sem credencial da conta de serviço.');
+  const credential = app.options.credential ?? applicationDefault();
+  const { access_token: token } = await credential.getAccessToken();
+  return { token, projectId: app.options.projectId ?? env.FIREBASE_PROJECT_ID ?? 'heroi-da-cidade' };
 }
