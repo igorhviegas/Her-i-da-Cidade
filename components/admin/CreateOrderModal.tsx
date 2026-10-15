@@ -67,7 +67,7 @@ export const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ onClose, onC
       const client = await createClient({ name: basics.cleanName, whatsapp: whatsapp.trim() });
       const order = await createOrder(buildCreateOrderInput({ ...details, clientId: client.id, selectedService, initialStatus, eventDate, deliveryDays, content, totalPaid, initialValues }));
       // Os vídeos nascem depois do evento (principal): se algum falhar, o evento já existe, então avisamos em vez de reabrir o formulário.
-      await onCreated(order, await createVideoOrders(videos, client.id, details.eventValues.eventDate));
+      await onCreated(order, await createVideoOrders(videos, client.id, details.eventValues?.eventDate ?? ''));
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Não foi possível criar o pedido.');
       setSubmitting(false);
