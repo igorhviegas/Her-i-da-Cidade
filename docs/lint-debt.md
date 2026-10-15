@@ -7,12 +7,13 @@ Para zerar uma regra, corrija os itens abaixo e promova a regra de `warn` para `
 
 
 
+
 ## complexity — 108
 
 Reduzir exige reestruturar ramificações (tabelas de lookup, early returns), não mover código. Fica em `functions/`, `api/` e `services/` (pedidos, financeiro, autenticação, ManyChat, Google Agenda), sem teste de unidade que garanta equivalência.
 
 - `functions/google-calendar.js` (5): linhas 135, 155, 249, 275, 316
-- `functions/manychat-handler.js` (5): linhas 49, 120, 177, 223, 259
+- `functions/manychat-handler.js` (5): linhas 50, 123, 180, 236, 275
 - `functions/missions-core.js` (5): linhas 65, 156, 260, 315, 388
 - `functions/video-call.js` (5): linhas 116, 134, 217, 247, 327
 - `functions/instagram-sync.js` (4): linhas 60, 109, 139, 163
@@ -118,7 +119,7 @@ Tipos reais exigem modelar o formato dos dados (documentos do Firestore, `Reques
 
 Mesma natureza de `complexity`: o corpo da função precisa ser repensado.
 
-- `functions/manychat-handler.js` (3): linhas 120, 223, 259
+- `functions/manychat-handler.js` (3): linhas 123, 236, 275
 - `services/videosService.ts` (3): linhas 115, 204, 387
 - `App.tsx` (2): linhas 55, 81
 - `components/admin/AdminDashboard.tsx` (2): linhas 117, 165
@@ -160,7 +161,7 @@ Trocar a assinatura (objeto de opções) altera todos os chamadores: não é mec
 - `services/kart.test.js` (3): linhas 65, 106, 149
 - `components/admin/orders/inviteArtCanvas.ts` (2): linhas 47, 55
 - `components/kart/kartStoryCanvas.ts` (1): linhas 15
-- `functions/manychat-handler.js` (1): linhas 12
+- `functions/manychat-handler.js` (1): linhas 13
 - `functions/missions-core.js` (1): linhas 390
 - `functions/missions-core.test.js` (1): linhas 305
 - `services/eventFinance.js` (1): linhas 36
@@ -191,7 +192,7 @@ Arquivos acima de 350 linhas: é o trabalho do prompt 09 (lote seguinte).
 - `components/admin/AdminClientAreaPage.tsx` (1): linhas 28
 - `components/admin/FinanceManychat.tsx` (1): linhas 49
 - `components/publicSite/AudioRequestModal.tsx` (1): linhas 36
-- `functions/manychat-handler.js` (1): linhas 223
+- `functions/manychat-handler.js` (1): linhas 236
 
 ## max-nested-callbacks — 1
 

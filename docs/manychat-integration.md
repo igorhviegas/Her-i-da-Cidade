@@ -56,7 +56,7 @@ Serviços sem modalidade (Aniversário, Temático e Chamada ao Vivo) usam o "Pra
 
 - `childName`: string, até 100 caracteres.
 - `theme`: string, até 100 caracteres (tema escolhido pelo cliente). Só Vídeo Temático; vai no conteúdo do pedido como `Tema: <theme>`.
-- `details`: string, até 1000 caracteres (observações do pedido).
+- `details`: string, até 5000 caracteres (observações do pedido; o roteiro completo do cliente cabe aqui).
 - `modality`: `"7_days"`, `"4_days"` ou `"2_days"`.
 - `eventDate`: `YYYY-MM-DD` (gravada às 12:00 de Brasília) ou data/hora ISO 8601 com fuso (`2026-11-21T16:30:00-03:00`). Só Personalizado e Convite.
 

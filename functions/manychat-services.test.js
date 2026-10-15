@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleManyChatOrderRequest, resolveInitialStatus, SERVICE_PROFILES, validateManyChatPayload } from './manychat-handler.js';
+import { DETAILS_MAX, handleManyChatOrderRequest, resolveInitialStatus, SERVICE_PROFILES, validateManyChatPayload } from './manychat-handler.js';
 import { resolveInitialStatus as frontendResolveInitialStatus } from '../services/orderInitialStatus.js';
 
 const SECRET = 'unit-test-secret';
@@ -129,6 +129,37 @@ test('campos opcionais do Personalizado e do Convite continuam funcionando', asy
   const invite = await post(base('invite-video', { modality: '2_days' }));
   assert.equal(invite.order.content, 'Pedido recebido via ManyChat.');
   assert.equal(invite.order.eventDate, undefined);
+});
+
+test('roteiro longo no campo details (acima de 1000) é aceito; o limite é de 5000 caracteres', async () => {
+  const script = 'Malu, aqui é o Homem-Aranha! '.repeat(42).trim(); // 1217 caracteres: foi a recusa real de um pedido pago
+  assert.ok(script.length > 1000);
+  const { res, order } = await post(base('custom-video', { modality: '7_days', childName: 'Malu', details: script }));
+  assert.equal(res.statusCode, 200);
+  assert.equal(order.content, `Aniversariante: Malu\nDetalhes: ${script}`);
+  const tooLong = await post(base('custom-video', { modality: '7_days', details: 'x'.repeat(DETAILS_MAX + 1) }));
+  assert.equal(tooLong.res.statusCode, 400);
+  assert.match(tooLong.res.body.details.join(' '), /details deve ser texto de até 5000 caracteres/);
+});
+
+test('recusa do webhook fica registrada em systemStatus/manychat (só o fim do WhatsApp) e o próximo pedido aceito a limpa', async () => {
+  const writes = [];
+  const database = fakeDatabase();
+  const baseCollection = database.collection.bind(database);
+  database.collection = (name) => {
+    const collection = baseCollection(name);
+    if (name !== 'systemStatus') return collection;
+    return { doc: (id) => ({ set: async (value) => { writes.push({ id, value }); } }) };
+  };
+  await post(base('custom-video', { modality: '7_days', amountPaid: 60 }), database);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].id, 'manychat');
+  assert.equal(writes[0].value.ok, false);
+  assert.match(writes[0].value.detail, /^validation_error \(custom-video, WhatsApp final 0000\): .*amountPaid/);
+  assert.ok(!writes[0].value.detail.includes('99999'), 'número completo não é guardado');
+  await post(base('custom-video', { modality: '7_days' }), database);
+  assert.equal(writes.length, 2);
+  assert.deepEqual([writes[1].value.ok, writes[1].value.detail], [true, null]);
 });
 
 // ---------- Chamada ao Vivo ----------

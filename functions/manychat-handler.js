@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { ACTIVITY_LOG_COLLECTION, GAMIFICATION_CONFIG_PATH, activityLogId, prepareActivityLog } from './activity-log.js';
 import { MISSION_EVENT, createMissionFromManyChat, validateMissionPayload } from './missions-manychat.js';
+import { recordRun } from './system-status.js';
 
 const CLIENTS = 'clients';
 const ORDERS = 'orders';
@@ -69,6 +70,8 @@ export function validateManyChatOrderInput(body) {
 const VALID_STATUSES = ['scheduled', 'recording', 'editing', 'delivery', 'completed'];
 const VALID_PRODUCTION_TYPES = ['scheduled', 'recording', 'editing', 'immediate'];
 const DEFAULT_SERVICE = 'birthday-video';
+/** Roteiro do cliente (campo "Detalhes" do ManyChat): um pedido pago nunca pode ser recusado por um texto longo; 1000 já barrou um roteiro de 1207. */
+export const DETAILS_MAX = 5000;
 
 const tiers = (price7, price4, price2) => ({
   '7_days': { days: 7, price: price7 },
@@ -136,7 +139,7 @@ export function validateManyChatPayload(body) {
     if (typeof body.customer.name !== 'string' || !body.customer.name.trim() || body.customer.name.trim().length > 120) errors.push('customer.name é obrigatório (até 120 caracteres).');
     if (!isValidWhatsApp(body.customer.whatsapp)) errors.push('customer.whatsapp deve ser um número brasileiro válido com DDD, ou internacional com "+" e o código do país.');
   }
-  const textRules = { childName: 100, theme: 100, details: 1000 };
+  const textRules = { childName: 100, theme: 100, details: DETAILS_MAX };
   for (const [field, limit] of Object.entries(textRules)) {
     const rule = profile.fields[field];
     if (!rule) continue;
@@ -208,6 +211,16 @@ function buildOrderContent(input) {
   return lines.join('\n') || 'Pedido recebido via ManyChat.';
 }
 
+/**
+ * Cartão "Saúde do sistema": o último pedido recebido ou a última recusa (a Vercel Hobby guarda os logs por 1 hora, então sem isso
+ * um pagamento recusado só seria notado quando o cliente reclamasse). Melhor esforço; guarda só o fim do WhatsApp.
+ */
+async function recordWebhook(database, input, rejection) {
+  const tail = String(input?.customer?.whatsapp ?? '').replace(/\D/g, '').slice(-4);
+  const detail = rejection ? `${rejection.code} (${input?.service ?? 'birthday-video'}, WhatsApp final ${tail || '?'}): ${rejection.message}`.slice(0, 400) : null;
+  await recordRun(database, 'manychat', { ok: !rejection, detail });
+}
+
 function secretsMatch(providedHeader, expectedSecret) {
   if (typeof providedHeader !== 'string' || !providedHeader.startsWith('Bearer ') || !expectedSecret) return false;
   const supplied = Buffer.from(providedHeader.slice(7));
@@ -235,7 +248,10 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
     return createMissionFromManyChat(res, mission, { database, logger: customLogger || console });
   }
   const { errors: validationErrors, profile } = validateManyChatPayload(input);
-  if (validationErrors.length) return jsonError(res, 400, 'validation_error', 'Revise os campos da requisição.', { details: validationErrors });
+  if (validationErrors.length) {
+    await recordWebhook(database, input, { code: 'validation_error', message: validationErrors.join(' ') });
+    return jsonError(res, 400, 'validation_error', 'Revise os campos da requisição.', { details: validationErrors });
+  }
 
   const normalizedWhatsApp = normalizeWhatsApp(input.customer.whatsapp);
   const serviceRef = database.collection(SERVICES).doc(profile.serviceId);
@@ -379,6 +395,8 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
       return { orderId: orderRef.id };
     });
 
+    if (transactionResult.problem) await recordWebhook(database, input, { code: transactionResult.problem, message: `${profile.title} fora da configuração esperada` });
+    else await recordWebhook(database, input, null);
     if (transactionResult.problem === 'service_not_found') return jsonError(res, 422, 'service_not_found', `O serviço services/${profile.serviceId} não existe.`);
     if (transactionResult.problem === 'service_configuration_changed') return jsonError(res, 422, 'service_configuration_changed', `${profile.title} não está com a configuração esperada no CRM (ativo, gera pedido, tipo de produção e status inicial). Nenhum registro foi criado.`);
     if (transactionResult.problem === 'service_price_unavailable') return jsonError(res, 422, 'service_price_unavailable', 'O preço fixo cadastrado para o serviço não pôde ser interpretado. Nenhum registro foi criado.');
@@ -398,6 +416,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
   } catch (error) {
     const log = customLogger || console;
     log.error('Falha ao processar webhook ManyChat.', { orderId: orderRef.id, error: error instanceof Error ? error.message : String(error) });
+    await recordWebhook(database, input, { code: 'internal_error', message: 'falha ao gravar o pedido' });
     return jsonError(res, 500, 'internal_error', 'Não foi possível registrar a confirmação. Verifique o CRM antes de reenviar para evitar um pedido duplicado.');
   }
 }

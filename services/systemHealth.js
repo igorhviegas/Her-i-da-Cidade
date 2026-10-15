@@ -54,6 +54,15 @@ function instagramRows(profile, now) {
   return [row, token];
 }
 
+/** Webhook de pagamento do ManyChat: erro enquanto o último pedido enviado foi recusado; some no próximo pedido aceito. */
+function manychatRow(doc, now) {
+  const base = { id: 'manychat', label: 'Pagamentos do ManyChat' };
+  const last = doc ? time(doc.lastRunAt) : null;
+  if (!doc || last === null) return { ...base, level: 'unknown', detail: 'Nenhum pedido recebido ainda' };
+  if (doc.ok === false) return { ...base, level: 'error', detail: `Pedido recusado ${agoLabel(now - last)}: ${doc.detail ?? 'sem detalhe'}` };
+  return { ...base, level: 'ok', detail: `Último pedido recebido ${agoLabel(now - last)}` };
+}
+
 function backupRow(doc, now) {
   const base = { id: 'backup', label: 'Backup do banco' };
   if (!doc) return { ...base, level: 'unknown', detail: 'Ainda sem verificação (aparece depois da próxima rotina)' };
@@ -66,13 +75,14 @@ function backupRow(doc, now) {
 }
 
 /**
- * status: { missions?, backup? } (documentos de systemStatus); instagram: instagramMeta/profile ou null;
+ * status: { missions?, manychat?, backup? } (documentos de systemStatus); instagram: instagramMeta/profile ou null;
  * reviewsOk: true/false do teste de /api/reviews (null = ainda não testado). Devolve { rows, overall } (overall = pior nível conhecido).
  */
 export function buildHealth({ status = {}, instagram = null, reviewsOk = null, now = Date.now() }) {
   const rows = [
     jobRow({ id: 'missions', label: 'Rotina diária (missões e avisos)', never: 'Ainda sem registro (aparece depois da próxima rotina, à meia-noite)' }, status.missions, now),
     ...instagramRows(instagram, now),
+    manychatRow(status.manychat, now),
     backupRow(status.backup, now),
     reviewsOk === null
       ? { id: 'reviews', label: 'Avaliações do Google', level: 'unknown', detail: 'Verificando…' }

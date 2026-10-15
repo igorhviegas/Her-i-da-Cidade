@@ -20,7 +20,7 @@ test('tudo em dia: nível geral ok', () => {
     now: NOW, instagram: healthyInstagram, reviewsOk: true,
     status: { missions: { ok: true, lastRunAt: ago(9) }, backup: { ok: true, latestAt: ago(5), count: 7 } },
   });
-  assert.deepEqual(levels(r), { missions: 'ok', instagram: 'ok', token: 'ok', backup: 'ok', reviews: 'ok' });
+  assert.deepEqual(levels(r), { missions: 'ok', instagram: 'ok', token: 'ok', manychat: 'unknown', backup: 'ok', reviews: 'ok' });
   assert.equal(r.overall, 'ok');
   assert.match(r.rows.find((x) => x.id === 'backup').detail, /há 5 h · 7 guardados/);
 });
@@ -61,4 +61,14 @@ test('avaliações e nível geral: pior nível conhecido; "sem informação" nã
   const mixed = buildHealth({ now: NOW, reviewsOk: false, status: { missions: { ok: false, lastRunAt: ago(1) } } });
   assert.equal(mixed.overall, 'error');
   assert.equal(buildHealth({ now: NOW, reviewsOk: true }).overall, 'ok');
+});
+
+test('ManyChat: último pedido recusado é erro com o motivo; um pedido aceito depois limpa; sem registro é desconhecido', () => {
+  const row = (doc) => buildHealth({ now: NOW, status: { manychat: doc } }).rows.find((r) => r.id === 'manychat');
+  assert.equal(row(undefined).level, 'unknown');
+  const refused = row({ ok: false, lastRunAt: ago(2), detail: 'validation_error (custom-video, WhatsApp final 4497): details deve ser texto' });
+  assert.equal(refused.level, 'error');
+  assert.match(refused.detail, /Pedido recusado há 2 h: validation_error .*4497/);
+  const accepted = row({ ok: true, lastRunAt: ago(50), detail: null });
+  assert.deepEqual([accepted.level, accepted.detail], ['ok', 'Último pedido recebido há 2 dias']); // sem pedidos por dias não é falha
 });
