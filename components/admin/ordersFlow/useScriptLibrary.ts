@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getCategories } from '../../../services/categoriesService';
 import { listContentScripts } from '../../../services/contentScriptsService';
+import { sortByPublishDate } from '../../../services/scriptSchedule.js';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../../../types';
 import { logScriptOperationError } from './scriptsHelpers';
 
@@ -40,7 +41,7 @@ export const useScriptsData = () => {
   return { scripts, setScripts, categories, setCategories, loading, error, categoryLoadError };
 };
 
-/** Busca e filtros da biblioteca, e as linhas em hierarquia (pais antes dos filhos). */
+/** Busca e filtros da biblioteca. */
 export const useScriptFilters = (scripts: ContentScript[]) => {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -50,48 +51,18 @@ export const useScriptFilters = (scripts: ContentScript[]) => {
   const categoriesInLibrary = useMemo(() => Array.from(new Set<string>(scripts.map((item) => item.category.trim()).filter(Boolean)))
     .sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })), [scripts]);
 
-  const hierarchyRows = useMemo(() => {
+  const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('pt-BR');
-    const matches = scripts.filter((script) => {
+    // Ordem por data de publicação (real ou prevista), sem data no final; em Publicados, os mais recentes primeiro.
+    return sortByPublishDate(scripts.filter((script) => {
       const matchesSearch = !term || script.title.toLocaleLowerCase('pt-BR').includes(term) || script.content.toLocaleLowerCase('pt-BR').includes(term);
       return matchesSearch && (!categoryFilter || script.category === categoryFilter) &&
         (!productionFilter || script.productionStatus === productionFilter) &&
         (!publicationFilter || script.publicationStatus === publicationFilter);
-    });
-    const scriptsById = new Map<string, ContentScript>(scripts.map((script) => [script.id, script] as const));
-    const visible = new Set(matches.map((script) => script.id));
-    // Inclui os pais como contexto quando um resultado da busca é filho.
-    matches.forEach((script) => {
-      let parentId = script.parentScriptId;
-      const visited = new Set<string>();
-      while (parentId && !visited.has(parentId)) {
-        visible.add(parentId);
-        visited.add(parentId);
-        parentId = scriptsById.get(parentId)?.parentScriptId;
-      }
-    });
-    const children = new Map<string, ContentScript[]>();
-    scripts.forEach((script) => {
-      if (!script.parentScriptId || !scriptsById.has(script.parentScriptId) || script.parentScriptId === script.id) return;
-      children.set(script.parentScriptId, [...(children.get(script.parentScriptId) || []), script]);
-    });
-    const rows: Array<{ script: ContentScript; depth: number }> = [];
-    const emitted = new Set<string>();
-    const append = (script: ContentScript, depth: number, ancestors: Set<string>) => {
-      if (!visible.has(script.id) || ancestors.has(script.id) || emitted.has(script.id)) return;
-      emitted.add(script.id);
-      rows.push({ script, depth });
-      const nextAncestors = new Set(ancestors).add(script.id);
-      (children.get(script.id) || []).forEach((child) => append(child, depth + 1, nextAncestors));
-    };
-    const roots = scripts.filter((script) => !script.parentScriptId || !scriptsById.has(script.parentScriptId) || script.parentScriptId === script.id);
-    roots.forEach((script) => append(script, 0, new Set()));
-    // Fallback para documentos legados com ciclos, para nunca ocultar roteiros.
-    scripts.filter((script) => visible.has(script.id) && !emitted.has(script.id)).forEach((script) => append(script, 0, new Set()));
-    return rows;
+    }), publicationFilter === 'published');
   }, [scripts, search, categoryFilter, productionFilter, publicationFilter]);
 
-  return { search, setSearch, categoryFilter, setCategoryFilter, productionFilter, setProductionFilter, publicationFilter, setPublicationFilter, categoriesInLibrary, hierarchyRows };
+  return { search, setSearch, categoryFilter, setCategoryFilter, productionFilter, setProductionFilter, publicationFilter, setPublicationFilter, categoriesInLibrary, filtered };
 };
 
 /** Estado do editor de roteiro (novo, novo filho ou edição). */
