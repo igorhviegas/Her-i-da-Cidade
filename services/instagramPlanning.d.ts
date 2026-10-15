@@ -5,8 +5,8 @@ export interface Option<T extends string = string> { id: T; label: string }
 export interface CampaignStep { id: string; title: string; offset: number; status: StepStatus; notes: string; missionId?: string }
 export interface Campaign { id: string; title: string; category: string; launchDate: string; status: CampaignStatus; notes: string; steps: CampaignStep[] }
 export type CampaignInput = Omit<Campaign, 'id'>;
-export interface Plan { id: string; date: string; title: string; format: FormatId; notes?: string }
-export type PlanInput = Omit<Plan, 'id'>;
+export interface Plan { id: string; date: string; title: string; format: FormatId; notes?: string; /** Presente quando vem da previsão de postagem de um roteiro (não editável no calendário). */ scriptId?: string }
+export type PlanInput = Omit<Plan, 'id' | 'scriptId'>;
 export type ResolvedStep = CampaignStep & { date: string | null; index: number };
 export interface DayStep { campaignId: string; campaignTitle: string; stepId: string | null; title: string; status: StepStatus | null; offset: number; launch: boolean }
 export interface DayEntries { plans: Plan[]; steps: DayStep[] }

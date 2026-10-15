@@ -19,7 +19,7 @@ const tone = (value: number) => (value > 0 ? 'text-emerald-300' : value < 0 ? 't
 const PlannedItems: React.FC<{ cell: CalendarCell }> = ({ cell }) => {
   const items = [
     ...cell.steps.map((step) => ({ key: `s${step.campaignId}${step.stepId}`, text: `${step.launch ? '🚀 ' : ''}${step.title}`, className: STEP_TONE })),
-    ...cell.plans.map((plan) => ({ key: `p${plan.id}`, text: `${formatLabel(plan.format)} · ${plan.title}`, className: PLAN_TONE })),
+    ...cell.plans.map((plan) => ({ key: `p${plan.id}`, text: `${plan.scriptId ? 'Roteiro' : formatLabel(plan.format)} · ${plan.title}`, className: PLAN_TONE })),
   ];
   if (!items.length) return null;
   return (

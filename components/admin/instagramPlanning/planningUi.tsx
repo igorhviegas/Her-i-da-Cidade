@@ -1,20 +1,26 @@
-import React, { useEffect, useState, type ReactNode } from 'react';
+import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { subscribeCampaigns, subscribePlans, subscribeTemplates, type Templates } from '../../../services/instagramPlanningService';
 import type { Campaign, Plan } from '../../../services/instagramPlanning.js';
+import { listContentScripts } from '../../../services/contentScriptsService';
+import { scriptCalendarPlans } from '../../../services/scriptSchedule.js';
 
-/** Planejamentos, campanhas e modelos de etapas em tempo real. `error` = alguma leitura falhou (ex.: regras ainda não publicadas). */
+/** Planejamentos, campanhas e modelos de etapas em tempo real; roteiros com previsão de postagem entram como planejamento avulso (lidos ao abrir a página). `error` = alguma leitura falhou (ex.: regras ainda não publicadas). */
 export function useInstagramPlanning() {
   const [plans, setPlans] = useState<Plan[] | undefined>(undefined);
   const [campaigns, setCampaigns] = useState<Campaign[] | undefined>(undefined);
   const [templates, setTemplates] = useState<Templates>({});
+  const [scriptPlans, setScriptPlans] = useState<Plan[]>([]);
   const [error, setError] = useState(false);
   useEffect(() => {
     const onError = () => setError(true);
+    let cancelled = false;
+    listContentScripts().then((scripts) => { if (!cancelled) setScriptPlans(scriptCalendarPlans(scripts)); }).catch(onError);
     const stops = [subscribePlans(setPlans, onError), subscribeCampaigns(setCampaigns, onError), subscribeTemplates(setTemplates, onError)];
-    return () => stops.forEach((stop) => stop());
+    return () => { cancelled = true; stops.forEach((stop) => stop()); };
   }, []);
-  return { plans, campaigns, templates, error };
+  const allPlans = useMemo(() => plans && [...plans, ...scriptPlans], [plans, scriptPlans]);
+  return { plans: allPlans, campaigns, templates, error };
 }
 
 /** Janela central no desktop e "folha" colada embaixo no celular. Fecha com Esc ou clicando fora. */

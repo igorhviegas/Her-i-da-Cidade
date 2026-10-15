@@ -65,11 +65,14 @@ export const DayPanel: React.FC<{ dayKey: string; summary: string; entries: DayE
             {plans.map((plan) => (
               <li key={plan.id} className={`flex items-start gap-2 rounded-xl p-2 ${PLAN_TONE}`}>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">{plan.title} <span className="font-normal opacity-80">— {formatLabel(plan.format)}</span></span>
+                  <span className="block text-sm font-semibold">{plan.title} <span className="font-normal opacity-80">— {plan.scriptId ? 'Roteiro' : formatLabel(plan.format)}</span></span>
                   {plan.notes && <span className="block text-[11px] opacity-75">{plan.notes}</span>}
+                  {plan.scriptId && <span className="block text-[11px] opacity-75">Previsão de postagem do roteiro; altere a data em Roteiros.</span>}
                 </span>
+                {!plan.scriptId && <>
                 <button type="button" disabled={busy} onClick={() => setDraft({ id: plan.id, title: plan.title, format: plan.format, notes: plan.notes ?? '' })} aria-label={`Editar ${plan.title}`} className="rounded-lg p-2 hover:bg-white/10"><Pencil className="h-4 w-4" /></button>
                 <button type="button" disabled={busy} onClick={() => remove(plan)} aria-label={`Excluir ${plan.title}`} className="rounded-lg p-2 hover:bg-red-500/20"><Trash2 className="h-4 w-4" /></button>
+                </>}
               </li>
             ))}
           </ul>
