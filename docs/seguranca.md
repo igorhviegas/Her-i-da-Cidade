@@ -28,3 +28,5 @@ A política completa continua em `Report-Only` até alguém abrir o site e o `/a
 - Classe que não existe no Tailwind não faz nada (hoje: `contrast-110`, `hover:scale-115`, `perspective-1000` e o breakpoint `xs:`), igual ao que já acontecia com o CDN.
 
 Ao incluir um serviço externo novo (embed, analytics, fonte), acrescente o domínio na diretiva certa (`script-src`, `connect-src`, `img-src`, `frame-src`...).
+
+O Cloudflare Turnstile do agendamento (`https://challenges.cloudflare.com`, ver `docs/agendamento-chamadas.md`) já está em `script-src`, `frame-src` e `connect-src` da política completa.

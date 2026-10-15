@@ -36,7 +36,9 @@ export function useBookingFormState() {
   const [callCountry, setCallCountry] = useState(DEFAULT_PHONE_COUNTRY);
   const [sameNumber, setSameNumber] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  return { values, setValues, country, setCountry, callCountry, setCallCountry, sameNumber, setSameNumber, submitting, setSubmitting };
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaReset, setCaptchaReset] = useState(0);
+  return { values, setValues, country, setCountry, callCountry, setCallCountry, sameNumber, setSameNumber, submitting, setSubmitting, captchaToken, setCaptchaToken, captchaReset, resetCaptcha: () => setCaptchaReset((n) => n + 1) };
 }
 
 export type BookingFormState = ReturnType<typeof useBookingFormState>;
