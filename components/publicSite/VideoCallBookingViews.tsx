@@ -1,4 +1,5 @@
 import React from 'react';
+import { TURNSTILE_SITE_KEY, TurnstileWidget } from './TurnstileWidget';
 import { localSlot } from '../../functions/video-call-time.js';
 import type { BookingFormState, CalendarData } from './useVideoCallBooking';
 import type { Booked, Day, PublicConfig, Step } from './videoCallShared';
@@ -38,7 +39,7 @@ export const BookedView: React.FC<BookedViewProps> = ({ booked, config, showLoca
 interface FormStepProps { form: BookingFormState; confirmText: string; error: string; onSubmit: (event: React.FormEvent) => void }
 
 const FormStep: React.FC<FormStepProps> = ({ form, confirmText, error, onSubmit }) => {
-  const { values, setValues, country, setCountry, callCountry, setCallCountry, sameNumber, setSameNumber, submitting } = form;
+  const { values, setValues, country, setCountry, callCountry, setCallCountry, sameNumber, setSameNumber, submitting, captchaToken, setCaptchaToken, captchaReset } = form;
   return (
     <form onSubmit={onSubmit} className="mt-6 space-y-4">
       <p className={heading}>Seus dados</p>
@@ -67,8 +68,9 @@ const FormStep: React.FC<FormStepProps> = ({ form, confirmText, error, onSubmit 
       </label>
       <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3"><Rich text={confirmText} /></div>
       <p className="text-xs leading-relaxed text-white/50">{BOOKING_PRIVACY_NOTE} <a href={PRIVACY_PATH} target="_blank" rel="noopener noreferrer" className="font-semibold text-blue-300 underline hover:text-blue-200">Política de Privacidade</a>.</p>
+      <TurnstileWidget onToken={setCaptchaToken} resetKey={captchaReset} />
       {error && <p role="alert" className="text-sm font-semibold text-red-300">{error}</p>}
-      <button type="submit" disabled={submitting} className="min-h-12 w-full rounded-xl bg-emerald-500 px-4 text-sm font-extrabold uppercase tracking-wide text-white hover:bg-emerald-400 disabled:opacity-60">
+      <button type="submit" disabled={submitting || (TURNSTILE_SITE_KEY !== '' && !captchaToken)} className="min-h-12 w-full rounded-xl bg-emerald-500 px-4 text-sm font-extrabold uppercase tracking-wide text-white hover:bg-emerald-400 disabled:opacity-60">
         {submitting ? 'Reservando...' : 'Prosseguir para pagamento no WhatsApp'}
       </button>
     </form>

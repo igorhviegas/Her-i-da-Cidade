@@ -72,5 +72,9 @@ jobs:
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
 
+      # GHSA-vfj7-8cjw-p6xm (braces <= 3.0.3, negação de serviço por padrões de chaves aninhados): único caminho é
+      # tailwindcss > micromatch > braces, uma devDependency que só roda no build com os globs do nosso próprio
+      # `tailwind.config.js` (nenhuma entrada de usuário). Não existe versão corrigida publicada (3.0.3 é a última).
+      # Reavaliar ao migrar para o Tailwind v4 (não usa micromatch) ou quando houver braces corrigido.
       - name: Audit
-        run: bun audit --audit-level=high
+        run: bun audit --audit-level=high --ignore=GHSA-vfj7-8cjw-p6xm
