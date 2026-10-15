@@ -80,13 +80,13 @@ export async function listFixedExpenses(): Promise<FixedExpense[]> {
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 }
 
-export async function createFixedExpense(input: { name: string; category: string; amount: number; description?: string; startMonth: string; oneTime?: boolean }) {
+export async function createFixedExpense(input: { name: string; category: string; amount: number; description?: string; paymentMethod?: string; startMonth: string; oneTime?: boolean }) {
   const name = input.name.trim();
   if (!name || !input.category.trim()) throw new Error("Nome e categoria são obrigatórios.");
   assertAmount(input.amount, "O valor mensal");
   assertMonth(input.startMonth);
   await addDoc(collection(requireDb(), FIXED_EXPENSES_COLLECTION), {
-    name, category: input.category.trim(), description: input.description?.trim() || "",
+    name, category: input.category.trim(), description: input.description?.trim() || "", paymentMethod: paymentMethodOf(input.paymentMethod),
     startMonth: input.startMonth, active: true,
     // Despesa única: encerra no mês seguinte ao de início (mesmo mecanismo de "desativar"), então só conta em startMonth.
     ...(input.oneTime ? { deactivatedFrom: shiftMonth(input.startMonth, 1) } : {}),
@@ -95,10 +95,12 @@ export async function createFixedExpense(input: { name: string; category: string
   });
 }
 
-export async function updateFixedExpenseInfo(id: string, input: { name: string; category: string; description?: string }) {
+const paymentMethodOf = (value?: string) => (value === "credit" ? "credit" : "pix");
+
+export async function updateFixedExpenseInfo(id: string, input: { name: string; category: string; description?: string; paymentMethod?: string }) {
   if (!input.name.trim() || !input.category.trim()) throw new Error("Nome e categoria são obrigatórios.");
   await updateDoc(doc(requireDb(), FIXED_EXPENSES_COLLECTION, id), {
-    name: input.name.trim(), category: input.category.trim(), description: input.description?.trim() || "", updatedAt: serverTimestamp(),
+    name: input.name.trim(), category: input.category.trim(), description: input.description?.trim() || "", paymentMethod: paymentMethodOf(input.paymentMethod), updatedAt: serverTimestamp(),
   });
 }
 

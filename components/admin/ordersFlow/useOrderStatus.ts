@@ -3,6 +3,7 @@ import type React from 'react';
 import type { OrderStatus } from '../../../types';
 import { updateOrder } from '../../../services/ordersService';
 import { isPresentialService } from '../../../services/stockCalculations.js';
+import { CUSTOM_VIDEO_SERVICE_ID, EDITING_COST } from '../../../services/financeCalculations.js';
 import { STATUS_LABELS } from '../orders/orderView';
 import type { OrderView } from '../orders/orderView';
 
@@ -59,10 +60,18 @@ export const useOrderStatus = ({ orders, completedOrders, loadOrders, setOrders,
     if (status === 'completed' && !requireEventCost(orderView)) return false;
     // Evento presencial: a conclusão passa pela conferência de materiais (a baixa de estoque é feita junto, em updateOrder).
     if (status === 'completed' && isPresentialService(orderView.service)) { setOrderActionError(''); setConsumptionView(orderView); return false; }
+    // Vídeo Personalizado na 1ª conclusão (sem custo gravado): nem toda edição é paga, então pergunta.
+    const asksEditingCost = status === 'completed' && orderView.order.serviceId === CUSTOM_VIDEO_SERVICE_ID && typeof orderView.order.editingCost !== 'number';
+    const chargeEditingCost = asksEditingCost
+      ? window.confirm(`Este vídeo teve custo de edição (R$ ${EDITING_COST},00)?
+
+OK = Sim, lançar a despesa e criar a missão de pagar o editor.
+Cancelar = Não, concluir sem custo de edição.`)
+      : undefined;
     setUpdatingOrderId(orderId);
     setOrderActionError('');
     try {
-      await updateOrder(orderId, { status });
+      await updateOrder(orderId, { status, ...(asksEditingCost ? { chargeEditingCost } : {}) });
       setSelectedOrder((current) => current?.order.id === orderId
         ? status === 'completed' ? null : { ...current, order: { ...current.order, status } }
         : current);

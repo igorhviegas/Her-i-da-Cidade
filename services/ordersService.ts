@@ -33,6 +33,8 @@ export type UpdateOrderInput = Partial<Omit<Order, "id" | "orderNumber" | "order
   materialConsumption?: ConsumptionLine[];
   /** Conclusão excepcional com estoque insuficiente (só administradores; as regras do Firestore também exigem). Baixa o disponível e registra pendências. */
   allowStockShortage?: boolean;
+  /** Vídeo Personalizado: a 1ª conclusão teve custo de edição? false grava editingCost 0 e não cria a missão de pagar o editor. Padrão: true. */
+  chargeEditingCost?: boolean;
 };
 
 function mapOrder(id: string, data: Record<string, unknown>): Order {
@@ -308,6 +310,8 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     const safeUpdates = { ...updates } as Record<string, unknown>;
     delete safeUpdates.materialConsumption;
     delete safeUpdates.allowStockShortage;
+    delete safeUpdates.chargeEditingCost;
+    const chargeEditingCost = updates.chargeEditingCost !== false;
     delete safeUpdates.orderNumber;
     delete safeUpdates.orderNumberDisplay;
     delete safeUpdates.technicalPurchaseId;
@@ -425,7 +429,7 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     const viaLedger = Boolean(currentData.eventLedger && currentData.eventForm);
     const completionValue = orderValue({ ...currentData, ...updates }); // sempre um número (Firestore recusa undefined)
     const completionRevenue = viaLedger ? booked('final') : completionValue;
-    const completionCost = viaLedger ? booked('cost') : editingCostFields(serviceId, currentData).editingCost ?? 0;
+    const completionCost = viaLedger ? booked('cost') : editingCostFields(serviceId, currentData, chargeEditingCost).editingCost ?? 0;
     const activityRefsForOrder = updates.status === 'completed' && currentData.status !== 'completed' ? activityRefs(firestore, 'order_completed', id) : null;
     const activityRecord = activityRefsForOrder
       ? await prepareActivityLog(transaction, activityRefsForOrder, {
@@ -440,12 +444,12 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
       ? await prepareActivityLog(transaction, publishRefs, { type: 'content_published', refId: linkedScriptRef.id, occurredAt: updates.completedAt instanceof Date ? updates.completedAt : new Date(), meta: { orderId: id } })
       : null;
 
-    if (updates.status === 'completed' && currentData.status !== 'completed') Object.assign(payload, editingCostFields(serviceId, currentData));
+    if (updates.status === 'completed' && currentData.status !== 'completed') Object.assign(payload, editingCostFields(serviceId, currentData, chargeEditingCost));
 
     // Vídeo Personalizado na 1ª conclusão: missão "Pagar Vitor" (fácil, prazo no dia da conclusão). ID por pedido + checagem na
     // transação: reabrir e concluir de novo não cria outra, e a missão já criada nunca é reescrita.
     let payMission: { ref: ReturnType<typeof doc>; data: Record<string, unknown> } | null = null;
-    if (updates.status === 'completed' && currentData.status !== 'completed' && serviceId === CUSTOM_VIDEO_SERVICE_ID) {
+    if (updates.status === 'completed' && currentData.status !== 'completed' && serviceId === CUSTOM_VIDEO_SERVICE_ID && chargeEditingCost) {
       const missionRef = doc(firestore, MISSIONS_COLLECTION, payEditorMissionId(id));
       const [missionSnapshot, clientSnapshot] = await Promise.all([transaction.get(missionRef), transaction.get(doc(firestore, CLIENTS_COLLECTION, updates.clientId ?? currentData.clientId))]);
       const data = missionSnapshot.exists() ? null : buildPayEditorMission({ ...currentData, ...updates, ...payload, id }, clientSnapshot.data(), null, updates.completedAt instanceof Date ? updates.completedAt : new Date());

@@ -1,7 +1,7 @@
 export interface RevenueEntry { orderId: string; order: any; revenueDate: Date; value: number; monthKey: string; dayKey: string; }
 export interface DayRevenue { day: number; total: number; count: number; entries: RevenueEntry[]; }
 export interface FixedExpense {
-  id: string; name: string; category: string; description?: string; startMonth: string; active: boolean;
+  id: string; name: string; category: string; description?: string; startMonth: string; active: boolean; paymentMethod?: 'pix' | 'credit';
   deactivatedFrom?: string; amountHistory: Record<string, number>; adjustments?: Record<string, number>;
 }
 export interface Asset {
@@ -24,7 +24,7 @@ export function topDay(days: DayRevenue[]): DayRevenue | null;
 export function variationPct(current: number, previous: number): number | null;
 export const EDITING_COST: number;
 export const CUSTOM_VIDEO_SERVICE_ID: string;
-export function editingCostFields(serviceId: string | undefined, existingOrder?: { editingCost?: number } | null): { editingCost?: number };
+export function editingCostFields(serviceId: string | undefined, existingOrder?: { editingCost?: number } | null, charge?: boolean): { editingCost?: number };
 export function editingCostForMonth(entries: RevenueEntry[], monthKey: string): { items: RevenueEntry[]; total: number };
 export function isExpenseInMonth(expense: Partial<FixedExpense>, monthKey: string): boolean;
 export function expenseAmountForMonth(expense: Partial<FixedExpense>, monthKey: string): number;

@@ -106,15 +106,16 @@ export function variationPct(current, previous) {
 export const EDITING_COST = 25;
 export const CUSTOM_VIDEO_SERVICE_ID = '3'; // id fixo do seed/ManyChat (ver services/teleprompter.js)
 
-/** Campo a gravar no pedido ao concluí-lo pela primeira vez; {} se não for Vídeo Personalizado ou já tiver custo. */
-export function editingCostFields(serviceId, existingOrder) {
+/** Campo a gravar no pedido ao concluí-lo pela primeira vez; {} se não for Vídeo Personalizado ou já tiver custo.
+ *  `charge` = false (edição sem custo, respondido na conclusão) grava 0: fica registrado e não conta como despesa. */
+export function editingCostFields(serviceId, existingOrder, charge = true) {
   if (serviceId !== CUSTOM_VIDEO_SERVICE_ID || typeof existingOrder?.editingCost === 'number') return {};
-  return { editingCost: EDITING_COST };
+  return { editingCost: charge ? EDITING_COST : 0 };
 }
 
 /** Custo de edição do mês: pedidos concluídos com `editingCost`, pela mesma data do faturamento. */
 export function editingCostForMonth(entries, monthKey) {
-  const items = entries.filter((e) => e.monthKey === monthKey && typeof e.order.editingCost === 'number');
+  const items = entries.filter((e) => e.monthKey === monthKey && e.order.editingCost > 0);
   return { items, total: items.reduce((sum, e) => sum + e.order.editingCost, 0) };
 }
 

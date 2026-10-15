@@ -5,24 +5,25 @@ import {
   createFixedExpense, deactivateFixedExpense, setFixedExpenseAdjustment, setFixedExpenseAmountFrom, updateFixedExpenseInfo,
 } from '../../services/financeService';
 import { cardClass, formatMoney, monthLabel, primaryBtn } from './financeFormat';
-import { CATEGORIES, ExpenseForm, type ExpenseMode } from './adminPages/ExpenseForm';
+import { CATEGORIES, ExpenseForm, type ExpenseFormState, type ExpenseMode } from './adminPages/ExpenseForm';
 import { ExpenseList } from './adminPages/ExpenseList';
 
 const parseAmount = (v: string) => (v.trim() === '' ? NaN : Number(v.replace(',', '.')));
 
 export const FinanceExpenses: React.FC<{ expenses: FixedExpense[]; videoCost: { items: unknown[]; total: number }; eventCost: { items: unknown[]; total: number }; monthKey: string; onChanged: () => Promise<void> | void }> = ({ expenses, videoCost, eventCost, monthKey, onChanged }) => {
   const [mode, setMode] = useState<ExpenseMode | null>(null);
-  const [form, setForm] = useState({ name: '', category: CATEGORIES[0], amount: '', description: '', startMonth: monthKey, oneTime: false });
+  const [form, setForm] = useState<ExpenseFormState>({ name: '', category: CATEGORIES[0], amount: '', description: '', paymentMethod: 'pix', startMonth: monthKey, oneTime: false });
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const { items, total: fixedTotal } = expensesForMonth(expenses, monthKey);
   const total = fixedTotal + videoCost.total + eventCost.total;
+  const creditTotal = items.reduce((sum, { expense, amount }) => sum + (expense.paymentMethod === 'credit' ? amount : 0), 0);
   const inactive = expenses.filter((e) => e.active === false);
 
   const open = (next: ExpenseMode, expense?: FixedExpense) => {
     setFeedback(null); setMode(next);
     setForm({
-      name: expense?.name ?? '', category: expense?.category ?? CATEGORIES[0], description: expense?.description ?? '', startMonth: monthKey, oneTime: false,
+      name: expense?.name ?? '', category: expense?.category ?? CATEGORIES[0], description: expense?.description ?? '', paymentMethod: expense?.paymentMethod ?? 'pix', startMonth: monthKey, oneTime: false,
       amount: expense ? String(expense.adjustments?.[monthKey] ?? currentDefaultAmount(expense)) : '',
     });
   };
@@ -52,6 +53,7 @@ export const FinanceExpenses: React.FC<{ expenses: FixedExpense[]; videoCost: { 
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-white/50">Total de despesas ·{monthLabel(monthKey)}</p>
           <p className="text-2xl font-extrabold text-white">{formatMoney(total)}</p>
+          <p className="text-xs text-white/50">Despesas no crédito: {formatMoney(creditTotal)} · no Pix: {formatMoney(fixedTotal - creditTotal)}</p>
         </div>
         <button type="button" className={primaryBtn} onClick={() => open('new')}><Plus className="h-4 w-4" />Nova despesa</button>
       </div>

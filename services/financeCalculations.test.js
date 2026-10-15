@@ -135,6 +135,13 @@ test('custo de edição: concluir de novo ou editar pedido concluído não gera 
   assert.equal(monthCost([edited]), 25);
 });
 
+test('custo de edição: concluir sem custo grava 0, não entra no mês e não é perguntado de novo', () => {
+  const done = { ...video('a'), status: 'completed', ...editingCostFields('3', video('a'), false) };
+  assert.equal(done.editingCost, 0);
+  assert.equal(editingCostForMonth(buildRevenueEntries([done]).entries, '2026-10').items.length, 0);
+  assert.deepEqual(editingCostFields('3', done), {});
+});
+
 test('custo de edição: não concluído e outros serviços não geram custo', () => {
   assert.equal(monthCost([video('a')]), 0);
   assert.equal(monthCost([complete(video('b', { serviceId: '1' }), '1')]), 0);

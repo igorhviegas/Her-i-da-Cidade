@@ -4,7 +4,8 @@ import { cardClass, ghostBtn, inputClass, labelClass, MONTH_NAMES, monthLabel, p
 
 export const CATEGORIES = ['Despesas fixas', 'Funcionários', 'Automações', 'Ferramentas e sistemas', 'Assinaturas', 'Outros custos operacionais'];
 export type ExpenseMode = 'new' | { id: string; kind: 'info' | 'default' | 'adjust' | 'deactivate' };
-export interface ExpenseFormState { name: string; category: string; amount: string; description: string; startMonth: string; oneTime: boolean }
+export const PAYMENT_METHODS = { pix: 'Pix', credit: 'Crédito' } as const;
+export interface ExpenseFormState { name: string; category: string; amount: string; description: string; paymentMethod: 'pix' | 'credit'; startMonth: string; oneTime: boolean }
 
 function modeInfo(mode: ExpenseMode, expenses: FixedExpense[]) {
   const editing = mode && mode !== 'new' ? expenses.find((e) => e.id === mode.id) : null;
@@ -29,7 +30,12 @@ const InfoFields: React.FC<FieldsProps> = ({ form, setForm }) => (
     <label className={labelClass}>Nome *<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputClass} /></label>
     <label className={labelClass}>Categoria *<input required list="expense-categories" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputClass} /></label>
     <datalist id="expense-categories">{CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
-    <label className={`${labelClass} sm:col-span-2`}>Descrição<input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputClass} placeholder="Opcional" /></label>
+    <label className={labelClass}>Forma de pagamento *
+      <select value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value as ExpenseFormState['paymentMethod'] })} className={inputClass}>
+        {Object.entries(PAYMENT_METHODS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select>
+    </label>
+    <label className={labelClass}>Descrição<input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className={inputClass} placeholder="Opcional" /></label>
   </div>
 );
 
