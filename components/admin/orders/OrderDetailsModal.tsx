@@ -1,7 +1,8 @@
 import React from 'react';
-import { CalendarPlus, Copy, Loader2, MessageCircle, Pencil, Trash2, Tv, X } from 'lucide-react';
+import { CalendarPlus, Copy, Loader2, MessageCircle, Pencil, Star, Trash2, Tv, X } from 'lucide-react';
 import { getServiceColor } from '../../../services/serviceColors.js';
 import { isInviteVideoService } from '../../../services/digitalDelivery.js';
+import { buildClientWhatsAppUrl, reviewRequestMessage } from '../../../services/clientMessages.js';
 import { getTeleprompterText } from '../../../services/teleprompter.js';
 import type { Order, OrderStatus } from '../../../types';
 import { SERVICE_COLOR_CLASSES, STATUS_FLOW, STATUS_LABELS, toDate } from './orderView';
@@ -131,12 +132,19 @@ interface OrderDetailsFooterProps {
 
 const OrderDetailsFooter: React.FC<OrderDetailsFooterProps> = ({ selectedOrder, whatsappUrl, updatingOrderId, deletingOrderId, setOrderActionError, setTeleprompterView, handleDeleteOrder }) => {
   const { order } = selectedOrder;
+  // Depois da entrega: abre o WhatsApp do cliente com o pedido de avaliação do Google pronto (nunca envia sozinho).
+  const reviewUrl = order.status === 'completed' ? buildClientWhatsAppUrl(selectedOrder.client?.whatsapp, reviewRequestMessage(selectedOrder.client?.name, order.childName)) : null;
   return (
     <div className="flex flex-col gap-2 border-t border-white/10 pt-4 sm:flex-row sm:items-center">
       {getTeleprompterText(selectedOrder) !== null && (
         <button type="button" onClick={() => { setOrderActionError(''); setTeleprompterView(selectedOrder); }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2.5 text-sm font-semibold text-white/70 hover:bg-white/5">
           <Tv className="h-4 w-4" /> Teleprompter
         </button>
+      )}
+      {reviewUrl && (
+        <a href={reviewUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20">
+          <Star className="h-4 w-4" /> Pedir avaliação
+        </a>
       )}
       {whatsappUrl ? (
         <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-500/20">
