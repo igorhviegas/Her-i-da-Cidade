@@ -11,7 +11,9 @@ export const Hero: React.FC<{ section: HomeSection }> = ({ section }) => {
       <div className="absolute inset-0 z-0">
         {/* Hero Image - Optimized for all screens */}
         <img 
-          src="https://rising-brown-rufjc3ycjc.edgeone.app/WhatsApp%20Image%202026-01-08%20at%2015.00.34.jpeg" 
+          src="/images/site/hero.webp"
+          fetchPriority="high"
+          decoding="async"
           alt="Homem-Aranha em apresentação do Herói da Cidade"
           className="w-full h-full object-cover object-center sm:object-[75%_center] opacity-90 brightness-[0.55] contrast-110 saturate-[1.1] transition-transform duration-[20s] ease-out scale-105"
         />

@@ -1,4 +1,5 @@
 import { Service } from "../../types";
+import { localImageUrl } from "../localImages.js";
 import { normalizeFaq } from "../serviceFaq.js";
 
 export const SERVICES_COLLECTION = "services";
@@ -18,7 +19,7 @@ export function mapDocToService(docId: string, data: any): Service {
     title: data.title || "",
     price: data.price || "",
     description: data.description || "",
-    imageUrl: data.imageUrl || "",
+    imageUrl: localImageUrl(data.imageUrl) || "",
     category: data.category || "Geral",
     whatsappUrl: data.internalOnly ? data.whatsappUrl || '' : data.whatsappUrl || defaultWhatsapp,
     active: data.active !== false,
