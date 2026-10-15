@@ -1,5 +1,5 @@
 import { logger } from '../lib/logger.js';
-import { collection, deleteField, doc, documentId, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { collection, deleteField, doc, documentId, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch, type Unsubscribe } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { activityRefs, prepareActivityLog } from './activityLog';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../types';
@@ -41,6 +41,7 @@ function mapScript(id: string, data: Record<string, any>): ContentScript {
     ...(typeof data.orderId === 'string' ? { orderId: data.orderId } : {}),
     ...(typeof data.sourceScriptId === 'string' ? { sourceScriptId: data.sourceScriptId } : {}),
     ...(typeof data.parentScriptId === 'string' ? { parentScriptId: data.parentScriptId } : {}),
+    ...(typeof data.sortOrder === 'number' ? { sortOrder: data.sortOrder } : {}),
   };
 }
 
@@ -61,6 +62,43 @@ export async function listContentScripts(): Promise<ContentScript[]> {
       .sort((a, b) => toMillis(b.updatedAt) - toMillis(a.updatedAt));
   } catch (error) {
     logContentScriptsError(`getDocs(collection(db, '${CONTENT_SCRIPTS_COLLECTION}'))`, error);
+    throw error;
+  }
+}
+
+/** Roteiros em tempo real (usado pelo calendário do Instagram para refletir a previsão de postagem). */
+export function subscribeContentScripts(onData: (scripts: ContentScript[]) => void, onError: (error: Error) => void): Unsubscribe {
+  if (!db) throw new Error('Firestore não inicializado.');
+  return onSnapshot(collection(db, CONTENT_SCRIPTS_COLLECTION), (snapshot) => onData(snapshot.docs.map((item) => mapScript(item.id, item.data()))), (error) => {
+    logContentScriptsError('onSnapshot(contentScripts)', error);
+    onError(error);
+  });
+}
+
+/** Grava só a posição na ordem manual (sem mexer em updatedAt), em lotes. */
+export async function saveScriptOrder(updates: Array<{ id: string; sortOrder: number }>): Promise<void> {
+  if (!db) throw new Error('Firestore não inicializado.');
+  const firestore = db;
+  for (let start = 0; start < updates.length; start += 400) {
+    const batch = writeBatch(firestore);
+    updates.slice(start, start + 400).forEach(({ id, sortOrder }) => batch.update(doc(firestore, CONTENT_SCRIPTS_COLLECTION, id), { sortOrder }));
+    try {
+      await batch.commit();
+    } catch (error) {
+      logContentScriptsError('salvar ordem manual dos roteiros', error);
+      throw error;
+    }
+  }
+}
+
+/** Define (ou remove, com null) só a previsão de postagem; usado pelo painel do dia do calendário. */
+export async function setScriptPlannedDate(id: string, date: Date | null): Promise<void> {
+  if (!db) throw new Error('Firestore não inicializado.');
+  if (!id || id.includes('/')) throw new Error('ID de roteiro inválido.');
+  try {
+    await updateDoc(doc(db, CONTENT_SCRIPTS_COLLECTION, id), { plannedPublishAt: date || deleteField(), updatedAt: serverTimestamp() });
+  } catch (error) {
+    logContentScriptsError('alterar previsão de postagem do roteiro ' + id, error);
     throw error;
   }
 }

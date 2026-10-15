@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Loader2, Pencil, Trash2 } from 'lucide-react';
 import { createPlan, deletePlan, updatePlan } from '../../../services/instagramPlanningService';
+import { setScriptPlannedDate } from '../../../services/contentScriptsService';
+import { dateFromInput } from '../ordersFlow/scriptEditorHelpers';
 import { describeOffset, FORMATS, formatLabel, fullDate, stepStatusLabel, validatePlan, type DayEntries, type FormatId, type Plan } from '../../../services/instagramPlanning.js';
 import { ghostBtn, inputClass, labelClass, primaryBtn } from '../financeFormat';
 import { Chip, ErrorLine, Modal, PLAN_TONE, STEP_TONE } from './planningUi';
@@ -14,6 +16,7 @@ export const DayPanel: React.FC<{ dayKey: string; summary: string; entries: DayE
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [flash, setFlash] = useState('');
+  const [scriptEdit, setScriptEdit] = useState<{ scriptId: string; title: string; date: string } | null>(null); // roteiro: só a previsão de postagem
   const plans = entries?.plans ?? [];
   const steps = entries?.steps ?? [];
 
@@ -28,10 +31,28 @@ export const DayPanel: React.FC<{ dayKey: string; summary: string; entries: DayE
       setDraft(EMPTY); setFlash(draft.id ? 'Planejamento atualizado.' : 'Planejamento adicionado.');
     } catch (e) { setErrors([e instanceof Error ? e.message : 'Não foi possível salvar.']); } finally { setBusy(false); }
   };
+  const saveScriptDate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!scriptEdit) return;
+    if (!scriptEdit.date) { setErrors(['Escolha a nova data de postagem.']); return; }
+    setBusy(true); setErrors([]); setFlash('');
+    try {
+      await setScriptPlannedDate(scriptEdit.scriptId, dateFromInput(scriptEdit.date));
+      setFlash(scriptEdit.date === dayKey ? 'Previsão mantida.' : `Previsão de "${scriptEdit.title}" movida para ${fullDate(scriptEdit.date)}.`); setScriptEdit(null);
+    } catch (e) { setErrors([e instanceof Error ? e.message : 'Não foi possível alterar a previsão.']); } finally { setBusy(false); }
+  };
   const remove = async (plan: Plan) => {
+    if (plan.scriptId) return removeScriptDate(plan.scriptId, plan.title);
     if (!window.confirm(`Excluir "${plan.title}"?`)) return;
     setBusy(true); setErrors([]); setFlash('');
     try { await deletePlan(plan.id); if (draft.id === plan.id) setDraft(EMPTY); setFlash('Planejamento excluído.'); } catch (e) { setErrors([e instanceof Error ? e.message : 'Não foi possível excluir.']); } finally { setBusy(false); }
+  };
+
+  // Excluir um roteiro do calendário só zera a previsão de postagem; o roteiro continua na biblioteca.
+  const removeScriptDate = async (scriptId: string, title: string) => {
+    if (!window.confirm(`Remover a previsão de postagem de "${title}"? O roteiro continua em Roteiros, sem data.`)) return;
+    setBusy(true); setErrors([]); setFlash('');
+    try { await setScriptPlannedDate(scriptId, null); if (scriptEdit?.scriptId === scriptId) setScriptEdit(null); setFlash('Previsão de postagem removida do roteiro.'); } catch (e) { setErrors([e instanceof Error ? e.message : 'Não foi possível remover a previsão.']); } finally { setBusy(false); }
   };
 
   return (
@@ -67,18 +88,27 @@ export const DayPanel: React.FC<{ dayKey: string; summary: string; entries: DayE
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold">{plan.title} <span className="font-normal opacity-80">— {plan.scriptId ? 'Roteiro' : formatLabel(plan.format)}</span></span>
                   {plan.notes && <span className="block text-[11px] opacity-75">{plan.notes}</span>}
-                  {plan.scriptId && <span className="block text-[11px] opacity-75">Previsão de postagem do roteiro; altere a data em Roteiros.</span>}
+                  {plan.scriptId && <span className="block text-[11px] opacity-75">Previsão de postagem do roteiro.</span>}
                 </span>
-                {!plan.scriptId && <>
-                <button type="button" disabled={busy} onClick={() => setDraft({ id: plan.id, title: plan.title, format: plan.format, notes: plan.notes ?? '' })} aria-label={`Editar ${plan.title}`} className="rounded-lg p-2 hover:bg-white/10"><Pencil className="h-4 w-4" /></button>
+                <button type="button" disabled={busy} onClick={() => (plan.scriptId ? setScriptEdit({ scriptId: plan.scriptId, title: plan.title, date: dayKey }) : setDraft({ id: plan.id, title: plan.title, format: plan.format, notes: plan.notes ?? '' }))} aria-label={`Editar ${plan.title}`} className="rounded-lg p-2 hover:bg-white/10"><Pencil className="h-4 w-4" /></button>
                 <button type="button" disabled={busy} onClick={() => remove(plan)} aria-label={`Excluir ${plan.title}`} className="rounded-lg p-2 hover:bg-red-500/20"><Trash2 className="h-4 w-4" /></button>
-                </>}
               </li>
             ))}
           </ul>
         )}
       </div>
 
+      {scriptEdit ? (
+        <form onSubmit={saveScriptDate} className="space-y-2 border-t border-white/10 pt-3">
+          <p className={labelClass}>Nova data de postagem de “{scriptEdit.title}”</p>
+          <input type="date" value={scriptEdit.date} onChange={(e) => setScriptEdit({ ...scriptEdit, date: e.target.value })} aria-label="Nova data de postagem" className={inputClass} />
+          <ErrorLine errors={errors} />
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => { setScriptEdit(null); setErrors([]); }} className={ghostBtn}>Cancelar edição</button>
+            <button type="submit" disabled={busy} className={primaryBtn}>{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}Salvar data</button>
+          </div>
+        </form>
+      ) : (
       <form onSubmit={save} className="space-y-2 border-t border-white/10 pt-3">
         <p className={labelClass}>{draft.id ? 'Editar planejamento' : 'Adicionar planejamento'}</p>
         <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Título do conteúdo (ex.: Dia das crianças)" aria-label="Título do conteúdo" maxLength={120} className={inputClass} />
@@ -96,6 +126,7 @@ export const DayPanel: React.FC<{ dayKey: string; summary: string; entries: DayE
           <button type="submit" disabled={busy} className={primaryBtn}>{busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}{draft.id ? 'Salvar' : 'Adicionar planejamento'}</button>
         </div>
       </form>
+      )}
     </Modal>
   );
 };

@@ -1,5 +1,5 @@
-import React from 'react';
-import { AlertTriangle, ArrowUpRight, Copy, Loader2, Plus, Search, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertTriangle, ArrowUpRight, Copy, GripVertical, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { scriptPublishTime } from '../../../services/scriptSchedule.js';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../../../types';
 import { productionOptions } from './scriptEditorHelpers';
@@ -45,11 +45,14 @@ interface ScriptRowProps {
   onDelete: (script: ContentScript) => void;
   onSendToRecording: (script: ContentScript) => void;
   onOpenOrder: (orderId: string) => void;
+  /** Atributos de arrastar (só na ordem manual). */
+  drag?: React.HTMLAttributes<HTMLElement>;
 }
 
-export const ScriptRow: React.FC<ScriptRowProps> = ({ script, scriptActionId, sendingScriptId, openEdit, openNewChild, onDuplicate, onDelete, onSendToRecording, onOpenOrder }) => (
-  <article>
+export const ScriptRow: React.FC<ScriptRowProps> = ({ script, scriptActionId, sendingScriptId, openEdit, openNewChild, onDuplicate, onDelete, onSendToRecording, onOpenOrder, drag }) => (
+  <article {...drag}>
     <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[#0D1527] px-3 py-2.5 transition-colors hover:border-blue-400/35 sm:flex-row sm:items-center sm:justify-between">
+      {drag && <GripVertical aria-hidden className="hidden h-4 w-4 shrink-0 cursor-grab text-white/30 sm:block" />}
       <button type="button" onClick={() => openEdit(script)} className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
         <span className="block truncate text-sm font-bold text-white">{script.title}</span>
         <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
@@ -80,7 +83,7 @@ const PublishDateBadge: React.FC<{ script: ContentScript }> = ({ script }) => {
 };
 
 /** Kanban por status de produção; o card fica verde quando o roteiro já foi publicado. */
-export const ScriptKanban: React.FC<{ scripts: ContentScript[]; openEdit: (script: ContentScript) => void }> = ({ scripts, openEdit }) => (
+export const ScriptKanban: React.FC<{ scripts: ContentScript[]; openEdit: (script: ContentScript) => void; dragFor: (script: ContentScript, column: ContentScript[]) => React.HTMLAttributes<HTMLElement> }> = ({ scripts, openEdit, dragFor }) => (
   <div className="-mx-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
     <div className="grid min-w-max grid-cols-4 gap-3 lg:min-w-0">
       {productionOptions.map(([status, label]) => {
@@ -93,7 +96,8 @@ export const ScriptKanban: React.FC<{ scripts: ContentScript[]; openEdit: (scrip
             </header>
             <div className="space-y-2.5">
               {items.map((script) => (
-                <button key={script.id} type="button" onClick={() => openEdit(script)} className={`block w-full rounded-xl border p-3 text-left transition hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${script.publicationStatus === 'published' ? publishedStyle : productionStyles[script.productionStatus]}`}>
+                <div key={script.id} {...dragFor(script, items)}>
+                <button type="button" onClick={() => openEdit(script)} className={`block w-full rounded-xl border p-3 text-left transition hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${script.publicationStatus === 'published' ? publishedStyle : productionStyles[script.productionStatus]}`}>
                   <span className="block text-sm font-bold text-white">{script.title}</span>
                   <span className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
                     {script.publicationStatus === 'published' && <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 font-bold">Publicado</span>}
@@ -101,6 +105,7 @@ export const ScriptKanban: React.FC<{ scripts: ContentScript[]; openEdit: (scrip
                     <PublishDateBadge script={script} />
                   </span>
                 </button>
+                </div>
               ))}
               {items.length === 0 && <p className="rounded-xl border border-dashed border-white/10 px-3 py-5 text-center text-xs text-white/30">Nenhum roteiro neste status</p>}
             </div>
@@ -110,3 +115,20 @@ export const ScriptKanban: React.FC<{ scripts: ContentScript[]; openEdit: (scrip
     </div>
   </div>
 );
+
+/**
+ * Arrastar para reordenar (HTML5 drag and drop; no celular o navegador não arrasta). Só aceita soltar sobre um roteiro do
+ * mesmo `group` (no Kanban, a mesma coluna); `onMove` recebe o arrastado e o alvo.
+ */
+export function useScriptDrag(onMove: (draggedId: string, targetId: string) => void) {
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const dragProps = (script: ContentScript, group: ContentScript[]): React.HTMLAttributes<HTMLElement> => ({
+    draggable: true,
+    className: `cursor-grab active:cursor-grabbing ${draggingId === script.id ? 'opacity-40' : ''}`,
+    onDragStart: (event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', script.id); setDraggingId(script.id); },
+    onDragEnd: () => setDraggingId(null),
+    onDragOver: (event) => { if (draggingId && draggingId !== script.id && group.some((item) => item.id === draggingId)) event.preventDefault(); },
+    onDrop: (event) => { event.preventDefault(); if (draggingId) onMove(draggingId, script.id); setDraggingId(null); },
+  });
+  return dragProps;
+}

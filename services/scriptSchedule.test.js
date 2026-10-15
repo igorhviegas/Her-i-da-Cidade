@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scriptCalendarPlans, scriptPublishTime, sortByPublishDate } from './scriptSchedule.js';
+import { moveScript, scriptCalendarPlans, scriptPublishTime, sortByManualOrder, sortByPublishDate } from './scriptSchedule.js';
 
 const day = (d) => new Date(2026, 9, d, 12);
 const ts = (d) => ({ toDate: () => day(d) });
@@ -30,4 +30,17 @@ test('roteiros não publicados com previsão viram planejamento avulso no calend
     { id: 'c', title: 'Já postado', publicationStatus: 'published', plannedPublishAt: day(21) },
   ]);
   assert.deepEqual(plans, [{ id: 'script-a', scriptId: 'a', date: '2026-10-20', title: 'Chupeta', format: 'reels' }]);
+});
+
+test('ordem manual: sem posição no topo, depois por sortOrder', () => {
+  const list = [{ id: 'x', sortOrder: 2 }, { id: 'novo' }, { id: 'y', sortOrder: 0 }];
+  assert.deepEqual(sortByManualOrder(list).map((s) => s.id), ['novo', 'y', 'x']);
+});
+
+test('arrastar para baixo fica depois do alvo; para cima, antes; só grava o que mudou', () => {
+  const list = [{ id: 'a', sortOrder: 0 }, { id: 'b', sortOrder: 1 }, { id: 'c', sortOrder: 2 }, { id: 'd', sortOrder: 3 }];
+  assert.deepEqual(moveScript(list, 'a', 'c'), [{ id: 'b', sortOrder: 0 }, { id: 'c', sortOrder: 1 }, { id: 'a', sortOrder: 2 }]);
+  assert.deepEqual(moveScript(list, 'd', 'b'), [{ id: 'd', sortOrder: 1 }, { id: 'b', sortOrder: 2 }, { id: 'c', sortOrder: 3 }]);
+  assert.deepEqual(moveScript(list, 'a', 'a'), []);
+  assert.deepEqual(moveScript([{ id: 'n' }, ...list], 'n', 'a'), [{ id: 'n', sortOrder: 1 }, { id: 'b', sortOrder: 2 }, { id: 'c', sortOrder: 3 }, { id: 'd', sortOrder: 4 }]);
 });

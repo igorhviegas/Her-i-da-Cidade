@@ -33,3 +33,25 @@ export function scriptCalendarPlans(scripts) {
     return time === null ? [] : [{ id: `script-${script.id}`, scriptId: script.id, date: dateKey(new Date(time)), title: script.title, format: 'reels' }];
   });
 }
+
+/** Ordem manual (arrastar): roteiros ainda sem posição ficam no topo, na ordem recebida; os demais por `sortOrder`. */
+export function sortByManualOrder(scripts) {
+  const unplaced = scripts.filter((script) => typeof script.sortOrder !== 'number');
+  const placed = scripts.filter((script) => typeof script.sortOrder === 'number').sort((a, b) => a.sortOrder - b.sortOrder);
+  return [...unplaced, ...placed];
+}
+
+/**
+ * Solta `draggedId` sobre `targetId` na ordem manual de TODOS os roteiros (inclusive os ocultos pelos filtros):
+ * descendo, fica logo depois do alvo; subindo, logo antes. Devolve só as posições que mudaram, para gravar.
+ */
+export function moveScript(scripts, draggedId, targetId) {
+  const ids = sortByManualOrder(scripts).map((script) => script.id);
+  const from = ids.indexOf(draggedId);
+  const to = ids.indexOf(targetId);
+  if (from < 0 || to < 0 || from === to) return [];
+  ids.splice(from, 1);
+  ids.splice(to, 0, draggedId);
+  const current = new Map(scripts.map((script) => [script.id, script.sortOrder]));
+  return ids.flatMap((id, index) => (current.get(id) === index ? [] : [{ id, sortOrder: index }]));
+}
