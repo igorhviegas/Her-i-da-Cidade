@@ -1,8 +1,9 @@
 # Dívida de lint (baseline após o burn-down)
 
-Gerado por `npm run lint:debt` (a partir do ESLint). Total: **234 avisos, 0 erros**. Nenhum `eslint-disable` foi adicionado: o que resta aparece como aviso.
+Gerado por `npm run lint:debt` (a partir do ESLint). Total: **237 avisos, 0 erros**. Nenhum `eslint-disable` foi adicionado: o que resta aparece como aviso.
 
 Para zerar uma regra, corrija os itens abaixo e promova a regra de `warn` para `error` em `eslint.config.mjs`.
+
 
 
 
@@ -28,11 +29,11 @@ Reduzir exige reestruturar ramificações (tabelas de lookup, early returns), n�
 - `services/serviceCatalog/serviceWrites.ts` (2): linhas 25, 114
 - `services/travelCost.js` (2): linhas 34, 73
 - `api/fit-ingest.ts` (1): linhas 14
-- `api/instagram-sync.ts` (1): linhas 18
+- `api/instagram-sync.ts` (1): linhas 29
 - `api/manychat.ts` (1): linhas 20
 - `api/travel-route.ts` (1): linhas 26
 - `api/upload-thumbnail.ts` (1): linhas 109
-- `api/video-call.ts` (1): linhas 18
+- `api/video-call.ts` (1): linhas 29
 - `components/admin/AdminClientAreaPage.tsx` (1): linhas 28
 - `components/admin/AdminContentPage.tsx` (1): linhas 23
 - `components/admin/AdminInstagramPage.tsx` (1): linhas 19
@@ -80,24 +81,24 @@ Reduzir exige reestruturar ramificações (tabelas de lookup, early returns), n�
 - `services/orderReference.js` (1): linhas 26
 - `services/pdfExtract.js` (1): linhas 30
 - `services/serviceCatalog/firestoreErrors.ts` (1): linhas 30
-- `services/serviceCatalog/serviceDocument.ts` (1): linhas 10
+- `services/serviceCatalog/serviceDocument.ts` (1): linhas 11
 - `services/serviceCatalog/serviceQueries.ts` (1): linhas 16
 
-## @typescript-eslint/no-explicit-any — 52
+## @typescript-eslint/no-explicit-any — 54
 
 Tipos reais exigem modelar o formato dos dados (documentos do Firestore, `Request | any` nos handlers de `api/` que aceitam fakes nos testes). Tentado por arquivo: só ficou o que o `tsc` aceitou sem erro novo.
 
 - `api/calendar-events.ts` (6): linhas 24, 25, 26, 44, 44, 58
 - `services/reports.d.ts` (6): linhas 36, 37, 41, 41, 47, 49
 - `services/missionsService.ts` (5): linhas 46, 303, 322, 323, 334
+- `api/video-call.ts` (4): linhas 13, 13, 30, 31
 - `api/alexa.ts` (3): linhas 61, 83, 83
 - `api/travel-route.ts` (3): linhas 16, 27, 28
 - `lib/firestore.ts` (3): linhas 105, 107, 107
 - `services/videosService.ts` (3): linhas 344, 387, 447
 - `api/fit-ingest.ts` (2): linhas 15, 16
-- `api/instagram-sync.ts` (2): linhas 19, 20
+- `api/instagram-sync.ts` (2): linhas 30, 31
 - `api/manychat.ts` (2): linhas 134, 134
-- `api/video-call.ts` (2): linhas 19, 20
 - `services/pdfExtract.d.ts` (2): linhas 6, 7
 - `components/admin/AdminFitWorkoutsPage.tsx` (1): linhas 121
 - `components/admin/EventOrderFields.tsx` (1): linhas 13
@@ -110,10 +111,10 @@ Tipos reais exigem modelar o formato dos dados (documentos do Firestore, `Reques
 - `services/eventFinance.d.ts` (1): linhas 17
 - `services/financeCalculations.d.ts` (1): linhas 1
 - `services/fitDataService.ts` (1): linhas 14
-- `services/serviceCatalog/serviceDocument.ts` (1): linhas 10
+- `services/serviceCatalog/serviceDocument.ts` (1): linhas 11
 - `services/serviceCatalog/serviceWrites.ts` (1): linhas 122
 
-## max-statements — 41
+## max-statements — 42
 
 Mesma natureza de `complexity`: o corpo da função precisa ser repensado.
 
@@ -125,10 +126,11 @@ Mesma natureza de `complexity`: o corpo da função precisa ser repensado.
 - `services/ordersService.ts` (2): linhas 76, 306
 - `services/serviceCatalog/serviceWrites.ts` (2): linhas 25, 114
 - `api/fit-ingest.ts` (1): linhas 14
-- `api/instagram-sync.ts` (1): linhas 18
+- `api/instagram-sync.ts` (1): linhas 29
 - `api/manychat.ts` (1): linhas 20
 - `api/travel-route.ts` (1): linhas 26
 - `api/upload-thumbnail.ts` (1): linhas 109
+- `api/video-call.ts` (1): linhas 29
 - `components/admin/AdminClientAreaPage.tsx` (1): linhas 28
 - `components/admin/AdminInstagramPage.tsx` (1): linhas 19
 - `components/admin/AdminMissionsPage.tsx` (1): linhas 44
