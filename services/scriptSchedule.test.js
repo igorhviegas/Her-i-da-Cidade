@@ -32,9 +32,9 @@ test('roteiros não publicados com previsão viram planejamento avulso no calend
   assert.deepEqual(plans, [{ id: 'script-a', scriptId: 'a', date: '2026-10-20', title: 'Chupeta', format: 'reels' }]);
 });
 
-test('ordem manual: sem posição no topo, depois por sortOrder', () => {
+test('ordem manual: posicionados por sortOrder e novos (sem posição) no final', () => {
   const list = [{ id: 'x', sortOrder: 2 }, { id: 'novo' }, { id: 'y', sortOrder: 0 }];
-  assert.deepEqual(sortByManualOrder(list).map((s) => s.id), ['novo', 'y', 'x']);
+  assert.deepEqual(sortByManualOrder(list).map((s) => s.id), ['y', 'x', 'novo']);
 });
 
 test('arrastar para baixo fica depois do alvo; para cima, antes; só grava o que mudou', () => {
@@ -42,5 +42,5 @@ test('arrastar para baixo fica depois do alvo; para cima, antes; só grava o que
   assert.deepEqual(moveScript(list, 'a', 'c'), [{ id: 'b', sortOrder: 0 }, { id: 'c', sortOrder: 1 }, { id: 'a', sortOrder: 2 }]);
   assert.deepEqual(moveScript(list, 'd', 'b'), [{ id: 'd', sortOrder: 1 }, { id: 'b', sortOrder: 2 }, { id: 'c', sortOrder: 3 }]);
   assert.deepEqual(moveScript(list, 'a', 'a'), []);
-  assert.deepEqual(moveScript([{ id: 'n' }, ...list], 'n', 'a'), [{ id: 'n', sortOrder: 1 }, { id: 'b', sortOrder: 2 }, { id: 'c', sortOrder: 3 }, { id: 'd', sortOrder: 4 }]);
+  assert.deepEqual(moveScript([{ id: 'n' }, ...list], 'n', 'a'), [{ id: 'n', sortOrder: 0 }, { id: 'a', sortOrder: 1 }, { id: 'b', sortOrder: 2 }, { id: 'c', sortOrder: 3 }, { id: 'd', sortOrder: 4 }]);
 });

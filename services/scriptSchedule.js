@@ -34,11 +34,14 @@ export function scriptCalendarPlans(scripts) {
   });
 }
 
-/** Ordem manual (arrastar): roteiros ainda sem posição ficam no topo, na ordem recebida; os demais por `sortOrder`. */
+/**
+ * Ordem manual (arrastar): primeiro os já posicionados, por `sortOrder`; os ainda sem posição (novos) vão para o final, na ordem recebida,
+ * para não desfazer a organização montada.
+ */
 export function sortByManualOrder(scripts) {
   const unplaced = scripts.filter((script) => typeof script.sortOrder !== 'number');
   const placed = scripts.filter((script) => typeof script.sortOrder === 'number').sort((a, b) => a.sortOrder - b.sortOrder);
-  return [...unplaced, ...placed];
+  return [...placed, ...unplaced];
 }
 
 /**
