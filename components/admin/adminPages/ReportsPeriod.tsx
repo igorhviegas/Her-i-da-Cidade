@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Client, Service } from '../../../types';
-import { expensesForMonth, monthKeyOf, variationPct, type FixedExpense, type RevenueEntry } from '../../../services/financeCalculations.js';
+import { creditExpensesForMonth, expensesForMonth, monthKeyOf, variationPct, type FixedExpense, type RevenueEntry } from '../../../services/financeCalculations.js';
 import { GRANULARITIES, dailyBreakdown, periodEntries, periodRange, periodTotals, serviceBreakdown, shiftPeriod, type Granularity, type PeriodRange } from '../../../services/reports.js';
 import { cardClass, formatMoney, ghostBtn, monthLabel } from '../financeFormat';
 import { Kpi } from './FinanceKpi';
@@ -56,6 +56,7 @@ export const ReportsPeriod: React.FC<Props> = ({ entries, costs, expenses, clien
   const isMonth = granularity === 'month';
   const fixed = isMonth ? expensesForMonth(expenses, monthKeyOf(anchor)).total : 0;
   const result = totals.result - fixed;
+  const credit = isMonth ? creditExpensesForMonth(expenses, monthKeyOf(anchor)) : 0;
   const previousLabel = { day: 'dia anterior', week: 'semana anterior', month: 'mês anterior' }[granularity];
   const serviceName = (id: string) => services.get(id)?.title || (services.has(id) ? 'Serviço removido' : 'Carregando…');
   const clientName = (id?: string) => (id ? clients.get(id)?.name || (clients.has(id) ? 'Cliente removido' : 'Carregando…') : '—');
@@ -95,6 +96,7 @@ export const ReportsPeriod: React.FC<Props> = ({ entries, costs, expenses, clien
             ))}
             <div className="flex justify-between gap-3 border-t border-white/10 pt-2 font-bold"><dt className="text-white">Resultado</dt><dd className={`tabular-nums ${result >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{formatMoney(result)}</dd></div>
           </dl>
+          <p className="mt-3 text-xs text-white/50">Custos por forma de pagamento: Pix {formatMoney(totals.variableCost + fixed - credit)} · Crédito {formatMoney(credit)}</p>
         </div>
       )}
 

@@ -29,6 +29,7 @@ export function editingCostForMonth(entries: RevenueEntry[], monthKey: string): 
 export function isExpenseInMonth(expense: Partial<FixedExpense>, monthKey: string): boolean;
 export function expenseAmountForMonth(expense: Partial<FixedExpense>, monthKey: string): number;
 export function expensesForMonth(expenses: FixedExpense[], monthKey: string): { items: { expense: FixedExpense; amount: number; adjusted: boolean }[]; total: number };
+export function creditExpensesForMonth(expenses: FixedExpense[], monthKey: string): number;
 export function currentDefaultAmount(expense: Partial<FixedExpense>): number;
 export function patrimonySummary(assets: Asset[]): { activeCount: number; currentTotal: number; acquisitionTotal: number };
 export function financeMetrics(entries: RevenueEntry[], expenses: FixedExpense[], monthKey: string, monthlyGoal?: number | null): {
