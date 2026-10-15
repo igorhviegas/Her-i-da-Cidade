@@ -26,10 +26,11 @@ export const VideoCallBooking: React.FC<{ /** Avisa quem hospeda o componente qu
     form.setSubmitting(true);
     setError('');
     try {
-      const body = buildBookingBody({ values: form.values, country: form.country, callCountry: form.callCountry, sameNumber: form.sameNumber, timeZone, date, time });
+      const body = { ...buildBookingBody({ values: form.values, country: form.country, callCountry: form.callCountry, sameNumber: form.sameNumber, timeZone, date, time }), turnstileToken: form.captchaToken };
       const response = await fetch('/api/video-call', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.ok) {
+        form.resetCaptcha(); // o token vale uma única vez
         setError(data?.error?.message || 'Não foi possível concluir o agendamento. Tente novamente.');
         if (data?.error?.code === 'slot_unavailable') { await load(); setStep('slot'); setTime(''); }
         return;
@@ -38,6 +39,7 @@ export const VideoCallBooking: React.FC<{ /** Avisa quem hospeda o componente qu
       // Segue direto para o WhatsApp com a mensagem pronta; a tela de confirmação fica para quando o cliente voltar.
       if (data.booking.whatsappUrl) window.location.href = data.booking.whatsappUrl;
     } catch {
+      form.resetCaptcha();
       setError('Sem conexão. Verifique sua internet e tente novamente.');
     } finally {
       form.setSubmitting(false);

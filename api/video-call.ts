@@ -1,12 +1,23 @@
 import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
 import { getAdminFirestore } from '../functions/firebase-admin.js';
+import { clientIp, verifyTurnstile } from '../functions/turnstile.js';
 import { GoogleCalendarError } from '../functions/google-calendar.js';
 import { VideoCallError, createVideoCallBooking, expireUnpaidBookings, getAvailability, publicConfig } from '../functions/video-call.js';
 
 const STATUS_BY_CODE: Record<string, number> = {
   validation_error: 400, slot_unavailable: 409, already_pending: 409, service_unavailable: 503,
 };
+
+/** Captcha (Cloudflare Turnstile) do POST: true = pode seguir. Ligado só com TURNSTILE_SECRET_KEY; sem ela, sempre passa. */
+async function passesCaptcha(req: { body?: any; headers?: any }, verify: typeof verifyTurnstile): Promise<boolean> {
+  const result = await verify({ token: req.body?.turnstileToken, secret: process.env.TURNSTILE_SECRET_KEY, ip: clientIp(req.headers) });
+  if (result.ok && result.unavailable) logger.warn('[VideoCall] Turnstile indisponível: reserva liberada sem verificação.');
+  return result.ok;
+}
+
+/** O token do captcha nunca entra na reserva. */
+const withoutCaptchaToken = (body: unknown) => Object.fromEntries(Object.entries((body ?? {}) as Record<string, unknown>).filter(([key]) => key !== 'turnstileToken'));
 
 /**
  * Público (sem login), pré-agendamento de Vídeo Chamada.
@@ -18,7 +29,7 @@ const STATUS_BY_CODE: Record<string, number> = {
 export async function handleVideoCall(
   req: Request | any,
   res: Response | any,
-  deps: { database?: unknown; availability?: typeof getAvailability; book?: typeof createVideoCallBooking; expire?: typeof expireUnpaidBookings } = {},
+  deps: { database?: unknown; availability?: typeof getAvailability; book?: typeof createVideoCallBooking; expire?: typeof expireUnpaidBookings; captcha?: typeof verifyTurnstile } = {},
 ) {
   const send = (status: number, body: unknown) => {
     res.setHeader?.('Cache-Control', 'no-store');
@@ -37,7 +48,8 @@ export async function handleVideoCall(
       const { days, config } = await (deps.availability ?? getAvailability)({ database });
       return send(200, { ok: true, days, config: publicConfig(config) });
     }
-    const booking = await (deps.book ?? createVideoCallBooking)({ database, input: req.body ?? {} });
+    if (!(await passesCaptcha(req, deps.captcha ?? verifyTurnstile))) return fail(403, 'captcha_failed', 'Não foi possível confirmar a verificação de segurança. Atualize a página e tente de novo.');
+    const booking = await (deps.book ?? createVideoCallBooking)({ database, input: withoutCaptchaToken(req.body) });
     return send(200, { ok: true, booking });
   } catch (error) {
     if (error instanceof VideoCallError || error instanceof GoogleCalendarError) {

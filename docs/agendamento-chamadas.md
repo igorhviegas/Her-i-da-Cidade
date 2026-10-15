@@ -77,6 +77,24 @@ O valor configurado vale para os agendamentos do site. O ManyChat continua com o
 
 `videoCallSlots/{AAAA-MM-DD_HHmm}` é lido e gravado na mesma transação do pedido: duas reservas simultâneas do mesmo horário conflitam e só uma vence. A trava só vale **enquanto o pedido existe**: excluir o pedido no CRM libera o horário sozinho. Um WhatsApp só pode ter **um** pré-agendamento aguardando pagamento (freia spam no endpoint público).
 
+## Proteção contra robôs (Cloudflare Turnstile)
+
+Sem isso, qualquer pessoa pode ocupar a agenda por até 72 h reservando horários com números inventados (a trava de "um pré-agendamento por WhatsApp" não adianta com números diferentes, porque o WhatsApp não é verificado). O Turnstile é o captcha gratuito do Cloudflare, quase sempre invisível para pessoas de verdade.
+
+**Desligado por padrão**: sem as duas variáveis abaixo nada muda (nenhum script é carregado, nenhuma verificação é feita). Para ligar:
+
+1. Em [dash.cloudflare.com](https://dash.cloudflare.com) → **Turnstile** → *Add widget*: nome "Herói da Cidade", domínio `www.heroidacidade.com` (e o de Preview, se quiser testar lá), modo **Managed**. A conta é gratuita; não precisa mudar o DNS do site.
+2. Na Vercel (Production **e** Preview), crie `VITE_TURNSTILE_SITE_KEY` (a chave do site, pública) e `TURNSTILE_SECRET_KEY` (o segredo, só servidor) e **publique de novo**: a chave do site entra no build.
+3. Abra `/agendar-chamada`, escolha um horário e confira que aparece a verificação no passo "dados" e que a reserva é concluída.
+
+Como se comporta:
+- O token é exigido **só no POST** (reservar). A consulta de horários (GET) nunca exige.
+- Token ausente ou recusado: 403 `captcha_failed`, a reserva nem é tentada. O token vale uma vez; após uma reserva recusada o widget pede um desafio novo.
+- **Cloudflare fora do ar ou sem resposta: a reserva é liberada** (e registrada no log). Escolha deliberada: para um negócio pequeno, perder um agendamento real pesa mais que o risco de um robô passar durante uma queda.
+- O token nunca entra no pedido; o IP vai ao Cloudflare só como dica extra.
+- Quem usa bloqueador de anúncios pode não carregar o script: o formulário mostra um aviso e o botão fica desabilitado; nesse caso o cliente fala com vocês pelo WhatsApp.
+- Para testar sem a conta: chaves públicas de teste do Cloudflare (`1x00000000000000000000AA` / `1x0000000000000000000000000000000AA`, sempre aprovam; `2x00000000000000000000AB` / `2x0000000000000000000000000000000AA`, sempre reprovam).
+
 ## CRM
 
 - Kanban: selo "⏳ Aguardando pagamento · Chamada dd/mm às HH:mm"; o valor só aparece depois de pago.
