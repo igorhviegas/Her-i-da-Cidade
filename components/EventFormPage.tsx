@@ -43,6 +43,20 @@ const withText = (url: string, message: string) => {
 };
 const readTheme = (): 'light' | 'dark' => { try { return localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light'; } catch { return 'light'; } };
 
+// Rascunho no próprio aparelho (sem login): atualizar a página ou voltar depois continua de onde parou. Some ao concluir,
+// ao tocar em "Recomeçar" ou depois de DRAFT_DAYS. O aceite dos termos não é guardado (precisa ser marcado de novo).
+const DRAFT_KEY = 'hdc.formulario.rascunho.v1';
+const DRAFT_DAYS = 14;
+interface Draft { values: Values; country: string; step: number; savedAt: number }
+const readDraft = (): Draft | null => {
+  try {
+    const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null') as Draft | null;
+    if (!draft?.values || Date.now() - draft.savedAt > DRAFT_DAYS * 86_400_000) { localStorage.removeItem(DRAFT_KEY); return null; }
+    return { ...draft, values: { ...EMPTY, ...draft.values, acceptTerms: false }, step: Math.min(Math.max(0, Number(draft.step) || 0), STEPS.length - 1) };
+  } catch { return null; }
+};
+const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch { /* sem armazenamento */ } };
+
 /**
  * Formulário da Missão (/formulario-evento): substitui o Google Forms do evento presencial. Uma seção por tela, com barra de
  * progresso; nada é gravado antes de "Concluir". Com ?orcamento=ID (link do Calendário → Orçamentos) já vem com pacote, data,
@@ -52,9 +66,12 @@ const readTheme = (): 'light' | 'dark' => { try { return localStorage.getItem(TH
 export const EventFormPage: React.FC = () => {
   const { whatsappUrl } = useSiteConfig();
   const [theme, setTheme] = useState(readTheme);
-  const [values, setValues] = useState<Values>(EMPTY);
-  const [country, setCountry] = useState(DEFAULT_PHONE_COUNTRY);
-  const [step, setStep] = useState(0);
+  const [draft] = useState(readDraft);
+  const [restored, setRestored] = useState(Boolean(draft));
+  const draftQuoteId = useRef(draft?.values.quoteId ?? '');
+  const [values, setValues] = useState<Values>(draft?.values ?? EMPTY);
+  const [country, setCountry] = useState(draft?.country ?? DEFAULT_PHONE_COUNTRY);
+  const [step, setStep] = useState(draft?.step ?? 0);
   const [error, setError] = useState('');
   const [quoteTotal, setQuoteTotal] = useState<number | null>(null);
   const [quoteNote, setQuoteNote] = useState('');
@@ -96,10 +113,21 @@ export const EventFormPage: React.FC = () => {
       if (!quoteId) return;
       const prefill = data?.prefill;
       if (!prefill) { setQuoteNote('Este link de orçamento venceu ou já foi usado. Preencha normalmente; conferimos o valor pelo WhatsApp.'); return; }
-      setValues((v) => ({ ...v, quoteId: prefill.quoteId, packageId: prefill.packageId, eventDate: prefill.date, location: prefill.location }));
+      // Rascunho do mesmo orçamento: mantém o que o cliente já corrigiu.
+      if (draftQuoteId.current !== prefill.quoteId) setValues((v) => ({ ...v, quoteId: prefill.quoteId, packageId: prefill.packageId, eventDate: prefill.date, location: prefill.location }));
       setQuoteTotal(prefill.total);
     }).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    // Nada preenchido ainda (ou já concluído): sem rascunho, para não avisar "continuamos de onde parou" à toa.
+    const untouched = step === 0 && JSON.stringify({ ...values, acceptTerms: false }) === JSON.stringify(EMPTY);
+    if (done || untouched) { clearDraft(); return; }
+    try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ values: { ...values, acceptTerms: false }, country, step, savedAt: Date.now() })); } catch { /* sem armazenamento: só não salva */ }
+  }, [values, country, step, done]);
+
+  // Recarrega para reaplicar o link do orçamento (se houver) sobre um formulário limpo.
+  const restart = () => { clearDraft(); setRestored(false); window.location.reload(); };
 
   const scrollTop = () => top.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const stepError = (index: number) => {
@@ -197,6 +225,12 @@ export const EventFormPage: React.FC = () => {
                 <p className={`mt-1 text-sm ${ui.body}`}>{STEPS[step].subtitle}</p>
               </div>
 
+              {restored && (
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+                  <span>Continuamos de onde você parou: o que você preencheu ficou salvo neste aparelho.</span>
+                  <button type="button" onClick={restart} className="font-bold underline">Recomeçar</button>
+                </div>
+              )}
               {quoteNote && step === 0 && <p className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">{quoteNote}</p>}
 
               <div className="space-y-5">
@@ -207,8 +241,16 @@ export const EventFormPage: React.FC = () => {
                         className={`w-full overflow-hidden rounded-2xl border text-left transition-colors ${values.packageId === p.id ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500/40 dark:bg-blue-600/15' : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10'}`}>
                         <div className={`h-1.5 bg-gradient-to-r ${ACCENT[p.id]}`} />
                         <div className="p-4">
-                          <p className="text-lg font-extrabold uppercase italic tracking-tight">{p.title}</p>
-                          <p className={`text-xs font-semibold ${ui.muted}`}>{p.duration}</p>
+                          <div className="flex items-start gap-3">
+                            {/* Bolinha de seleção (como um botão de rádio). */}
+                            <span aria-hidden className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${values.packageId === p.id ? 'border-blue-600 dark:border-blue-400' : 'border-slate-300 dark:border-white/30'}`}>
+                              {values.packageId === p.id && <span className="h-2.5 w-2.5 rounded-full bg-blue-600 dark:bg-blue-400" />}
+                            </span>
+                            <div>
+                              <p className="text-lg font-extrabold uppercase italic tracking-tight">{p.title}</p>
+                              <p className={`text-xs font-semibold ${ui.muted}`}>{p.duration}</p>
+                            </div>
+                          </div>
                           {values.packageId === p.id && <PackageItems items={p.items} />}
                         </div>
                       </button>
@@ -304,7 +346,7 @@ export const EventFormPage: React.FC = () => {
 
                 {step === 4 && (
                   <div className="space-y-4">
-                    <AddonCard image="/images/formulario/teia-extra.jpg" title="Lançamento de teia extra" price={`${formatBrl(prices.extraWeb)} cada`} checked={values.extraWeb > 0}
+                    <AddonCard image="/images/formulario/teia-extra.jpg" title="Lançamento de teia extra" video={config.addonVideos.extraWeb} price={`${formatBrl(prices.extraWeb)} cada`} checked={values.extraWeb > 0}
                       text="Os pacotes já incluem um lançamento. As teias são de papel enrolado, descartáveis, e só o personagem lança."
                       control={(
                         <div className="flex gap-2" role="group" aria-label="Teias extras">
@@ -315,12 +357,12 @@ export const EventFormPage: React.FC = () => {
                           ))}
                         </div>
                       )} />
-                    <AddonCard image="/images/formulario/video-aniversario.jpg" title="Vídeo Especial de Aniversário" price={`+${formatBrl(prices.birthdayVideo)}`} checked={values.birthdayVideo}
+                    <AddonCard image="/images/formulario/video-aniversario.jpg" title="Vídeo Especial de Aniversário" video={config.addonVideos.birthdayVideo} price={`+${formatBrl(prices.birthdayVideo)}`} checked={values.birthdayVideo}
                       onChange={(birthdayVideo) => set({ birthdayVideo, birthdayName: birthdayVideo ? values.birthdayName || values.childName.split(' ')[0] : '' })}
                       text="Mais de 1 minuto, já gravado pelo Homem-Aranha com o primeiro nome da criança. Entregue em instantes após o pagamento, se o nome estiver no nosso banco de vídeos.">
                       <label className={ui.label}>Primeiro nome no vídeo *<input value={values.birthdayName} onChange={(e) => set({ birthdayName: e.target.value })} className={field} maxLength={40} /></label>
                     </AddonCard>
-                    <AddonCard image="/images/formulario/video-convite.jpg" title="Vídeo Convite" price={`+${formatBrl(prices.inviteVideo)}`} checked={values.inviteVideo}
+                    <AddonCard image="/images/formulario/video-convite.jpg" title="Vídeo Convite" video={config.addonVideos.inviteVideo} price={`+${formatBrl(prices.inviteVideo)}`} checked={values.inviteVideo}
                       onChange={(inviteVideo) => set({ inviteVideo })}
                       text="Cerca de 1 minuto, personalizado: o Homem-Aranha convida para a festa e inclui uma arte de brinde. Entrega em até 7 dias corridos após o pagamento.">
                       <dl className={`${ui.panel} grid grid-cols-2 gap-x-3 gap-y-2 p-3 text-sm`}>
@@ -402,7 +444,7 @@ export const EventFormPage: React.FC = () => {
 
           <p className={`mt-4 px-2 text-center text-[11px] leading-relaxed ${ui.muted}`}>
             <Lock className="mr-1 inline h-3 w-3 align-[-1px]" aria-hidden />
-            Formulário oficial do {PROVIDER.tradeName} · CNPJ {PROVIDER.cnpj}. Conexão segura; seus dados não são compartilhados.
+            Formulário oficial do {PROVIDER.tradeName} · CNPJ {PROVIDER.cnpj}. Conexão segura; seus dados não são compartilhados. Até concluir, o preenchimento fica salvo só neste aparelho.
           </p>
           <p className={`mt-3 text-center text-[11px] ${ui.muted}`}>© Herói da Cidade · <Link href="/" className="underline">heroidacidade.com</Link> · <Link href={PRIVACY_PATH} className="underline">Privacidade</Link></p>
         </div>

@@ -9,6 +9,7 @@ import { ErrorNote, cardClass, ghostButton, inputClass, labelClass, primaryButto
 interface Draft {
   packages: { id: string; title: string; duration: string; items: string }[];
   addonPrices: { extraWeb: string; birthdayVideo: string; inviteVideo: string; extraChild: string };
+  addonVideos: { extraWeb: string; birthdayVideo: string; inviteVideo: string };
   depositDays: string;
   termsText: string;
 }
@@ -16,6 +17,7 @@ interface Draft {
 const toDraft = (config: FormConfig): Draft => ({
   packages: config.packages.map((p) => ({ id: p.id, title: p.title, duration: p.duration, items: p.items.join('\n') })),
   addonPrices: { extraWeb: String(config.addonPrices.extraWeb), birthdayVideo: String(config.addonPrices.birthdayVideo), inviteVideo: String(config.addonPrices.inviteVideo), extraChild: String(config.addonPrices.extraChild) },
+  addonVideos: { ...config.addonVideos },
   depositDays: String(config.depositDays),
   termsText: config.termsText,
 });
@@ -57,7 +59,7 @@ export const EventFormSettings: React.FC = () => {
     if (unknown.length) { setError(`Campo desconhecido nos termos: {${unknown.join('}, {')}}. Use só os campos da lista.`); return; }
     const built = buildFormConfigDoc(config, {
       packages: draft.packages.map((p) => ({ id: p.id as FormConfig['packages'][number]['id'], title: p.title.trim(), duration: p.duration.trim(), items: lines(p.items) })),
-      addonPrices: prices, depositDays, termsText: draft.termsText,
+      addonPrices: prices, addonVideos: draft.addonVideos, depositDays, termsText: draft.termsText,
     });
     if (built.error) { setError(built.error); return; }
     if (built.newVersion && !window.confirm(`Salvar cria a versão ${built.newVersion} dos termos. Formulários já enviados continuam com a versão que o cliente aceitou. Confirmar?`)) return;
@@ -105,6 +107,14 @@ export const EventFormSettings: React.FC = () => {
           <label className={labelClass}>Criança a mais (certificado, R$)<input inputMode="decimal" value={draft.addonPrices.extraChild} onChange={(e) => set({ addonPrices: { ...draft.addonPrices, extraChild: e.target.value } })} className={inputClass} /></label>
           <label className={labelClass}>Prazo do sinal (dias)<input inputMode="numeric" value={draft.depositDays} onChange={(e) => set({ depositDays: e.target.value })} className={inputClass} /></label>
         </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {([['extraWeb', 'Vídeo de exemplo · Teia extra'], ['birthdayVideo', 'Vídeo de exemplo · Vídeo de Aniversário'], ['inviteVideo', 'Vídeo de exemplo · Vídeo Convite']] as const).map(([key, title]) => (
+            <label key={key} className={labelClass}>{title}
+              <input type="url" value={draft.addonVideos[key]} onChange={(e) => set({ addonVideos: { ...draft.addonVideos, [key]: e.target.value } })} className={inputClass} placeholder="https://youtube.com/shorts/…" />
+            </label>
+          ))}
+        </div>
+        <p className="text-[11px] text-white/45">Link do YouTube (Shorts não listado serve) ou de um arquivo .mp4. Com link, o adicional ganha o botão “Ver exemplar”, que toca o vídeo sem sair do formulário. Link inválido é ignorado ao salvar.</p>
         <p className="text-[11px] text-white/45">O prazo do sinal vale para o aviso ao cliente, para a missão de recontato e para a exclusão automática (mesmo prazo depois da missão concluída).</p>
       </section>
 

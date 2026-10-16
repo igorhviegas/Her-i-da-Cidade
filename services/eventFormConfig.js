@@ -4,6 +4,7 @@
 // anterior nunca é alterada (pedidos e PDFs antigos continuam apontando para a versão que o cliente aceitou).
 
 import { PACKAGES } from './eventQuote.js';
+import { parseThankYouVideo } from './clientsPage.js';
 import { ADDON_PRICES } from './eventSiteForm.js';
 import { BUILTIN_TERMS, DEPOSIT_DAYS, TERMS_VERSION, parseTerms } from './eventTerms.js';
 
@@ -21,6 +22,11 @@ export function normalizeFormConfig(saved) {
     return { ...base, title: text(edit.title, 60, base.title), duration: text(edit.duration, 120, base.duration), items: items.length ? items : base.items };
   });
   const addonPrices = Object.fromEntries(Object.entries(ADDON_PRICES).map(([key, value]) => [key, price(s.addonPrices?.[key], value)]));
+  // Vídeo de exemplo de cada adicional (YouTube, inclusive Shorts não listados, ou arquivo .mp4): link inválido é descartado.
+  const addonVideos = Object.fromEntries(['extraWeb', 'birthdayVideo', 'inviteVideo'].map((key) => {
+    const url = typeof s.addonVideos?.[key] === 'string' ? s.addonVideos[key].trim() : '';
+    return [key, url && parseThankYouVideo(url) ? url : ''];
+  }));
   const depositDays = Number.isInteger(Number(s.depositDays)) && Number(s.depositDays) >= 1 && Number(s.depositDays) <= 30 ? Number(s.depositDays) : DEPOSIT_DAYS;
   // Versões do código primeiro; as salvas no CRM nunca sobrescrevem uma embutida (texto aceito não muda).
   const terms = { ...BUILTIN_TERMS };
@@ -28,7 +34,7 @@ export function normalizeFormConfig(saved) {
     if (/^\d+$/.test(version) && !(version in BUILTIN_TERMS) && typeof body === 'string' && parseTerms(body).length) terms[version] = body;
   }
   const termsVersion = typeof s.termsVersion === 'string' && terms[s.termsVersion] ? s.termsVersion : TERMS_VERSION;
-  return { packages, addonPrices, depositDays, termsVersion, termsText: terms[termsVersion], terms };
+  return { packages, addonPrices, addonVideos, depositDays, termsVersion, termsText: terms[termsVersion], terms };
 }
 
 /** O que vai ao navegador: sem o histórico de versões. */
@@ -47,7 +53,7 @@ export function buildFormConfigDoc(current, edits) {
   return {
     doc: {
       packages: Object.fromEntries(edits.packages.map((p) => [p.id, { title: p.title, duration: p.duration, items: p.items }])),
-      addonPrices: edits.addonPrices, depositDays: edits.depositDays, termsVersion, terms,
+      addonPrices: edits.addonPrices, addonVideos: edits.addonVideos ?? current.addonVideos, depositDays: edits.depositDays, termsVersion, terms,
     },
     newVersion: changed ? termsVersion : null,
   };
