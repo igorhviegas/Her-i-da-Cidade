@@ -1,5 +1,6 @@
 import { normalizeWhatsApp } from '../../../services/clientsService';
 import { formatOrderReference } from '../../../services/orderReference.js';
+import { formatCpf } from '../../../services/eventSiteForm.js';
 import type { Client, Order, Service } from '../../../types';
 import { displayDate, displayDays, formatMoney } from './orderView';
 import type { OrderView } from './orderView';
@@ -39,8 +40,21 @@ function buildEventRows({ order, client, service }: OrderView, event: NonNullabl
     ['Valor de entrada', formatMoney(event.entryValue)],
     ['Custo', typeof event.cost === 'number' ? formatMoney(event.cost) : '—'],
     ['Observações', event.observations || '—'],
+    ...siteFormRows(order),
   ];
 }
+
+/** Formulário preenchido pelo cliente no site: dados do contrato (CPF, e-mail) e o registro do aceite dos termos. */
+const siteFormRows = (order: Order): DetailRow[] => {
+  const site = order.eventFormSite;
+  if (!site) return [];
+  return [
+    ['CPF do responsável', formatCpf(site.cpf)],
+    ['E-mail', site.email],
+    ['Termos aceitos', `versão ${site.termsVersion} em ${new Date(site.submittedAtMs).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`],
+    ['Sinal', order.paymentPending ? 'Aguardando' : 'Confirmado'],
+  ];
+};
 
 function buildStandardRows({ order, client, service }: OrderView): DetailRow[] {
   return [

@@ -13,6 +13,7 @@ import { db } from "../lib/firebase";
 import { PublicSiteConfig } from "../types";
 import { isValidWhatsAppUrl } from "./serviceWhatsApp.js";
 import { VIDEO_CALL_CONFIG_PATH, normalizeVideoCallConfig, type VideoCallConfig } from "../functions/video-call-config.js";
+import { normalizeQuoteConfig, type QuoteConfig } from "./eventQuote.js";
 
 export { isValidWhatsAppUrl };
 
@@ -269,4 +270,15 @@ export async function saveVideoCallConfig(config: VideoCallConfig): Promise<void
   if (!db) throw new Error("Firebase Firestore não inicializado.");
   const { profile: _profile, ...editable } = normalizeVideoCallConfig(config);
   await setDoc(doc(db, ...VIDEO_CALL_CONFIG_PATH), { ...editable, updatedAt: serverTimestamp() });
+}
+
+/** Regras do orçamento de eventos (Calendário → Orçamentos). Lidas também pelo servidor no cálculo. */
+export async function getEventQuoteConfig(): Promise<QuoteConfig> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  return normalizeQuoteConfig((await getDoc(doc(db, SITE_CONFIG_COLLECTION, "eventQuote"))).data());
+}
+
+export async function saveEventQuoteConfig(config: QuoteConfig): Promise<void> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  await setDoc(doc(db, SITE_CONFIG_COLLECTION, "eventQuote"), { ...normalizeQuoteConfig(config), updatedAt: serverTimestamp() });
 }

@@ -1,5 +1,6 @@
 import React, { FormEvent, useState } from 'react';
 import { updateOrder } from '../../services/ordersService';
+import { sendOrderToGoogleCalendar } from '../../services/googleCalendarService';
 import { EventOrderFields } from './EventOrderFields';
 import { emptyVideoAddons, ImportFormButton, VideoAddonsSection } from './EventVideoAddons';
 import type { Client, Order, Service } from '../../types';
@@ -18,7 +19,11 @@ interface EditOrderModalProps {
 
 export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, service, onClose, onSaved }) => {
   const [saving, setSaving] = useState(false);
-  const [videoAddons, setVideoAddons] = useState(emptyVideoAddons);
+  // Formulário do site ainda não conferido: os vídeos pedidos pelo cliente já vêm marcados.
+  const [videoAddons, setVideoAddons] = useState(() => {
+    const site = order.eventDraft ? order.eventFormSite?.videos : undefined;
+    return site ? { ...emptyVideoAddons(), birthday: site.birthday, birthdayName: site.birthdayName, invite: site.invite, inviteName: site.invite ? order.childName ?? '' : '', inviteDetails: site.inviteDetails } : emptyVideoAddons();
+  });
   const { services, loadingServices, error, setError } = useEditOrderServices(order, service);
   const fields = useEditOrderFields(order, client);
   const { name, whatsapp, serviceId, paidDate, eventDate, deliveryDays, content, servicePrice, rushFee, totalPaid, eventState, setEventState } = fields;
@@ -51,8 +56,12 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
       const eventUpdates = buildEventUpdates(saveContext.eventValues);
       await updateOrder(order.id, buildOrderUpdates(saveContext, changes, eventUpdates));
       const warning = eventValues ? await createVideoOrders(videos, updatedClient.id, eventValues.eventDate) : undefined;
+      // Formulário do site confirmado: o evento da agenda deixa de mostrar "(aguardando sinal)" e recebe os dados conferidos.
+      const calendarWarning = isDraft && order.eventFormSite
+        ? await sendOrderToGoogleCalendar(order.id).then(() => undefined, (calendarError: Error) => `Pedido salvo, mas a agenda não foi atualizada: ${calendarError.message} Use "Enviar para Google Agenda".`)
+        : undefined;
       onSaved(buildUpdatedOrder(saveContext, changes, eventUpdates), updatedClient, basics.selectedService);
-      if (warning) window.alert(warning);
+      if (warning || calendarWarning) window.alert([warning, calendarWarning].filter(Boolean).join('\n\n'));
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar as alterações do pedido.');
       setSaving(false);

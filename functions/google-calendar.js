@@ -116,10 +116,12 @@ export function buildCalendarEvent(order, client) {
     throw new GoogleCalendarError('invalid_order');
   }
   const { start, end } = eventTimes(dateKey, f.eventTime);
+  // Formulário do site sem sinal confirmado: Banana + "(aguardando sinal)"; reenviar depois do pagamento volta ao normal.
+  const pending = order.paymentPending === true;
   return {
     status: 'confirmed',
-    colorId: TANGERINE_COLOR_ID,
-    summary: eventTitle(order, client),
+    colorId: pending ? BANANA_COLOR_ID : TANGERINE_COLOR_ID,
+    summary: `${pending ? '(aguardando sinal) ' : ''}${eventTitle(order, client)}`,
     location: f.location,
     description: eventDescription(order, client),
     start: { dateTime: start, timeZone: TIME_ZONE },

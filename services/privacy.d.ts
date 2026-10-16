@@ -4,3 +4,4 @@ export const PRIVACY_CONTROLLER: { tradeName: string; legalName: string; cnpj: s
 export const BOOKING_PRIVACY_NOTE: string;
 export const AUDIO_PRIVACY_NOTE: string;
 export const BOOKING_DETAILS_HINT: string;
+export const EVENT_FORM_PRIVACY_NOTE: string;
