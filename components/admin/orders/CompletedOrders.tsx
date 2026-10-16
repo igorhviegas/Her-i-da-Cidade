@@ -27,6 +27,15 @@ export const CompletedOrders: React.FC<CompletedOrdersProps> = ({
   setEditOrderOpen,
   setOrderActionError,
 }) => {
+  const [clientSearch, setClientSearch] = React.useState('');
+  const nameTerm = clientSearch.trim().toLocaleLowerCase('pt-BR');
+  const digitsTerm = clientSearch.replace(/\D/g, '');
+  const visibleOrders = nameTerm
+    ? filteredCompletedOrders.filter(({ client }) =>
+      (client?.name || '').toLocaleLowerCase('pt-BR').includes(nameTerm) ||
+      (!!digitsTerm && (client?.whatsapp || '').replace(/\D/g, '').includes(digitsTerm)))
+    : filteredCompletedOrders;
+  const showList = completedOpen || !!nameTerm;
   return (
     <section className="space-y-3 border-t border-white/10 pt-5">
       <div className="flex items-start justify-between gap-3">
@@ -38,9 +47,17 @@ export const CompletedOrders: React.FC<CompletedOrdersProps> = ({
           {completedOpen ? 'Ver menos' : 'Ver mais'}
         </button>
       </div>
-      {!completedOpen ? null : filteredCompletedOrders.length > 0 ? (
+      <input
+        type="search"
+        value={clientSearch}
+        onChange={(e) => setClientSearch(e.target.value)}
+        placeholder="Buscar por nome ou WhatsApp da cliente"
+        aria-label="Buscar pedido concluído por nome ou WhatsApp da cliente"
+        className="min-h-10 w-full rounded-lg border border-white/10 bg-[#0D1527] px-3 text-sm text-white placeholder:text-white/35 focus:border-emerald-400/50 focus:outline-none"
+      />
+      {!showList ? null : visibleOrders.length > 0 ? (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredCompletedOrders.map(({ order, client, service, script }) => {
+          {visibleOrders.map(({ order, client, service, script }) => {
             const birthdayPerson = extractBirthdayPerson(order);
             return (
               <button key={order.id} type="button" onClick={() => { setSelectedOrder({ order, client, service, script }); setEditOrderOpen(false); setOrderActionError(''); }} className="rounded-xl border border-white/10 bg-[#0D1527] p-3.5 text-left transition-colors hover:border-emerald-400/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">

@@ -29,7 +29,7 @@ test('botão de WhatsApp nos cards não move nem abre o card', () => {
 test('concluídos iniciam recolhidos; Ver mais/Ver menos alternam; busca e detalhes preservados', () => {
   assert.match(source, /const \[completedOpen, setCompletedOpen\] = useState\(false\)/);
   assert.match(completed, /completedOpen \? 'Ver menos' : 'Ver mais'/);
-  assert.match(completed, /!completedOpen \? null : filteredCompletedOrders/);
+  assert.match(completed, /!showList \? null : visibleOrders/);
   assert.match(completed, /setSelectedOrder\(\{ order, client, service, script \}\)/);
 });
 
