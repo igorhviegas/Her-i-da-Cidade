@@ -14,6 +14,7 @@ import { PublicSiteConfig } from "../types";
 import { isValidWhatsAppUrl } from "./serviceWhatsApp.js";
 import { VIDEO_CALL_CONFIG_PATH, normalizeVideoCallConfig, type VideoCallConfig } from "../functions/video-call-config.js";
 import { normalizeQuoteConfig, type QuoteConfig } from "./eventQuote.js";
+import { FORM_CONFIG_PATH, normalizeFormConfig, type FormConfig } from "./eventFormConfig.js";
 
 export { isValidWhatsAppUrl };
 
@@ -281,4 +282,16 @@ export async function getEventQuoteConfig(): Promise<QuoteConfig> {
 export async function saveEventQuoteConfig(config: QuoteConfig): Promise<void> {
   if (!db) throw new Error("Firebase Firestore não inicializado.");
   await setDoc(doc(db, SITE_CONFIG_COLLECTION, "eventQuote"), { ...normalizeQuoteConfig(config), updatedAt: serverTimestamp() });
+}
+
+/** Formulário do evento (Calendário → Formulário): pacotes, adicionais, prazo do sinal e termos versionados. */
+export async function getEventFormConfig(): Promise<FormConfig> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  return normalizeFormConfig((await getDoc(doc(db, ...FORM_CONFIG_PATH))).data());
+}
+
+/** Grava o documento montado por buildFormConfigDoc (inclui todas as versões dos termos). */
+export async function saveEventFormConfig(document: Record<string, unknown>): Promise<void> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  await setDoc(doc(db, ...FORM_CONFIG_PATH), { ...document, updatedAt: serverTimestamp() });
 }

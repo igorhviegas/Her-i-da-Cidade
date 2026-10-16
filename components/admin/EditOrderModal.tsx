@@ -22,7 +22,12 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
   // Formulário do site ainda não conferido: os vídeos pedidos pelo cliente já vêm marcados.
   const [videoAddons, setVideoAddons] = useState(() => {
     const site = order.eventDraft ? order.eventFormSite?.videos : undefined;
-    return site ? { ...emptyVideoAddons(), birthday: site.birthday, birthdayName: site.birthdayName, invite: site.invite, inviteName: site.invite ? order.childName ?? '' : '', inviteDetails: site.inviteDetails } : emptyVideoAddons();
+    if (!site) return emptyVideoAddons();
+    const inviteDetails = [site.inviteParents && `Pais: ${site.inviteParents}`, site.inviteDetails].filter(Boolean).join('. ');
+    return {
+      ...emptyVideoAddons(), birthday: site.birthday, birthdayName: site.birthdayName, invite: site.invite, inviteName: site.invite ? order.childName ?? '' : '',
+      inviteAge: (site.childAge ?? '').replace(/\D/g, ''), inviteTime: site.inviteGuestTime ?? '', inviteDetails,
+    };
   });
   const { services, loadingServices, error, setError } = useEditOrderServices(order, service);
   const fields = useEditOrderFields(order, client);

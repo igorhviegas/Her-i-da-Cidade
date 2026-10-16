@@ -10,6 +10,12 @@ input[type='month'] {
   color-scheme: dark;
 }
 
+/* Formulário do evento no tema claro: ícone e calendário claros. */
+.form-light input[type='date'],
+.form-light input[type='time'] {
+  color-scheme: light;
+}
+
 input::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }

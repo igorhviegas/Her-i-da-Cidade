@@ -1,20 +1,21 @@
 // PDF do formulário do evento + termos aceitos, gerado no navegador do cliente na tela final (jsPDF carregado só ali).
 // Fontes padrão do PDF (Helvetica/WinAnsi): acentos do português funcionam; emojis e setas não, então o texto não usa.
-import { PACKAGES } from './eventQuote.js';
-import { ADDON_PRICES, formatCpf } from './eventSiteForm.js';
+import { formatCpf } from './eventSiteForm.js';
+import type { PublicFormConfig } from './eventFormConfig.js';
 import { PROVIDER, termsSections } from './eventTerms.js';
 import type { SiteFormValues } from './eventSiteForm.js';
 
-export interface PdfInput { form: SiteFormValues; label: string; acceptedAtMs: number; termsVersion: string; total: number; whatsappLabel: string }
+export interface PdfInput { form: SiteFormValues; config: PublicFormConfig; label: string; acceptedAtMs: number; termsVersion: string; total: number; whatsappLabel: string }
 
 const brDate = (key: string) => key.split('-').reverse().join('/');
 const brl = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`;
 
 /** Monta o PDF (sem baixar). */
-export async function buildEventFormPdf({ form, label, acceptedAtMs, termsVersion, total, whatsappLabel }: PdfInput) {
+export async function buildEventFormPdf({ form, config, label, acceptedAtMs, termsVersion, total, whatsappLabel }: PdfInput) {
   const { jsPDF } = await import('jspdf');
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
-  const pack = PACKAGES.find((p) => p.id === form.packageId);
+  const pack = config.packages.find((p) => p.id === form.packageId);
+  const prices = config.addonPrices;
   const accepted = new Date(acceptedAtMs).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
   const width = 210;
   const margin = 16;
@@ -72,10 +73,11 @@ export async function buildEventFormPdf({ form, label, acceptedAtMs, termsVersio
   heading(isVip ? 'Evento' : 'Aniversariante');
   row(isVip ? 'Nome do evento' : 'Nome', form.childName);
   if (form.childAge) row('Idade', form.childAge);
+  form.extraChildren.forEach((child, index) => row(`Criança ${index + 2}`, `${child.name}${child.age ? ` (${child.age})` : ''}`));
   row('PCD/PNE', form.pcd === true ? `Sim${form.pcdDetails ? `: ${form.pcdDetails}` : ''}` : form.pcd === false ? 'Não' : 'Não informado');
   heading('Dados do evento');
   row('Data', brDate(form.eventDate));
-  row('Horário de início', form.eventTime);
+  row('Início da participação', form.eventTime);
   row('Endereço', form.location);
   if (form.reference) row('Ponto de referência', form.reference);
   heading('Responsável');
@@ -84,9 +86,12 @@ export async function buildEventFormPdf({ form, label, acceptedAtMs, termsVersio
   row('WhatsApp', whatsappLabel);
   row('E-mail', form.email);
   heading('Adicionais');
-  row('Teia extra', form.extraWeb ? `${form.extraWeb} lançamento(s) extra(s) (+${brl(form.extraWeb * ADDON_PRICES.extraWeb)})` : 'Não');
-  row('Vídeo de Aniversário', form.birthdayVideo ? `Sim, para ${form.birthdayName} (+${brl(ADDON_PRICES.birthdayVideo)})` : 'Não');
-  row('Vídeo Convite', form.inviteVideo ? `Sim (+${brl(ADDON_PRICES.inviteVideo)})${form.inviteDetails ? `. Detalhes: ${form.inviteDetails}` : ''}` : 'Não');
+  row('Teia extra', form.extraWeb ? `${form.extraWeb} lançamento(s) extra(s) (+${brl(form.extraWeb * prices.extraWeb)})` : 'Não');
+  row('Vídeo de Aniversário', form.birthdayVideo ? `Sim, para ${form.birthdayName} (+${brl(prices.birthdayVideo)})` : 'Não');
+  if (form.extraChildren.length) row('Certificados a mais', `${form.extraChildren.length} (+${brl(form.extraChildren.length * prices.extraChild)})`);
+  row('Vídeo Convite', form.inviteVideo
+    ? `Sim (+${brl(prices.inviteVideo)}). Pais: ${form.inviteParents}. Horário para os convidados: ${form.inviteGuestTime}.${form.inviteDetails ? ` Detalhes: ${form.inviteDetails}` : ''}`
+    : 'Não');
   if (form.observations) row('Observações', form.observations);
   heading('Valor e reserva');
   paragraph(total > 0
@@ -102,9 +107,9 @@ export async function buildEventFormPdf({ form, label, acceptedAtMs, termsVersio
   heading('TERMOS DE PRESTAÇÃO DE SERVIÇO: PRESENÇA TEATRAL');
   paragraph(`Formulário ${label} · Versão dos termos: ${termsVersion} · Aceito em ${accepted}`, 8.5);
   for (const section of termsSections({
-    number: label, packageTitle: pack?.title, duration: pack?.duration, date: brDate(form.eventDate), time: form.eventTime, location: form.location,
+    packageTitle: pack?.title, duration: pack?.duration, date: brDate(form.eventDate), time: form.eventTime, location: form.location,
     name: form.responsibleName, cpf: formatCpf(form.cpf), whatsapp: whatsappLabel, email: form.email,
-  })) {
+  }, { text: config.termsText, depositDays: config.depositDays })) {
     heading(section.title);
     section.items.forEach((item, index) => paragraph(`${index + 1}. ${item}`, 9));
   }

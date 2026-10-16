@@ -4,10 +4,11 @@ import { getAdminFirestore } from '../functions/firebase-admin.js';
 import { authorizeAdminRequest } from '../functions/admin-auth.js';
 import { clientIp, verifyTurnstile } from '../functions/turnstile.js';
 import { TravelRouteError } from '../functions/travel-route.js';
-import { EventFormError, calculateQuote, getQuotePrefill, saveQuote, submitEventForm } from '../functions/event-form.js';
+import { EventFormError, calculateQuote, getQuotePrefill, loadFormConfig, saveQuote, submitEventForm } from '../functions/event-form.js';
+import { publicFormConfig } from '../services/eventFormConfig.js';
 
 const STATUS_BY_CODE: Record<string, number> = {
-  validation_error: 400, already_pending: 409, service_unavailable: 503,
+  validation_error: 400, already_pending: 409, terms_changed: 409, service_unavailable: 503,
   not_configured: 503, address_not_found: 422, no_route: 422, auth: 503, rate_limited: 429, unavailable: 503, api_error: 502,
 };
 
@@ -16,7 +17,7 @@ type Auth = 'unauthenticated' | 'forbidden' | 'authorized';
 /**
  * Formulário do evento presencial (/formulario-evento) e orçamentos do Calendário. Uma função só (a Vercel limita o número de funções).
  * Público:
- *   GET  ?orcamento=ID                 -> { prefill } do orçamento enviado (ou null)
+ *   GET  [?orcamento=ID]               -> { config, prefill }: textos/preços/termos atuais do CRM e o orçamento enviado (ou null)
  *   POST { action: 'submit', ... }     -> grava o formulário (captcha Turnstile quando ligado) e devolve número + link do WhatsApp
  * Administrador (ID token do Firebase):
  *   POST { action: 'quote', address, date, packageId, companyBase? } -> cálculo com a rota casa → evento
@@ -36,7 +37,10 @@ export async function handleEventForm(
 
   try {
     const database = (deps.database ?? getAdminFirestore()) as any;
-    if (req.method === 'GET') return send(200, { ok: true, prefill: await getQuotePrefill({ database, quoteId: req.query?.orcamento }) });
+    if (req.method === 'GET') {
+      const [config, prefill] = await Promise.all([loadFormConfig(database), getQuotePrefill({ database, quoteId: req.query?.orcamento })]);
+      return send(200, { ok: true, config: publicFormConfig(config), prefill });
+    }
 
     const body = req.body ?? {};
     if (body.action === 'submit') {

@@ -9,21 +9,23 @@ import { ErrorNote, WarningNote, cardClass, ghostButton, primaryButton } from '.
 import { DayList, MonthGrid, WeekList, fmt } from './ordersFlow/CalendarViews';
 import { EventDialog } from './ordersFlow/CalendarEventDialog';
 import { EventQuotesPanel } from './EventQuotesPanel';
+import { EventFormSettings } from './EventFormSettings';
 
 const VIEWS: { id: CalendarView; label: string }[] = [{ id: 'month', label: 'Mês' }, { id: 'week', label: 'Semana' }, { id: 'day', label: 'Dia' }];
 
-/** Calendário com duas abas: a agenda (Google) e os orçamentos de eventos (?aba=orcamentos). */
+/** Calendário com três abas: a agenda (Google), os orçamentos de eventos (?aba=orcamentos) e o formulário do site (?aba=formulario). */
 export const AdminCalendarPage: React.FC = () => {
   const { search } = useRouter();
-  const [tab, setTab] = useState<'agenda' | 'quotes'>(() => (new URLSearchParams(search).get('aba') === 'orcamentos' ? 'quotes' : 'agenda'));
+  const [tab, setTab] = useState<'agenda' | 'quotes' | 'form'>(() => ({ orcamentos: 'quotes', formulario: 'form' } as const)[new URLSearchParams(search).get('aba') as 'orcamentos'] ?? 'agenda');
   const tabClass = (active: boolean) => `rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${active ? 'bg-blue-600 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'}`;
   return (
     <div className="space-y-4">
       <div className="flex w-fit gap-1 rounded-xl bg-white/5 p-1" role="tablist" aria-label="Calendário">
         <button type="button" role="tab" aria-selected={tab === 'agenda'} onClick={() => setTab('agenda')} className={tabClass(tab === 'agenda')}>Agenda</button>
         <button type="button" role="tab" aria-selected={tab === 'quotes'} onClick={() => setTab('quotes')} className={tabClass(tab === 'quotes')}>Orçamentos</button>
+        <button type="button" role="tab" aria-selected={tab === 'form'} onClick={() => setTab('form')} className={tabClass(tab === 'form')}>Formulário</button>
       </div>
-      {tab === 'agenda' ? <AgendaView /> : <EventQuotesPanel />}
+      {tab === 'agenda' ? <AgendaView /> : tab === 'quotes' ? <EventQuotesPanel /> : <EventFormSettings />}
     </div>
   );
 };

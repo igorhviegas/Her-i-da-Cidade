@@ -1,7 +1,7 @@
 # Termos de contratação — evento presencial (proposta v2)
 
 > Rascunho para revisão do dono e, de preferência, de um advogado antes de publicar.
-> **O texto que vale no site é `services/eventTerms.js`** (versão 2, gravada em cada pedido). Já preenchido lá: CNPJ/MEI (CCMEI),
+> **O texto que vale no site é o da aba Calendário → Formulário** (padrão = versão 3 em `services/eventTerms.js`, com 5.2 "tolerância de 10 min só em força maior", 6.2 sem local para trocar e 7.4 "ator ou agente"; cada versão fica gravada). Já preenchido lá: CNPJ/MEI (CCMEI),
 > duração dos pacotes, sinal em **3 dias**. Ainda são sugestões a confirmar pelo dono: restante "até o início do evento", reagendamento
 > com **7 dias** de antecedência e crédito por **6 meses**, espera de **15 minutos**, remoção de imagens em **7 dias**.
 > Abaixo, `{chaves}` são os campos que o formulário preenche.
