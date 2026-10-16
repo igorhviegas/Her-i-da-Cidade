@@ -43,7 +43,8 @@ export const SystemHealthWidget: React.FC<{ now: Date }> = ({ now }) => {
     () => buildHealth({ status: status ?? {}, instagram, reviewsOk, now: now.getTime() }),
     [status, instagram, reviewsOk, now],
   );
-  const badge = BADGE[health.overall];
+  // Sem ler o registro das rotinas o cartão não sabe se elas rodaram: nunca mostra "Tudo certo" nem "Sem dados" nesse caso.
+  const badge = BADGE[failed && (health.overall === 'ok' || health.overall === 'unknown') ? 'warn' : health.overall];
 
   return (
     <section className="flex flex-col rounded-2xl border border-white/10 bg-[#0D1527] p-5 shadow-lg" aria-label="Saúde do sistema">
