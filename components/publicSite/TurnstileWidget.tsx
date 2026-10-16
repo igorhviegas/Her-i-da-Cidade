@@ -51,7 +51,7 @@ export const TurnstileWidget: React.FC<Props> = ({ onToken, resetKey = 0 }) => {
       if (cancelled || !box.current || !window.turnstile) return;
       widgetId.current = window.turnstile.render(box.current, {
         sitekey: TURNSTILE_SITE_KEY,
-        language: 'pt-BR',
+        language: 'pt-br',
         theme: 'dark',
         callback: (token: string) => onTokenRef.current(token),
         'expired-callback': () => onTokenRef.current(''),
