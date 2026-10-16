@@ -295,3 +295,15 @@ export async function saveEventFormConfig(document: Record<string, unknown>): Pr
   if (!db) throw new Error("Firebase Firestore não inicializado.");
   await setDoc(doc(db, ...FORM_CONFIG_PATH), { ...document, updatedAt: serverTimestamp() });
 }
+
+/** Próximo número do formulário do evento (siteConfig/eventFormCounter; o servidor avança a cada envio). null = ainda não gravado aqui. */
+export async function getEventFormNextNumber(): Promise<number | null> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  const next = Number((await getDoc(doc(db, SITE_CONFIG_COLLECTION, "eventFormCounter"))).data()?.next);
+  return Number.isInteger(next) && next > 0 ? next : null;
+}
+
+export async function saveEventFormNextNumber(next: number): Promise<void> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  await setDoc(doc(db, SITE_CONFIG_COLLECTION, "eventFormCounter"), { next, updatedAt: serverTimestamp() });
+}

@@ -52,22 +52,22 @@ const quiet = { error() {} };
 const submit = (database, over, extra = {}) => submitEventForm({ database, input: input(over), nowMs: NOW, syncCalendar: async () => ({ eventId: 'evt1', calendarId: 'cal', htmlLink: null }), logger: quiet, ...extra });
 const orderOf = (db) => [...db.docs].find(([p]) => p.startsWith('orders/'));
 
-test('envio cria rascunho aguardando sinal com número sequencial a partir de 214', async () => {
+test('envio cria rascunho aguardando sinal com número sequencial a partir de 215', async () => {
   const db = fakeDatabase({ 'services/6': SERVICE });
   const result = await submit(db);
-  assert.equal(result.label, 'A214');
-  assert.match(result.whatsappUrl, /A214/);
+  assert.equal(result.label, 'A215');
+  assert.match(result.whatsappUrl, /A215/);
   const [, order] = orderOf(db);
   assert.equal(order.eventDraft, true);
   assert.equal(order.paymentPending, true);
-  assert.equal(order.eventForm.formType, 'A214 · Aniversário Espetacular');
+  assert.equal(order.eventForm.formType, 'A215 · Aniversário Espetacular');
   assert.equal(order.eventForm.totalValue, 0); // sem orçamento: o dono confere o valor
   assert.equal(order.eventFormSite.cpf, '52998224725');
-  assert.equal(db.docs.get('counters/eventForm').next, 215);
+  assert.equal(db.docs.get('siteConfig/eventFormCounter').next, 216);
   assert.deepEqual(order.googleCalendar.eventId, 'evt1');
 
-  await assert.rejects(submit(db), (e) => e instanceof EventFormError && e.code === 'already_pending' && /A214/.test(e.message));
-  assert.equal((await submit(db, { whatsapp: '(31) 98888-0002' })).label, 'A215');
+  await assert.rejects(submit(db), (e) => e instanceof EventFormError && e.code === 'already_pending' && /A215/.test(e.message));
+  assert.equal((await submit(db, { whatsapp: '(31) 98888-0002' })).label, 'A216');
 });
 
 test('orçamento do link define o valor quando pacote e data batem; falha da agenda não perde o formulário', async () => {
@@ -137,4 +137,12 @@ test('usa a configuração do CRM: preço do adicional, prazo do sinal e versão
   assert.equal((await run(NOW + 4 * DAY)).reminders, 0);
   assert.equal((await run(NOW + 5 * DAY)).reminders, 1);
   assert.match(db.docs.get(`missions/${depositMissionId(path.split('/')[1])}`).description, /Sem sinal em 5 dias/);
+});
+
+test('numeração: segue o contador antigo e aceita a correção do dono (mesmo para trás)', async () => {
+  const legacy = fakeDatabase({ 'services/6': SERVICE, 'counters/eventForm': { next: 216 } });
+  assert.equal((await submit(legacy)).label, 'A216');
+  const fixed = fakeDatabase({ 'services/6': SERVICE, 'counters/eventForm': { next: 216 }, 'siteConfig/eventFormCounter': { next: 215 } });
+  assert.equal((await submit(fixed)).label, 'A215');
+  assert.equal(fixed.docs.get('siteConfig/eventFormCounter').next, 216);
 });

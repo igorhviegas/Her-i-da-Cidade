@@ -8,7 +8,7 @@ Tema claro por padrão, com botão para o escuro (lembrado no aparelho, `localSt
 
 1. **Orçamento** (admin, Calendário → aba **Orçamentos**): clica no dia, informa pacote e endereço, **Calcular** (rota casa → evento no Google Maps + regras). **Salvar e copiar mensagem** guarda o orçamento (`eventQuotes/{id}`, vale 30 dias, uso único) e copia o texto do WhatsApp com o link `…/formulario-evento?orcamento=ID`.
 2. **Cliente** abre o link: pacote, data e endereço já vêm preenchidos. Sem link o formulário funciona igual, e o valor fica para conferir.
-3. **Concluir** (`POST /api/event-form`, `action: 'submit'`, Turnstile quando ligado): numa transação reserva o número (`counters/eventForm`, primeiro = **A214**), cria/acha o cliente pelo WhatsApp e grava o pedido no CRM como **rascunho de evento aguardando sinal** (`eventDraft` + `paymentPending`, `source: 'event-form'`, dados do contrato em `eventFormSite`). Depois cria o evento na agenda: título "(aguardando sinal)", cor Banana. Se o Google falhar, o pedido fica (botão "Enviar para Google Agenda").
+3. **Concluir** (`POST /api/event-form`, `action: 'submit'`, Turnstile quando ligado): numa transação reserva o número (`siteConfig/eventFormCounter`, primeiro = **A215**; o antigo `counters/eventForm` só vale enquanto o novo não existe). Apagar um pedido **não devolve o número**: depois de apagar testes, corrija o próximo número em Calendário → Formulário → Numeração, cria/acha o cliente pelo WhatsApp e grava o pedido no CRM como **rascunho de evento aguardando sinal** (`eventDraft` + `paymentPending`, `source: 'event-form'`, dados do contrato em `eventFormSite`). Depois cria o evento na agenda: título "(aguardando sinal)", cor Banana. Se o Google falhar, o pedido fica (botão "Enviar para Google Agenda").
 4. Tela final: número do formulário, **Avisar no WhatsApp** (mensagem com o número, pedindo os dados do sinal de 50%) e **Baixar formulário e termos (PDF)** (gerado no navegador, jsPDF carregado só nesse clique).
 
 ## Valor
@@ -42,7 +42,7 @@ Regras puras e testes: `services/eventQuote.js` / `.test.js`.
 ## Configuração (Vercel)
 
 - `GOOGLE_MAPS_API_KEY` (a mesma do Deslocamento). Partida do orçamento: `TRAVEL_STOP_ADDRESS` (decisão do dono; `QUOTE_ORIGIN_ADDRESS`, se criada, tem prioridade). Endereço só no servidor.
-- Nada novo no Firestore Rules: `counters`, `eventFormPending` e `eventQuotes` só são acessados pelo servidor; `siteConfig/eventQuote` já é coberto por `siteConfig/{id}` (admin).
+- Nada novo no Firestore Rules: `eventFormPending` e `eventQuotes` só são acessados pelo servidor; `siteConfig/eventQuote` já é coberto por `siteConfig/{id}` (admin).
 - Termos: versões 2 (primeira publicada, intocável) e 3 (padrão atual: 5.1, 5.2, 6.2 e 7.4 ajustados) em `services/eventTerms.js`; as seguintes são criadas pela aba Formulário. Revisão e justificativas em `docs/termos-evento-presencial.md`.
 
 ## Arquivos
