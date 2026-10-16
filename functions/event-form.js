@@ -6,7 +6,9 @@
 // "Enviar para Google Agenda" do pedido refaz). Confirmação do sinal: pelo ManyChat (mesmo WhatsApp, eventFormPending) ou ao salvar
 // o pedido em "Editar pedido" (o rascunho vira evento e a entrada é lançada, como nos rascunhos do ManyChat).
 //
-// Sem sinal: depois de DEPOSIT_DAYS aparece a missão de recontatar; DEPOSIT_DAYS depois de ela ser concluída, sem pagamento, o pedido
+// Pacotes, preços dos adicionais, prazo do sinal e termos vêm de siteConfig/eventForm (editáveis no CRM; ver eventFormConfig.js).
+//
+// Sem sinal: depois do prazo do sinal aparece a missão de recontatar; o mesmo prazo depois de ela ser concluída, sem pagamento, o pedido
 // e o evento são excluídos (syncEventFormHolds, rodada no cron diário das missões).
 
 import { randomBytes } from 'node:crypto';
@@ -17,8 +19,8 @@ import { TravelRouteError, computeLegsMeters, geocodeAddress } from './travel-ro
 import { bookingWhatsAppUrl, normalizePhone } from './video-call.js';
 import { zonedInstant } from './video-call-time.js';
 import { computeQuote, normalizeQuoteConfig, packageById } from '../services/eventQuote.js';
-import { addonsTotal, formNumberLabel, fullLocation, observationLines, validateSiteForm, whatsappDoneMessage } from '../services/eventSiteForm.js';
-import { DEPOSIT_DAYS, TERMS_VERSION } from '../services/eventTerms.js';
+import { addonsTotal, childrenNames, formNumberLabel, fullLocation, observationLines, validateSiteForm, whatsappDoneMessage } from '../services/eventSiteForm.js';
+import { FORM_CONFIG_PATH, normalizeFormConfig } from '../services/eventFormConfig.js';
 
 export const FIRST_FORM_NUMBER = 214;
 export const COUNTER = ['counters', 'eventForm'];
@@ -48,17 +50,23 @@ export async function getQuotePrefill({ database, quoteId, nowMs = Date.now() })
   return { quoteId, packageId: quote.packageId, date: quote.date, location: quote.location, total: quote.total };
 }
 
+/** Configuração do formulário salva no CRM, completada com o padrão. */
+export async function loadFormConfig(database) {
+  const snapshot = await database.collection(FORM_CONFIG_PATH[0]).doc(FORM_CONFIG_PATH[1]).get();
+  return normalizeFormConfig(snapshot.exists ? snapshot.data() : null);
+}
+
 // ---------- envio do formulário ----------
 
-function orderContent(form, number, quoteNote) {
-  const pack = packageById(form.packageId);
+function orderContent(form, number, quoteNote, config) {
+  const pack = config.packages.find((p) => p.id === form.packageId);
   return [
     `Formulário: ${formNumberLabel(number)} · ${pack.title} (enviado pelo site)`,
-    `Nome do aniversariante: ${form.childName}`,
+    `Nome do aniversariante: ${childrenNames(form)}`,
     `Horário de início: ${form.eventTime}`,
     `Local: ${fullLocation(form)}`,
     `Responsável: ${form.responsibleName} · ${form.email}`,
-    ...observationLines(form),
+    ...observationLines(form, config.addonPrices),
     ...(quoteNote ? [quoteNote] : []),
   ].join('\n');
 }
@@ -72,6 +80,9 @@ export async function submitEventForm({ database, input, nowMs = Date.now(), syn
   if (errors) throw new EventFormError('validation_error', errors[0]);
   const contact = normalizePhone(form.ddi, form.whatsapp);
   if (!contact) throw new EventFormError('validation_error', 'Informe um WhatsApp válido com DDD.');
+  const config = await loadFormConfig(database);
+  // O cliente aceitou o texto que a página mostrou: se os termos mudaram no meio do preenchimento, ele precisa ler a versão nova.
+  if (String(input?.termsVersion ?? '') !== config.termsVersion) throw new EventFormError('terms_changed', 'Os termos de contratação foram atualizados. Recarregue a página e confira a versão nova antes de concluir.');
 
   const profile = SERVICE_PROFILES['presential-event'];
   const serviceSnapshot = await database.collection('services').doc(profile.serviceId).get();
@@ -108,7 +119,7 @@ export async function submitEventForm({ database, input, nowMs = Date.now(), syn
     // Valor: só vem do orçamento quando pacote e data batem com o que foi orçado (senão o dono confere no CRM).
     const quote = quoteSnap?.exists && !quoteSnap.get('usedByOrderId') ? quoteSnap.data() : null;
     const quoteMatches = quote && quote.packageId === form.packageId && quote.date === form.eventDate;
-    const total = quoteMatches ? money(quote.total + addonsTotal(form)) : 0;
+    const total = quoteMatches ? money(quote.total + addonsTotal(form, config.addonPrices)) : 0;
     const quoteNote = quote && !quoteMatches ? `Atenção: pacote ou data diferente do orçamento (${packageById(quote.packageId)?.title ?? quote.packageId}, ${brDate(quote.date)}, ${quote.total}). Conferir o valor.` : quote ? null : 'Valor: conferir o orçamento enviado no WhatsApp.';
 
     const clientRef = indexSnap.exists ? database.collection('clients').doc(String(indexSnap.get('clientId'))) : legacyRef ?? database.collection('clients').doc();
@@ -117,21 +128,22 @@ export async function submitEventForm({ database, input, nowMs = Date.now(), syn
     else transaction.set(clientRef, { name: form.responsibleName, whatsapp: `+${contact.e164}`, whatsappNormalized: contact.e164, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
     if (!indexSnap.exists) transaction.set(indexRef, { clientId: clientRef.id, whatsappNormalized: contact.e164, recordType: 'whatsapp-index' });
 
-    const pack = packageById(form.packageId);
+    const pack = config.packages.find((p) => p.id === form.packageId);
     order = {
       clientId: clientRef.id, serviceId: profile.serviceId, status: evaluation.status, eventDraft: true, paymentPending: true,
-      content: orderContent(form, number, quoteNote), childName: form.childName,
+      content: orderContent(form, number, quoteNote, config), childName: childrenNames(form),
       eventDate: Timestamp.fromDate(new Date(zonedInstant(form.eventDate, '12:00'))),
       // Mesmo formato do formulário manual do CRM: "Editar pedido" abre tudo preenchido; salvar lá confirma o sinal.
       eventForm: {
         eventTime: form.eventTime, location: fullLocation(form), imageAuthorization: form.imageAuthorization, extraWeb: form.extraWeb,
-        totalValue: total, entryValue: money(total / 2), cost: null, observations: [...observationLines(form), ...(quoteNote ? [quoteNote] : [])].join('\n'),
+        totalValue: total, entryValue: money(total / 2), cost: null, observations: [...observationLines(form, config.addonPrices), ...(quoteNote ? [quoteNote] : [])].join('\n'),
         formType: `${formNumberLabel(number)} · ${pack.title}`, birthDate: '', pcd: form.pcd,
       },
       eventFormSite: {
-        number, packageId: form.packageId, submittedAtMs: nowMs, termsVersion: TERMS_VERSION, cpf: form.cpf, email: form.email,
+        number, packageId: form.packageId, submittedAtMs: nowMs, termsVersion: config.termsVersion, cpf: form.cpf, email: form.email,
         whatsapp: contact.e164, ddi: contact.ddi, phone: contact.phone,
-        videos: { birthday: form.birthdayVideo, birthdayName: form.birthdayName, invite: form.inviteVideo, inviteDetails: form.inviteDetails },
+        ...(form.extraChildren.length ? { extraChildren: form.extraChildren } : {}),
+        videos: { birthday: form.birthdayVideo, birthdayName: form.birthdayName, invite: form.inviteVideo, inviteParents: form.inviteParents, inviteGuestTime: form.inviteGuestTime, inviteDetails: form.inviteDetails, childAge: form.childAge },
         ...(quote ? { quoteId: form.quoteId, quoteTotal: quote.total } : {}),
       },
       servicePrice: 0, rushFee: 0, totalPaid: 0, productionType: evaluation.productionType,
@@ -150,8 +162,8 @@ export async function submitEventForm({ database, input, nowMs = Date.now(), syn
     logger.error('[EventForm] pedido criado sem evento na agenda (usar "Enviar para Google Agenda").', { orderId: orderRef.id, code: error?.code });
   }
 
-  const message = whatsappDoneMessage({ number, ...form });
-  return { number, label: formNumberLabel(number), acceptedAtMs: nowMs, termsVersion: TERMS_VERSION, total: order.eventForm.totalValue, whatsappUrl: bookingWhatsAppUrl(serviceSnapshot.get('whatsappUrl'), message) };
+  const message = whatsappDoneMessage({ number, ...form, childName: childrenNames(form), packageTitle: config.packages.find((p) => p.id === form.packageId)?.title });
+  return { number, label: formNumberLabel(number), acceptedAtMs: nowMs, termsVersion: config.termsVersion, total: order.eventForm.totalValue, whatsappUrl: bookingWhatsAppUrl(serviceSnapshot.get('whatsappUrl'), message) };
 }
 
 // ---------- depois do envio ----------
@@ -168,12 +180,13 @@ export async function markEventFormPaid({ database, orderId, syncCalendar = sync
 
 /**
  * Rotina diária (cron das missões). Para cada formulário do site ainda sem sinal:
- * - DEPOSIT_DAYS após o envio, cria a missão "Recontatar cliente" (uma por pedido);
- * - DEPOSIT_DAYS após essa missão ser concluída, ainda sem sinal: exclui pedido + trava do WhatsApp + evento da agenda.
+ * - prazo do sinal (depositDays) após o envio, cria a missão "Recontatar cliente" (uma por pedido);
+ * - o mesmo prazo após essa missão ser concluída, ainda sem sinal: exclui pedido + trava do WhatsApp + evento da agenda.
  * Missões de pedidos que já foram pagos ou excluídos somem (não há mais o que cobrar). Devolve contagens.
  */
 export async function syncEventFormHolds({ database, nowMs = Date.now(), deleteEvent = deleteCalendarEvent, ctx = {}, logger = console }) {
   const result = { reminders: 0, expired: 0, cleared: 0 };
+  const { depositDays } = await loadFormConfig(database);
   const pending = await database.collection('orders').where('paymentPending', '==', true).get();
   const holdIds = new Set();
   for (const document of pending.docs) {
@@ -183,12 +196,12 @@ export async function syncEventFormHolds({ database, nowMs = Date.now(), deleteE
     const missionRef = database.collection('missions').doc(depositMissionId(document.id));
     const mission = await missionRef.get();
     if (!mission.exists) {
-      if (nowMs - site.submittedAtMs < DEPOSIT_DAYS * DAY_MS) continue;
+      if (nowMs - site.submittedAtMs < depositDays * DAY_MS) continue;
       const when = eventDateKey(document.get('eventDate'));
       await missionRef.create({
         title: `Recontatar cliente: sinal do formulário ${formNumberLabel(site.number)}`,
         description: [`Evento: ${document.get('childName')}${when ? ` · ${brDate(when)}` : ''}`, `WhatsApp: +${site.whatsapp}`,
-          `Sem sinal em ${DEPOSIT_DAYS} dias. Concluir esta missão depois de falar com o cliente: se ele não pagar em mais ${DEPOSIT_DAYS} dias, o pedido e o evento da agenda são excluídos.`].join('\n'),
+          `Sem sinal em ${depositDays} dias. Concluir esta missão depois de falar com o cliente: se ele não pagar em mais ${depositDays} dias, o pedido e o evento da agenda são excluídos.`].join('\n'),
         difficulty: 1, status: 'pending', source: DEPOSIT_MISSION_SOURCE, orderId: document.id,
         dueAt: Timestamp.fromMillis(nowMs), createdAt: Timestamp.fromMillis(nowMs),
       }).then(() => { result.reminders += 1; }, (error) => { if (!/ALREADY_EXISTS/.test(String(error?.message)) && error?.code !== 6) throw error; });
@@ -196,7 +209,7 @@ export async function syncEventFormHolds({ database, nowMs = Date.now(), deleteE
     }
     const completedAt = mission.get('completedAt');
     const completedMs = completedAt?.toMillis?.() ?? (completedAt instanceof Date ? completedAt.getTime() : NaN);
-    if (mission.get('status') !== 'completed' || !(nowMs - completedMs >= DEPOSIT_DAYS * DAY_MS)) continue;
+    if (mission.get('status') !== 'completed' || !(nowMs - completedMs >= depositDays * DAY_MS)) continue;
     const pendingRef = database.collection(PENDING).doc(bookingKey(String(site.whatsapp)));
     const eventId = document.get('googleCalendar')?.eventId ?? calendarEventId(document.id);
     const removed = await database.runTransaction(async (transaction) => {

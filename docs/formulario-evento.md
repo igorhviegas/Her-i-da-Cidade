@@ -1,7 +1,8 @@
 # Formulário do evento presencial (site) e Orçamentos
 
 Substitui o "Formulário da Missão" do Google Forms. Página pública `/formulario-evento` (fora do Google: `noindex`), uma seção por tela:
-Pacote → Aniversariante → Evento → Responsável (com CPF) → Adicionais → Termos e uso de imagem → Revisão → **Concluir**.
+Pacote → Aniversariante (com irmãos: +R$ 10 por certificado individual) → Evento → Responsável (com CPF) → Adicionais (cartões com imagem; Vídeo Convite com pais, horário para os convidados e detalhes) → Termos e uso de imagem → Revisão → **Concluir**.
+Tema claro por padrão, com botão para o escuro (lembrado no aparelho, `localStorage`). Imagens em `public/images/formulario/` (as dos adicionais têm o preço desenhado: trocar a imagem se o preço mudar).
 
 ## Fluxo
 
@@ -21,7 +22,16 @@ Pacote → Aniversariante → Evento → Responsável (com CPF) → Adicionais �
 - **Em "Editar pedido"**: salvar o rascunho confirma a reserva: lança a entrada no Financeiro (como nos rascunhos do ManyChat), tira o `paymentPending` e reenvia o evento à agenda. Os vídeos pedidos já vêm marcados em "Vídeos com desconto". **Salve só depois de receber o sinal.**
 - Cron diário das missões (`syncEventFormHolds`): **3 dias** sem sinal → missão "Recontatar cliente: sinal do formulário A###". **3 dias depois de concluir essa missão**, ainda sem sinal → pedido, trava e evento da agenda são excluídos (o cliente precisa preencher de novo). Pagou ou foi excluído antes: a missão pendente some.
 - Um WhatsApp só pode ter um formulário aguardando sinal (freia spam; para um segundo evento, falar pelo WhatsApp).
-- A Function do Firebase (`receiveManyChatOrder`) só passa a confirmar formulários depois de `firebase deploy --only functions`.
+- O ManyChat usa `/api/manychat` da Vercel (a Function `receiveManyChatOrder` do Firebase nunca foi publicada).
+
+## Editar o formulário (Calendário → aba **Formulário**)
+
+Salvo em `siteConfig/eventForm` (`services/eventFormConfig.js`); a página pública recebe junto do `GET /api/event-form` e o servidor usa o que está salvo (nunca o que o navegador manda).
+
+- **Pacotes**: nome, duração e itens (os ids ficam fixos). Valem no formulário, no PDF e na mensagem do orçamento.
+- **Adicionais** (preço da teia extra e dos vídeos) e **prazo do sinal** (1 a 30 dias; vale para o aviso, a missão de recontato e a exclusão).
+- **Termos**: modelo de texto (`## Título` + uma linha por item) com campos `{contratante}`, `{cpf}`, `{pacote}`, `{data}`, `{prazoSinal}` etc., preenchidos na página e no PDF. Salvar um texto diferente cria a **próxima versão**; todas ficam guardadas em `terms`, e o pedido grava a versão aceita (`eventFormSite.termsVersion`). Se a versão mudar enquanto um cliente preenche, o envio é recusado (`terms_changed`) e a página recarrega o texto novo e pede o aceite de novo.
+- As **perguntas** são fixas: estão ligadas aos campos do CRM.
 
 ## Regras do orçamento (`siteConfig/eventQuote`, editáveis em "Regras de preço")
 
@@ -31,9 +41,9 @@ Regras puras e testes: `services/eventQuote.js` / `.test.js`.
 
 ## Configuração (Vercel)
 
-- `GOOGLE_MAPS_API_KEY` (a mesma do Deslocamento) e **`QUOTE_ORIGIN_ADDRESS`** = endereço de partida do orçamento (casa do dono, completo). Sem ela vale `TRAVEL_STOP_ADDRESS`. Endereço só no servidor; não escrever em código/docs.
+- `GOOGLE_MAPS_API_KEY` (a mesma do Deslocamento). Partida do orçamento: `TRAVEL_STOP_ADDRESS` (decisão do dono; `QUOTE_ORIGIN_ADDRESS`, se criada, tem prioridade). Endereço só no servidor.
 - Nada novo no Firestore Rules: `counters`, `eventFormPending` e `eventQuotes` só são acessados pelo servidor; `siteConfig/eventQuote` já é coberto por `siteConfig/{id}` (admin).
-- Termos: texto em `services/eventTerms.js` (mudou o texto → subir `TERMS_VERSION`); revisão e justificativas em `docs/termos-evento-presencial.md`.
+- Termos: versões 2 (primeira publicada, intocável) e 3 (padrão atual: 5.1, 5.2, 6.2 e 7.4 ajustados) em `services/eventTerms.js`; as seguintes são criadas pela aba Formulário. Revisão e justificativas em `docs/termos-evento-presencial.md`.
 
 ## Arquivos
 

@@ -19,4 +19,4 @@ export function distanceFee(km: number, rules: { tierKm: number; tierFee: number
 export function roundPrice(value: number): number;
 export function computeQuote(input: { packageId: string; km: number; date?: string; city?: string; companyBase?: unknown }, config?: QuoteConfig): QuoteResult | { error: string };
 export function formatBrl(value: number): string;
-export function quoteMessage(input: { packageId: string; date?: string; total: number; link?: string }): string;
+export function quoteMessage(input: { packageId: string; date?: string; total: number; link?: string; pack?: EventPackage }): string;

@@ -46,7 +46,7 @@ const SERVICE = { title: 'Serviços Presenciais', active: true, generateOrder: t
 const input = (over = {}) => ({
   packageId: 'aniversario', childName: 'Miguel', eventDate: '2026-11-22', eventTime: '14:00', location: 'Rua 3, 60, Vila Alpina, Betim/MG',
   responsibleName: 'Kemily Caires', cpf: '529.982.247-25', ddi: '55', whatsapp: '(31) 99999-0001', email: 'k@x.com', extraWeb: 1,
-  birthdayVideo: false, inviteVideo: false, imageAuthorization: 'yes', acceptTerms: true, ...over,
+  birthdayVideo: false, inviteVideo: false, imageAuthorization: 'yes', acceptTerms: true, termsVersion: '3', ...over,
 });
 const quiet = { error() {} };
 const submit = (database, over, extra = {}) => submitEventForm({ database, input: input(over), nowMs: NOW, syncCalendar: async () => ({ eventId: 'evt1', calendarId: 'cal', htmlLink: null }), logger: quiet, ...extra });
@@ -121,4 +121,20 @@ test('sinal pago pelo ManyChat confirma o formulário (sem rascunho novo) e a mi
   assert.equal([...db.docs.keys()].filter((p) => p.startsWith('orders/')).length, 1);
 
   assert.equal((await syncEventFormHolds({ database: db, nowMs: NOW + 4 * DAY, logger: quiet })).cleared, 1);
+});
+
+test('usa a configuração do CRM: preço do adicional, prazo do sinal e versão dos termos', async () => {
+  const config = { addonPrices: { extraWeb: 25 }, depositDays: 5, termsVersion: '4', terms: { 4: '## 1. Teste\nItem.' } };
+  const db = fakeDatabase({ 'services/6': SERVICE, 'siteConfig/eventForm': config, 'eventQuotes/abc123def456': { packageId: 'aniversario', date: '2026-11-22', location: 'x', total: 847, createdAtMs: NOW } });
+  await assert.rejects(submit(db), (e) => e.code === 'terms_changed');
+  const result = await submit(db, { termsVersion: '4', quoteId: 'abc123def456', extraChildren: [{ name: 'Ana', age: '3' }] });
+  assert.equal(result.termsVersion, '4');
+  const [path, order] = orderOf(db);
+  assert.equal(order.eventForm.totalValue, 882); // 847 + teia a R$ 25 + certificado da irmã R$ 10
+  assert.equal(order.childName, 'Miguel e Ana');
+  assert.equal(order.eventFormSite.termsVersion, '4');
+  const run = (ms) => syncEventFormHolds({ database: db, nowMs: ms, logger: quiet });
+  assert.equal((await run(NOW + 4 * DAY)).reminders, 0);
+  assert.equal((await run(NOW + 5 * DAY)).reminders, 1);
+  assert.match(db.docs.get(`missions/${depositMissionId(path.split('/')[1])}`).description, /Sem sinal em 5 dias/);
 });

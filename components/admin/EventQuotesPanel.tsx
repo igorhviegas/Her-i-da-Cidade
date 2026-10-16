@@ -6,7 +6,8 @@ import { useCalendarEvents } from '../../services/calendarService';
 import { DEFAULT_QUOTE_CONFIG, PACKAGES, formatBrl, quoteMessage, type QuoteConfig } from '../../services/eventQuote.js';
 import { FORM_PATH } from '../../services/eventSiteForm.js';
 import { calculateEventQuote, saveEventQuote, type QuoteCalculation } from '../../services/eventQuoteService';
-import { getEventQuoteConfig, saveEventQuoteConfig } from '../../services/siteConfigService';
+import { getEventFormConfig, getEventQuoteConfig, saveEventQuoteConfig } from '../../services/siteConfigService';
+import type { EventPackage } from '../../services/eventQuote.js';
 import { ErrorNote, cardClass, ghostButton, inputClass, labelClass, primaryButton } from './missionsUi';
 import { fmt } from './ordersFlow/CalendarViews';
 
@@ -23,10 +24,13 @@ export const EventQuotesPanel: React.FC = () => {
   const [config, setConfig] = useState<QuoteConfig | null>(null);
   const [configError, setConfigError] = useState('');
   const [showRules, setShowRules] = useState(false);
+  // Nomes e itens dos pacotes como estão na aba Formulário (a mensagem do orçamento usa os mesmos textos do site).
+  const [packages, setPackages] = useState<EventPackage[]>(PACKAGES);
   const range = useMemo(() => visibleRange('month', selected), [selected]);
   const { state } = useCalendarEvents(range.from, range.to);
   const events = state.status === 'ready' ? state.events : [];
 
+  useEffect(() => { getEventFormConfig().then((form) => setPackages(form.packages), () => undefined); }, []);
   useEffect(() => { getEventQuoteConfig().then(setConfig, (e) => setConfigError(e instanceof Error ? e.message : 'Não foi possível carregar as regras.')); }, []);
 
   const persist = async (next: QuoteConfig) => {
@@ -72,12 +76,12 @@ export const EventQuotesPanel: React.FC = () => {
       </div>
       {state.status === 'error' && <p className="text-xs text-amber-200">Agenda indisponível agora ({state.message}); o orçamento funciona mesmo assim.</p>}
 
-      {config && <DayQuote key={selected} date={selected} config={config} onSaveConfig={persist} busy={eventsOnDay(events, selected).map((e) => `${e.startTime ?? 'dia todo'} · ${e.title}`)} />}
+      {config && <DayQuote key={selected} date={selected} config={config} packages={packages} onSaveConfig={persist} busy={eventsOnDay(events, selected).map((e) => `${e.startTime ?? 'dia todo'} · ${e.title}`)} />}
     </div>
   );
 };
 
-const DayQuote: React.FC<{ date: string; config: QuoteConfig; busy: string[]; onSaveConfig: (next: QuoteConfig) => Promise<void> }> = ({ date, config, busy, onSaveConfig }) => {
+const DayQuote: React.FC<{ date: string; config: QuoteConfig; packages: EventPackage[]; busy: string[]; onSaveConfig: (next: QuoteConfig) => Promise<void> }> = ({ date, config, packages, busy, onSaveConfig }) => {
   const [extra, setExtra] = useState(config.dateExtras[date] ? String(config.dateExtras[date]) : '');
   const [packageId, setPackageId] = useState('aniversario');
   const [address, setAddress] = useState('');
@@ -119,7 +123,7 @@ const DayQuote: React.FC<{ date: string; config: QuoteConfig; busy: string[]; on
     try {
       const id = await saveEventQuote({ packageId, date, location: result.address.formatted || address, total, km: result.quote.km, city: result.address.city });
       const link = `${window.location.origin}${FORM_PATH}?orcamento=${id}`;
-      const text = quoteMessage({ packageId, date, total, link });
+      const text = quoteMessage({ packageId, date, total, link, pack: packages.find((p) => p.id === packageId) });
       await navigator.clipboard.writeText(text).catch(() => undefined);
       setCopied(text);
     } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível salvar o orçamento.'); }
@@ -150,7 +154,7 @@ const DayQuote: React.FC<{ date: string; config: QuoteConfig; busy: string[]; on
       <div className="grid gap-3 sm:grid-cols-2">
         <label className={labelClass}>Pacote
           <select value={packageId} onChange={(e) => { setPackageId(e.target.value); reset(); }} className={inputClass}>
-            {PACKAGES.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+            {packages.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
           </select>
         </label>
         {packageId === 'vip' && <label className={labelClass}>Cachê da empresa (R$, pelo tempo)<input inputMode="decimal" value={companyBase} onChange={(e) => { setCompanyBase(e.target.value); reset(); }} className={inputClass} /></label>}

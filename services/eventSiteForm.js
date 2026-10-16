@@ -5,7 +5,9 @@ import { packageById } from './eventQuote.js';
 
 export const FORM_PATH = '/formulario-evento';
 /** Preços dos adicionais com desconto (só valem junto de um pacote presencial). */
-export const ADDON_PRICES = { extraWeb: 15, birthdayVideo: 20, inviteVideo: 45 };
+export const ADDON_PRICES = { extraWeb: 15, birthdayVideo: 20, inviteVideo: 45, extraChild: 10 };
+/** Irmãos no mesmo evento (cada um ganha certificado individual, cobrado em extraChild). */
+export const MAX_EXTRA_CHILDREN = 3;
 export const FORM_PREFIX = 'A';
 
 const DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -47,6 +49,7 @@ export function validateSiteForm(input, { today }) {
   const form = {
     packageId: pack?.id ?? '',
     childName: text(i.childName, 100), childAge: text(i.childAge, 20),
+    extraChildren: (Array.isArray(i.extraChildren) ? i.extraChildren : []).slice(0, MAX_EXTRA_CHILDREN).map((c) => ({ name: text(c?.name, 100), age: text(c?.age, 20) })),
     pcd: i.pcd === 'yes' ? true : i.pcd === 'no' ? false : null, pcdDetails: text(i.pcdDetails, 300),
     eventDate: typeof i.eventDate === 'string' ? i.eventDate : '', eventTime: typeof i.eventTime === 'string' ? i.eventTime : '',
     location: text(i.location, 300), reference: text(i.reference, 200),
@@ -54,7 +57,7 @@ export function validateSiteForm(input, { today }) {
     ddi: String(i.ddi ?? '55').replace(/\D/g, '') || '55', whatsapp: text(i.whatsapp, 40),
     extraWeb: [0, 1, 2].includes(Number(i.extraWeb)) ? Number(i.extraWeb) : -1,
     birthdayVideo: i.birthdayVideo === true, birthdayName: text(i.birthdayName, 40),
-    inviteVideo: i.inviteVideo === true, inviteDetails: text(i.inviteDetails, 500),
+    inviteVideo: i.inviteVideo === true, inviteParents: text(i.inviteParents, 120), inviteGuestTime: text(i.inviteGuestTime, 20), inviteDetails: text(i.inviteDetails, 500),
     observations: text(i.observations, 1000),
     imageAuthorization: i.imageAuthorization === 'yes' ? true : i.imageAuthorization === 'no' ? false : null,
     acceptTerms: i.acceptTerms === true,
@@ -65,6 +68,7 @@ export function validateSiteForm(input, { today }) {
   const add = (field, message) => { errors.push(message); fields.push(field); };
   if (!pack) add('packageId', 'Escolha o pacote do evento.');
   if (!form.childName) add('childName', isVip ? 'Informe o nome do evento ou da empresa.' : 'Informe o nome do aniversariante.');
+  if (form.extraChildren.some((c) => !c.name)) add('extraChildren', 'Informe o nome de cada criança adicionada (ou remova a linha).');
   if (!isValidDate(form.eventDate)) add('eventDate', 'Informe a data do evento.');
   else if (today && form.eventDate < today) add('eventDate', 'A data do evento já passou.');
   if (!TIME.test(form.eventTime)) add('eventTime', 'Informe o horário de início.');
@@ -76,24 +80,34 @@ export function validateSiteForm(input, { today }) {
   if (!EMAIL.test(form.email)) add('email', 'Informe um e-mail válido.');
   if (form.extraWeb < 0) add('extraWeb', 'Escolha a quantidade de teias extras.');
   if (form.birthdayVideo && !form.birthdayName) add('birthdayName', 'Informe o primeiro nome para o Vídeo Especial de Aniversário.');
+  if (form.inviteVideo && !form.inviteParents) add('inviteParents', 'Informe o nome dos pais para o Vídeo Convite.');
+  if (form.inviteVideo && !form.inviteGuestTime) add('inviteGuestTime', 'Informe o horário para os convidados no Vídeo Convite.');
   if (form.imageAuthorization === null) add('imageAuthorization', 'Responda se autoriza o uso de imagens.');
   if (!form.acceptTerms) add('acceptTerms', 'Para concluir, leia e aceite os termos de contratação.');
   return errors.length ? { errors, fields } : { form };
 }
 
 /** Soma dos adicionais escolhidos. */
-export const addonsTotal = (form) => form.extraWeb * ADDON_PRICES.extraWeb + (form.birthdayVideo ? ADDON_PRICES.birthdayVideo : 0) + (form.inviteVideo ? ADDON_PRICES.inviteVideo : 0);
+export const addonsTotal = (form, prices = ADDON_PRICES) => form.extraWeb * prices.extraWeb + (form.birthdayVideo ? prices.birthdayVideo : 0) + (form.inviteVideo ? prices.inviteVideo : 0)
+  + (form.extraChildren?.length ?? 0) * prices.extraChild;
+
+/** Nome(s) para o pedido e a agenda: "Miguel" ou "Miguel e Ana" / "Miguel, Ana e Leo". */
+export function childrenNames(form) {
+  const names = [form.childName, ...(form.extraChildren ?? []).map((c) => c.name)].filter(Boolean);
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}` : names[0] ?? '';
+}
 
 /** Endereço gravado no pedido (com o ponto de referência, se houver). */
 export const fullLocation = (form) => (form.reference ? `${form.location} (ref.: ${form.reference})` : form.location);
 
 /** Linhas de observação para o CRM e a agenda: o que o formulário do CRM não tem campo próprio. */
-export function observationLines(form) {
+export function observationLines(form, prices = ADDON_PRICES) {
   return [
     form.childAge && `Idade: ${form.childAge}`,
+    form.extraChildren?.length && `Irmãos: ${form.extraChildren.map((c) => (c.age ? `${c.name} (${c.age})` : c.name)).join(', ')} · certificado individual (+R$ ${prices.extraChild} cada)`,
     form.pcd && form.pcdDetails && `PCD/PNE: ${form.pcdDetails}`,
-    form.birthdayVideo && `Vídeo Especial de Aniversário: ${form.birthdayName} (+R$ ${ADDON_PRICES.birthdayVideo})`,
-    form.inviteVideo && `Vídeo Convite (+R$ ${ADDON_PRICES.inviteVideo})${form.inviteDetails ? `: ${form.inviteDetails}` : ''}`,
+    form.birthdayVideo && `Vídeo Especial de Aniversário: ${form.birthdayName} (+R$ ${prices.birthdayVideo})`,
+    form.inviteVideo && `Vídeo Convite (+R$ ${prices.inviteVideo}): pais ${form.inviteParents}; horário para os convidados ${form.inviteGuestTime}${form.inviteDetails ? `; detalhes: ${form.inviteDetails}` : ''}`,
     form.observations && `Cliente: ${form.observations}`,
   ].filter(Boolean);
 }
@@ -101,7 +115,7 @@ export function observationLines(form) {
 const brDate = (key) => key.split('-').reverse().join('/');
 
 /** Mensagem do botão do WhatsApp na tela final. */
-export function whatsappDoneMessage({ number, packageId, eventDate, eventTime, childName }) {
-  const pack = packageById(packageId);
-  return `Olá! Preenchi o formulário ${formNumberLabel(number)} (${pack?.title ?? 'evento'} de ${childName}, ${brDate(eventDate)} às ${eventTime}). Aguardo os dados para o pagamento do sinal de 50% da reserva.`;
+export function whatsappDoneMessage({ number, packageId, packageTitle, eventDate, eventTime, childName }) {
+  const title = packageTitle ?? packageById(packageId)?.title ?? 'evento';
+  return `Olá! Preenchi o formulário ${formNumberLabel(number)} (${title} de ${childName}, ${brDate(eventDate)} às ${eventTime}). Aguardo os dados para o pagamento do sinal de 50% da reserva.`;
 }

@@ -8,6 +8,8 @@ export default {
     './{App,constants,index}.tsx',
     './{components,context,lib,services,utils,types,functions}/**/*.{ts,tsx,js,jsx}',
   ],
+  // Tema escuro por classe: hoje só o formulário do evento (/formulario-evento) alterna claro/escuro.
+  darkMode: 'class',
   theme: { extend: {} },
   plugins: [],
 };

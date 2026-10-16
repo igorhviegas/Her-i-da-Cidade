@@ -95,8 +95,8 @@ export const formatBrl = brl;
 const brDate = (key) => key.split('-').reverse().join('/');
 
 /** Texto do orçamento para o WhatsApp (o link leva ao formulário já preenchido com pacote, data, endereço e valor). */
-export function quoteMessage({ packageId, date, total, link }) {
-  const pack = packageById(packageId);
+export function quoteMessage({ packageId, date, total, link, pack: edited }) {
+  const pack = edited ?? packageById(packageId); // edited = pacote com textos do CRM (Formulário)
   return [
     `*${pack.title}*${date ? ` · ${brDate(date)}` : ''}`,
     '',
