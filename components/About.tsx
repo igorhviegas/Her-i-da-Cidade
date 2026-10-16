@@ -19,6 +19,8 @@ export const About: React.FC<{ section: HomeSection }> = ({ section }) => {
           <img 
             src={localImageUrl(section.imageUrl) || "/images/site/sobre.webp"}
             alt={section.title || "Homem-Aranha em apresentação ao vivo"}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center transition-colors group-hover:bg-black/20">
@@ -26,6 +28,7 @@ export const About: React.FC<{ section: HomeSection }> = ({ section }) => {
               href={youtubeShortsUrl}
               target="_blank"
               rel="noopener noreferrer"
+              aria-label="Assistir ao vídeo no YouTube"
               className="w-20 h-20 rounded-full bg-white text-black flex items-center justify-center hover:scale-110 transition-transform cursor-pointer shadow-[0_0_30px_rgba(255,255,255,0.3)]"
             >
               <svg fill="currentColor" className="w-8 h-8 ml-1" viewBox="0 0 16 16">

@@ -1,6 +1,6 @@
 import { logger } from './logger.js';
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { getAuth, Auth } from "firebase/auth";
+import type { Auth } from "firebase/auth";
 import { getFirestore, Firestore, doc, getDocFromServer } from "firebase/firestore";
 import firebaseAppletConfig from "../firebase-applet-config.json";
 
@@ -28,13 +28,17 @@ export const isFirebaseConfigured = Boolean(
 );
 
 let app: FirebaseApp | null = null;
+// Preenchido por lib/firebaseAuth.ts, que só é carregado pelas áreas que usam login (painel, agente, kart):
+// o Firebase Auth pesa ~90 KB e abria um iframe do Google em toda visita ao site público.
 let auth: Auth | null = null;
+export function setAuth(next: Auth) {
+  auth = next;
+}
 let db: Firestore | null = null;
 
 if (isFirebaseConfigured) {
   try {
     app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-    auth = getAuth(app);
     // Utilizar firestoreDatabaseId se especificado e diferente de (default)
     db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)"
       ? getFirestore(app, firebaseConfig.firestoreDatabaseId)

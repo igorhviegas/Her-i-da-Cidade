@@ -1,7 +1,8 @@
 import { logger } from '../lib/logger.js';
 import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { auth, db } from '../lib/firebase';
+import { db } from '../lib/firebase';
+import { auth } from '../lib/firebaseAuth';
 import type { KartPilot, KartRace } from './kart.js';
 import { DEFAULT_KART_PILOTS } from './kartPilots.js';
 import type { KartNextConfig } from './kartNext.js';

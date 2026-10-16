@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { auth } from '../lib/firebase';
+import { auth } from '../lib/firebaseAuth';
 import type { CalendarEvent, CalendarEventInput } from '../functions/google-calendar.js';
 
 export type { CalendarEvent, CalendarEventInput };
