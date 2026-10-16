@@ -65,13 +65,19 @@ export const InfoTip: React.FC<{ label: string; children: React.ReactNode }> = (
 /** Telefone em duas partes (DDI + número), como no agendamento da vídeo chamada, com as cores do tema. */
 export const PhoneInput: React.FC<{ title: string; note?: string; country: string; number: string; onCountry: (iso: string) => void; onNumber: (value: string) => void }> = ({ title, note, country, number, onCountry, onNumber }) => {
   const options = useMemo(() => phoneCountryOptions(), []);
+  const selected = options.find((option) => option.iso === country);
   return (
     <div>
       <span className={ui.label}>{title}</span>
       <div className="mt-1.5 flex gap-2">
-        <select aria-label={`${title}: país (DDI)`} value={country} onChange={(e) => onCountry(e.target.value)} className={`w-[7.25rem] shrink-0 ${ui.input} px-2`}>
-          {options.map((option) => <option key={option.iso} value={option.iso}>{option.label}</option>)}
-        </select>
+        {/* DDI compacto: mostra só bandeira + código; o select invisível por cima abre a lista completa (com o nome dos países). */}
+        <div className="relative flex w-[5.75rem] shrink-0 items-center justify-center gap-1 rounded-xl border border-slate-300 bg-white text-base text-slate-900 focus-within:border-blue-500 dark:border-white/10 dark:bg-[#070B14] dark:text-white">
+          <span aria-hidden>{selected?.flag}</span><span aria-hidden className="font-semibold">+{selected?.ddi}</span>
+          <svg aria-hidden viewBox="0 0 12 12" className="h-3 w-3 opacity-50"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+          <select aria-label={`${title}: país (DDI)`} value={country} onChange={(e) => onCountry(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0">
+            {options.map((option) => <option key={option.iso} value={option.iso}>{option.label}</option>)}
+          </select>
+        </div>
         <input type="tel" inputMode="tel" autoComplete="tel" aria-label={`${title}: número`} placeholder={country === 'BR' ? '(31) 99999-0000' : 'Número com código de área'} value={number} onChange={(e) => onNumber(e.target.value)} className={`min-w-0 flex-1 ${ui.input}`} />
       </div>
       {note && <span className={ui.hint}>{note}</span>}
