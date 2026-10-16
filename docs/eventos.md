@@ -8,6 +8,8 @@ Pedidos antigos e os criados pelo ManyChat não mudam: continuam sendo faturados
 Dados do formulário ficam em `orders/{id}.eventForm` (+ `childName`, `eventDate`); `content` recebe um resumo legível.
 Valor de entrada = 50% do total até ser editado à mão; depois disso é preservado (botão "Recalcular 50%").
 
+Formulário preenchido pelo cliente no site (`/formulario-evento`, número A214 em diante) e orçamentos do Calendário: ver `docs/formulario-evento.md`.
+
 Pedidos presenciais criados pelo ManyChat (só cliente e WhatsApp) entram como rascunho (`eventDraft`); ver `docs/manychat-integration.md`. O formulário do evento completa o pedido, e a entrada é lançada nesse momento.
 
 ## Importar formulário (PDF) e vídeos com desconto

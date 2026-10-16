@@ -73,7 +73,9 @@ const OrderCardDates: React.FC<OrderCardDatesProps> = ({ order, state }) => {
 const OrderCardPayment: React.FC<{ order: Order }> = ({ order }) => (
   <>
     {order.paymentPending && order.videoCall && <p className="mt-3 text-xs font-bold text-amber-300">⏳ Aguardando pagamento · Chamada {order.videoCall.date.split('-').reverse().join('/')} às {order.videoCall.time}</p>}
-    {order.eventDraft ? <p className="mt-3 text-xs font-bold text-amber-300">⚠ Dados do evento pendentes</p> : order.paymentPending ? null : <p className="mt-3 text-sm font-extrabold text-emerald-300">{formatMoney(order.totalPaid)}</p>}
+    {order.eventFormSite && order.eventDraft ? (
+      <p className="mt-3 text-xs font-bold text-amber-300">{order.paymentPending ? '⏳ Aguardando sinal' : '✓ Sinal pago: conferir e salvar'} · Formulário A{order.eventFormSite.number}</p>
+    ) : order.eventDraft ? <p className="mt-3 text-xs font-bold text-amber-300">⚠ Dados do evento pendentes</p> : order.paymentPending ? null : <p className="mt-3 text-sm font-extrabold text-emerald-300">{formatMoney(order.totalPaid)}</p>}
   </>
 );
 

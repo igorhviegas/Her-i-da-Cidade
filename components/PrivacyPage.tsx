@@ -71,8 +71,8 @@ export const PrivacyPage: React.FC = () => {
               Nome, número de WhatsApp e o que você nos conta (nome da criança, tema, detalhes do vídeo) para atender, receber o pagamento, produzir e entregar.
             </Item>
             <Item title="Festas e eventos presenciais">
-              Pelo formulário da festa: nome do responsável, nome e data de nascimento da criança, data, horário e endereço do evento e se a criança tem alguma necessidade especial (para o Herói poder adaptar a atuação).
-              Usamos para organizar e realizar o evento. A sua escolha sobre uso de imagem é registrada à parte (veja “Fotos, vídeos e voz”).
+              Pelo formulário da festa (no nosso site): nome, CPF, WhatsApp e e-mail do responsável (o CPF identifica quem contrata no termo), nome e idade da criança, data, horário e endereço do evento e, se você quiser informar, alguma necessidade especial (para o Herói poder adaptar a atuação).
+              Usamos para organizar e realizar o evento e para o termo de contratação; o aceite fica registrado com data, hora e versão dos termos. A sua escolha sobre uso de imagem é registrada à parte (veja “Fotos, vídeos e voz”).
             </Item>
             <Item title="Campeonato Viegas Kart">
               A página mostra o nome, os resultados e os vídeos dos pilotos inscritos, a partir dos relatórios de cronometragem das corridas.
@@ -94,7 +94,7 @@ export const PrivacyPage: React.FC = () => {
             mas só são divulgados se o responsável autorizar de forma específica, em pergunta própria, separada dos termos de contratação.
           </p>
           <p>
-            Hoje a autorização pedida no formulário da festa vale para a divulgação nas redes sociais do Herói da Cidade. Qualquer outro uso exige uma nova autorização.
+            Hoje a autorização pedida no formulário da festa vale para a divulgação nas redes sociais e no site do Herói da Cidade. Qualquer outro uso exige uma nova autorização.
             Você pode mudar de ideia quando quiser, pelos canais acima: paramos de usar e retiramos dos nossos canais o que já foi publicado
             (não conseguimos recolher cópias que outras pessoas já tenham salvo ou compartilhado).
           </p>
@@ -104,7 +104,7 @@ export const PrivacyPage: React.FC = () => {
           <p>Só com quem precisa para o serviço funcionar, e apenas o necessário:</p>
           <ul className="list-disc space-y-1.5 pl-5">
             <li><strong className="text-white">WhatsApp (Meta) e ManyChat:</strong> conversas de atendimento e confirmação do pagamento.</li>
-            <li><strong className="text-white">Google:</strong> Agenda (compromissos das chamadas e das festas), Formulários (cadastro da festa), Maps (cálculo do deslocamento até o local do evento) e YouTube (vídeos).</li>
+            <li><strong className="text-white">Google:</strong> Agenda (compromissos das chamadas e das festas), Formulários (cadastros de festas feitos antes do formulário do site), Maps (cálculo do deslocamento até o local do evento) e YouTube (vídeos).</li>
             <li><strong className="text-white">Google Firebase e Vercel:</strong> banco de dados do atendimento e hospedagem do site e dos arquivos.</li>
             <li><strong className="text-white">Equipe que acompanha a festa:</strong> nome do responsável e da criança, horário, endereço e as informações necessárias para o evento.</li>
           </ul>

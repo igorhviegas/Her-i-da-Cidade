@@ -98,7 +98,10 @@ export async function geocodeAddress(address, { apiKey, fetchImpl = fetch, label
   const location = result?.geometry?.location;
   if (!result || !Number.isFinite(location?.lat) || !Number.isFinite(location?.lng)) throw new TravelRouteError('api_error', { detail: status });
   const precise = !result.partial_match && ['ROOFTOP', 'RANGE_INTERPOLATED'].includes(result.geometry.location_type);
-  return { formatted: result.formatted_address ?? '', lat: location.lat, lng: location.lng, placeId: result.place_id ?? '', precise };
+  // Município: no Brasil vem como administrative_area_level_2 (locality nem sempre aparece). Usado no mínimo por cidade do orçamento.
+  const component = (type) => (result.address_components ?? []).find((c) => c.types?.includes(type))?.long_name;
+  const city = component('administrative_area_level_2') ?? component('locality') ?? '';
+  return { formatted: result.formatted_address ?? '', lat: location.lat, lng: location.lng, placeId: result.place_id ?? '', precise, city };
 }
 
 /** Distância (metros) de cada trecho de uma rota por `points` ({lat,lng}), em uma única chamada. Mantém a ordem recebida. */

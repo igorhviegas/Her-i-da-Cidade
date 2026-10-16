@@ -10,6 +10,7 @@ import { handleInstagramSync } from "./api/instagram-sync";
 import { handleCalendarEvents } from "./api/calendar-events";
 import { handleVideoCall } from "./api/video-call";
 import { handleTravelRoute } from "./api/travel-route";
+import { handleEventForm } from "./api/event-form";
 import { handleFitIngest } from "./api/fit-ingest";
 import { handleReviews } from "./api/reviews";
 
@@ -63,6 +64,11 @@ async function startServer() {
   // Deslocamento dos eventos (área do agente; exige código de acesso): km por trecho via Google Maps
   app.all("/api/travel-route", (req, res) => {
     handleTravelRoute(req, res);
+  });
+
+  // Formulário do evento presencial (público) e orçamentos do Calendário (administrador)
+  app.all("/api/event-form", (req, res) => {
+    handleEventForm(req, res);
   });
 
   // Fit: totais diários do Apple Saúde enviados pelo Atalho do iPhone (segredo FIT_INGEST_TOKEN)

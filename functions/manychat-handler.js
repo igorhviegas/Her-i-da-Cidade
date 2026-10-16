@@ -95,8 +95,8 @@ export const SERVICE_PROFILES = {
   'themed-video': { serviceId: '5', title: 'Vídeo Temático', pricing: 'catalog', fields: { childName: 'required', theme: 'required' } },
   'custom-video': { serviceId: '3', title: 'Vídeo Personalizado', pricing: 'tiers', tiers: tiers(60, 75, 85), fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
   'invite-video': { serviceId: '4', title: 'Vídeo Convite', pricing: 'tiers', tiers: tiers(65, 80, 95), fields: { childName: 'optional', details: 'optional', eventDate: 'optional' } },
-  'live-call': { serviceId: '2', title: 'Vídeo Chamada ao Vivo', pricing: 'fixed', price: 75, confirmsBooking: true, fields: { childName: 'optional', details: 'optional' } },
-  'presential-event': { serviceId: '6', title: 'Serviços Presenciais', pricing: 'pending', dedupeMs: 10 * 60 * 1000, fields: {} },
+  'live-call': { serviceId: '2', title: 'Vídeo Chamada ao Vivo', pricing: 'fixed', price: 75, confirmsBooking: 'videoCallPending', fields: { childName: 'optional', details: 'optional' } },
+  'presential-event': { serviceId: '6', title: 'Serviços Presenciais', pricing: 'pending', confirmsBooking: 'eventFormPending', dedupeMs: 10 * 60 * 1000, fields: {} },
 };
 
 const normalizeTitle = (value) => String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
@@ -283,11 +283,18 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
       const evaluation = evaluateService(profile, serviceSnapshot.data(), input.modality);
       if (evaluation.problem) return { problem: evaluation.problem };
 
-      // Vídeo Chamada: se este WhatsApp tem um pré-agendamento do site aguardando pagamento, o pagamento o confirma (sem pedido novo).
+      // Vídeo Chamada / formulário do evento: se este WhatsApp tem um pré-agendamento do site aguardando pagamento, o pagamento o
+      // confirma (sem pedido novo).
       if (profile.confirmsBooking) {
-        const pendingSnapshot = await transaction.get(database.collection('videoCallPending').doc(bookingKey(normalizedWhatsApp)));
+        const pendingSnapshot = await transaction.get(database.collection(profile.confirmsBooking).doc(bookingKey(normalizedWhatsApp)));
         const bookedRef = pendingSnapshot.exists ? database.collection(ORDERS).doc(String(pendingSnapshot.get('orderId'))) : null;
         const bookedSnapshot = bookedRef ? await transaction.get(bookedRef) : null;
+        // Evento: o sinal só tira o "aguardando"; o pedido continua rascunho até o dono conferir valores em "Editar pedido" (é lá
+        // que a entrada é lançada no Financeiro, como nos rascunhos do ManyChat).
+        if (profile.pricing === 'pending' && bookedSnapshot?.exists && bookedSnapshot.get('paymentPending') === true) {
+          transaction.update(bookedRef, { paymentPending: FieldValue.delete(), depositPaidAt: paidAt, updatedAt: FieldValue.serverTimestamp() });
+          return { orderId: bookedRef.id, confirmedBooking: true };
+        }
         if (bookedSnapshot?.exists && bookedSnapshot.get('paymentPending') === true) {
           // O valor cobrado é o que estava configurado quando a reserva foi feita (gravado no pedido).
           const bookedPrice = bookedSnapshot.get('servicePrice');

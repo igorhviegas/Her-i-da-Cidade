@@ -3,6 +3,7 @@ import { addDays, buildNotifications, dateKey, syncRecurringTasks } from './miss
 import { EVENT_MISSION_SOURCE, syncEventMissions } from './event-missions.js';
 import { buildInstagramAlerts } from './instagram-alerts.js';
 import { buildReportNotice } from './report-notice.js';
+import { syncEventFormHolds } from './event-form.js';
 
 const toStored = (data) => Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v instanceof Date ? Timestamp.fromDate(v) : v]));
 const docs = (snapshot) => snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -30,6 +31,9 @@ export async function runMissionsSync(database, now = new Date()) {
   let events = { created: 0, updated: 0 };
   let eventError = null;
   try { events = await syncEventMissions(eventStore(database), now); } catch (error) { eventError = error; }
+  // Formulários do site sem sinal: missão de recontato e exclusão no prazo (mesma regra de falha: não impede os avisos).
+  let holds = { reminders: 0, expired: 0, cleared: 0 };
+  try { holds = await syncEventFormHolds({ database, nowMs: now.getTime() }); } catch (error) { eventError ??= error; }
 
   const [missions, recent] = await Promise.all([
     database.collection('missions').where('status', '==', 'pending').get().then(docs),
@@ -45,7 +49,7 @@ export async function runMissionsSync(database, now = new Date()) {
     } catch (error) { if (!(error?.code === 6 || /ALREADY_EXISTS/.test(String(error?.message)))) throw error; }
   }
   if (eventError) throw eventError;
-  return { created: result.created.length, resolved: result.resolved.length, notified, eventMissions: events.created, eventMissionsUpdated: events.updated };
+  return { created: result.created.length, resolved: result.resolved.length, notified, eventMissions: events.created, eventMissionsUpdated: events.updated, depositReminders: holds.reminders, depositExpired: holds.expired };
 }
 
 const isAlreadyExists = (error) => error?.code === 6 || /ALREADY_EXISTS/.test(String(error?.message));

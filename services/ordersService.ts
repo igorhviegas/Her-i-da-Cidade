@@ -386,6 +386,8 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
       if (!existingEntry.exists()) draftEntry = { id: entryRef.id, record: { ...record, createdAt: serverTimestamp() } };
       payload.eventDraft = deleteField();
       payload.eventLedger = { entry: record.amount };
+      // Formulário do site: salvar o rascunho é a confirmação do sinal (se o ManyChat ainda não confirmou).
+      if (currentData.paymentPending === true) payload.paymentPending = deleteField();
     }
 
     // Evento com livro de lançamentos: a PRIMEIRA conclusão lança a 2ª parcela e a "Despesa evento" (IDs determinísticos, create-only).
