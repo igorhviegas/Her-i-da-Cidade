@@ -11,12 +11,12 @@ const getInitials = (name: string) => {
 
 const getAvatarColor = (name: string) => {
   const colors = [
-    "bg-blue-500",
-    "bg-red-500",
-    "bg-yellow-600",
-    "bg-green-600",
-    "bg-purple-500",
-    "bg-pink-500",
+    "bg-blue-700",
+    "bg-red-700",
+    "bg-yellow-700",
+    "bg-green-700",
+    "bg-purple-700",
+    "bg-pink-700",
   ];
   const index = name.length % colors.length;
   return colors[index];
@@ -82,6 +82,7 @@ export const FeedbacksHeader: React.FC<FeedbacksHeaderProps> = ({ googleIconUrl,
     {onScroll && <div className="flex gap-2">
       <button
         onClick={() => onScroll("left")}
+        aria-label="Avaliações anteriores"
         className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all active:scale-90"
       >
         <svg
@@ -101,6 +102,7 @@ export const FeedbacksHeader: React.FC<FeedbacksHeaderProps> = ({ googleIconUrl,
       </button>
       <button
         onClick={() => onScroll("right")}
+        aria-label="Próximas avaliações"
         className="w-12 h-12 rounded-full border border-white/10 flex items-center justify-center hover:bg-white/20 transition-all active:scale-90"
       >
         <svg

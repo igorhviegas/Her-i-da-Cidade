@@ -144,7 +144,7 @@ export const Footer: React.FC = () => {
           </div>
         </div>
 
-        <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] text-white/30 font-bold uppercase tracking-[0.2em]">
+        <div className="pt-12 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] text-white/60 font-bold uppercase tracking-[0.2em]">
           <p className="text-center md:text-left">
             © {new Date().getFullYear()} O Herói da Cidade. Todos os direitos
             reservados.

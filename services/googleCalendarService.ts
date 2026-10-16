@@ -1,4 +1,4 @@
-import { auth } from '../lib/firebase';
+import { auth } from '../lib/firebaseAuth';
 import { invalidateCalendarCache } from './calendarService';
 
 export interface CalendarSendResult { created: boolean; htmlLink: string | null; persisted: boolean }

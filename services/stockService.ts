@@ -1,5 +1,6 @@
 import { addDoc, collection, doc, getDocs, limit, orderBy, query, runTransaction, serverTimestamp, updateDoc } from "firebase/firestore";
-import { auth, db } from "../lib/firebase";
+import { db } from "../lib/firebase";
+import { auth } from "../lib/firebaseAuth";
 import { StockError, validateMaterialInput, type MovementType, type StockMaterial, type StockMovement } from "./stockCalculations.js";
 import { STOCK_MATERIALS, STOCK_MOVEMENTS, STOCK_PENDINGS, prepareMovements } from "./stockTransactions.js";
 

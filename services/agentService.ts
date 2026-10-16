@@ -1,7 +1,8 @@
 import { logger } from '../lib/logger.js';
 import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { auth, db } from '../lib/firebase';
+import { db } from '../lib/firebase';
+import { auth } from '../lib/firebaseAuth';
 import { DEFAULT_AGENT_FAQ, DEFAULT_AGENT_STEPS, sortByOrder, type AgentFaqCategory, type AgentStep, type AgentTrack } from './agentContent.js';
 
 export type { AgentStep, AgentTrack, AgentItem, AgentFaqCategory, AgentFaqItem } from './agentContent.js';

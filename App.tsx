@@ -1,12 +1,6 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { RouterProvider, useRouter } from './lib/router';
-import { AuthProvider } from './context/AuthContext';
 import { PublicSite } from './components/PublicSite';
-import { VideoCatalog } from './components/VideoCatalog';
-import { VideoCallPage } from './components/VideoCallPage';
-import { ServiceFaqPages } from './components/ServiceFaqPages';
-import { ClientsPage } from './components/ClientsPage';
-import { PrivacyPage } from './components/PrivacyPage';
 import { PRIVACY_PATH } from './services/privacy.js';
 import type { Service } from './types';
 import { useHomeContent } from './services/homeContentService';
@@ -31,6 +25,13 @@ const SITE_NAME = 'O Herói da Cidade';
 const AgentApp = lazy(() => import('./components/agente/AgentApp').then(({ AgentApp: component }) => ({ default: component })));
 const KartApp = lazy(() => import('./components/kart/KartApp').then(({ KartApp: component }) => ({ default: component })));
 const AdminApp = lazy(() => import('./components/admin/AdminApp').then(({ AdminApp: component }) => ({ default: component })));
+// Páginas públicas secundárias ficam fora do pacote da home (PageSpeed: JS não usado atrasava o título da home)
+const VideoCatalog = lazy(() => import('./components/VideoCatalog').then(({ VideoCatalog: component }) => ({ default: component })));
+const VideoCallPage = lazy(() => import('./components/VideoCallPage').then(({ VideoCallPage: component }) => ({ default: component })));
+const ServiceFaqPages = lazy(() => import('./components/ServiceFaqPages').then(({ ServiceFaqPages: component }) => ({ default: component })));
+const ClientsPage = lazy(() => import('./components/ClientsPage').then(({ ClientsPage: component }) => ({ default: component })));
+const PrivacyPage = lazy(() => import('./components/PrivacyPage').then(({ PrivacyPage: component }) => ({ default: component })));
+const pageFallback = <div className="min-h-screen bg-[#0B1929]" />;
 
 function setMeta(attribute: 'name' | 'property', key: string, content: string) {
   let element = document.head.querySelector<HTMLMetaElement>(`meta[${attribute}="${key}"]`);
@@ -186,20 +187,20 @@ const AppContent: React.FC = () => {
     );
   }
 
-  if (isClients) return <ClientsPage />;
+  if (isClients) return <Suspense fallback={pageFallback}><ClientsPage /></Suspense>;
 
   // Política de Privacidade (LGPD): linkada no rodapé e nos formulários públicos
-  if (isPrivacy) return <PrivacyPage />;
+  if (isPrivacy) return <Suspense fallback={pageFallback}><PrivacyPage /></Suspense>;
 
   // Página pública de agendamento de Vídeo Chamada (link compartilhável; substitui o link do Calendly)
-  if (isCall) return <VideoCallPage />;
+  if (isCall) return <Suspense fallback={pageFallback}><VideoCallPage /></Suspense>;
 
   // Dúvidas públicas por serviço: /duvidas e /duvidas/{slug}
-  if (isFaq) return <ServiceFaqPages slug={faqSlug || undefined} onResolved={setFaqService} />;
+  if (isFaq) return <Suspense fallback={pageFallback}><ServiceFaqPages slug={faqSlug || undefined} onResolved={setFaqService} /></Suspense>;
 
   // Rota dedicada para o catálogo de vídeos estilo Netflix
   if (isVideos) {
-    return <VideoCatalog />;
+    return <Suspense fallback={pageFallback}><VideoCatalog /></Suspense>;
   }
 
   return <PublicSite homeContent={homeContent} />;
@@ -208,9 +209,7 @@ const AppContent: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <RouterProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
+      <AppContent />
     </RouterProvider>
   );
 };

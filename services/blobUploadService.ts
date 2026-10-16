@@ -1,4 +1,4 @@
-import { auth } from '../lib/firebase';
+import { auth } from '../lib/firebaseAuth';
 
 /**
  * Envia o arquivo de imagem selecionado no frontend para a rota da API (/api/upload-thumbnail),

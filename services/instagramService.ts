@@ -1,5 +1,6 @@
 import { collection, doc, documentId, onSnapshot, query, where } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { db } from '../lib/firebase';
+import { auth } from '../lib/firebaseAuth';
 import type { InstagramPost } from './instagramMetrics.js';
 import type { DailySummary } from './instagramDaily.js';
 
