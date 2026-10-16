@@ -22,8 +22,10 @@ import { computeQuote, normalizeQuoteConfig, packageById } from '../services/eve
 import { addonsTotal, childrenNames, formNumberLabel, fullLocation, observationLines, validateSiteForm, whatsappDoneMessage } from '../services/eventSiteForm.js';
 import { FORM_CONFIG_PATH, normalizeFormConfig } from '../services/eventFormConfig.js';
 
-export const FIRST_FORM_NUMBER = 214;
-export const COUNTER = ['counters', 'eventForm'];
+export const FIRST_FORM_NUMBER = 215; // A214 já existe (último do Google Forms)
+// Próximo número em siteConfig (o admin lê e corrige na aba Formulário, ex.: depois de apagar testes). Antes ficava em counters/eventForm.
+export const COUNTER = ['siteConfig', 'eventFormCounter'];
+const LEGACY_COUNTER = ['counters', 'eventForm'];
 export const PENDING = 'eventFormPending';
 export const QUOTES = 'eventQuotes';
 export const QUOTE_CONFIG_PATH = ['siteConfig', 'eventQuote'];
@@ -90,6 +92,7 @@ export async function submitEventForm({ database, input, nowMs = Date.now(), syn
   if (evaluation.problem) throw new EventFormError('service_unavailable', 'O formulário está indisponível no momento. Fale conosco pelo WhatsApp.');
 
   const counterRef = database.collection(COUNTER[0]).doc(COUNTER[1]);
+  const legacyCounterRef = database.collection(LEGACY_COUNTER[0]).doc(LEGACY_COUNTER[1]);
   const pendingRef = database.collection(PENDING).doc(bookingKey(contact.e164));
   const indexRef = database.collection('clients').doc(`whatsapp_${contact.e164}`);
   const quoteRef = form.quoteId ? database.collection(QUOTES).doc(form.quoteId) : null;
@@ -106,15 +109,17 @@ export async function submitEventForm({ database, input, nowMs = Date.now(), syn
   let customerName = form.responsibleName;
   let order = null;
   await database.runTransaction(async (transaction) => {
-    const [counterSnap, pendingSnap, indexSnap, quoteSnap] = await Promise.all([
-      transaction.get(counterRef), transaction.get(pendingRef), transaction.get(indexRef), quoteRef ? transaction.get(quoteRef) : null,
+    const [counterSnap, legacySnap, pendingSnap, indexSnap, quoteSnap] = await Promise.all([
+      transaction.get(counterRef), transaction.get(legacyCounterRef), transaction.get(pendingRef), transaction.get(indexRef), quoteRef ? transaction.get(quoteRef) : null,
     ]);
     const pendingOrder = pendingSnap.exists ? await transaction.get(database.collection('orders').doc(String(pendingSnap.get('orderId')))) : null;
     if (pendingOrder?.exists && pendingOrder.get('paymentPending') === true) {
       const previous = pendingOrder.get('eventFormSite')?.number;
       throw new EventFormError('already_pending', `Este WhatsApp já tem um formulário aguardando o sinal${previous ? ` (${formNumberLabel(previous)})` : ''}. Fale conosco pelo WhatsApp para alterar ou incluir outro evento.`);
     }
-    number = Math.max(FIRST_FORM_NUMBER, Number(counterSnap.exists ? counterSnap.get('next') : 0) || 0);
+    // O valor salvo vale mesmo se for menor que o anterior (correção do dono); só nunca fica abaixo do primeiro número.
+    const saved = counterSnap.exists ? counterSnap.get('next') : legacySnap.exists ? legacySnap.get('next') : 0;
+    number = Math.max(FIRST_FORM_NUMBER, Math.trunc(Number(saved)) || 0);
 
     // Valor: só vem do orçamento quando pacote e data batem com o que foi orçado (senão o dono confere no CRM).
     const quote = quoteSnap?.exists && !quoteSnap.get('usedByOrderId') ? quoteSnap.data() : null;

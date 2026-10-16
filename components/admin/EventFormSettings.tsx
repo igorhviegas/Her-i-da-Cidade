@@ -3,7 +3,7 @@ import { ExternalLink, Loader2, RotateCcw, Save } from 'lucide-react';
 import { buildFormConfigDoc, type FormConfig } from '../../services/eventFormConfig.js';
 import { FORM_PATH } from '../../services/eventSiteForm.js';
 import { TERMS_FIELDS, TERMS_TEMPLATE, parseTerms, unknownTermsFields } from '../../services/eventTerms.js';
-import { getEventFormConfig, saveEventFormConfig } from '../../services/siteConfigService';
+import { getEventFormConfig, getEventFormNextNumber, saveEventFormConfig, saveEventFormNextNumber } from '../../services/siteConfigService';
 import { ErrorNote, cardClass, ghostButton, inputClass, labelClass, primaryButton } from './missionsUi';
 
 interface Draft {
@@ -78,6 +78,8 @@ export const EventFormSettings: React.FC = () => {
         <a href={FORM_PATH} target="_blank" rel="noopener noreferrer" className={ghostButton}><ExternalLink className="h-3.5 w-3.5" />Abrir formulário</a>
       </div>
 
+      <NumberSettings />
+
       <section className={`${cardClass} space-y-3`} aria-label="Pacotes">
         <h3 className="text-sm font-bold text-white">Pacotes</h3>
         <div className="grid gap-3 lg:grid-cols-3">
@@ -138,5 +140,36 @@ export const EventFormSettings: React.FC = () => {
         {notice && <span className="text-xs font-semibold text-emerald-300">{notice}</span>}
       </div>
     </div>
+  );
+};
+
+/** Próximo número do formulário. Apagar um pedido não devolve o número; aqui o dono corrige a sequência (ex.: depois de testes). */
+const NumberSettings: React.FC = () => {
+  const [saved, setSaved] = useState<number | null | undefined>(undefined);
+  const [value, setValue] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  useEffect(() => { getEventFormNextNumber().then((next) => { setSaved(next); setValue(next ? String(next) : ''); }, () => setSaved(null)); }, []);
+  const save = async () => {
+    const next = Number(value);
+    if (!Number.isInteger(next) || next < 1) { setMessage('Informe um número inteiro.'); return; }
+    if (saved && next < saved && !window.confirm(`Voltar a numeração de A${saved} para A${next}? Só faça isso se os números entre eles foram apagados (testes): um número já usado em pedido real ficaria repetido.`)) return;
+    setBusy(true); setMessage('');
+    try { await saveEventFormNextNumber(next); setSaved(next); setMessage(`Salvo. O próximo formulário será A${next}.`); }
+    catch (e) { setMessage(e instanceof Error ? e.message : 'Não foi possível salvar.'); }
+    setBusy(false);
+  };
+  return (
+    <section className={`${cardClass} space-y-3`} aria-label="Numeração">
+      <h3 className="text-sm font-bold text-white">Numeração</h3>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className={`${labelClass} w-48`}>Próximo formulário (A…)
+          <input inputMode="numeric" value={value} onChange={(e) => { setValue(e.target.value.replace(/\D/g, '')); setMessage(''); }} className={inputClass} placeholder={saved === null ? 'sequência automática' : ''} disabled={saved === undefined} />
+        </label>
+        <button type="button" onClick={save} disabled={busy || saved === undefined} className={ghostButton}>{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}Salvar número</button>
+      </div>
+      <p className="text-[11px] text-white/45">Cada envio usa este número e avança 1. Apagar um pedido não devolve o número: depois de apagar formulários de teste, volte aqui para o número certo.{saved === null ? ' Ainda não há número salvo aqui; ao salvar, ele passa a valer.' : ''}</p>
+      {message && <p className="text-xs font-semibold text-emerald-300">{message}</p>}
+    </section>
   );
 };
