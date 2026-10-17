@@ -26,7 +26,7 @@
     "@vercel/blob": "^2.8.1",
     "@vercel/oidc": "^3.8.9",
     "express": "^5.2.1",
-    "firebase": "^12.19.0",
+    "firebase": "^13.0.0",
     "fit-file-parser": "6.1.2",
     "jspdf": "4.2.1",
     "lucide-react": "^1.52.0",
