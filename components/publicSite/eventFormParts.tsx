@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { Award, Car, Check, Clock, Gift, Info, Mic, Star, UserRound, Video } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Award, Car, Check, Clock, Gift, Info, Mic, PlayCircle, Star, UserRound, Video, X } from 'lucide-react';
 import { phoneCountryOptions } from '../../services/phoneCountries.js';
+import { parseThankYouVideo } from '../../services/clientsPage.js';
 
 // Peças do formulário do evento (/formulario-evento) com tema claro (padrão) e escuro (classe `dark` na raiz da página).
 
@@ -65,13 +66,19 @@ export const InfoTip: React.FC<{ label: string; children: React.ReactNode }> = (
 /** Telefone em duas partes (DDI + número), como no agendamento da vídeo chamada, com as cores do tema. */
 export const PhoneInput: React.FC<{ title: string; note?: string; country: string; number: string; onCountry: (iso: string) => void; onNumber: (value: string) => void }> = ({ title, note, country, number, onCountry, onNumber }) => {
   const options = useMemo(() => phoneCountryOptions(), []);
+  const selected = options.find((option) => option.iso === country);
   return (
     <div>
       <span className={ui.label}>{title}</span>
       <div className="mt-1.5 flex gap-2">
-        <select aria-label={`${title}: país (DDI)`} value={country} onChange={(e) => onCountry(e.target.value)} className={`w-[7.25rem] shrink-0 ${ui.input} px-2`}>
-          {options.map((option) => <option key={option.iso} value={option.iso}>{option.label}</option>)}
-        </select>
+        {/* DDI compacto: mostra só bandeira + código; o select invisível por cima abre a lista completa (com o nome dos países). */}
+        <div className="relative flex w-[5.75rem] shrink-0 items-center justify-center gap-1 rounded-xl border border-slate-300 bg-white text-base text-slate-900 focus-within:border-blue-500 dark:border-white/10 dark:bg-[#070B14] dark:text-white">
+          <span aria-hidden>{selected?.flag}</span><span aria-hidden className="font-semibold">+{selected?.ddi}</span>
+          <svg aria-hidden viewBox="0 0 12 12" className="h-3 w-3 opacity-50"><path d="M2 4l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+          <select aria-label={`${title}: país (DDI)`} value={country} onChange={(e) => onCountry(e.target.value)} className="absolute inset-0 h-full w-full cursor-pointer opacity-0">
+            {options.map((option) => <option key={option.iso} value={option.iso}>{option.label}</option>)}
+          </select>
+        </div>
         <input type="tel" inputMode="tel" autoComplete="tel" aria-label={`${title}: número`} placeholder={country === 'BR' ? '(31) 99999-0000' : 'Número com código de área'} value={number} onChange={(e) => onNumber(e.target.value)} className={`min-w-0 flex-1 ${ui.input}`} />
       </div>
       {note && <span className={ui.hint}>{note}</span>}
@@ -80,7 +87,7 @@ export const PhoneInput: React.FC<{ title: string; note?: string; country: strin
 };
 
 /** Cartão de um adicional: imagem, descrição e o que preencher quando marcado. */
-export const AddonCard: React.FC<{ image: string; title: string; price: string; text: string; checked: boolean; onChange?: (value: boolean) => void; control?: React.ReactNode; children?: React.ReactNode }> = ({ image, title, price, text, checked, onChange, control, children }) => (
+export const AddonCard: React.FC<{ image: string; title: string; price: string; text: string; checked: boolean; video?: string; onChange?: (value: boolean) => void; control?: React.ReactNode; children?: React.ReactNode }> = ({ image, title, price, text, checked, video, onChange, control, children }) => (
   <article className={`overflow-hidden rounded-2xl border transition-colors ${checked ? 'border-blue-500 ring-1 ring-blue-500/40' : 'border-slate-200 dark:border-white/10'} bg-white dark:bg-white/5`}>
     <img src={image} alt={title} loading="lazy" className="aspect-video w-full object-cover" />
     <div className="space-y-3 p-4">
@@ -97,8 +104,39 @@ export const AddonCard: React.FC<{ image: string; title: string; price: string; 
         )}
       </div>
       <p className={`text-sm leading-relaxed ${ui.body}`}>{text} <span className={ui.muted}>Desconto válido só junto do pacote presencial.</span></p>
+      {video && <ExampleVideo url={video} title={title} />}
       {control}
       {checked && children}
     </div>
   </article>
 );
+
+/** "Ver exemplar": toca o vídeo de exemplo numa janela sobre a página (YouTube sem cookies ou arquivo), sem sair do formulário. */
+const ExampleVideo: React.FC<{ url: string; title: string }> = ({ url, title }) => {
+  const [open, setOpen] = useState(false);
+  const video = useMemo(() => parseThankYouVideo(url), [url]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [open]);
+  if (!video) return null;
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className="flex items-center gap-1.5 text-sm font-bold text-blue-600 hover:text-blue-500 dark:text-blue-300">
+        <PlayCircle className="h-4 w-4" aria-hidden />Ver exemplar
+      </button>
+      {open && (
+        <div role="dialog" aria-modal="true" aria-label={`Exemplo: ${title}`} onClick={() => setOpen(false)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
+          <div onClick={(event) => event.stopPropagation()} className="relative aspect-[9/16] h-[min(80vh,640px)] max-w-full overflow-hidden rounded-2xl bg-black shadow-2xl">
+            {video.kind === 'youtube'
+              ? <iframe src={video.embedUrl} title={`Exemplo: ${title}`} className="h-full w-full" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowFullScreen />
+              : <video src={video.src} controls autoPlay playsInline className="h-full w-full object-contain" />}
+          </div>
+          <button type="button" onClick={() => setOpen(false)} aria-label="Fechar vídeo" className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"><X className="h-5 w-5" /></button>
+        </div>
+      )}
+    </>
+  );
+};

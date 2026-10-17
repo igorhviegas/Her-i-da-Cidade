@@ -54,3 +54,9 @@ test('valores salvos inválidos caem no padrão', () => {
   assert.equal(normalizeFormConfig({ terms: { 2: '## Falso\nTexto trocado.' } }).terms['2'], BUILTIN_TERMS[2]); // versão embutida não é sobrescrita
   assert.equal(config.packages[2].title, 'Presença VIP');
 });
+
+test('vídeos de exemplo: YouTube (Shorts) ou .mp4; link inválido vira vazio', () => {
+  const config = normalizeFormConfig({ addonVideos: { extraWeb: 'https://youtube.com/shorts/SzTLExDEMQY', birthdayVideo: 'https://instagram.com/reel/x', inviteVideo: 'https://x.public.blob.vercel-storage.com/convite.mp4' } });
+  assert.deepEqual(config.addonVideos, { extraWeb: 'https://youtube.com/shorts/SzTLExDEMQY', birthdayVideo: '', inviteVideo: 'https://x.public.blob.vercel-storage.com/convite.mp4' });
+  assert.deepEqual(normalizeFormConfig(null).addonVideos, { extraWeb: '', birthdayVideo: '', inviteVideo: '' });
+});
