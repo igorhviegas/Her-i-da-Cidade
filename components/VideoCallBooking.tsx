@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BookingView } from './publicSite/VideoCallBookingViews';
 import { useBookingFormState, useCalendarData, useVideoCallAvailability } from './publicSite/useVideoCallBooking';
 import { buildBookingBody, detectTimeZone } from './publicSite/videoCallShared';
@@ -48,12 +48,20 @@ export const VideoCallBooking: React.FC<{ /** Avisa quem hospeda o componente qu
 
   const choose = (t: string) => { setTime(t); setError(''); setStep('info'); };
 
+  // Trocou de passo com o topo do cartão fora da tela (ex.: escolheu o horário lá embaixo): volta para o começo do passo.
+  const top = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (top.current && top.current.getBoundingClientRect().top < 0) top.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [step, booked]);
+
   return (
-    <BookingView
-      days={days} config={config} loadError={loadError} onRetry={load} booked={booked} step={step}
-      month={month} date={date} time={time} error={error} calendar={calendar} form={form} timeZone={timeZone}
-      onMonth={setMonth} onDate={(key) => { setDate(key); setTime(''); setError(''); }} onChoose={choose}
-      onBack={backToSlots} onContinue={() => setStep('form')} onSubmit={submit}
-    />
+    <div ref={top} className="scroll-mt-4">
+      <BookingView
+        days={days} config={config} loadError={loadError} onRetry={load} booked={booked} step={step}
+        month={month} date={date} time={time} error={error} calendar={calendar} form={form} timeZone={timeZone}
+        onMonth={setMonth} onDate={(key) => { setDate(key); setTime(''); setError(''); }} onChoose={choose}
+        onBack={backToSlots} onInfo={() => { setStep('info'); setError(''); }} onContinue={() => setStep('form')} onSubmit={submit}
+      />
+    </div>
   );
 };

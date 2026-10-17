@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { isValidTimeZone } from '../../functions/video-call-time.js';
-import { ddiOf, phoneCountryOptions } from '../../services/phoneCountries.js';
+import { ddiOf } from '../../services/phoneCountries.js';
 
 export interface Day { date: string; times: string[] }
 export interface Booked { date: string; time: string; whatsappUrl: string | null }
@@ -30,44 +30,20 @@ export function detectTimeZone(): string {
   }
 }
 
-export const inputBase = 'rounded-xl border border-white/10 bg-[#070B14] px-3 py-3 text-base text-white placeholder:text-white/30 focus:border-blue-500 focus:outline-none';
-export const field = `mt-1.5 w-full ${inputBase}`;
-export const label = 'block text-xs font-semibold text-white/70';
-export const hint = 'mt-1 block text-xs font-normal text-white/40';
-export const heading = 'text-xs font-black uppercase tracking-[0.2em] text-blue-400';
-export const primary = 'min-h-12 w-full rounded-xl bg-blue-600 px-6 text-sm font-extrabold uppercase tracking-wide text-white hover:bg-blue-500 disabled:opacity-60';
-export const box = 'rounded-[2rem] border border-white/10 bg-[#0B1929]/60 p-5 text-left shadow-[0_30px_60px_-12px_rgba(0,0,0,0.5)] backdrop-blur-xl sm:p-8';
-
-/** Trechos entre ** viram negrito (textos configuráveis no admin). */
-export const renderBold = (text: string) => text.split('**').map((part, i) => (i % 2 ? <strong key={i} className="font-bold text-white">{part}</strong> : part));
+/** Trechos entre ** viram negrito (textos configuráveis no admin). O padrão é para fundo escuro; os formulários com tema passam a cor do tema. */
+export const renderBold = (text: string, strong = 'font-bold text-white') => text.split('**').map((part, i) => (i % 2 ? <strong key={i} className={strong}>{part}</strong> : part));
+const themedStrong = 'font-bold text-slate-900 dark:text-white';
 
 /** Texto configurável no admin: parágrafos separados por linha em branco e **negrito**. */
 export const Rich: React.FC<{ text: string; className?: string }> = ({ text, className }) => (
-  <div className={`space-y-3 text-sm leading-relaxed text-white/75 ${className ?? ''}`}>
+  <div className={`space-y-3 text-sm leading-relaxed text-slate-700 dark:text-white/75 ${className ?? ''}`}>
     {text.split(/\n\s*\n/).map((paragraph, i) => (
       <p key={i} className="whitespace-pre-line">
-        {renderBold(paragraph)}
+        {renderBold(paragraph, themedStrong)}
       </p>
     ))}
   </div>
 );
-
-/** Telefone em duas partes: país (DDI, Brasil por padrão) e número. O servidor junta os dois no formato internacional. */
-export const PhoneField: React.FC<{ title: string; note?: string; country: string; number: string; onCountry: (iso: string) => void; onNumber: (value: string) => void; autoComplete?: string }> = ({ title, note, country, number, onCountry, onNumber, autoComplete }) => {
-  const options = useMemo(() => phoneCountryOptions(), []);
-  return (
-    <div>
-      <span className={label}>{title}</span>
-      <div className="mt-1.5 flex gap-2">
-        <select aria-label={`${title}: país (DDI)`} value={country} onChange={(e) => onCountry(e.target.value)} className={`w-[7.25rem] shrink-0 ${inputBase} px-2`}>
-          {options.map((option) => <option key={option.iso} value={option.iso}>{option.label}</option>)}
-        </select>
-        <input required type="tel" inputMode="tel" autoComplete={autoComplete} aria-label={`${title}: número`} placeholder={country === 'BR' ? '(31) 99999-0000' : 'Número com código de área'} value={number} onChange={(e) => onNumber(e.target.value)} className={`min-w-0 flex-1 ${inputBase}`} />
-      </div>
-      {note && <span className={hint}>{note}</span>}
-    </div>
-  );
-};
 
 interface BookingBodyInput {
   values: BookingValues;
