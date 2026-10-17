@@ -10,6 +10,7 @@ import type { OrderView } from './orderView';
 import { buildContactWhatsappUrl, buildOrderRows } from './orderDetails';
 import { ClientHistoryList } from './ClientHistoryList';
 import { InviteArtPanel } from './InviteArtPanel';
+import { FormPdfButton } from './FormPdfButton';
 import type { CalendarState } from './useOrderCalendar';
 
 interface OrderDetailsModalProps {
@@ -98,6 +99,7 @@ const OrderCalendarMessage: React.FC<{ calendar: NonNullable<CalendarState> | nu
 
 interface OrderCalendarPanelProps {
   order: Order;
+  client: OrderView['client'];
   calendar: NonNullable<CalendarState> | null;
   syncedAt: Date | null;
   updatingOrderId: string | null;
@@ -105,13 +107,14 @@ interface OrderCalendarPanelProps {
   handleSendToCalendar: (orderId: string) => Promise<void>;
 }
 
-const OrderCalendarPanel: React.FC<OrderCalendarPanelProps> = ({ order, calendar, syncedAt, updatingOrderId, deletingOrderId, handleSendToCalendar }) => (
+const OrderCalendarPanel: React.FC<OrderCalendarPanelProps> = ({ order, client, calendar, syncedAt, updatingOrderId, deletingOrderId, handleSendToCalendar }) => (
   <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3.5">
     <div className="flex flex-wrap items-center gap-3">
       <button type="button" onClick={() => void handleSendToCalendar(order.id)} disabled={calendar?.kind === 'sending' || Boolean(updatingOrderId || deletingOrderId)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-sky-500/25 bg-sky-500/10 px-4 py-2.5 text-sm font-semibold text-sky-200 hover:bg-sky-500/20 disabled:opacity-50">
         {calendar?.kind === 'sending' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarPlus className="h-4 w-4" />}
         {calendar?.kind === 'sending' ? 'Enviando…' : 'Enviar para Google Agenda'}
       </button>
+      <FormPdfButton order={order} client={client} />
       <span className="text-[11px] text-white/45">
         {syncedAt ? `Último envio: ${syncedAt.toLocaleString('pt-BR')}. Reenviar atualiza o mesmo evento.` : 'Ainda não enviado. Salve as alterações do pedido antes de enviar.'}
       </span>
@@ -203,7 +206,9 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           </dl>
           {order.eventDraft && (
             <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100">
-              Pedido recebido pelo ManyChat com cliente e WhatsApp. Faltam os dados do evento: use "Editar pedido" para completar. Nada foi lançado no Financeiro ainda.
+              {order.eventFormSite
+                ? `Formulário A${order.eventFormSite.number} enviado pelo cliente no site${order.paymentPending ? ', aguardando o sinal' : ', sinal confirmado'}. Confira os valores em "Editar pedido" e salve depois de receber o sinal: é aí que a entrada é lançada no Financeiro.`
+                : 'Pedido recebido pelo ManyChat com cliente e WhatsApp. Faltam os dados do evento: use "Editar pedido" para completar. Nada foi lançado no Financeiro ainda.'}
             </p>
           )}
           {!event && (
@@ -213,7 +218,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             </div>
           )}
           {isInviteVideoService(service) && <InviteArtPanel key={order.id} order={order} />}
-          {event && <OrderCalendarPanel order={order} calendar={calendar} syncedAt={syncedAt} updatingOrderId={updatingOrderId} deletingOrderId={deletingOrderId} handleSendToCalendar={handleSendToCalendar} />}
+          {event && <OrderCalendarPanel order={order} client={client} calendar={calendar} syncedAt={syncedAt} updatingOrderId={updatingOrderId} deletingOrderId={deletingOrderId} handleSendToCalendar={handleSendToCalendar} />}
 
           <details open className="border-b border-white/[0.07] pb-3">
             <summary className="cursor-pointer select-none text-[10px] font-bold uppercase tracking-[0.12em] text-white/40 hover:text-white/60">Histórico do cliente ({clientHistoryViews.length})</summary>
