@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, Download, Loader2, Lock, MessageCircle, Moon, Plus, ShieldCheck, Sun, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Download, Loader2, Lock, MessageCircle, Plus, ShieldCheck, X } from 'lucide-react';
 import { Link } from '../lib/router';
 import { dateKey } from '../functions/missions-core.js';
 import { formatBrl } from '../services/eventQuote.js';
@@ -10,7 +10,7 @@ import { EVENT_FORM_PRIVACY_NOTE, PRIVACY_PATH } from '../services/privacy.js';
 import { DEFAULT_PHONE_COUNTRY, ddiOf } from '../services/phoneCountries.js';
 import { useSiteConfig } from '../services/siteConfigService';
 import { TurnstileWidget } from './publicSite/TurnstileWidget';
-import { AddonCard, InfoTip, PackageItems, PhoneInput, choice, field, ui } from './publicSite/eventFormParts';
+import { AddonCard, FormHeader, InfoTip, PackageItems, PhoneInput, StepHeader, alertBox, choice, field, pageBg, ui, useFormTheme } from './publicSite/eventFormParts';
 
 type Values = Omit<SiteFormValues, 'pcd' | 'imageAuthorization' | 'ddi'> & { pcd: '' | 'yes' | 'no'; imageAuthorization: '' | 'yes' | 'no' };
 type Field = keyof SiteFormValues;
@@ -33,7 +33,6 @@ const STEPS: { title: string; subtitle: string; fields: Field[] }[] = [
 ];
 
 const ACCENT: Record<string, string> = { aniversario: 'from-cyan-400 to-blue-600', visita: 'from-amber-300 to-yellow-500', vip: 'from-red-500 to-red-700' };
-const THEME_KEY = 'hdc.formulario.tema';
 const QUOTE_REQUEST = 'Olá! Vi o formulário do evento e gostaria de solicitar um orçamento para outra opção.';
 
 const brDate = (key: string) => key.split('-').reverse().join('/');
@@ -41,7 +40,6 @@ const maskCpf = (value: string) => value.replace(/\D/g, '').slice(0, 11).replace
 const withText = (url: string, message: string) => {
   try { const u = new URL(url); u.searchParams.delete('text'); return `${u.toString()}${u.search ? '&' : '?'}text=${encodeURIComponent(message)}`; } catch { return url; }
 };
-const readTheme = (): 'light' | 'dark' => { try { return localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light'; } catch { return 'light'; } };
 
 // Rascunho no próprio aparelho (sem login): atualizar a página ou voltar depois continua de onde parou. Some ao concluir,
 // ao tocar em "Recomeçar" ou depois de DRAFT_DAYS. O aceite dos termos não é guardado (precisa ser marcado de novo).
@@ -65,7 +63,7 @@ const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch { /
  */
 export const EventFormPage: React.FC = () => {
   const { whatsappUrl } = useSiteConfig();
-  const [theme, setTheme] = useState(readTheme);
+  const { theme, toggle: toggleTheme, rootClass } = useFormTheme();
   const [draft] = useState(readDraft);
   const [restored, setRestored] = useState(Boolean(draft));
   const draftQuoteId = useRef(draft?.values.quoteId ?? '');
@@ -94,12 +92,6 @@ export const EventFormPage: React.FC = () => {
     { packageTitle: pack?.title, duration: pack?.duration, date: values.eventDate ? brDate(values.eventDate) : '', time: values.eventTime, location: values.location, name: values.responsibleName, cpf: values.cpf, whatsapp: phoneLabel, email: values.email },
     { text: config.termsText, depositDays: config.depositDays },
   );
-
-  const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    try { localStorage.setItem(THEME_KEY, next); } catch { /* sem armazenamento: vale só nesta visita */ }
-  };
 
   const loadConfig = () => {
     const quoteId = new URLSearchParams(window.location.search).get('orcamento');
@@ -187,21 +179,10 @@ export const EventFormPage: React.FC = () => {
   };
 
   return (
-    <div className={theme === 'dark' ? 'dark' : 'form-light'}>
-      <main className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-white px-4 pb-10 pt-5 text-slate-900 dark:from-black dark:via-[#07101d] dark:to-[#0B1929] dark:text-white">
+    <div className={rootClass}>
+      <main className={pageBg}>
         <div ref={top} className="mx-auto max-w-xl scroll-mt-4">
-          <header className="mb-4 flex items-center justify-between">
-            <Link href="/" aria-label="Herói da Cidade: ir para o site" className="flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[#0072d2] shadow-lg shadow-blue-600/30">
-                <img src="/images/logo-128.webp" alt="" className="h-full w-full scale-125 object-cover" />
-              </span>
-              <span className="text-base font-bold tracking-tight">Herói da Cidade</span>
-            </Link>
-            <button type="button" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white/80">
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-          </header>
+          <FormHeader theme={theme} onToggle={toggleTheme} />
 
           {step === 0 && !done && (
             <div className="relative -mx-4 mb-[-2.5rem] h-56 overflow-hidden sm:mx-0 sm:h-64 sm:rounded-[2rem]">
@@ -214,16 +195,7 @@ export const EventFormPage: React.FC = () => {
 
           {done ? <DoneView done={done} depositDays={config.depositDays} pdfBusy={pdfBusy} onPdf={downloadPdf} error={error} /> : (
             <div className={ui.card}>
-              <div className="mb-6">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Passo {step + 1} de {STEPS.length}</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-label="Progresso do formulário">
-                  <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-600 transition-all" style={{ width: `${((step + 1) / STEPS.length) * 100}%` }} />
-                </div>
-                <h2 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl">{STEPS[step].title}</h2>
-                <p className={`mt-1 text-sm ${ui.body}`}>{STEPS[step].subtitle}</p>
-              </div>
+              <StepHeader index={step} total={STEPS.length} title={STEPS[step].title} subtitle={STEPS[step].subtitle} />
 
               {restored && (
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-100">
@@ -431,7 +403,7 @@ export const EventFormPage: React.FC = () => {
                 )}
               </div>
 
-              {error && <p role="alert" className="mt-4 rounded-xl border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">{error}</p>}
+              {error && <p role="alert" className={`mt-4 ${alertBox}`}>{error}</p>}
 
               <div className="mt-6 flex gap-2">
                 {step > 0 && <button type="button" onClick={back} disabled={submitting} className={ui.secondary}><ArrowLeft className="h-4 w-4" />Voltar</button>}

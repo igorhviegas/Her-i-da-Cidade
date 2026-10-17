@@ -1,9 +1,55 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Award, Car, Check, Clock, Gift, Info, Mic, PlayCircle, Star, UserRound, Video, X } from 'lucide-react';
+import { Award, Car, Check, Clock, Gift, Info, Mic, Moon, PlayCircle, Star, Sun, UserRound, Video, X } from 'lucide-react';
+import { Link } from '../../lib/router';
 import { phoneCountryOptions } from '../../services/phoneCountries.js';
 import { parseThankYouVideo } from '../../services/clientsPage.js';
 
-// Peças do formulário do evento (/formulario-evento) com tema claro (padrão) e escuro (classe `dark` na raiz da página).
+// Peças dos formulários públicos (/formulario-evento e /agendar-chamada) com tema claro (padrão) e escuro (classe `dark` na raiz da página).
+
+const THEME_KEY = 'hdc.formulario.tema';
+
+/** Tema claro por padrão; o escuro fica lembrado no aparelho (vale para os dois formulários). */
+export function useFormTheme() {
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => { try { return localStorage.getItem(THEME_KEY) === 'dark' ? 'dark' : 'light'; } catch { return 'light'; } });
+  const toggle = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch { /* sem armazenamento: vale só nesta visita */ }
+  };
+  return { theme, toggle, rootClass: theme === 'dark' ? 'dark' : 'form-light' };
+}
+
+export const pageBg = 'min-h-screen bg-gradient-to-b from-sky-50 via-white to-white px-4 pb-10 pt-5 text-slate-900 dark:from-black dark:via-[#07101d] dark:to-[#0B1929] dark:text-white';
+
+/** Marca (link para o site) e botão de tema. */
+export const FormHeader: React.FC<{ theme: 'light' | 'dark'; onToggle: () => void }> = ({ theme, onToggle }) => (
+  <header className="mb-4 flex items-center justify-between">
+    <Link href="/" aria-label="Herói da Cidade: ir para o site" className="flex items-center gap-2">
+      <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[#0072d2] shadow-lg shadow-blue-600/30">
+        <img src="/images/logo-128.webp" alt="" className="h-full w-full scale-125 object-cover" />
+      </span>
+      <span className="text-base font-bold tracking-tight">Herói da Cidade</span>
+    </Link>
+    <button type="button" onClick={onToggle} aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}
+      className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-white/5 dark:text-white/80">
+      {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </button>
+  </header>
+);
+
+/** "Passo X de N", barra de progresso, título e subtítulo da tela. */
+export const StepHeader: React.FC<{ index: number; total: number; title: string; subtitle: string }> = ({ index, total, title, subtitle }) => (
+  <div className="mb-6">
+    <span className="text-xs font-bold uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400">Passo {index + 1} de {total}</span>
+    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10" role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={index + 1} aria-label="Progresso do formulário">
+      <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-600 transition-all" style={{ width: `${((index + 1) / total) * 100}%` }} />
+    </div>
+    <h2 className="mt-4 text-2xl font-extrabold tracking-tight sm:text-3xl">{title}</h2>
+    <p className="mt-1 text-sm text-slate-700 dark:text-white/75">{subtitle}</p>
+  </div>
+);
+
+export const alertBox = 'rounded-xl border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200';
 
 export const ui = {
   card: 'rounded-[2rem] border border-slate-200 bg-white p-5 text-left shadow-xl shadow-slate-200/60 sm:p-8 dark:border-white/10 dark:bg-[#0B1929]/70 dark:shadow-black/40',
@@ -64,7 +110,7 @@ export const InfoTip: React.FC<{ label: string; children: React.ReactNode }> = (
 };
 
 /** Telefone em duas partes (DDI + número), como no agendamento da vídeo chamada, com as cores do tema. */
-export const PhoneInput: React.FC<{ title: string; note?: string; country: string; number: string; onCountry: (iso: string) => void; onNumber: (value: string) => void }> = ({ title, note, country, number, onCountry, onNumber }) => {
+export const PhoneInput: React.FC<{ title: string; note?: string; country: string; number: string; onCountry: (iso: string) => void; onNumber: (value: string) => void; required?: boolean; autoComplete?: string }> = ({ title, note, country, number, onCountry, onNumber, required, autoComplete = 'tel' }) => {
   const options = useMemo(() => phoneCountryOptions(), []);
   const selected = options.find((option) => option.iso === country);
   return (
@@ -79,7 +125,7 @@ export const PhoneInput: React.FC<{ title: string; note?: string; country: strin
             {options.map((option) => <option key={option.iso} value={option.iso}>{option.label}</option>)}
           </select>
         </div>
-        <input type="tel" inputMode="tel" autoComplete="tel" aria-label={`${title}: número`} placeholder={country === 'BR' ? '(31) 99999-0000' : 'Número com código de área'} value={number} onChange={(e) => onNumber(e.target.value)} className={`min-w-0 flex-1 ${ui.input}`} />
+        <input required={required} type="tel" inputMode="tel" autoComplete={autoComplete} aria-label={`${title}: número`} placeholder={country === 'BR' ? '(31) 99999-0000' : 'Número com código de área'} value={number} onChange={(e) => onNumber(e.target.value)} className={`min-w-0 flex-1 ${ui.input}`} />
       </div>
       {note && <span className={ui.hint}>{note}</span>}
     </div>

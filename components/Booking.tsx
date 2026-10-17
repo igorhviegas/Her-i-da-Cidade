@@ -25,7 +25,8 @@ export const Booking: React.FC<{ section: HomeSection }> = ({ section }) => {
           
           <div className="bg-[#0B1929]/40 backdrop-blur-xl border border-white/10 rounded-[2rem] overflow-hidden shadow-[0_30px_60px_-12px_rgba(0,0,0,0.5)] transition-transform hover:scale-[1.005] duration-500">
             <div className="p-1 sm:p-2 bg-gradient-to-b from-white/10 to-transparent">
-              <VideoCallBooking />
+              {/* O agendamento tem tema claro/escuro; na home, sempre o escuro. */}
+              <div className="dark"><VideoCallBooking /></div>
             </div>
           </div>
 
