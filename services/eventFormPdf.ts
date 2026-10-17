@@ -5,13 +5,13 @@ import type { PublicFormConfig } from './eventFormConfig.js';
 import { PROVIDER, termsSections } from './eventTerms.js';
 import type { SiteFormValues } from './eventSiteForm.js';
 
-export interface PdfInput { form: SiteFormValues; config: PublicFormConfig; label: string; acceptedAtMs: number; termsVersion: string; total: number; whatsappLabel: string }
+export interface PdfInput { form: SiteFormValues; config: PublicFormConfig; label: string; acceptedAtMs: number; termsVersion: string; total: number; whatsappLabel: string; /** Pedido importado do Google Forms ou criado no CRM: rótulos de registro em vez de envio pelo site. */ legacy?: boolean }
 
 const brDate = (key: string) => key.split('-').reverse().join('/');
 const brl = (value: number) => `R$ ${value.toFixed(2).replace('.', ',')}`;
 
 /** Monta o PDF (sem baixar). */
-export async function buildEventFormPdf({ form, config, label, acceptedAtMs, termsVersion, total, whatsappLabel }: PdfInput) {
+export async function buildEventFormPdf({ form, config, label, acceptedAtMs, termsVersion, total, whatsappLabel, legacy = false }: PdfInput) {
   const { jsPDF } = await import('jspdf');
   const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
   const pack = config.packages.find((p) => p.id === form.packageId);
@@ -100,12 +100,14 @@ export async function buildEventFormPdf({ form, config, label, acceptedAtMs, ter
   heading('Autorizações');
   row('Termos de contratação', `Li e aceito (versão ${termsVersion})`);
   row('Uso de imagens', form.imageAuthorization ? 'Autorizo' : 'Não autorizo');
-  row('Enviado em', `${accepted} (horário de Brasília)`);
+  row(legacy ? 'Registrado no CRM em' : 'Enviado em', `${accepted} (horário de Brasília)`);
 
   pdf.addPage();
   header();
   heading('TERMOS DE PRESTAÇÃO DE SERVIÇO: PRESENÇA TEATRAL');
-  paragraph(`Formulário ${label} · Versão dos termos: ${termsVersion} · Aceito em ${accepted}`, 8.5);
+  paragraph(legacy
+    ? `Formulário ${label} · Termos do Google Forms (versão ${termsVersion}), aceitos no preenchimento do formulário original`
+    : `Formulário ${label} · Versão dos termos: ${termsVersion} · Aceito em ${accepted}`, 8.5);
   for (const section of termsSections({
     packageTitle: pack?.title, duration: pack?.duration, date: brDate(form.eventDate), time: form.eventTime, location: form.location,
     name: form.responsibleName, cpf: formatCpf(form.cpf), whatsapp: whatsappLabel, email: form.email,

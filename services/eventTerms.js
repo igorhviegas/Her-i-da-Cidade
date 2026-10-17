@@ -23,6 +23,53 @@ export const TERMS_FIELDS = {
   prazoSinal: 'prazo do sinal (dias)',
 };
 
+/**
+ * Versão 1: termos do Google Forms ("Termos de contrato.docx"), aceitos nos formulários anteriores ao site (até A214) e usados no
+ * PDF que o CRM gera para pedidos importados ou criados à mão. Texto original, inclusive a numeração. Não editar.
+ */
+const TERMS_V1 = `## 1. Descrição dos Serviços
+O Prestador de Serviços fornecerá a participação do personagem Homem-Aranha que fará uma animação temática durante o evento de acordo com as condições e especificações acordadas. O trabalho prestado não se trata de Recreação infantil e sim de uma Presença Teatral Animada em que o ator interpretará nas devidas condições, o personagem contratado.
+
+## 2. Pagamento
+O contratante concorda em efetuar o pagamento no valor total conforme detalhes de pagamento acertados.
+
+## 3. Cancelamento
+O contratante compreende que em caso de cancelamento por parte dele, o valor pago até o momento não será reembolsado, a menos que especificado de outra forma no presente termo.
+
+## 5. Responsabilidades do Contratante
+O contratante se compromete a fornecer as condições necessárias para a realização dos serviços, incluindo espaço adequado, energia elétrica e quaisquer outros recursos especificamente solicitados pelo Prestador de Serviços e reconhece que é responsabilidade do mesmo supervisionar todas as crianças durante a execução do serviço.
+
+## 6. Condições de Execução
+O contratante compreende e concorda que:
+6.1 Segurança do Ator: O ator que interpretará o serviço não será obrigado a realizar movimentos ou ações nas quais possam comprometer sua segurança e/ou bem-estar. Caso o ator e/ou Agente considere que uma ação específica é arriscada ou insegura para ele e/ou demais convidados, ele terá o direito de não realizá-la.
+6.2 Pausas e Hidratação: O ator terá o direito de solicitar pausas caso necessário para descanso e hidratação. O contratante entende que a saúde do ator são prioridades, e que as condições de respiração do uniforme é limitada, por isso, essas pausas serão concedidas de forma a garantir o seu bem-estar durante a execução do serviço contratado.
+6.3 Ajustes de Performance: O ator pode fazer ajustes na performance com o objetivo de garantir a segurança das crianças e a sua própria segurança. Esses ajustes podem incluir modificações nas atividades ou ações planejadas, sempre visando a segurança e o conforto de todos os envolvidos.
+
+## 7. Responsabilidade do Prestador de Serviço
+O Prestador de Serviço deve prestar o serviço conforme o pacote oferecido ao Contratante, cumprindo o horário e programações previamente estabelecidas. Deve entregar uma performance teatral temática, um ator em condições para a execução do serviço contratado e demais itens inclusos no pacote de serviços.
+
+## 8. Mudanças de Programação
+O contratante compreende que mudanças de horário ou de detalhes do evento podem afetar a execução do serviço de animação infantil. Caso haja necessidade de alterações, se compromete a informar ao Prestador de Serviços com a devida antecedência para que possam ajustar os planos.
+
+## 9. Participantes com Necessidades Especiais
+O contratante informará ao Prestador de Serviços com antecedência sobre a presença de participantes com necessidades especiais ou restrições médicas. Isso garantirá que as atividades planejadas possam ser adaptadas para acomodar esses participantes da melhor forma possível.
+
+## 10. Interrupção ou Comportamento Inadequado
+O contratante compreende que o Prestador de Serviços se reserva o direito de interromper ou encerrar a execução do serviço caso haja comportamento inadequado, agressivo ou disruptivo por parte dos participantes. Nesse caso, o pagamento não será reembolsado.
+
+## 11. Comunicação
+O contratante se compromete a manter uma comunicação clara e eficaz com o Prestador de Serviços, fornecendo informações precisas e atualizadas sobre o evento, como localização, horários e quaisquer requisitos especiais.
+
+## 12. Renúncia de Responsabilidade
+O contratante isenta o Prestador de Serviços de qualquer responsabilidade por lesões, danos ou perdas ocorridas durante a execução do serviço de animação infantil, exceto em casos de negligência grosseira.
+
+## 13. Força Maior
+O contratante compreende que o Prestador de Serviços não será responsável por atrasos ou incapacidade de cumprir as obrigações em casos de circunstâncias imprevistas, como condições climáticas extremas ou eventos de força maior.
+Da mesma forma, o Contratado deverá oferecer alternativas para o reagendamento do evento em caso de força maior por parte do Contratante, caso não haja essa possibilidade o valor já pago pode ser devolvido integralmente.
+
+## 12. Aceitação das Condições
+Ao assinalar a caixa no formulário, o contratante confirma que leu e compreendeu todas as condições acima e concorda em cumpri-las integralmente.`;
+
 /** Versão 2: texto aceito pelos primeiros formulários. Não editar (o histórico precisa continuar igual). */
 const TERMS_V2 = `## 1. Partes
 Prestador: {prestador}.
@@ -154,7 +201,9 @@ Ao marcar a caixa de aceite e concluir o formulário, o contratante declara que 
 Fica eleito o foro do domicílio do contratante.`;
 
 /** Versões que vêm no código (as do CRM ficam em siteConfig/eventForm.terms). */
-export const BUILTIN_TERMS = { 2: TERMS_V2, 3: TERMS_TEMPLATE };
+export const BUILTIN_TERMS = { 1: TERMS_V1, 2: TERMS_V2, 3: TERMS_TEMPLATE };
+/** Versão do Google Forms: a dos pedidos que não vieram do formulário do site. */
+export const LEGACY_TERMS_VERSION = '1';
 
 /** Modelo → seções [{ title, items }]. Linhas antes do primeiro "## " são ignoradas. */
 export function parseTerms(text) {

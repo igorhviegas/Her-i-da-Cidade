@@ -9,3 +9,4 @@ export interface TermsData { packageTitle?: string; duration?: string; date?: st
 export function parseTerms(text: string): TermsSection[];
 export function unknownTermsFields(text: string): string[];
 export function termsSections(data?: TermsData, options?: { text?: string; depositDays?: number }): TermsSection[];
+export const LEGACY_TERMS_VERSION: string;

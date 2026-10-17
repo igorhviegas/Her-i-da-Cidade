@@ -63,6 +63,9 @@ test('envio cria rascunho aguardando sinal com número sequencial a partir de 21
   assert.equal(order.eventForm.formType, 'A215 · Aniversário Espetacular');
   assert.equal(order.eventForm.totalValue, 0); // sem orçamento: o dono confere o valor
   assert.equal(order.eventFormSite.cpf, '52998224725');
+  assert.equal(order.eventFormSite.form.childName, 'Miguel'); // envio guardado para o PDF do CRM
+  assert.equal(order.eventFormSite.form.acceptTerms, undefined);
+  assert.equal(order.eventFormSite.prices.extraWeb, 15);
   assert.equal(db.docs.get('siteConfig/eventFormCounter').next, 216);
   assert.deepEqual(order.googleCalendar.eventId, 'evt1');
 

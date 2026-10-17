@@ -84,7 +84,7 @@ export interface Order {
   /** Pré-agendamento de Vídeo Chamada feito pelo site: o horário está reservado, mas o pagamento ainda não foi confirmado (sai quando o ManyChat confirma o pagamento). */
   paymentPending?: boolean;
   /** Formulário do evento preenchido pelo cliente no site (/formulario-evento). Nasce com eventDraft + paymentPending. */
-  eventFormSite?: { number: number; packageId: string; submittedAtMs: number; termsVersion: string; cpf: string; email: string; whatsapp: string; ddi?: string; phone?: string; videos?: { birthday: boolean; birthdayName: string; invite: boolean; inviteDetails: string; inviteParents?: string; inviteGuestTime?: string; childAge?: string }; extraChildren?: { name: string; age: string }[]; quoteId?: string; quoteTotal?: number };
+  eventFormSite?: { number: number; packageId: string; submittedAtMs: number; termsVersion: string; cpf: string; email: string; whatsapp: string; ddi?: string; phone?: string; videos?: { birthday: boolean; birthdayName: string; invite: boolean; inviteDetails: string; inviteParents?: string; inviteGuestTime?: string; childAge?: string }; extraChildren?: { name: string; age: string }[]; /** Envio completo (sem aceite/orçamento) e preços da época, para o PDF do CRM. */ form?: Record<string, unknown>; prices?: { extraWeb: number; birthdayVideo: number; inviteVideo: number; extraChild: number }; quoteId?: string; quoteTotal?: number };
   /** Sinal confirmado pelo ManyChat (formulário do site). */
   depositPaidAt?: Date;
   /** Dados do agendamento público de Vídeo Chamada (/agendar-chamada). `date`/`time` são o horário local da agenda. */

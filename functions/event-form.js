@@ -134,6 +134,7 @@ export async function submitEventForm({ database, input, nowMs = Date.now(), syn
     if (!indexSnap.exists) transaction.set(indexRef, { clientId: clientRef.id, whatsappNormalized: contact.e164, recordType: 'whatsapp-index' });
 
     const pack = config.packages.find((p) => p.id === form.packageId);
+    const { quoteId: _quoteId, acceptTerms: _accepted, ...submittedForm } = form;
     order = {
       clientId: clientRef.id, serviceId: profile.serviceId, status: evaluation.status, eventDraft: true, paymentPending: true,
       content: orderContent(form, number, quoteNote, config), childName: childrenNames(form),
@@ -150,6 +151,8 @@ export async function submitEventForm({ database, input, nowMs = Date.now(), syn
         ...(form.extraChildren.length ? { extraChildren: form.extraChildren } : {}),
         videos: { birthday: form.birthdayVideo, birthdayName: form.birthdayName, invite: form.inviteVideo, inviteParents: form.inviteParents, inviteGuestTime: form.inviteGuestTime, inviteDetails: form.inviteDetails, childAge: form.childAge },
         ...(quote ? { quoteId: form.quoteId, quoteTotal: quote.total } : {}),
+        // Envio completo + preços da época: o CRM gera o mesmo PDF que o cliente baixou (Detalhes do pedido → Baixar formulário).
+        form: submittedForm, prices: config.addonPrices,
       },
       servicePrice: 0, rushFee: 0, totalPaid: 0, productionType: evaluation.productionType,
       source: 'event-form', technicalPurchaseId: orderRef.id, createdAt: FieldValue.serverTimestamp(),
