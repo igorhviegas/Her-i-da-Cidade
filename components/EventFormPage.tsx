@@ -349,7 +349,7 @@ export const EventFormPage: React.FC = () => {
                       </label>
                       <label className={ui.label}>Detalhes<textarea rows={2} value={values.inviteDetails} onChange={(e) => set({ inviteDetails: e.target.value })} className={field} maxLength={500} placeholder="Ex.: venha fantasiado, confirme sua presença" /></label>
                     </AddonCard>
-                    <label className={ui.label}>Algo mais que devemos saber?<textarea rows={2} value={values.observations} onChange={(e) => set({ observations: e.target.value })} className={field} maxLength={1000} placeholder="Tema da festa, acesso ao local…" /></label>
+                    <label className={ui.label}>Algo mais que devemos saber?<textarea rows={2} value={values.observations} onChange={(e) => set({ observations: e.target.value })} className={field} maxLength={1000} placeholder="Ex.: não cantamos É big, é big…" /></label>
                   </div>
                 )}
 
