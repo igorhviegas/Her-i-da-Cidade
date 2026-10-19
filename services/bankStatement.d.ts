@@ -13,7 +13,8 @@ export function parseOfx(text: string): BankTransaction[];
 export function parseStatement(text: string, csvRows: string[][]): BankTransaction[];
 export function categoryKey(t: Pick<BankTransaction, 'kind' | 'title' | 'description'>): string;
 export function ruleId(key: string): string;
-export function planImport(items: BankTransaction[], existingIds: Set<string>, rules: Map<string, string>): { toWrite: BankTransaction[]; skipped: number; auto: number };
+export const DEFAULT_IN_CATEGORY: string;
+export function planImport(items: BankTransaction[], existingIds: Set<string>, rules: Map<string, string>, defaultIn?: string | null): { toWrite: BankTransaction[]; skipped: number; auto: number; defaulted: number };
 export function bankTotals(items: BankTransaction[]): BankTotals;
 export interface BankCategorySettings { in: string[]; out: string[]; hidden: string[] }
 export const DEFAULT_CATEGORY_SETTINGS: BankCategorySettings;

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { collection, doc, getDocs, onSnapshot, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { bankTotals, categoryKey, DEFAULT_CATEGORY_SETTINGS, planImport, replaceCategory, ruleId, visibleItems, type BankCategorySettings, type BankTotals, type BankTransaction } from './bankStatement.js';
+import { bankTotals, categoryKey, DEFAULT_CATEGORY_SETTINGS, DEFAULT_IN_CATEGORY, planImport, replaceCategory, ruleId, visibleItems, type BankCategorySettings, type BankTotals, type BankTransaction } from './bankStatement.js';
 
 export type { BankCategorySettings, BankTotals, BankTransaction };
 export type BankMonth = { items: BankTransaction[]; totals: BankTotals };
@@ -29,8 +29,11 @@ export async function listBankRange(from?: string, to?: string): Promise<BankTra
   return result.docs.map((d) => ({ ...(d.data() as Omit<BankTransaction, 'id'>), id: d.id }));
 }
 
-/** Grava só o que ainda não existe (consulta apenas o período do arquivo) e aplica as regras de categoria salvas. */
-export async function importBankStatement(items: BankTransaction[]): Promise<{ added: number; skipped: number; auto: number; from: string; to: string }> {
+/**
+ * Grava só o que ainda não existe (consulta apenas o período do arquivo) e aplica as regras de categoria salvas.
+ * Entrada sem regra entra como "Serviços (clientes)", enquanto essa categoria existir na lista de entradas.
+ */
+export async function importBankStatement(items: BankTransaction[], settings: BankCategorySettings): Promise<{ added: number; skipped: number; auto: number; defaulted: number; from: string; to: string }> {
   const firestore = requireDb();
   const dates = items.map((t) => t.date).sort();
   const from = dates[0], to = dates[dates.length - 1];
@@ -38,13 +41,14 @@ export async function importBankStatement(items: BankTransaction[]): Promise<{ a
     getDocs(query(collection(firestore, TX), where('date', '>=', from), where('date', '<=', to))),
     getDocs(collection(firestore, RULES)),
   ]);
-  const plan = planImport(items, new Set(existing.docs.map((d) => d.id)), new Map(rules.docs.map((d) => [d.data().key as string, d.data().category as string])));
+  const defaultIn = settings.in.includes(DEFAULT_IN_CATEGORY) ? DEFAULT_IN_CATEGORY : null;
+  const plan = planImport(items, new Set(existing.docs.map((d) => d.id)), new Map(rules.docs.map((d) => [d.data().key as string, d.data().category as string])), defaultIn);
   for (let i = 0; i < plan.toWrite.length; i += 400) {
     const batch = writeBatch(firestore);
     for (const { id, ...data } of plan.toWrite.slice(i, i + 400)) batch.set(doc(firestore, TX, id), { ...data, importedAt: serverTimestamp() });
     await batch.commit();
   }
-  return { added: plan.toWrite.length, skipped: plan.skipped, auto: plan.auto, from, to };
+  return { added: plan.toWrite.length, skipped: plan.skipped, auto: plan.auto, defaulted: plan.defaulted, from, to };
 }
 
 /**

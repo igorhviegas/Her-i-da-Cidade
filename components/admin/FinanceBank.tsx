@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Papa from 'papaparse';
 import { AlertCircle, EyeOff, Loader2, Tags, Upload } from 'lucide-react';
 import { importBankStatement, renameBankCategory, saveBankSettings, setBankCategory, useBankRange, useBankSettings, type BankCategorySettings, type BankTransaction } from '../../services/bankService';
-import { bankPeriod, bankSeries, bankTotals, parseStatement, UNCATEGORIZED, visibleItems, type BankPeriodId, type BankRange, type CategoryTotal } from '../../services/bankStatement.js';
+import { bankPeriod, bankSeries, bankTotals, DEFAULT_IN_CATEGORY, parseStatement, UNCATEGORIZED, visibleItems, type BankPeriodId, type BankRange, type CategoryTotal } from '../../services/bankStatement.js';
 import type { RevenueEntry } from '../../services/financeCalculations.js';
 import { cardClass, formatMoney, ghostBtn, inputClass, labelClass, MONTH_NAMES, monthLabel, primaryBtn } from './financeFormat';
 import { Kpi } from './adminPages/FinanceKpi';
@@ -165,8 +165,9 @@ export const FinanceBank: React.FC<{ entries: RevenueEntry[]; monthKey: string }
       const rows = Papa.parse<string[]>(text, { skipEmptyLines: true }).data;
       const parsed = parseStatement(text, rows);
       if (!parsed.length) throw new Error('Nenhum lançamento encontrado. Use o extrato do Inter exportado em CSV ou OFX.');
-      const r = await importBankStatement(parsed);
-      setNotice(`${br(r.from)} a ${br(r.to)}: ${r.added} lançamento(s) novo(s)${r.auto ? ` (${r.auto} já categorizado(s) pelas regras)` : ''}, ${r.skipped} já importado(s) antes.`);
+      const r = await importBankStatement(parsed, settings);
+      const detail = [r.auto ? `${r.auto} pelas regras lembradas` : '', r.defaulted ? `${r.defaulted} entrada(s) como ${DEFAULT_IN_CATEGORY}` : ''].filter(Boolean).join(', ');
+      setNotice(`${br(r.from)} a ${br(r.to)}: ${r.added} lançamento(s) novo(s)${detail ? ` (${detail})` : ''}, ${r.skipped} já importado(s) antes.`);
       setReload((n) => n + 1);
     } catch (e) { setError(e instanceof Error ? e.message : 'Falha ao importar o extrato.'); } finally { setBusy(false); }
   };
