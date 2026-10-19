@@ -9,7 +9,7 @@ import { ScriptEditorModal } from './ScriptEditorModal';
 import { ScriptFiltersBar, ScriptKanban, ScriptRow } from './ordersFlow/ScriptLibraryParts';
 import { SortableArea, SortableGroup, SortableItem } from './ordersFlow/ScriptSortable';
 import { logScriptOperationError, toDate } from './ordersFlow/scriptsHelpers';
-import { useScriptEditorState, useScriptFilters, useScriptsData } from './ordersFlow/useScriptLibrary';
+import { useScriptEditorState, useScriptFilters, useScriptLink, useScriptsData } from './ordersFlow/useScriptLibrary';
 
 export const AdminScriptsPage: React.FC = () => {
   const { navigate } = useRouter();
@@ -43,6 +43,7 @@ export const AdminScriptsPage: React.FC = () => {
   const [sendingScriptId, setSendingScriptId] = useState<string | null>(null);
   const [scriptActionId, setScriptActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  useScriptLink(scripts, !loading && !error, openEdit, () => setActionError('O roteiro deste link não foi encontrado (pode ter sido excluído).'));
 
   const handleSendToRecording = async (script: ContentScript, showPageError = true): Promise<ContentScript> => {
     if (sendingScriptId) throw new Error('Aguarde o envio da produção em andamento.');

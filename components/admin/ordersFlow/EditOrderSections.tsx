@@ -59,7 +59,9 @@ export const EditOrderNotices: React.FC<EditOrderNoticesProps> = ({ order, isDra
       {isDraft && order.eventFormSite ? (
         <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-[11px] text-amber-100">
           Formulário A{order.eventFormSite.number} preenchido pelo cliente no site{order.paymentPending ? ', ainda sem sinal confirmado' : ' (sinal confirmado pelo ManyChat)'}.
-          Confira valor total e entrada e salve <strong>depois de receber o sinal</strong>: salvar confirma a reserva, lança a entrada no Financeiro e tira o “aguardando sinal”.
+          {order.paymentPending
+            ? <> Defina valor total e entrada e salve à vontade: <strong>salvar não confirma o sinal</strong>. A reserva é confirmada sozinha quando o pagamento chega pelo ManyChat (mesmo WhatsApp do formulário) ou marcando “Já recebi o sinal” abaixo.</>
+            : <> Confira valor total e entrada e salve: salvar lança a entrada no Financeiro.</>}
         </p>
       ) : isDraft && (
         <p className="rounded-xl border border-blue-500/25 bg-blue-500/10 p-3 text-[11px] text-blue-100">

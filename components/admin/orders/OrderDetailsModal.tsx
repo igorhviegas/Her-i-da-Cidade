@@ -207,7 +207,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           {order.eventDraft && (
             <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100">
               {order.eventFormSite
-                ? `Formulário A${order.eventFormSite.number} enviado pelo cliente no site${order.paymentPending ? ', aguardando o sinal' : ', sinal confirmado'}. Confira os valores em "Editar pedido" e salve depois de receber o sinal: é aí que a entrada é lançada no Financeiro.`
+                ? `Formulário A${order.eventFormSite.number} enviado pelo cliente no site${order.paymentPending ? ', aguardando o sinal' : ', sinal confirmado'}. ${order.paymentPending ? ' Defina os valores em "Editar pedido" (salvar não confirma o sinal); a reserva é confirmada pelo pagamento no ManyChat ou por "Já recebi o sinal".' : ' Confira os valores em "Editar pedido" e salve para lançar a entrada no Financeiro.'}`
                 : 'Pedido recebido pelo ManyChat com cliente e WhatsApp. Faltam os dados do evento: use "Editar pedido" para completar. Nada foi lançado no Financeiro ainda.'}
             </p>
           )}

@@ -35,6 +35,8 @@ export type UpdateOrderInput = Partial<Omit<Order, "id" | "orderNumber" | "order
   allowStockShortage?: boolean;
   /** Vídeo Personalizado: a 1ª conclusão teve custo de edição? false grava editingCost 0 e não cria a missão de pagar o editor. Padrão: true. */
   chargeEditingCost?: boolean;
+  /** Formulário do site: "Já recebi o sinal" marcado no Editar pedido (sem isso, salvar só guarda os dados). Não é gravado. */
+  confirmDeposit?: boolean;
 };
 
 function mapOrder(id: string, data: Record<string, unknown>): Order {
@@ -311,6 +313,7 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     delete safeUpdates.materialConsumption;
     delete safeUpdates.allowStockShortage;
     delete safeUpdates.chargeEditingCost;
+    delete safeUpdates.confirmDeposit;
     const chargeEditingCost = updates.chargeEditingCost !== false;
     delete safeUpdates.orderNumber;
     delete safeUpdates.orderNumberDisplay;
@@ -379,7 +382,10 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
     // Primeira vez que o cadastro do evento é salvo num rascunho: vira evento comum e a entrada é lançada (data = este momento).
     // ID determinístico + checagem na transação: salvar de novo nunca lança outra entrada.
     let draftEntry: { id: string; record: Record<string, unknown> } | null = null;
-    if (currentData.eventDraft === true && updates.eventForm) {
+    // Formulário do site ainda sem sinal: salvar só guarda os dados (o valor costuma ser definido antes de mandar os dados do
+    // pagamento). A reserva é confirmada pelo ManyChat (mesmo WhatsApp) ou com "Já recebi o sinal" (confirmDeposit).
+    const holdsDeposit = Boolean(currentData.eventFormSite) && currentData.paymentPending === true && updates.confirmDeposit !== true;
+    if (currentData.eventDraft === true && updates.eventForm && !holdsDeposit) {
       const entryRef = doc(firestore, LEDGER_COLLECTION, ledgerId(id, 'entry'));
       const existingEntry = await transaction.get(entryRef);
       const record = planEntry(id, { ...currentData, ...updates }, serverTimestamp());

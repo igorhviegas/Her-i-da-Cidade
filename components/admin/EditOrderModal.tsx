@@ -19,9 +19,9 @@ interface EditOrderModalProps {
 
 export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, service, onClose, onSaved }) => {
   const [saving, setSaving] = useState(false);
-  // Formulário do site ainda não conferido: os vídeos pedidos pelo cliente já vêm marcados.
+  // Formulário do site: os vídeos pedidos pelo cliente já vêm marcados até virarem pedidos (videosCreated).
   const [videoAddons, setVideoAddons] = useState(() => {
-    const site = order.eventDraft ? order.eventFormSite?.videos : undefined;
+    const site = order.eventFormSite?.videosCreated ? undefined : order.eventFormSite?.videos;
     if (!site) return emptyVideoAddons();
     const inviteDetails = [site.inviteParents && `Pais: ${site.inviteParents}`, site.inviteDetails].filter(Boolean).join('. ');
     return {
@@ -36,6 +36,10 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
   const isDraft = order.eventDraft === true; // criado pelo ManyChat: só cliente e WhatsApp até este cadastro
   const isEventOrder = Boolean(order.eventForm) || isDraft;
   const { adjustment, describeAdjustment } = useEventAdjustment(order, eventState, isDraft);
+  // Formulário do site aguardando o sinal: salvar só guarda os dados; "Já recebi o sinal" confirma a reserva (entrada no Financeiro).
+  const awaitingDeposit = isDraft && Boolean(order.eventFormSite) && order.paymentPending === true;
+  const [depositReceived, setDepositReceived] = useState(false);
+  const holding = awaitingDeposit && !depositReceived;
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -47,7 +51,8 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
     const numbers = validateEditNumbers({ deliveryDays, servicePrice, rushFee, totalPaid, content, setError });
     if (!numbers) return;
     const eventValues = basics.eventValidation?.value;
-    const videos = eventValues ? validateVideoOrders({ addons: videoAddons, services, event: eventValues, setFormError: setError }) : [];
+    // Enquanto aguarda o sinal, os vídeos ficam só marcados (viram pedidos na confirmação, uma vez).
+    const videos = eventValues && !holding ? validateVideoOrders({ addons: videoAddons, services, event: eventValues, setFormError: setError }) : [];
     if (!videos) return;
 
     if (adjustment && !window.confirm(`Salvar vai lançar no Financeiro, na data de hoje: ${describeAdjustment()}.\nOs lançamentos anteriores continuam como estão (histórico preservado). Confirmar?`)) return;
@@ -55,11 +60,16 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
     try {
       const updatedClient = await resolveUpdatedClient({ client, cleanName: basics.cleanName, whatsapp, normalizedWhatsApp: contact.normalizedWhatsApp });
       const saveContext = {
-        order, updatedClient, selectedService: basics.selectedService, eventValues: basics.eventValidation?.value, isEventOrder, isDraft, adjustment, paidDate, eventDate, deliveryDays, content, ...numbers,
+        order, updatedClient, selectedService: basics.selectedService, eventValues: basics.eventValidation?.value, isEventOrder, isDraft: isDraft && !holding, adjustment, paidDate, eventDate, deliveryDays, content, ...numbers,
       };
       const changes = computeEditChanges(saveContext);
       const eventUpdates = buildEventUpdates(saveContext.eventValues);
-      await updateOrder(order.id, buildOrderUpdates(saveContext, changes, eventUpdates));
+      await updateOrder(order.id, {
+        ...buildOrderUpdates(saveContext, changes, eventUpdates),
+        ...(awaitingDeposit && depositReceived ? { confirmDeposit: true } : {}),
+        // Caminho de campo do Firestore: marca só este item de eventFormSite.
+        ...(order.eventFormSite && videos.length ? { 'eventFormSite.videosCreated': true } as Record<string, unknown> : {}),
+      });
       const warning = eventValues ? await createVideoOrders(videos, updatedClient.id, eventValues.eventDate) : undefined;
       // Formulário do site confirmado: o evento da agenda deixa de mostrar "(aguardando sinal)" e recebe os dados conferidos.
       const calendarWarning = isDraft && order.eventFormSite
@@ -87,6 +97,12 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({ order, client, s
                 <ImportFormButton event={eventState} addons={videoAddons} disabled={saving} onEvent={setEventState} onAddons={setVideoAddons} />
                 <EventOrderFields value={eventState} onChange={setEventState} disabled={saving} />
                 <VideoAddonsSection value={videoAddons} onChange={setVideoAddons} disabled={saving} />
+                {awaitingDeposit && (
+                  <label className="flex items-start gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+                    <input type="checkbox" checked={depositReceived} onChange={(e) => setDepositReceived(e.target.checked)} disabled={saving} className="mt-0.5 h-4 w-4 accent-emerald-500" />
+                    <span><strong>Já recebi o sinal</strong> (fora do ManyChat). Marque só com o pagamento em mãos: salvar confirma a reserva, lança a entrada no Financeiro e cria os pedidos dos vídeos. Sem marcar, salvar só guarda os dados.</span>
+                  </label>
+                )}
               </>
             ) : (
               <>

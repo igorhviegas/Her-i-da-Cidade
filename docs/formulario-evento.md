@@ -18,8 +18,9 @@ Tema claro por padrão, com botão para o escuro (lembrado no aparelho, `localSt
 
 ## Sinal
 
-- **Pelo ManyChat** (`presential-event` com o mesmo WhatsApp, via `eventFormPending/{bookingKey}`): o pagamento só tira o "aguardando" (`depositPaidAt`), sem criar outro rascunho, e o evento da agenda volta ao título/cor normais. O pedido continua rascunho até o dono conferir.
-- **Em "Editar pedido"**: salvar o rascunho confirma a reserva: lança a entrada no Financeiro (como nos rascunhos do ManyChat), tira o `paymentPending` e reenvia o evento à agenda. Os vídeos pedidos já vêm marcados em "Vídeos com desconto". **Salve só depois de receber o sinal.**
+- **Salvar no "Editar pedido" não confirma o sinal** enquanto o pedido aguarda: dá para definir valor total e entrada antes de mandar os dados do pagamento. Os vídeos ficam marcados e só viram pedidos na confirmação (`eventFormSite.videosCreated`).
+- **Pelo ManyChat** (`presential-event` com o mesmo WhatsApp, via `eventFormPending/{bookingKey}`): o pagamento confirma o **mesmo** pedido (nunca cria outro). Com valor já definido, lança a entrada no Financeiro (`financeEntries/evt-{id}-entry`) e fecha o rascunho; sem valor, só tira o "aguardando" e a entrada é lançada quando o dono salvar os valores. O evento da agenda volta ao título/cor normais.
+- **Fora do ManyChat** (PIX direto etc.): "Já recebi o sinal" no Editar pedido confirma a reserva, lança a entrada e cria os pedidos dos vídeos.
 - Cron diário das missões (`syncEventFormHolds`): **3 dias** sem sinal → missão "Recontatar cliente: sinal do formulário A###". **3 dias depois de concluir essa missão**, ainda sem sinal → pedido, trava e evento da agenda são excluídos (o cliente precisa preencher de novo). Pagou ou foi excluído antes: a missão pendente some.
 - Um WhatsApp só pode ter um formulário aguardando sinal (freia spam; para um segundo evento, falar pelo WhatsApp).
 - O ManyChat usa `/api/manychat` da Vercel (a Function `receiveManyChatOrder` do Firebase nunca foi publicada).
