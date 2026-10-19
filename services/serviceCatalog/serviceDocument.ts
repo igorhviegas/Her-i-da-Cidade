@@ -1,6 +1,7 @@
 import { Service } from "../../types";
 import { localImageUrl } from "../localImages.js";
 import { normalizeFaq } from "../serviceFaq.js";
+import { normalizeArt } from "../serviceArt.js";
 
 export const SERVICES_COLLECTION = "services";
 export const INTERNAL_CONTENT_SERVICE_ID = 'internal-content-production';
@@ -35,5 +36,6 @@ export function mapDocToService(docId: string, data: any): Service {
     ...(typeof data.deliveryMessage === 'string' && data.deliveryMessage.trim() ? { deliveryMessage: data.deliveryMessage } : {}),
     ...(data.internalOnly === true ? { internalOnly: true } : {}),
     ...(normalizeFaq(data.faq).length ? { faq: normalizeFaq(data.faq) } : {}),
+    ...(normalizeArt(data.art) ? { art: normalizeArt(data.art) } : {}),
   };
 }

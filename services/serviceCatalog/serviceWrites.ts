@@ -11,6 +11,7 @@ import {
 import { db } from "../../lib/firebase";
 import { Service, FirestoreService } from "../../types";
 import { normalizeFaq } from "../serviceFaq.js";
+import { normalizeArt } from "../serviceArt.js";
 import { getConfiguredWhatsAppUrl } from "../siteConfigService";
 import { planCreateWhatsApp, planUpdateWhatsApp } from "../serviceWhatsApp.js";
 import { SERVICES_COLLECTION } from "./serviceDocument";
@@ -80,6 +81,7 @@ export async function createService(input: CreateServiceInput): Promise<Service>
     ...(input.defaultDeliveryDays !== undefined ? { defaultDeliveryDays: input.defaultDeliveryDays } : {}),
     ...(input.deliveryMessage?.trim() ? { deliveryMessage: input.deliveryMessage.trim() } : {}),
     ...(normalizeFaq(input.faq).length ? { faq: normalizeFaq(input.faq) } : {}),
+    ...(normalizeArt(input.art) ? { art: normalizeArt(input.art) } : {}),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -134,6 +136,8 @@ export async function updateService(id: string, updates: UpdateServiceInput): Pr
     const message = updates.deliveryMessage?.trim();
     payload.deliveryMessage = message ? message : deleteField();
   }
+
+  if (updates.art !== undefined) payload.art = normalizeArt(updates.art) ?? deleteField();
 
   if (updates.faq !== undefined) {
     const faq = normalizeFaq(updates.faq);
