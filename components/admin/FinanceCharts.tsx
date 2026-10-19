@@ -34,39 +34,56 @@ export const MonthlyBars: React.FC<{ series: { monthKey: string; total: number }
 
 const SIZE = 320; const C = SIZE / 2; const R0 = 58; const MAX_LEN = 72;
 
-/** Faturamento diário em círculo (um raio por dia do mês); o maior dia é destacado. */
-export const DailyCompass: React.FC<{ days: DayRevenue[]; topDay: number | null; selectedDay: number | null; onSelect: (day: number | null) => void; monthTotal: number }> = ({ days, topDay, selectedDay, onSelect, monthTotal }) => {
-  const max = Math.max(...days.map((d) => d.total), 0);
+export interface CompassItem { key: string; tick: string; label: string; value: number; sub: string }
+
+/**
+ * "Bússola": um raio por item (dia, mês ou ano) em volta de um círculo; o maior é destacado em âmbar e o
+ * escolhido em branco. Sem escolha, o centro mostra o maior item. `tickEvery`: rótulo no 1º e a cada N itens.
+ */
+export const Compass: React.FC<{
+  items: CompassItem[]; selected: string | null; onSelect: (key: string | null) => void;
+  total: number; totalLabel: string; hint: string; color?: string; ariaLabel: string; tickEvery?: number; topSuffix?: string;
+}> = ({ items, selected, onSelect, total, totalLabel, hint, color = '#3b82f6', ariaLabel, tickEvery = 1, topSuffix = 'maior' }) => {
+  const max = Math.max(...items.map((d) => d.value), 0);
+  const top = max > 0 ? items.find((d) => d.value === max)?.key ?? null : null;
   const point = (i: number, r: number) => {
-    const a = (i / days.length) * 2 * Math.PI - Math.PI / 2;
+    const a = (i / items.length) * 2 * Math.PI - Math.PI / 2;
     return [C + r * Math.cos(a), C + r * Math.sin(a)];
   };
-  const focus = days.find((d) => d.day === selectedDay) ?? days.find((d) => d.day === topDay) ?? null;
+  const focus = items.find((d) => d.key === selected) ?? items.find((d) => d.key === top) ?? null;
   return (
-    <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="mx-auto w-full max-w-[340px]" role="img" aria-label="Faturamento diário">
+    <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="mx-auto w-full max-w-[340px]" role="img" aria-label={ariaLabel}>
       <circle cx={C} cy={C} r={R0 - 6} fill="none" stroke="rgba(255,255,255,0.08)" />
-      {days.map((d, i) => {
-        const len = max > 0 && d.total > 0 ? Math.max(6, (d.total / max) * MAX_LEN) : 3;
+      {items.map((d, i) => {
+        const len = max > 0 && d.value > 0 ? Math.max(6, (d.value / max) * MAX_LEN) : 3;
         const [x1, y1] = point(i, R0); const [x2, y2] = point(i, R0 + len); const [x3, y3] = point(i, R0 + MAX_LEN + 6);
-        const color = d.day === selectedDay ? '#ffffff' : d.day === topDay ? '#fbbf24' : d.total > 0 ? '#3b82f6' : 'rgba(255,255,255,0.15)';
+        const stroke = d.key === selected ? '#ffffff' : d.key === top ? '#fbbf24' : d.value > 0 ? color : 'rgba(255,255,255,0.15)';
         const [lx, ly] = point(i, R0 + MAX_LEN + 20);
+        const toggle = () => onSelect(d.key === selected ? null : d.key);
         return (
-          <g key={d.day} className="cursor-pointer" onClick={() => onSelect(d.day === selectedDay ? null : d.day)} role="button" tabIndex={0} aria-label={`Dia ${d.day}: ${formatMoney(d.total)}`}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(d.day === selectedDay ? null : d.day); } }}>
-            <line x1={x1} y1={y1} x2={x3} y2={y3} stroke="transparent" strokeWidth={Math.max(8, 300 / days.length)} />
-            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={5} strokeLinecap="round" />
-            {(d.day === 1 || d.day % 5 === 0 || d.day === topDay || d.day === selectedDay) && (
-              <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize="9" fill={d.day === topDay ? '#fbbf24' : 'rgba(255,255,255,0.45)'}>{d.day}</text>
+          <g key={d.key} className="cursor-pointer" onClick={toggle} role="button" tabIndex={0} aria-label={`${d.label}: ${formatMoney(d.value)}`}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}>
+            <line x1={x1} y1={y1} x2={x3} y2={y3} stroke="transparent" strokeWidth={Math.max(8, 300 / items.length)} />
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth={items.length > 40 ? 3 : 5} strokeLinecap="round" />
+            {(i === 0 || (i + 1) % tickEvery === 0 || d.key === top || d.key === selected) && (
+              <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" fontSize="9" fill={d.key === top ? '#fbbf24' : 'rgba(255,255,255,0.45)'}>{d.tick}</text>
             )}
           </g>
         );
       })}
-      <text x={C} y={C - 14} textAnchor="middle" fontSize="10" fill="rgba(255,255,255,0.5)">{focus ? `Dia ${focus.day}${focus.day === topDay && focus.day !== selectedDay ? ' · maior dia' : ''}` : 'Mês'}</text>
-      <text x={C} y={C + 6} textAnchor="middle" fontSize="15" fontWeight="700" fill="#fff">{formatMoney(focus ? focus.total : monthTotal)}</text>
-      <text x={C} y={C + 22} textAnchor="middle" fontSize="9" fill="rgba(255,255,255,0.4)">{focus ? `${focus.count} serviço${focus.count === 1 ? '' : 's'}` : 'toque em um dia'}</text>
+      <text x={C} y={C - 14} textAnchor="middle" fontSize="10" fill="rgba(255,255,255,0.5)">{focus ? `${focus.label}${focus.key === top && focus.key !== selected ? ` · ${topSuffix}` : ''}` : totalLabel}</text>
+      <text x={C} y={C + 6} textAnchor="middle" fontSize="15" fontWeight="700" fill="#fff">{formatMoney(focus ? focus.value : total)}</text>
+      <text x={C} y={C + 22} textAnchor="middle" fontSize="9" fill="rgba(255,255,255,0.4)">{focus ? focus.sub : hint}</text>
     </svg>
   );
 };
+
+/** Faturamento diário em círculo (um raio por dia do mês); o maior dia é destacado. */
+export const DailyCompass: React.FC<{ days: DayRevenue[]; topDay: number | null; selectedDay: number | null; onSelect: (day: number | null) => void; monthTotal: number }> = ({ days, selectedDay, onSelect, monthTotal }) => (
+  <Compass items={days.map((d) => ({ key: String(d.day), tick: String(d.day), label: `Dia ${d.day}`, value: d.total, sub: `${d.count} serviço${d.count === 1 ? '' : 's'}` }))}
+    selected={selectedDay === null ? null : String(selectedDay)} onSelect={(k) => onSelect(k === null ? null : Number(k))}
+    total={monthTotal} totalLabel="Mês" hint="toque em um dia" ariaLabel="Faturamento diário" tickEvery={5} topSuffix="maior dia" />
+);
 
 /** Barras horizontais: serviços com mais pedidos (já ordenados). */
 export const ServiceBars: React.FC<{ rows: { id: string; label: string; count: number }[] }> = ({ rows }) => {

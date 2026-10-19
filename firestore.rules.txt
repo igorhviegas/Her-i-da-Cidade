@@ -355,6 +355,17 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
 
+    // Listas de categorias do extrato (entrada/saída) e as ocultas dos resultados: um único documento.
+    match /bankSettings/{id} {
+      allow read: if isAdmin();
+      allow write: if isAdmin() && id == 'categories'
+        && request.resource.data.keys().hasOnly(['in', 'out', 'hidden', 'updatedAt'])
+        && request.resource.data.in is list && request.resource.data.in.size() <= 100
+        && request.resource.data.out is list && request.resource.data.out.size() <= 100
+        && request.resource.data.hidden is list && request.resource.data.hidden.size() <= 200
+        && request.resource.data.updatedAt == request.time;
+    }
+
     match /assets/{assetId} {
       allow read, create, update: if isAdmin();
       allow delete: if false;

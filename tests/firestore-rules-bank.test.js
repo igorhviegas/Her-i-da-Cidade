@@ -44,3 +44,14 @@ test('bankCategoryRules: admin grava e apaga; campos validados', async () => {
   await assertSucceeds(deleteDoc(ref));
   await assertFails(getDoc(doc(as('stranger'), 'bankCategoryRules/x')));
 });
+
+test('bankSettings/categories: admin salva listas e ocultas; outro id, campo extra e visitante falham', async () => {
+  const db = as('owner');
+  const settings = (extra = {}) => ({ in: ['Serviços (clientes)'], out: ['Tarifas bancárias'], hidden: ['Transferência entre contas'], updatedAt: serverTimestamp(), ...extra });
+  await assertSucceeds(setDoc(doc(db, 'bankSettings/categories'), settings()));
+  await assertSucceeds(getDoc(doc(db, 'bankSettings/categories')));
+  await assertFails(setDoc(doc(db, 'bankSettings/outro'), settings()));
+  await assertFails(setDoc(doc(db, 'bankSettings/categories'), settings({ x: 1 })));
+  await assertFails(setDoc(doc(db, 'bankSettings/categories'), settings({ hidden: 'x' })));
+  await assertFails(getDoc(doc(as('stranger'), 'bankSettings/categories')));
+});

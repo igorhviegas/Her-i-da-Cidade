@@ -103,6 +103,58 @@ export function planImport(items, existingIds, rules) {
   return { toWrite, skipped: items.length - fresh.length, auto };
 }
 
+const pad = (n) => String(n).padStart(2, '0');
+const lastDay = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+const monthStart = (y, m) => { const d = new Date(Date.UTC(y, m - 1, 1)); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`; };
+
+/**
+ * Período do filtro da aba Banco: 'month' (mês escolhido no topo, um raio por dia), 'year' (ano corrente),
+ * '12m' (últimos 12 meses) ou 'all' (do 1º lançamento importado até hoje; por ano quando passa de 36 meses).
+ */
+export function bankPeriod(period, monthKey, now = new Date(), items = []) {
+  const y = now.getFullYear(), m = now.getMonth() + 1;
+  const current = `${y}-${pad(m)}`;
+  const endOf = (mk) => `${mk}-${pad(lastDay(Number(mk.slice(0, 4)), Number(mk.slice(5, 7))))}`;
+  if (period === 'month') return { from: `${monthKey}-01`, to: endOf(monthKey), unit: 'day' };
+  if (period === 'year') return { from: `${y}-01-01`, to: `${y}-12-31`, unit: 'month' };
+  if (period === '12m') return { from: `${monthStart(y, m - 11)}-01`, to: endOf(current), unit: 'month' };
+  const first = items.reduce((min, t) => (t.date < min ? t.date : min), `${current}-01`).slice(0, 7);
+  const months = (y - Number(first.slice(0, 4))) * 12 + m - Number(first.slice(5, 7)) + 1;
+  return { from: `${first}-01`, to: endOf(current), unit: months > 36 ? 'year' : 'month' };
+}
+
+/** Entradas e saídas por dia, mês ou ano do período, incluindo os vazios (cada um vira um raio da bússola). */
+export function bankSeries(items, { from, to, unit }) {
+  const size = unit === 'day' ? 10 : unit === 'month' ? 7 : 4;
+  const keys = [];
+  const [fy, fm] = [Number(from.slice(0, 4)), Number(from.slice(5, 7))];
+  if (unit === 'year') for (let yy = fy; yy <= Number(to.slice(0, 4)); yy += 1) keys.push(String(yy));
+  else if (unit === 'month') for (let i = 0; monthStart(fy, fm + i) <= to.slice(0, 7); i += 1) keys.push(monthStart(fy, fm + i));
+  else for (const d = new Date(`${from}T00:00:00Z`); d.toISOString().slice(0, 10) <= to; d.setUTCDate(d.getUTCDate() + 1)) keys.push(d.toISOString().slice(0, 10));
+  const map = new Map(keys.map((key) => [key, { key, in: 0, out: 0, count: 0 }]));
+  for (const t of items) {
+    const row = map.get(t.date.slice(0, size));
+    if (!row) continue;
+    row[t.kind] = cents(row[t.kind] + t.amount) / 100;
+    row.count += 1;
+  }
+  return [...map.values()];
+}
+
+/** Configuração padrão das categorias (antes de o dono salvar a dele em bankSettings/categories). */
+export const DEFAULT_CATEGORY_SETTINGS = { in: IN_CATEGORIES, out: OUT_CATEGORIES, hidden: [] };
+
+/** Tira as categorias ocultas e, se escolhida, deixa só uma categoria (UNCATEGORIZED = sem categoria). */
+export function visibleItems(items, hidden = [], category = null) {
+  const off = new Set(hidden);
+  return items.filter((t) => !(t.category && off.has(t.category)) && (!category || (t.category || UNCATEGORIZED) === category));
+}
+
+/** Troca (ou remove, com `next` nulo) um nome numa lista de categorias, sem repetir. */
+export function replaceCategory(list, old, next) {
+  return [...new Set(list.map((c) => (c === old ? next : c)).filter(Boolean))];
+}
+
 /** Totais e quebra por categoria (maior primeiro). */
 export function bankTotals(items) {
   const group = (kind) => {

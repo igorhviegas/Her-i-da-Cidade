@@ -15,3 +15,11 @@ export function categoryKey(t: Pick<BankTransaction, 'kind' | 'title' | 'descrip
 export function ruleId(key: string): string;
 export function planImport(items: BankTransaction[], existingIds: Set<string>, rules: Map<string, string>): { toWrite: BankTransaction[]; skipped: number; auto: number };
 export function bankTotals(items: BankTransaction[]): BankTotals;
+export interface BankCategorySettings { in: string[]; out: string[]; hidden: string[] }
+export const DEFAULT_CATEGORY_SETTINGS: BankCategorySettings;
+export function visibleItems(items: BankTransaction[], hidden?: string[], category?: string | null): BankTransaction[];
+export function replaceCategory(list: string[], old: string, next: string | null): string[];
+export type BankPeriodId = 'month' | 'year' | '12m' | 'all';
+export interface BankRange { from: string; to: string; unit: 'day' | 'month' | 'year' }
+export function bankPeriod(period: BankPeriodId, monthKey: string, now?: Date, items?: Pick<BankTransaction, 'date'>[]): BankRange;
+export function bankSeries(items: BankTransaction[], range: BankRange): { key: string; in: number; out: number; count: number }[];

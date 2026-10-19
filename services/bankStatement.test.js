@@ -1,6 +1,44 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bankTotals, categoryKey, parseCsvRows, parseMoney, parseOfx, parseStatement, planImport } from './bankStatement.js';
+import { bankPeriod, bankSeries, bankTotals, categoryKey, parseCsvRows, parseMoney, parseOfx, parseStatement, planImport, replaceCategory, visibleItems } from './bankStatement.js';
+
+test('visibleItems: oculta categorias e filtra por uma (inclusive "Sem categoria")', () => {
+  const items = [{ id: 1, category: 'Transferência entre contas' }, { id: 2, category: 'Combustível e transporte' }, { id: 3, category: null }];
+  assert.deepEqual(visibleItems(items, ['Transferência entre contas']).map((t) => t.id), [2, 3]);
+  assert.deepEqual(visibleItems(items, [], 'Combustível e transporte').map((t) => t.id), [2]);
+  assert.deepEqual(visibleItems(items, ['Combustível e transporte'], 'Sem categoria').map((t) => t.id), [3]);
+  assert.deepEqual(visibleItems(items).map((t) => t.id), [1, 2, 3]);
+});
+
+test('replaceCategory: renomeia sem duplicar e remove com nulo', () => {
+  assert.deepEqual(replaceCategory(['A', 'B', 'C'], 'B', 'C'), ['A', 'C']);
+  assert.deepEqual(replaceCategory(['A', 'B'], 'B', 'D'), ['A', 'D']);
+  assert.deepEqual(replaceCategory(['A', 'B'], 'A', null), ['B']);
+});
+
+test('bankPeriod: mês, ano, 12 meses e todo o período (por ano acima de 36 meses)', () => {
+  const now = new Date(2026, 9, 19);
+  assert.deepEqual(bankPeriod('month', '2026-02', now), { from: '2026-02-01', to: '2026-02-28', unit: 'day' });
+  assert.deepEqual(bankPeriod('year', '2026-02', now), { from: '2026-01-01', to: '2026-12-31', unit: 'month' });
+  assert.deepEqual(bankPeriod('12m', '2026-02', now), { from: '2025-11-01', to: '2026-10-31', unit: 'month' });
+  assert.deepEqual(bankPeriod('all', '2026-02', now, [{ date: '2025-03-10' }, { date: '2026-01-02' }]), { from: '2025-03-01', to: '2026-10-31', unit: 'month' });
+  assert.equal(bankPeriod('all', '2026-02', now, [{ date: '2023-01-05' }]).unit, 'year');
+  assert.deepEqual(bankPeriod('all', '2026-02', now, []), { from: '2026-10-01', to: '2026-10-31', unit: 'month' });
+});
+
+test('bankSeries: preenche os vazios e soma entradas/saídas por dia, mês e ano', () => {
+  const items = [
+    { date: '2025-12-31', kind: 'in', amount: 10 }, { date: '2026-01-01', kind: 'in', amount: 0.1 },
+    { date: '2026-01-01', kind: 'in', amount: 0.2 }, { date: '2026-03-15', kind: 'out', amount: 5 },
+  ];
+  const months = bankSeries(items, { from: '2025-11-01', to: '2026-03-31', unit: 'month' });
+  assert.deepEqual(months.map((r) => r.key), ['2025-11', '2025-12', '2026-01', '2026-02', '2026-03']);
+  assert.deepEqual(months[2], { key: '2026-01', in: 0.3, out: 0, count: 2 });
+  assert.equal(months[4].out, 5);
+  const days = bankSeries(items, { from: '2026-02-01', to: '2026-02-28', unit: 'day' });
+  assert.equal(days.length, 28); assert.equal(days[0].key, '2026-02-01');
+  assert.deepEqual(bankSeries(items, { from: '2025-01-01', to: '2026-12-31', unit: 'year' }).map((r) => [r.key, r.in]), [['2025', 10], ['2026', 0.3]]);
+});
 
 const CSV = [
   ['Extrato Conta Corrente'], ['Conta', '1234567'], ['Período', '01/10/2026 a 03/10/2026'], ['Saldo', '1.000,00'], [],
