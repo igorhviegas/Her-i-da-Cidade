@@ -139,9 +139,8 @@ service cloud.firestore {
 
     // Vínculo só com roteiro que existe (contentScripts); um vínculo já gravado não precisa existir de novo
     // (o roteiro pode ter sido excluído depois e a pergunta continua editável).
-    function linksExistingScript(d, before) {
-      return d.scriptId == null || (before != null && before.scriptId == d.scriptId)
-        || exists(/databases/$(database)/documents/contentScripts/$(d.scriptId));
+    function scriptExists(scriptId) {
+      return exists(/databases/$(database)/documents/contentScripts/$(scriptId));
     }
 
     // Resumo de pedalada do Fit (services/fitRide.js): só estes campos, com tipos e limites plausíveis.
@@ -316,10 +315,11 @@ service cloud.firestore {
       allow read, delete: if isAdmin();
       allow create: if isAdmin() && validCreativeQuestion(request.resource.data)
         && request.resource.data.createdAt == request.time
-        && linksExistingScript(request.resource.data, null);
+        && (request.resource.data.scriptId == null || scriptExists(request.resource.data.scriptId));
       allow update: if isAdmin() && validCreativeQuestion(request.resource.data)
         && request.resource.data.createdAt == resource.data.createdAt
-        && linksExistingScript(request.resource.data, resource.data);
+        && (request.resource.data.scriptId == null || request.resource.data.scriptId == resource.data.scriptId
+          || scriptExists(request.resource.data.scriptId));
     }
 
     // Dados internos do CRM: acesso restrito aos administradores autenticados.
