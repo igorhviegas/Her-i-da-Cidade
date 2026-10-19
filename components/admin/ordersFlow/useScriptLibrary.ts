@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from '../../../lib/router';
 import { getCategories } from '../../../services/categoriesService';
 import { listContentScripts } from '../../../services/contentScriptsService';
 import { sortByPublishDate } from '../../../services/scriptSchedule.js';
@@ -76,4 +77,16 @@ export const useScriptEditorState = () => {
   const openEdit = (script: ContentScript) => { setEditingScript(script); setInitialParentScriptId(undefined); setEditorOpen(true); };
 
   return { editorOpen, setEditorOpen, editingScript, setEditingScript, initialParentScriptId, openNew, openNewChild, openEdit };
+};
+
+/** ?scriptId= abre o roteiro direto no editor (links da Caixinha de Perguntas e da visão geral do Espaço Criativo); depois limpa o parâmetro. */
+export const useScriptLink = (scripts: ContentScript[], ready: boolean, openEdit: (script: ContentScript) => void, onMissing: () => void) => {
+  const { path, search, navigate } = useRouter();
+  const scriptId = new URLSearchParams(search).get('scriptId');
+  useEffect(() => {
+    if (!ready || !scriptId) return;
+    const linked = scripts.find((item) => item.id === scriptId);
+    if (linked) openEdit(linked); else onMissing();
+    navigate(path, { replace: true });
+  }, [ready, scriptId]); // eslint-disable-line react-hooks/exhaustive-deps -- roda uma vez por link; scripts/callbacks mudam a cada render
 };

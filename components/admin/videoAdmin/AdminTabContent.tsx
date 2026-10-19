@@ -5,7 +5,6 @@ import { AdminVideosPage } from '../AdminVideosPage';
 import { AdminCategoriesPage } from '../AdminCategoriesPage';
 import { AdminContentPage } from '../AdminContentPage';
 import { AdminOrdersPage } from '../AdminOrdersPage';
-import { AdminScriptsPage } from '../AdminScriptsPage';
 import { AdminClientsPage } from '../AdminClientsPage';
 import { AdminMissionsPage } from '../AdminMissionsPage';
 import { AdminFinancePage } from '../AdminFinancePage';
@@ -19,6 +18,8 @@ import { AdminClientAreaPage } from '../AdminClientAreaPage';
 import { AdminFitPage } from '../AdminFitPage';
 import { AdminFitCheckinsPage } from '../AdminFitCheckinsPage';
 import { AdminFitWorkoutsPage } from '../AdminFitWorkoutsPage';
+import { AdminCreativePage } from '../creative/AdminCreativePage';
+import { CREATIVE_HOME, CREATIVE_TOOLS } from '../creative/creativeTools';
 import type { AdminTab } from './dashboardTypes';
 
 interface AdminTabContentProps {
@@ -54,7 +55,8 @@ export const AdminTabContentSecondary: React.FC<AdminTabContentProps> = ({ curre
   <>
     {currentTab === 'orders' && <AdminOrdersPage />}
     {currentTab === 'clients' && <AdminClientsPage />}
-    {currentTab === 'scripts' && <AdminScriptsPage />}
+    {currentTab === CREATIVE_HOME.id && <AdminCreativePage />}
+    {CREATIVE_TOOLS.map(({ id, Page }) => currentTab === id && <Page key={id} />)}
     {currentTab === 'missions' && <AdminMissionsPage />}
     {currentTab === 'finance' && <AdminFinancePage />}
     {currentTab === 'instagram' && <AdminInstagramPage />}
