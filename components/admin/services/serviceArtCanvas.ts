@@ -38,7 +38,7 @@ const LAYOUTS: Record<ArtFormat, Layout> = {
   },
   site: {
     w: 1080, h: 1920,
-    title: { ...STORY_TITLE, top: 280 },
+    title: { ...STORY_TITLE, top: 240, cap: 110 }, // menor que no story para não cobrir o rosto
     badge: { where: 'above', cap: 30 },
     price: { x: 540, align: 'center', cap: 352, baseline: 1600, color: '#88EC24', gapToDesc: 0 },
   },
@@ -180,11 +180,17 @@ function drawDescription(ctx: Ctx, text: string, D: NonNullable<Layout['desc']>,
 
 function drawPrice(ctx: Ctx, num: string, P: Layout['price'], baseline: number) {
   ctx.fillStyle = P.color;
+  // Sombra escura e difusa atrás do valor, como nas artes originais.
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+  ctx.shadowBlur = P.cap * 0.25;
+  ctx.shadowOffsetX = ctx.shadowOffsetY = P.cap * 0.03;
   ctx.font = font(PRICE, P.cap / capRatio(ctx, PRICE));
   const { left } = drawAligned(ctx, num, P.x, P.align, baseline);
   const rsCap = P.cap * 0.2;
   ctx.font = font(PRICE, rsCap / capRatio(ctx, PRICE));
   drawAligned(ctx, 'R$', left - P.cap * 0.06, 'right', baseline - P.cap + rsCap);
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
 }
 
 /** Desenha a arte de um formato; null quando o serviço não tem fundo para ele. */
