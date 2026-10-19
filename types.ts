@@ -6,6 +6,15 @@ export interface ServiceFaqItem {
   content: string;
 }
 
+/** Textos e fundos das artes do serviço (quadrado, story, site e horizontal); o preço vem de Service.price. */
+export interface ServiceArt {
+  title?: string;
+  badge?: string;
+  /** **trecho** sai em negrito. */
+  description?: string;
+  backgrounds?: { square?: string; story?: string; wide?: string };
+}
+
 export interface Service {
   id: string;
   title: string;
@@ -30,6 +39,7 @@ export interface Service {
   internalOnly?: boolean;
   /** Dúvidas públicas, na ordem de exibição. */
   faq?: ServiceFaqItem[];
+  art?: ServiceArt;
 }
 
 export type ProductionType = 'scheduled' | 'recording' | 'editing' | 'immediate';
@@ -175,6 +185,7 @@ export interface FirestoreService {
   deliveryMessage?: string;
   internalOnly?: boolean;
   faq?: ServiceFaqItem[];
+  art?: ServiceArt;
 }
 
 /**

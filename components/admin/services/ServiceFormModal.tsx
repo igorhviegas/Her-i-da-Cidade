@@ -5,6 +5,7 @@ import { ServicePriceCategoryFields } from './ServicePriceCategoryFields';
 import { ServicePublishFields } from './ServicePublishFields';
 import type { ServiceImageUpload } from './useServiceImageUpload';
 import { ServiceImageField } from './ServiceImageField';
+import { ServiceArtSection } from './ServiceArtSection';
 import { ServiceOrderConfigSection } from './ServiceOrderConfigSection';
 import { ServiceDeliveryMessageSection } from './ServiceDeliveryMessageSection';
 import { ServiceFaqSection } from './ServiceFaqSection';
@@ -108,6 +109,8 @@ export const ServiceFormModal: React.FC<ServiceFormModalProps> = ({
             isSubmitting={isSubmitting}
             image={image}
           />
+
+          <ServiceArtSection formData={formData} setFormData={setFormData} />
 
           <ServicePublishFields formData={formData} setFormData={setFormData} formErrors={formErrors} />
 

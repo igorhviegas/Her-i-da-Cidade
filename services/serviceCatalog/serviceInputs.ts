@@ -1,4 +1,4 @@
-import { Service, ServiceFaqItem, OrderStatus, ProductionType } from "../../types";
+import { Service, ServiceArt, ServiceFaqItem, OrderStatus, ProductionType } from "../../types";
 
 /**
  * Opções de configuração para busca de serviços.
@@ -28,6 +28,7 @@ export interface CreateServiceInput {
   defaultDeliveryDays?: number;
   deliveryMessage?: string;
   faq?: ServiceFaqItem[];
+  art?: ServiceArt;
 }
 
 export interface UpdateServiceInput {
@@ -49,6 +50,8 @@ export interface UpdateServiceInput {
   deliveryMessage?: string | null;
   /** Substitui a lista inteira; lista vazia (ou só com itens incompletos) remove o campo. */
   faq?: ServiceFaqItem[];
+  /** Substitui a arte inteira; sem nada preenchido remove o campo. */
+  art?: ServiceArt;
 }
 
 /**

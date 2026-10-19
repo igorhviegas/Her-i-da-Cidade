@@ -1,4 +1,4 @@
-import type { Service, OrderStatus, ProductionType, ServiceFaqItem } from '../../../types';
+import type { Service, ServiceArt, OrderStatus, ProductionType, ServiceFaqItem } from '../../../types';
 import type { CreateServiceInput, UpdateServiceInput } from '../../../services/servicesService';
 
 export interface ServiceFormData {
@@ -17,6 +17,7 @@ export interface ServiceFormData {
   defaultDeliveryDays: string;
   deliveryMessage: string;
   faq: ServiceFaqItem[];
+  art: ServiceArt;
 }
 
 export type ServiceFormErrors = Partial<Record<keyof ServiceFormData, string>>;
@@ -44,6 +45,7 @@ export const emptyServiceForm = (order: number): ServiceFormData => ({
   defaultDeliveryDays: '',
   deliveryMessage: '',
   faq: [],
+  art: {},
 });
 
 export const serviceToFormData = (service: Service): ServiceFormData => ({
@@ -62,6 +64,7 @@ export const serviceToFormData = (service: Service): ServiceFormData => ({
   defaultDeliveryDays: service.defaultDeliveryDays !== undefined ? String(service.defaultDeliveryDays) : '',
   deliveryMessage: service.deliveryMessage ?? '',
   faq: service.faq ?? [],
+  art: service.art ?? {},
 });
 
 const validateImageUrl = (errors: ServiceFormErrors, formData: ServiceFormData, hasPendingImage: boolean) => {
@@ -124,6 +127,7 @@ export const buildUpdatePayload = (formData: ServiceFormData, orderConfigTouched
   badgeText: formData.badgeText,
   deliveryMessage: formData.deliveryMessage,
   faq: formData.faq,
+  art: formData.art,
   ...(orderConfigTouched ? {
     generateOrder: formData.generateOrder,
     productionType: formData.productionType || null,
@@ -144,6 +148,7 @@ export const buildCreatePayload = (formData: ServiceFormData, orderConfigTouched
   badgeText: formData.badgeText,
   deliveryMessage: formData.deliveryMessage,
   faq: formData.faq,
+  art: formData.art,
   ...(orderConfigTouched ? {
     generateOrder: formData.generateOrder,
     ...(formData.productionType ? { productionType: formData.productionType } : {}),
