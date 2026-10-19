@@ -9,6 +9,8 @@ const ORDERS = 'orders';
 const SERVICES = 'services';
 /** Reservas anti-duplicidade (só pedidos presenciais): uma por WhatsApp, gravadas na mesma transação do pedido. Acesso só pelo Admin SDK. */
 const DEDUPE = 'manychatRequests';
+/** Livro de lançamentos dos eventos (mesma coleção de services/eventFinance.js). */
+const LEDGER = 'financeEntries';
 
 function jsonError(res, status, code, message, extra = {}) {
   return res.status(status).json({ ok: false, error: { code, message }, ...extra });
@@ -289,10 +291,25 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
         const pendingSnapshot = await transaction.get(database.collection(profile.confirmsBooking).doc(bookingKey(normalizedWhatsApp)));
         const bookedRef = pendingSnapshot.exists ? database.collection(ORDERS).doc(String(pendingSnapshot.get('orderId'))) : null;
         const bookedSnapshot = bookedRef ? await transaction.get(bookedRef) : null;
-        // Evento: o sinal só tira o "aguardando"; o pedido continua rascunho até o dono conferir valores em "Editar pedido" (é lá
-        // que a entrada é lançada no Financeiro, como nos rascunhos do ManyChat).
+        // Formulário do evento (site): o sinal tira o "aguardando". Se o dono já definiu o valor no CRM, a reserva é confirmada aqui
+        // mesmo: a entrada é lançada no Financeiro e o rascunho fecha (como "Já recebi o sinal" no Editar pedido). Sem valor ainda,
+        // continua rascunho e a entrada é lançada quando o dono salvar os valores.
         if (profile.pricing === 'pending' && bookedSnapshot?.exists && bookedSnapshot.get('paymentPending') === true) {
-          transaction.update(bookedRef, { paymentPending: FieldValue.delete(), depositPaidAt: paidAt, updatedAt: FieldValue.serverTimestamp() });
+          const confirmation = { paymentPending: FieldValue.delete(), depositPaidAt: paidAt, updatedAt: FieldValue.serverTimestamp() };
+          const event = bookedSnapshot.get('eventForm');
+          if (bookedSnapshot.get('eventDraft') === true && event?.totalValue > 0 && Number.isFinite(event.entryValue) && event.entryValue >= 0) {
+            // Mesmo registro de services/eventFinance.js#planEntry (ID determinístico: nunca lança duas vezes).
+            const entryRef = database.collection(LEDGER).doc(`evt-${bookedRef.id}-entry`);
+            const amount = Math.round(event.entryValue * 100) / 100;
+            if (!(await transaction.get(entryRef)).exists) {
+              transaction.set(entryRef, {
+                orderId: bookedRef.id, kind: 'entry', type: 'revenue', amount, date: paidAt, clientId: bookedSnapshot.get('clientId'),
+                serviceId: bookedSnapshot.get('serviceId'), childName: bookedSnapshot.get('childName') ?? '', createdAt: FieldValue.serverTimestamp(),
+              });
+            }
+            Object.assign(confirmation, { eventDraft: FieldValue.delete(), eventLedger: { entry: amount } });
+          }
+          transaction.update(bookedRef, confirmation);
           return { orderId: bookedRef.id, confirmedBooking: true };
         }
         if (bookedSnapshot?.exists && bookedSnapshot.get('paymentPending') === true) {
