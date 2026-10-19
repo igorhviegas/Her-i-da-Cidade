@@ -149,3 +149,29 @@ test('numeração: segue o contador antigo e aceita a correção do dono (mesmo 
   assert.equal((await submit(fixed)).label, 'A215');
   assert.equal(fixed.docs.get('siteConfig/eventFormCounter').next, 216);
 });
+
+test('valor definido no CRM antes do pagamento: o ManyChat confirma o mesmo pedido e lança a entrada', async () => {
+  const db = fakeDatabase({ 'services/6': SERVICE });
+  await submit(db);
+  const [path] = orderOf(db);
+  const id = path.split('/')[1];
+  // O dono salva o valor no "Editar pedido" (continua rascunho aguardando sinal).
+  Object.assign(db.docs.get(path).eventForm, { totalValue: 847, entryValue: 423.5 });
+  assert.equal(db.docs.get(path).paymentPending, true);
+
+  const res = { statusCode: 0, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; }, setHeader() {}, set() { return this; } };
+  await handleManyChatOrderRequest(
+    { method: 'POST', rawBody: Buffer.from('{}'), is: () => true, get: (h) => (h === 'authorization' ? 'Bearer s' : undefined), body: { eventType: 'payment.paid', service: 'presential-event', customer: { name: 'Kemily', whatsapp: '+55 31 99999-0001' } } },
+    res, { database: db, secret: 's', logger: { ...console, info() {}, warn() {}, error() {} } },
+  );
+  assert.equal(res.statusCode < 300, true, JSON.stringify(res.body));
+  assert.equal([...db.docs.keys()].filter((p) => p.startsWith('orders/')).length, 1); // nada de pedido novo
+  const order = db.docs.get(path);
+  assert.equal(order.paymentPending, undefined);
+  assert.equal(order.eventDraft, undefined);
+  assert.deepEqual(order.eventLedger, { entry: 423.5 });
+  const entry = db.docs.get(`financeEntries/evt-${id}-entry`);
+  assert.equal(entry.amount, 423.5);
+  assert.equal(entry.kind, 'entry');
+  assert.equal(entry.type, 'revenue');
+});
