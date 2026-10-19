@@ -3,6 +3,7 @@ import { variationPct } from '../../../services/financeCalculations.js';
 import type { FitMonth, InstagramMonth } from '../../../services/monthlyReport.js';
 import type { PeriodTotals } from '../../../services/reports.js';
 import { formatMoney, monthLabel } from '../financeFormat';
+import type { BankTotals, CategoryTotal } from '../../../services/bankStatement.js';
 
 export type Loadable<T> = { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: T };
 
@@ -21,6 +22,8 @@ export interface MonthlyData {
   delivery: { delivered: number; onTimeRate: number | null; avgLateDays: number | null; avgLeadDays: number | null };
   instagram: Loadable<InstagramMonth>;
   fit: Loadable<FitMonth>;
+  /** Extrato real do Inter importado (bankTransactions). */
+  bank: Loadable<BankTotals>;
 }
 
 const pct = (value: number | null) => (value === null ? '—' : `${Math.round(value * 100)}%`);
@@ -45,6 +48,33 @@ const Row: React.FC<{ label: string; value: string; strong?: boolean; tone?: str
   <div className={`flex justify-between gap-3 py-1 text-sm ${strong ? 'border-t border-slate-300 pt-2 font-bold' : ''}`}><dt className="text-slate-600">{label}</dt><dd className={`tabular-nums ${tone}`}>{value}</dd></div>
 );
 const Pending: React.FC<{ state: Loadable<unknown>; what: string }> = ({ state, what }) => <p className="text-sm text-slate-500">{state.status === 'loading' ? `Carregando ${what}…` : `${what} indisponível no momento.`}</p>;
+
+const Bank: React.FC<{ state: Loadable<BankTotals>; revenue: number }> = ({ state, revenue }) => {
+  if (state.status !== 'ready') return <Pending state={state} what="Extrato do Inter" />;
+  const b = state.data;
+  if (b.count === 0) return <p className="text-sm text-slate-500">Extrato do Inter não importado neste mês.</p>;
+  const list = (title: string, rows: CategoryTotal[], total: number, tone: string) => (
+    <div>
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</p>
+      <dl>{rows.map((r) => <Row key={r.category} label={`${r.category} (${total ? Math.round((r.total / total) * 100) : 0}%)`} value={formatMoney(r.total)} tone={tone} />)}</dl>
+    </div>
+  );
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat label="Entradas" value={formatMoney(b.totalIn)} tone="text-emerald-700" />
+        <Stat label="Saídas" value={formatMoney(b.totalOut)} tone="text-red-600" />
+        <Stat label="Saldo do mês" value={formatMoney(b.balance)} tone={b.balance < 0 ? 'text-red-600' : 'text-emerald-700'} />
+        <Stat label="Entradas − faturamento" value={formatMoney(b.totalIn - revenue)} hint="Diferença para o faturamento do sistema" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {list('Entradas por categoria', b.byCategory.in, b.totalIn, 'text-emerald-700')}
+        {list('Saídas por categoria', b.byCategory.out, b.totalOut, 'text-red-600')}
+      </div>
+      <p className="text-xs text-slate-500">{b.count} lançamento(s) da conta PJ no Banco Inter{b.uncategorized ? `, ${b.uncategorized} sem categoria` : ''}.</p>
+    </div>
+  );
+};
 
 const Instagram: React.FC<{ state: Loadable<InstagramMonth> }> = ({ state }) => {
   if (state.status !== 'ready') return <Pending state={state} what="Instagram" />;
@@ -110,6 +140,8 @@ export const MonthlyDocument: React.FC<{ data: MonthlyData }> = ({ data }) => {
         </dl>
         <p className="mt-2 text-xs text-slate-500">Custos por forma de pagamento: Pix {formatMoney(totals.variableCost + fixed - credit)} · Crédito {formatMoney(credit)}</p>
       </Section>
+
+      <Section title="Banco Inter (valores reais)"><Bank state={data.bank} revenue={totals.revenue} /></Section>
 
       <Section title="Faturamento por dia">
         <div className="flex h-28 items-end gap-0.5">

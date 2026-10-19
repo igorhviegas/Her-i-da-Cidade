@@ -15,6 +15,7 @@ import type { InstagramPost } from '../../../services/instagramMetrics.js';
 import { cardClass, ghostBtn, monthLabel, primaryBtn } from '../financeFormat';
 import type { Lookup } from './financePageHooks';
 import { MonthlyDocument, type Loadable, type MonthlyData } from './MonthlyDocument';
+import { useBankMonth } from '../../../services/bankService';
 
 type FitSources = Parameters<typeof fitMonth>[0];
 
@@ -72,6 +73,7 @@ export const ReportsMonthly: React.FC<Props> = ({ entries, costs, orders, expens
   useEffect(() => { if (openMonth) setMonthKey(openMonth); }, [openMonth]);
   const instagram = useInstagramSources();
   const fit = useFitSources();
+  const bank = useBankMonth(monthKey);
 
   const data = useMemo<MonthlyData>(() => {
     const range = monthRange(monthKey);
@@ -90,9 +92,9 @@ export const ReportsMonthly: React.FC<Props> = ({ entries, costs, orders, expens
       events: eventProfitability(entries, costs, range).totals,
       clients: clientsInMonth(entries, range),
       delivery: { delivered: delivery.delivered, onTimeRate: delivery.onTimeRate, avgLateDays: delivery.avgLateDays, avgLeadDays: delivery.avgLeadDays },
-      instagram: igMonth, fit: fitState,
+      instagram: igMonth, fit: fitState, bank: bank.status === 'ready' ? { status: 'ready', data: bank.data.totals } : bank,
     };
-  }, [monthKey, entries, costs, orders, expenses, services, instagram, fit]);
+  }, [monthKey, entries, costs, orders, expenses, services, instagram, fit, bank]);
 
   const atCurrent = monthKey >= monthKeyOf(new Date());
   const go = (delta: number) => setMonthKey(monthKeyOf(shiftPeriod('month', new Date(Number(monthKey.slice(0, 4)), Number(monthKey.slice(5, 7)) - 1, 1), delta)));

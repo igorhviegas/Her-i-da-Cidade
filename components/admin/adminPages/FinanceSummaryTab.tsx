@@ -5,6 +5,7 @@ import { DailyCompass, MonthlyBars, ServiceBars } from '../FinanceCharts';
 import { cardClass, formatMoney, MONTH_NAMES, monthLabel } from '../financeFormat';
 import { monthKeyOf, shiftMonth, type DayRevenue } from '../../../services/financeCalculations.js';
 import { Kpi } from './FinanceKpi';
+import { useBankMonth } from '../../../services/bankService';
 import type { Lookup } from './financePageHooks';
 
 /** Mesmo formato do `view` calculado em AdminFinancePage. */
@@ -39,6 +40,21 @@ const SummaryKpis: React.FC<{ view: FinanceView; monthKey: string }> = ({ view, 
     <Kpi label="Patrimônio ativo" value={formatMoney(view.patrimony.currentTotal)} hint={`${view.patrimony.activeCount} iten${view.patrimony.activeCount === 1 ? '' : 's'}`} />
   </div>
 );
+
+/** Valores reais da conta no Inter (extrato importado em bankTransactions), ao lado dos números do sistema. */
+const BankKpis: React.FC<{ monthKey: string; systemRevenue: number }> = ({ monthKey, systemRevenue }) => {
+  const bank = useBankMonth(monthKey);
+  const data = bank.status === 'ready' && bank.data.totals.count > 0 ? bank.data.totals : null;
+  const hint = bank.status === 'loading' ? 'Carregando…' : bank.status === 'error' ? 'Extrato indisponível' : !data ? 'Extrato do Inter não importado neste mês' : 'Banco Inter · valor real';
+  const money = (n: number | undefined) => (n === undefined ? '—' : formatMoney(n));
+  return (
+    <div className="grid grid-cols-1 gap-3 min-[480px]:grid-cols-3">
+      <Kpi label="Entradas reais" value={money(data?.totalIn)} tone="text-emerald-300" hint={data ? `Diferença p/ faturamento: ${formatMoney(data.totalIn - systemRevenue)}` : hint} />
+      <Kpi label="Saídas reais" value={money(data?.totalOut)} tone="text-red-300" hint={hint} />
+      <Kpi label="Saldo real do mês" value={money(data?.balance)} tone={data && data.balance < 0 ? 'text-red-300' : 'text-white'} hint={hint} />
+    </div>
+  );
+};
 
 interface DayEntriesProps {
   view: FinanceView;
@@ -93,6 +109,7 @@ interface FinanceSummaryTabProps {
 export const FinanceSummaryTab: React.FC<FinanceSummaryTabProps> = ({ view, monthKey, selectedDay, onSelectDay, clients, services, topServices }) => (
   <div className="space-y-6">
     <SummaryKpis view={view} monthKey={monthKey} />
+    <BankKpis monthKey={monthKey} systemRevenue={view.current.total} />
 
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <section className={cardClass}>
