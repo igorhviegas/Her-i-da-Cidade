@@ -124,6 +124,26 @@ service cloud.firestore {
         && d.importedAt == request.time;
     }
 
+    // Caixinha de Perguntas do Espaço Criativo (services/creativeQuestions.js): mesmos campos e limites do app.
+    function validCreativeQuestion(d) {
+      return d.keys().hasOnly(['text', 'category', 'notes', 'status', 'answeredAt', 'scriptId', 'createdAt', 'updatedAt'])
+        && d.keys().hasAll(['text', 'category', 'notes', 'status', 'answeredAt', 'scriptId', 'createdAt', 'updatedAt'])
+        && d.text is string && d.text.size() > 0 && d.text.size() <= 500
+        && d.category is string && d.category.size() <= 60
+        && d.notes is string && d.notes.size() <= 2000
+        && d.status in ['draft', 'ready', 'answered', 'scripted']
+        && (d.answeredAt == null || d.answeredAt is timestamp)
+        && (d.scriptId == null || (d.scriptId is string && d.scriptId.size() > 0 && d.scriptId.size() <= 128))
+        && d.updatedAt == request.time;
+    }
+
+    // Vínculo só com roteiro que existe (contentScripts); um vínculo já gravado não precisa existir de novo
+    // (o roteiro pode ter sido excluído depois e a pergunta continua editável).
+    function linksExistingScript(d, before) {
+      return d.scriptId == null || (before != null && before.scriptId == d.scriptId)
+        || exists(/databases/$(database)/documents/contentScripts/$(d.scriptId));
+    }
+
     // Resumo de pedalada do Fit (services/fitRide.js): só estes campos, com tipos e limites plausíveis.
     function validFitRide(rideId, d) {
       return d.keys().hasAll(['source', 'sourceKey', 'sport', 'virtual', 'startedAt', 'durationSec', 'movingSec', 'distanceKm', 'avgSpeedKmh', 'maxSpeedKmh', 'createdAt'])
@@ -289,6 +309,17 @@ service cloud.firestore {
     // Biblioteca interna de roteiros, acessível somente a administradores.
     match /contentScripts/{scriptId} {
       allow read, write: if isAdmin();
+    }
+
+    // Pergunta da Caixinha (Espaço Criativo): só admin; data de criação fixa; roteiro relacionado por id, sem cópia do conteúdo.
+    match /creativeQuestions/{questionId} {
+      allow read, delete: if isAdmin();
+      allow create: if isAdmin() && validCreativeQuestion(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && linksExistingScript(request.resource.data, null);
+      allow update: if isAdmin() && validCreativeQuestion(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && linksExistingScript(request.resource.data, resource.data);
     }
 
     // Dados internos do CRM: acesso restrito aos administradores autenticados.

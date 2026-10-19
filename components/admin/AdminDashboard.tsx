@@ -10,6 +10,7 @@ import { DashboardDesktopSidebar, DashboardMobileDrawer, DashboardTopbar } from 
 import { DashboardTab } from './videoAdmin/DashboardTab';
 import { AdminTabContentPrimary, AdminTabContentSecondary } from './videoAdmin/AdminTabContent';
 import type { AdminTab } from './videoAdmin/dashboardTypes';
+import { CREATIVE_HOME, CREATIVE_TOOLS, creativePathOf, creativeRoute } from './creative/creativeTools';
 import {
   LayoutDashboard,
   Sparkles,
@@ -19,7 +20,6 @@ import {
   Layers,
   UserCheck,
   ClipboardList,
-  BookOpen,
   Target,
   Wallet,
   Camera,
@@ -44,7 +44,8 @@ const NAV_ITEMS: NavItem<AdminTab>[] = [
   { id: 'missions', label: 'Missões', icon: Target },
   { id: 'finance', label: 'Financeiro', icon: Wallet },
   { id: 'instagram', label: 'Instagram', icon: Camera },
-  { id: 'scripts', label: 'Roteiros', icon: BookOpen },
+  { id: CREATIVE_HOME.id, label: 'Visão geral', icon: CREATIVE_HOME.icon },
+  ...CREATIVE_TOOLS.map(({ id, label, icon }) => ({ id, label, icon })),
   { id: 'clients', label: 'Clientes', icon: UserCheck },
   { id: 'videos', label: 'Vídeos', icon: Video },
   { id: 'categories', label: 'Categorias', icon: Layers },
@@ -60,7 +61,9 @@ const NAV_ITEMS: NavItem<AdminTab>[] = [
   { id: 'kart', label: 'Kart', icon: Flag },
 ];
 const NAV_GROUPS: NavGroup<AdminTab>[] = [
-  { key: 'crm', label: 'CRM', icon: Briefcase, ids: ['orders', 'missions', 'finance', 'instagram', 'scripts', 'clients'] },
+  { key: 'crm', label: 'CRM', icon: Briefcase, ids: ['orders', 'missions', 'finance', 'instagram', 'clients'] },
+  // Espaço Criativo: ferramentas vêm de creative/creativeTools.ts (nova ferramenta não precisa mexer aqui).
+  { key: 'criativo', label: CREATIVE_HOME.label, icon: CREATIVE_HOME.icon, ids: [CREATIVE_HOME.id, ...CREATIVE_TOOLS.map((tool) => tool.id)] },
   { key: 'streaming', label: 'Streaming', icon: Tv, ids: ['videos', 'categories', 'clientarea'] },
   { key: 'pessoal', label: 'Pessoal', icon: Activity, ids: ['fit', 'fitcheckins', 'fittreinos', 'kart'] },
   { key: 'ajustes', label: 'Ajustes', icon: SlidersHorizontal, ids: ['services', 'content', 'dashboard', 'settings', 'agent'] },
@@ -69,7 +72,7 @@ const NAV_ORDER = NAV_ITEMS.map((item) => item.id);
 
 // Sincronização inicial da aba com a URL
 const tabFromPath = (path: string): AdminTab =>
-    path === '/admin/servicos' || path === '/admin/services'
+    creativeRoute(path)?.tab ?? (path === '/admin/servicos' || path === '/admin/services'
       ? 'services'
       : path === '/admin/configuracoes' || path === '/admin/settings'
       ? 'settings'
@@ -81,8 +84,6 @@ const tabFromPath = (path: string): AdminTab =>
       ? 'content'
       : path === '/admin/pedidos'
       ? 'orders'
-      : path === '/admin/roteiros'
-      ? 'scripts'
       : path === '/admin/clientes'
       ? 'clients'
       : path === '/admin/missoes'
@@ -111,10 +112,15 @@ const tabFromPath = (path: string): AdminTab =>
       ? 'dashboard'
       : path === '/admin/perfil'
       ? 'profile'
-      : 'home';
+      : 'home');
 
 // Monitora alterações na URL para refletir na aba
 const syncTabFromPath = (path: string, setCurrentTab: (tab: AdminTab) => void) => {
+    const creative = creativeRoute(path);
+    if (creative) {
+      setCurrentTab(creative.tab);
+      return;
+    }
     if (path === '/admin/servicos' || path === '/admin/services') {
       setCurrentTab('services');
     } else if (path === '/admin/configuracoes' || path === '/admin/settings') {
@@ -127,8 +133,6 @@ const syncTabFromPath = (path: string, setCurrentTab: (tab: AdminTab) => void) =
       setCurrentTab('content');
     } else if (path === '/admin/pedidos') {
       setCurrentTab('orders');
-    } else if (path === '/admin/roteiros') {
-      setCurrentTab('scripts');
     } else if (path === '/admin/clientes') {
       setCurrentTab('clients');
     } else if (path === '/admin/missoes') {
@@ -163,6 +167,11 @@ const syncTabFromPath = (path: string, setCurrentTab: (tab: AdminTab) => void) =
 };
 
 const navigateToTab = (tabId: AdminTab, navigate: (to: string) => void) => {
+    const creativePath = creativePathOf(tabId);
+    if (creativePath) {
+      navigate(creativePath);
+      return;
+    }
     if (tabId === 'services') {
       navigate('/admin/servicos');
     } else if (tabId === 'videos') {
@@ -175,8 +184,6 @@ const navigateToTab = (tabId: AdminTab, navigate: (to: string) => void) => {
       navigate('/admin/conteudo');
     } else if (tabId === 'orders') {
       navigate('/admin/pedidos');
-    } else if (tabId === 'scripts') {
-      navigate('/admin/roteiros');
     } else if (tabId === 'clients') {
       navigate('/admin/clientes');
     } else if (tabId === 'missions') {
@@ -212,7 +219,7 @@ const navigateToTab = (tabId: AdminTab, navigate: (to: string) => void) => {
 
 export const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
-  const { path, navigate } = useRouter();
+  const { path, search, navigate } = useRouter();
 
   const initialTab: AdminTab = tabFromPath(path);
 
@@ -225,14 +232,17 @@ export const AdminDashboard: React.FC = () => {
     const link = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
     if (!link) return;
     const original = link.getAttribute('href') ?? '';
-    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes', '/admin/pagina-clientes': 'streaming', '/admin/agendamento-chamadas': 'calendario', '/admin/perfil': 'principal', '/admin/fit': 'principal', '/admin/fit/checkins': 'principal', '/admin/fit/treinos': 'principal' } as Record<string, string>)[path] ?? path.split('/')[2];
+    const slug = ({ '/admin': 'principal', '/admin/services': 'servicos', '/admin/settings': 'configuracoes', '/admin/pagina-clientes': 'streaming', '/admin/agendamento-chamadas': 'calendario', '/admin/perfil': 'principal', '/admin/fit': 'principal', '/admin/fit/checkins': 'principal', '/admin/fit/treinos': 'principal' } as Record<string, string>)[path] ?? (path.startsWith(CREATIVE_HOME.path) ? 'roteiros' : path.split('/')[2]);
     if (slug) link.setAttribute('href', `/images/modules/${slug}.png`);
     return () => link.setAttribute('href', original);
   }, [path]);
 
   useEffect(() => {
     syncTabFromPath(path, setCurrentTab);
-  }, [path]);
+    // Endereço antigo (ex.: /admin/roteiros): troca pelo novo sem criar entrada no histórico, preservando ?parâmetros.
+    const redirect = creativeRoute(path)?.redirect;
+    if (redirect) navigate(redirect + search, { replace: true });
+  }, [path, search, navigate]);
 
   const handleTabChange = (tabId: AdminTab) => {
     setCurrentTab(tabId);

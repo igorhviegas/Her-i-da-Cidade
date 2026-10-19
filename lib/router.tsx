@@ -3,7 +3,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 interface RouterContextType {
   path: string;
   search: string;
-  navigate: (to: string) => void;
+  /** `replace` troca a entrada atual do histórico (redirecionamentos), sem criar uma nova. */
+  navigate: (to: string, options?: { replace?: boolean }) => void;
 }
 
 const RouterContext = createContext<RouterContextType>({
@@ -37,7 +38,7 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const navigate = useCallback((to: string) => {
+  const navigate = useCallback((to: string, options?: { replace?: boolean }) => {
     if (typeof window !== 'undefined') {
       const [targetPathPart, targetQueryPart] = to.split('?');
       const targetPath = targetPathPart || '/';
@@ -45,7 +46,9 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const targetFull = targetPath + targetSearch;
       const currentFull = window.location.pathname + window.location.search;
 
-      if (currentFull !== targetFull) {
+      if (options?.replace) {
+        window.history.replaceState({}, '', targetFull);
+      } else if (currentFull !== targetFull) {
         window.history.pushState({}, '', targetFull);
       }
       setPath(targetPath);

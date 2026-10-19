@@ -5,11 +5,13 @@ import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } f
 import { NewCampaignForm } from './instagramPlanning/CampaignForm';
 import { ScriptEditorFooter, ScriptEditorHeader } from './ordersFlow/ScriptEditorParts';
 import { dateFromInput, inputClass, labelClass, productionOptions, publicationOptions, todayInput } from './ordersFlow/scriptEditorHelpers';
-import { useScriptStatuses, useScriptTexts } from './ordersFlow/useScriptDraft';
+import { useScriptStatuses, useScriptTexts, type ScriptDraft } from './ordersFlow/useScriptDraft';
 
 interface ScriptEditorModalProps {
   script: ContentScript | null;
   initialParentScriptId?: string;
+  /** Só para roteiro novo: textos já preenchidos. */
+  initialDraft?: ScriptDraft;
   scripts: ContentScript[];
   categories: string[];
   onClose: () => void;
@@ -18,9 +20,9 @@ interface ScriptEditorModalProps {
   onOpenOrder: (orderId: string) => void;
 }
 
-export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, initialParentScriptId, scripts, categories, onClose, onSaved, onSendToRecording, onOpenOrder }) => {
+export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, initialParentScriptId, initialDraft, scripts, categories, onClose, onSaved, onSendToRecording, onOpenOrder }) => {
   const [persistedScript, setPersistedScript] = useState(script);
-  const { title, setTitle, category, setCategory, parentScriptId, setParentScriptId, content, setContent, notes, setNotes } = useScriptTexts(script, initialParentScriptId);
+  const { title, setTitle, category, setCategory, parentScriptId, setParentScriptId, content, setContent, notes, setNotes } = useScriptTexts(script, initialParentScriptId, initialDraft);
   const { productionStatus, setProductionStatus, publicationStatus, setPublicationStatus, publishedDate, setPublishedDate, plannedDate, setPlannedDate, linkedOrderId, setLinkedOrderId } = useScriptStatuses(script);
   const [saving, setSaving] = useState(false);
   const [sendingToProduction, setSendingToProduction] = useState(false);
