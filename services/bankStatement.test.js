@@ -95,6 +95,16 @@ test('planImport ignora o que já existe e aplica a categoria das regras', () =>
   assert.equal(plan.skipped, 1); assert.equal(plan.toWrite.length, 4); assert.equal(plan.auto, 1);
   assert.equal(plan.toWrite[0].category, 'Assinaturas e software');
   assert.equal(categoryKey({ kind: 'out', title: 'Pagamento  Efetuado', description: 'Adobe' }), categoryKey(items[1]), 'ignora caixa e espaços');
+  assert.equal(plan.toWrite[2].category, null, 'sem padrão, entrada fica sem categoria');
+});
+
+test('planImport: entrada sem regra recebe a categoria padrão; regra lembrada vence; saída não', () => {
+  const items = parseCsvRows(CSV);
+  const plan = planImport(items, new Set(), new Map(), 'Serviços (clientes)');
+  assert.deepEqual(plan.toWrite.map((t) => t.category), ['Serviços (clientes)', null, null, 'Serviços (clientes)', null]);
+  assert.equal(plan.defaulted, 2); assert.equal(plan.auto, 0);
+  const ruled = planImport(items, new Set(), new Map([[categoryKey(items[3]), 'Reembolso']]), 'Serviços (clientes)');
+  assert.equal(ruled.toWrite[3].category, 'Reembolso'); assert.equal(ruled.auto, 1); assert.equal(ruled.defaulted, 1);
 });
 
 test('bankTotals: entradas, saídas, saldo e quebra por categoria', () => {

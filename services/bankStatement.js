@@ -91,16 +91,24 @@ export function categoryKey(t) {
 /** Id de documento seguro para a regra (sem "/"). */
 export const ruleId = (key) => encodeURIComponent(key).replace(/\./g, '%2E').slice(0, 1400);
 
-/** Separa o que ainda não existe e já aplica a categoria das regras salvas. */
-export function planImport(items, existingIds, rules) {
+/** Categoria das entradas que nenhuma regra lembrada cobre. */
+export const DEFAULT_IN_CATEGORY = 'Serviços (clientes)';
+
+/**
+ * Separa o que ainda não existe e já aplica a categoria das regras salvas; entrada sem regra recebe `defaultIn`
+ * (null = deixa sem categoria, ex.: a categoria padrão foi renomeada/excluída).
+ */
+export function planImport(items, existingIds, rules, defaultIn = null) {
   const fresh = items.filter((t) => !existingIds.has(t.id));
-  let auto = 0;
+  let auto = 0, defaulted = 0;
   const toWrite = fresh.map((t) => {
-    const category = rules.get(categoryKey(t)) ?? null;
-    if (category) auto += 1;
+    const ruled = rules.get(categoryKey(t)) ?? null;
+    if (ruled) auto += 1;
+    const category = ruled ?? (t.kind === 'in' ? defaultIn : null);
+    if (!ruled && category) defaulted += 1;
     return { ...t, category };
   });
-  return { toWrite, skipped: items.length - fresh.length, auto };
+  return { toWrite, skipped: items.length - fresh.length, auto, defaulted };
 }
 
 const pad = (n) => String(n).padStart(2, '0');
