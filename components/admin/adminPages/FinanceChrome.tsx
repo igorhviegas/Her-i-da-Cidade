@@ -6,11 +6,12 @@ import { FinanceAssets } from '../FinanceAssets';
 import { FinanceStock } from '../FinanceStock';
 import { FinanceLeaderboard } from '../FinanceLeaderboard';
 import { FinanceManychat } from '../FinanceManychat';
+import { FinanceBank } from '../FinanceBank';
 import { ghostBtn, inputClass, labelClass, MONTH_NAMES } from '../financeFormat';
 
-export type FinanceTab = 'summary' | 'statement' | 'reports' | 'expenses' | 'assets' | 'stock' | 'leaderboard' | 'manychat';
+export type FinanceTab = 'summary' | 'statement' | 'reports' | 'expenses' | 'assets' | 'stock' | 'leaderboard' | 'manychat' | 'bank';
 export const TABS: { id: FinanceTab; label: string }[] = [
-  { id: 'summary', label: 'Resumo' }, { id: 'statement', label: 'Extrato' }, { id: 'reports', label: 'Relatórios' }, { id: 'expenses', label: 'Despesas' }, { id: 'assets', label: 'Patrimônio' }, { id: 'stock', label: 'Estoque' }, { id: 'leaderboard', label: 'Leaderboard' }, { id: 'manychat', label: 'WhatsApp API' },
+  { id: 'summary', label: 'Resumo' }, { id: 'statement', label: 'Extrato' }, { id: 'bank', label: 'Banco (Inter)' }, { id: 'reports', label: 'Relatórios' }, { id: 'expenses', label: 'Despesas' }, { id: 'assets', label: 'Patrimônio' }, { id: 'stock', label: 'Estoque' }, { id: 'leaderboard', label: 'Leaderboard' }, { id: 'manychat', label: 'WhatsApp API' },
 ];
 
 interface FinanceHeaderProps {
@@ -81,6 +82,7 @@ export const FinanceOtherTabs: React.FC<FinanceOtherTabsProps> = ({ tab, expense
     {tab === 'assets' && <FinanceAssets assets={assets} onChanged={onChanged} />}
     {tab === 'stock' && <FinanceStock />}
     {tab === 'leaderboard' && <FinanceLeaderboard entries={entries} nameOf={nameOf} />}
+    {tab === 'bank' && <FinanceBank entries={entries} monthKey={monthKey} />}
     {tab === 'manychat' && <FinanceManychat entries={entries} monthKey={monthKey} serviceName={nameOf} />}
   </>
 );
