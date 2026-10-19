@@ -72,9 +72,13 @@ export function wrapRich(text, maxWidth, measure) {
 export function splitTitle(title) {
   const ws = String(title ?? '').trim().split(/\s+/);
   if (ws.length < 2) return [ws.join(' ')];
-  let best = 1;
   const longest = (i) => Math.max(ws.slice(0, i).join(' ').length, ws.slice(i).join(' ').length);
-  for (let i = 2; i < ws.length; i += 1) if (longest(i) < longest(best)) best = i;
+  // a segunda linha não começa com "de", "da", "e"... ("VÍDEO ESPECIAL DE / ANIVERSÁRIO")
+  const points = Array.from({ length: ws.length - 1 }, (_, i) => i + 1);
+  const ok = points.filter((i) => ws[i].length > 2);
+  const candidates = ok.length ? ok : points;
+  let best = candidates[0];
+  for (const i of candidates) if (longest(i) < longest(best)) best = i;
   return [ws.slice(0, best).join(' '), ws.slice(best).join(' ')];
 }
 

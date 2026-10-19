@@ -24,7 +24,8 @@ test('descrição: quebra pela largura, mantém negrito e respeita Enter', () =>
 });
 
 test('título em duas linhas equilibradas', () => {
-  assert.deepEqual(splitTitle('VÍDEO ESPECIAL DE ANIVERSÁRIO'), ['VÍDEO ESPECIAL', 'DE ANIVERSÁRIO']);
+  assert.deepEqual(splitTitle('VÍDEO ESPECIAL DE ANIVERSÁRIO'), ['VÍDEO ESPECIAL DE', 'ANIVERSÁRIO']);
+  assert.deepEqual(splitTitle('VÍDEO ESPECIAL ANIVERSÁRIO'), ['VÍDEO ESPECIAL', 'ANIVERSÁRIO']);
   assert.deepEqual(splitTitle('VÍDEO PERSONALIZADO'), ['VÍDEO', 'PERSONALIZADO']);
   assert.deepEqual(splitTitle('CONVITE'), ['CONVITE']);
 });
