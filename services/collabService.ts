@@ -18,7 +18,9 @@ function firestore() {
 
 function fail(operation: string, error: unknown): never {
   logger.error(`[collabService] Falha na operação: ${operation}`, { error });
-  throw error instanceof Error && error.message && !/permission|PERMISSION/.test(error.message) ? error : new Error('Não foi possível salvar. Verifique a conexão e tente de novo.');
+  // Sem permissão aqui = regras do Firestore das Collabs ainda não publicadas (ou login sem acesso de administrador).
+  if (error instanceof Error && /permission|PERMISSION/.test(error.message)) throw new Error(`Sem permissão para ${operation}. Confira se as regras do Firestore (firestore.rules) estão publicadas.`);
+  throw error instanceof Error && error.message ? error : new Error(`Não foi possível ${operation}. Verifique a conexão e tente de novo.`);
 }
 
 const str = (value: unknown) => (typeof value === 'string' ? value : '');
