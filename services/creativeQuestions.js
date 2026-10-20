@@ -1,11 +1,10 @@
 // Caixinha de Perguntas (Espaço Criativo): regras puras, sem React/Firebase.
 
-/** Colunas do Kanban, na ordem do fluxo. */
+/** Colunas do Kanban, na ordem do fluxo: ideia → roteiro (enviado para Roteiros) → respondida nos Stories. */
 export const QUESTION_STATUSES = [
   ['draft', 'Rascunhos'],
-  ['ready', 'Prontas para responder'],
-  ['answered', 'Respondidas'],
-  ['scripted', 'Roteiro criado'],
+  ['scripted', 'Roteiro pronto'],
+  ['answered', 'Respondidos'],
 ];
 const STATUS_IDS = QUESTION_STATUSES.map(([id]) => id);
 export const QUESTION_LIMITS = { text: 500, category: 60, notes: 2000 };
@@ -26,12 +25,17 @@ export function cleanQuestion(input) {
 }
 
 /**
- * Data da resposta: só existe em Respondidas/Roteiro criado. Mantém a já registrada (ou a escolhida pelo usuário);
- * na primeira vez que a pergunta chega a essas colunas, usa `now`. Voltar para Rascunhos/Prontas limpa.
+ * Data da resposta: só existe em Respondidos. Mantém a já registrada (ou a escolhida pelo usuário);
+ * na primeira vez que a pergunta chega lá, usa `now`. Voltar para outra coluna limpa.
  */
 export function answeredAtFor(status, current, now) {
-  if (status !== 'answered' && status !== 'scripted') return null;
+  if (status !== 'answered') return null;
   return current ?? now;
+}
+
+/** Status gravado antes do fluxo de 3 colunas ("Prontas para responder") volta para Rascunhos. */
+export function normalizeStatus(status) {
+  return STATUS_IDS.includes(status) ? status : 'draft';
 }
 
 const normalize = (value) => String(value ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase('pt-BR');

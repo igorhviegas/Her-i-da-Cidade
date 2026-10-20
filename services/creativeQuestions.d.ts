@@ -1,4 +1,4 @@
-export type QuestionStatus = 'draft' | 'ready' | 'answered' | 'scripted';
+export type QuestionStatus = 'draft' | 'scripted' | 'answered';
 
 export interface CreativeQuestion {
   id: string;
@@ -18,5 +18,6 @@ export interface QuestionInput { text: string; category: string; notes: string; 
 export const QUESTION_STATUSES: Array<[QuestionStatus, string]>;
 export const QUESTION_LIMITS: { text: number; category: number; notes: number };
 export function cleanQuestion(input: QuestionInput): Required<QuestionInput>;
+export function normalizeStatus(status: unknown): QuestionStatus;
 export function answeredAtFor(status: QuestionStatus, current: Date | null, now: Date): Date | null;
 export function filterQuestions<T extends Pick<CreativeQuestion, 'text' | 'category' | 'notes' | 'status'>>(questions: T[], filters?: { search?: string; category?: string; status?: QuestionStatus | '' }): T[];

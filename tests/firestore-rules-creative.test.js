@@ -1,8 +1,8 @@
-// Regras da Caixinha de Perguntas (creativeQuestions). Exige Java 21+ e firebase-tools (emulador local).
+// Regras da Caixinha de Perguntas (creativeQuestions) e dos projetos de roteiro (scriptProjects). Exige Java 21+ e firebase-tools (emulador local).
 // Execução: firebase emulators:exec --only firestore --project demo-heroi-da-cidade "node --test tests/firestore-rules-creative.test.js"
 import test, { after, before } from 'node:test';
 import { readFile } from 'node:fs/promises';
-import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
 
 let env;
@@ -51,4 +51,33 @@ test('creativeQuestions: valida campos, status, datas e o vínculo com o roteiro
   // Roteiro excluído depois: a pergunta continua editável com o vínculo antigo.
   await env.withSecurityRulesDisabled(async (context) => { await deleteDoc(doc(context.firestore(), 'contentScripts/s1')); });
   await assertSucceeds(updateDoc(ref, { notes: 'ainda editável', updatedAt: serverTimestamp() }));
+});
+
+test('creativeQuestions: enviar para Roteiros cria o roteiro e vincula a pergunta no mesmo lote', async () => {
+  const db = as('owner');
+  const questionRef = doc(db, 'creativeQuestions/q3');
+  await assertSucceeds(setDoc(questionRef, question()));
+  const scriptRef = doc(collection(db, 'contentScripts'));
+  const batch = writeBatch(db);
+  batch.set(scriptRef, { title: 'Pergunta', content: 'Pergunta da caixinha: x', projectId: 'caixinha', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  batch.update(questionRef, { status: 'scripted', scriptId: scriptRef.id, updatedAt: serverTimestamp() });
+  await assertSucceeds(batch.commit());
+  await assertFails(updateDoc(questionRef, { status: 'ready', updatedAt: serverTimestamp() })); // status antigo não é mais aceito
+});
+
+test('scriptProjects: admin cria, renomeia e troca ícone; nomes/ícones validados; o da Caixinha não é excluído', async () => {
+  const db = as('owner');
+  const project = (extra = {}) => ({ name: 'Séries', icon: 'Tv', createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...extra });
+  await assertSucceeds(setDoc(doc(db, 'scriptProjects/caixinha'), project({ name: 'Aranha Responde', icon: 'MessageCircleQuestionMark' })));
+  await assertSucceeds(setDoc(doc(db, 'scriptProjects/series'), project()));
+  await assertSucceeds(updateDoc(doc(db, 'scriptProjects/series'), { name: 'Séries do Aranha', icon: 'Clapperboard', updatedAt: serverTimestamp() }));
+  await assertFails(setDoc(doc(db, 'scriptProjects/x'), project({ name: '' })));
+  await assertFails(setDoc(doc(db, 'scriptProjects/x'), project({ name: 'x'.repeat(61) })));
+  await assertFails(setDoc(doc(db, 'scriptProjects/x'), project({ icon: '<svg onload=1>' })));
+  await assertFails(setDoc(doc(db, 'scriptProjects/x'), project({ color: 'red' })));
+  await assertFails(updateDoc(doc(db, 'scriptProjects/series'), { createdAt: new Date('2020-01-01'), updatedAt: serverTimestamp() }));
+  await assertFails(deleteDoc(doc(db, 'scriptProjects/caixinha')));
+  await assertFails(getDoc(doc(as('stranger'), 'scriptProjects/series')));
+  await assertFails(setDoc(doc(as('stranger'), 'scriptProjects/y'), project()));
+  await assertSucceeds(deleteDoc(doc(db, 'scriptProjects/series')));
 });

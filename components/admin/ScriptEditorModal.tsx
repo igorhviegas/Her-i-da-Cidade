@@ -5,24 +5,24 @@ import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } f
 import { NewCampaignForm } from './instagramPlanning/CampaignForm';
 import { ScriptEditorFooter, ScriptEditorHeader } from './ordersFlow/ScriptEditorParts';
 import { dateFromInput, inputClass, labelClass, productionOptions, publicationOptions, todayInput } from './ordersFlow/scriptEditorHelpers';
-import { useScriptStatuses, useScriptTexts, type ScriptDraft } from './ordersFlow/useScriptDraft';
+import { useScriptStatuses, useScriptTexts } from './ordersFlow/useScriptDraft';
+import type { ScriptProject } from '../../services/scriptProjects.js';
+import { ProjectIcon } from './scriptProjects/projectIcons';
 
 interface ScriptEditorModalProps {
   script: ContentScript | null;
   initialParentScriptId?: string;
-  /** Só para roteiro novo: textos já preenchidos. */
-  initialDraft?: ScriptDraft;
   scripts: ContentScript[];
-  categories: string[];
+  projects: ScriptProject[];
   onClose: () => void;
   onSaved: (script: ContentScript, closeEditor?: boolean) => void;
   onSendToRecording: (script: ContentScript) => Promise<ContentScript>;
   onOpenOrder: (orderId: string) => void;
 }
 
-export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, initialParentScriptId, initialDraft, scripts, categories, onClose, onSaved, onSendToRecording, onOpenOrder }) => {
+export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, initialParentScriptId, scripts, projects, onClose, onSaved, onSendToRecording, onOpenOrder }) => {
   const [persistedScript, setPersistedScript] = useState(script);
-  const { title, setTitle, category, setCategory, parentScriptId, setParentScriptId, content, setContent, notes, setNotes } = useScriptTexts(script, initialParentScriptId, initialDraft);
+  const { title, setTitle, projectId, setProjectId, parentScriptId, setParentScriptId, content, setContent, notes, setNotes } = useScriptTexts(script, initialParentScriptId);
   const { productionStatus, setProductionStatus, publicationStatus, setPublicationStatus, publishedDate, setPublishedDate, plannedDate, setPlannedDate, linkedOrderId, setLinkedOrderId } = useScriptStatuses(script);
   const [saving, setSaving] = useState(false);
   const [sendingToProduction, setSendingToProduction] = useState(false);
@@ -34,7 +34,9 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, in
   const persistScript = async (): Promise<ContentScript> => {
     const input = {
       title,
-      category,
+      // Categoria antiga: não aparece mais no editor, mas o valor gravado é preservado.
+      category: script?.category || '',
+      projectId: projectId || null,
       content,
       notes,
       productionStatus,
@@ -45,7 +47,7 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, in
     };
     if (persistedScript) {
       await updateContentScript(persistedScript.id, input);
-      const saved = { ...persistedScript, ...input, publishedAt: input.publishedAt || undefined, plannedPublishAt: input.plannedPublishAt || undefined, parentScriptId: input.parentScriptId || undefined };
+      const saved = { ...persistedScript, ...input, publishedAt: input.publishedAt || undefined, plannedPublishAt: input.plannedPublishAt || undefined, parentScriptId: input.parentScriptId || undefined, projectId: input.projectId || undefined };
       setPersistedScript(saved);
       return saved;
     }
@@ -118,10 +120,16 @@ export const ScriptEditorModal: React.FC<ScriptEditorModalProps> = ({ script, in
             {linkedOrderId && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.06] p-3 text-xs text-emerald-100"><span>Produção vinculada ao pedido {linkedOrderId}</span><button type="button" onClick={() => onOpenOrder(linkedOrderId)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold hover:bg-emerald-500/10"><ArrowUpRight className="h-3.5 w-3.5" />Abrir pedido</button></div>}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className={labelClass}>Título *<input required maxLength={180} value={title} onChange={(event) => setTitle(event.target.value)} disabled={saving} className={inputClass} placeholder="Ex.: Chupeta — versão para cliente" /></label>
-              <label className={labelClass}>Categoria / assunto
-                <input list="script-categories" value={category} onChange={(event) => setCategory(event.target.value)} disabled={saving} className={inputClass} placeholder="Escolha ou digite um assunto" />
-                <datalist id="script-categories">{categories.map((item) => <option key={item} value={item} />)}</datalist>
-                <span className="mt-1 block text-[10px] font-normal text-white/40">Reaproveite o mesmo assunto em vários roteiros.</span>
+              <label className={labelClass}>Projeto
+                <span className="relative block">
+                  <span className="pointer-events-none absolute left-3 top-1/2 mt-[3px] -translate-y-1/2 text-fuchsia-200"><ProjectIcon icon={projects.find((item) => item.id === projectId)?.icon} /></span>
+                  <select value={projectId} onChange={(event) => setProjectId(event.target.value)} disabled={saving} className={`${inputClass} pl-9`}>
+                    <option value="">Sem projeto</option>
+                    {projectId && !projects.some((item) => item.id === projectId) && <option value={projectId}>Projeto removido</option>}
+                    {projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                </span>
+                <span className="mt-1 block text-[10px] font-normal text-white/40">Tipo de conteúdo. Gerencie na aba Projetos.</span>
               </label>
             </div>
             <label className={labelClass}>Roteiro pai

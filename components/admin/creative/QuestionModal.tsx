@@ -1,5 +1,5 @@
 import React, { FormEvent, useState } from 'react';
-import { AlertCircle, ArrowUpRight, Loader2, PenLine, Trash2, X } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, Loader2, Send, Trash2, X } from 'lucide-react';
 import { answeredAtFor, QUESTION_LIMITS, QUESTION_STATUSES } from '../../../services/creativeQuestions.js';
 import type { CreativeQuestion, QuestionInput, QuestionStatus } from '../../../services/creativeQuestions.js';
 import type { ContentScript } from '../../../types';
@@ -19,11 +19,11 @@ interface Props {
   onSave: (input: QuestionInput, answeredAt: Date | null) => Promise<void>;
   onDelete: (question: CreativeQuestion) => void;
   onOpenScript: (scriptId: string) => void;
-  onCreateScript: (question: CreativeQuestion) => void;
+  onSend: (question: CreativeQuestion) => void;
 }
 
 /** Ver a pergunta completa, editar, mudar status, vincular/criar roteiro e excluir. */
-export const QuestionModal: React.FC<Props> = ({ question, scripts, categories, onClose, onSave, onDelete, onOpenScript, onCreateScript }) => {
+export const QuestionModal: React.FC<Props> = ({ question, scripts, categories, onClose, onSave, onDelete, onOpenScript, onSend }) => {
   const [text, setText] = useState(question?.text ?? '');
   const [category, setCategory] = useState(question?.category ?? '');
   const [notes, setNotes] = useState(question?.notes ?? '');
@@ -32,7 +32,7 @@ export const QuestionModal: React.FC<Props> = ({ question, scripts, categories, 
   const [scriptId, setScriptId] = useState(question?.scriptId ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const answered = status === 'answered' || status === 'scripted';
+  const answered = status === 'answered';
   const linkedMissing = !!scriptId && !scripts.some((script) => script.id === scriptId);
   const sortedScripts = [...scripts].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR', { sensitivity: 'base' }));
 
@@ -101,9 +101,9 @@ export const QuestionModal: React.FC<Props> = ({ question, scripts, categories, 
               </label>
               <div className="flex flex-wrap gap-2">
                 {scriptId && !linkedMissing && <button type="button" onClick={() => onOpenScript(scriptId)} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold text-blue-200 hover:bg-blue-500/10"><ArrowUpRight className="h-4 w-4" />Abrir roteiro</button>}
-                {question && !question.scriptId && !scriptId && <button type="button" onClick={() => onCreateScript(question)} disabled={saving} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-blue-600/15 px-3 text-xs font-bold text-blue-100 hover:bg-blue-600/25 disabled:opacity-50"><PenLine className="h-4 w-4" />Criar roteiro a partir desta pergunta</button>}
+                {question && !question.scriptId && !scriptId && <button type="button" onClick={() => onSend(question)} disabled={saving} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-fuchsia-400/25 bg-fuchsia-500/10 px-3 text-xs font-bold text-fuchsia-100 hover:bg-fuchsia-500/20 disabled:opacity-50"><Send className="h-4 w-4" />Enviar para Roteiros</button>}
               </div>
-              {scriptId && status !== 'scripted' && <p className="text-[11px] text-white/45">Dica: com roteiro vinculado, a pergunta costuma ir para “Roteiro criado”.</p>}
+              {!scriptId && <p className="text-[11px] text-white/45">“Enviar para Roteiros” cria um rascunho na biblioteca de Roteiros, no projeto da Caixinha, e move a pergunta para “Roteiro pronto”.</p>}
             </div>
           </div>
           <footer className="flex items-center justify-between gap-2 border-t border-white/10 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">

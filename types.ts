@@ -164,6 +164,8 @@ export interface ContentScript {
   sourceScriptId?: string;
   /** ID de outro documento contentScripts; ausente identifica um roteiro principal. */
   parentScriptId?: string;
+  /** Projeto (tipo de conteúdo) em scriptProjects; ausente = sem projeto. */
+  projectId?: string;
 }
 
 /**
