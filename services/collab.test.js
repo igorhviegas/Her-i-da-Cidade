@@ -123,3 +123,8 @@ test('Financeiro: comissão de parceira é custo do mês da conclusão; desconto
   const totals = periodTotals(entries, [], periodRange('month', new Date(2026, 9, 1)));
   assert.deepEqual([totals.collabCost, totals.variableCost, totals.result], [3, 3, 47]);
 });
+
+test('campo CUPOM vazio no ManyChat (marcador do campo) não é cupom', () => {
+  for (const raw of ['{{cuf_15079500}}', 'cuf_15079500', ' CUF_15079500 ', '{{CUPOM}}']) assert.equal(normalizeCouponCode(raw), '', raw);
+  assert.equal(normalizeCouponCode('MARI5'), 'MARI5');
+});

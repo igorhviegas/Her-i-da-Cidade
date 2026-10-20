@@ -49,8 +49,15 @@ const validKey = (key) => typeof key === 'string' && parseDateKey(key) !== null;
 export const brDate = (key) => (validKey(key) ? key.split('-').reverse().slice(0, 2).join('/') : '');
 export const money = (value) => `R$ ${Number(value).toFixed(2).replace('.', ',')}`;
 
+/**
+ * Marcador de campo do ManyChat que não foi preenchido: com o CUPOM vazio, o External Request envia o nome interno do campo
+ * ("{{cuf_15079500}}" ou "cuf_15079500") em vez de texto vazio. Isso nunca é um cupom.
+ */
+const MANYCHAT_PLACEHOLDER = /\{\{|\}\}|^\s*cuf_\d+\s*$/i;
+
 /** Código do cupom como é comparado: maiúsculas, sem acento, só letras e números (até 20). "mari 5" e "MARI5" são o mesmo cupom. */
 export function normalizeCouponCode(value) {
+  if (MANYCHAT_PLACEHOLDER.test(String(value ?? ''))) return '';
   return String(value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
 }
 

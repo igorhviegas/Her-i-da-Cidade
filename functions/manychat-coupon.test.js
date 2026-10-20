@@ -115,3 +115,18 @@ test('vídeo chamada pré-agendada: a confirmação aplica o desconto sobre o va
   assert.equal(order.totalPaid, 75);
   assert.equal(order.collab.partnerId, 'p1');
 });
+
+test('CUPOM vazio: o ManyChat manda o marcador do campo e o pedido fica sem desconto nem aviso', async () => {
+  for (const coupon of ['{{cuf_15079500}}', 'cuf_15079500']) {
+    const { res, order } = await post(birthday(coupon), fakeDatabase([mari]));
+    assert.equal(res.statusCode, 200);
+    assert.equal(order.totalPaid, 30);
+    assert.equal(order.collab, undefined);
+  }
+  const database = fakeDatabase([mari]);
+  database.store.set('videoCallPending/553199990000', { orderId: 'booked' });
+  database.store.set('orders/booked', { serviceId: '2', status: 'scheduled', paymentPending: true, servicePrice: 75, totalPaid: 0 });
+  await post({ eventType: 'payment.paid', service: 'live-call', customer, coupon: 'cuf_15079500' }, database);
+  assert.equal(database.store.get('orders/booked').totalPaid, 75);
+  assert.equal(database.store.get('orders/booked').collab, undefined);
+});
