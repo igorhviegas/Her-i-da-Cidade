@@ -3,6 +3,7 @@ import { RouterProvider, useRouter } from './lib/router';
 import { PublicSite } from './components/PublicSite';
 import { PRIVACY_PATH } from './services/privacy.js';
 import { FORM_PATH } from './services/eventSiteForm.js';
+import { FORM_PATH as COLLAB_PATH } from './services/collab.js';
 import type { Service } from './types';
 import { useHomeContent } from './services/homeContentService';
 
@@ -29,6 +30,7 @@ const AdminApp = lazy(() => import('./components/admin/AdminApp').then(({ AdminA
 // Páginas públicas secundárias ficam fora do pacote da home (PageSpeed: JS não usado atrasava o título da home)
 const VideoCatalog = lazy(() => import('./components/VideoCatalog').then(({ VideoCatalog: component }) => ({ default: component })));
 const VideoCallPage = lazy(() => import('./components/VideoCallPage').then(({ VideoCallPage: component }) => ({ default: component })));
+const CollabFormPage = lazy(() => import('./components/CollabFormPage').then(({ CollabFormPage: component }) => ({ default: component })));
 const EventFormPage = lazy(() => import('./components/EventFormPage').then(({ EventFormPage: component }) => ({ default: component })));
 const ServiceFaqPages = lazy(() => import('./components/ServiceFaqPages').then(({ ServiceFaqPages: component }) => ({ default: component })));
 const ClientsPage = lazy(() => import('./components/ClientsPage').then(({ ClientsPage: component }) => ({ default: component })));
@@ -64,6 +66,8 @@ const AppContent: React.FC = () => {
   const isCall = path === '/agendar-chamada';
   // Formulário do evento presencial (link enviado com o orçamento; fora do Google)
   const isEventForm = path === FORM_PATH || path === `${FORM_PATH}/`;
+  // Cadastro das Mamães em Collab (link enviado em particular às criadoras; fora do Google)
+  const isCollab = path === COLLAB_PATH || path === `${COLLAB_PATH}/`;
   // Página exclusiva de quem recebeu o personagem na festa (QR do certificado); link compartilhável, fora do Google (noindex)
   const isClients = path === '/clientes' || path === '/clientes/';
   const isFaq = path === '/duvidas' || path.startsWith('/duvidas/');
@@ -71,7 +75,7 @@ const AppContent: React.FC = () => {
   const faqSlug = isFaq ? decodeURIComponent(path.split('/').filter(Boolean)[1] ?? '') : '';
   // Serviço aberto em /duvidas/{slug}: undefined = carregando, null = inexistente ou sem dúvidas (não indexar).
   const [faqService, setFaqService] = useState<Service | null | undefined>(undefined);
-  const homeContent = useHomeContent(!isAdmin && !isVideos && !isAgent && !isKart && !isCall && !isEventForm && !isFaq && !isClients && !isPrivacy);
+  const homeContent = useHomeContent(!isAdmin && !isVideos && !isAgent && !isKart && !isCall && !isEventForm && !isCollab && !isFaq && !isClients && !isPrivacy);
 
   // Ícone do iOS ("Adicionar à Tela de Início") próprio da plataforma de streaming, da área do agente e do campeonato de kart
   const iosIcon = isVideos ? '/images/modules/streaming.png' : isAgent ? '/images/modules/agente-hdc.png' : isKart ? '/images/modules/kart.png' : null;
@@ -87,11 +91,12 @@ const AppContent: React.FC = () => {
     const structuredDataId = 'site-seo-structured-data';
     const existingStructuredData = document.getElementById(structuredDataId);
 
-    if (isAdmin || isAgent || isKart || isClients || isEventForm) {
+    if (isAdmin || isAgent || isKart || isClients || isEventForm || isCollab) {
       if (isAgent) document.title = 'Agente HDC';
       if (isKart) document.title = 'Campeonato Viegas Kart';
       if (isClients) document.title = 'Herói da Cidade | Acesso exclusivo';
       if (isEventForm) document.title = 'Formulário da Missão | Herói da Cidade';
+      if (isCollab) document.title = 'Mamães em Collab | Herói da Cidade';
       setMeta('name', 'robots', 'noindex, nofollow');
       document.querySelector('link[rel="canonical"]')?.remove();
       document.querySelector('meta[name="description"]')?.remove();
@@ -164,7 +169,7 @@ const AppContent: React.FC = () => {
       document.head.appendChild(script);
     }
     script.textContent = JSON.stringify(structuredData);
-  }, [isAdmin, isAgent, isKart, isClients, isEventForm, isVideos, isCall, isFaq, isPrivacy, faqSlug, faqService, homeContent.seoTitle, homeContent.seoDescription]);
+  }, [isAdmin, isAgent, isKart, isClients, isEventForm, isCollab, isVideos, isCall, isFaq, isPrivacy, faqSlug, faqService, homeContent.seoTitle, homeContent.seoDescription]);
 
   if (isAdmin) {
     return (
@@ -200,6 +205,7 @@ const AppContent: React.FC = () => {
   // Página pública de agendamento de Vídeo Chamada (link compartilhável; substitui o link do Calendly)
   if (isCall) return <Suspense fallback={pageFallback}><VideoCallPage /></Suspense>;
   if (isEventForm) return <Suspense fallback={pageFallback}><EventFormPage /></Suspense>;
+  if (isCollab) return <Suspense fallback={pageFallback}><CollabFormPage /></Suspense>;
 
   // Dúvidas públicas por serviço: /duvidas e /duvidas/{slug}
   if (isFaq) return <Suspense fallback={pageFallback}><ServiceFaqPages slug={faqSlug || undefined} onResolved={setFaqService} /></Suspense>;

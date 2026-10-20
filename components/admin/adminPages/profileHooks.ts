@@ -2,20 +2,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { subscribeCompletedOrders, listFixedExpenses } from '../../../services/financeService';
 import { activateXp, loadProfileCounts, previewBaseline } from '../../../services/xpService';
 import {
-  buildRevenueEntries, editingCostForMonth, eventCostForMonth, expensesForMonth, monthKeyOf, shiftMonth, type FixedExpense,
+  buildRevenueEntries, collabCostForMonth, editingCostForMonth, eventCostForMonth, expensesForMonth, monthKeyOf, shiftMonth, type FixedExpense,
 } from '../../../services/financeCalculations.js';
 import { formatMoney } from '../financeFormat';
 
 const HIDDEN_KEY = 'hdc.finance.revenueHidden'; // o mesmo do indicador de faturamento no topo do painel
 const readHidden = () => { try { return localStorage.getItem(HIDDEN_KEY) === '1'; } catch { return false; } };
 
-/** Total de gastos desde o primeiro mês com registro: despesas fixas + custo de edição + despesa de evento (mesma base do Financeiro). */
+/** Total de gastos desde o primeiro mês com registro: despesas fixas + custo de edição + comissão de parceira + despesa de evento (mesma base do Financeiro). */
 function totalExpenses(entries: ReturnType<typeof buildRevenueEntries>['entries'], costs: ReturnType<typeof buildRevenueEntries>['costs'], fixed: FixedExpense[], now: Date) {
   const nowKey = monthKeyOf(now);
   const first = [...entries.map((e) => e.monthKey), ...costs.map((c) => c.monthKey), ...fixed.map((f) => f.startMonth).filter(Boolean)].sort()[0];
   let total = 0;
   for (let key = first ?? nowKey; key <= nowKey; key = shiftMonth(key, 1)) {
-    total += expensesForMonth(fixed, key).total + editingCostForMonth(entries, key).total + eventCostForMonth(costs, key).total;
+    total += expensesForMonth(fixed, key).total + editingCostForMonth(entries, key).total + collabCostForMonth(entries, key).total + eventCostForMonth(costs, key).total;
   }
   return total;
 }

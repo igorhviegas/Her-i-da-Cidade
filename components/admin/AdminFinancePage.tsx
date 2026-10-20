@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from '../../lib/router';
 import { listAssets, listFixedExpenses, subscribeCompletedOrders } from '../../services/financeService';
 import {
-  buildRevenueEntries, dailyRevenue, editingCostForMonth, eventCostForMonth, expensesForMonth, monthKeyOf, monthTotals, patrimonySummary, revenueSeries, serviceRanking, shiftMonth, topDay, variationPct,
+  buildRevenueEntries, collabCostForMonth, dailyRevenue, editingCostForMonth, eventCostForMonth, expensesForMonth, monthKeyOf, monthTotals, patrimonySummary, revenueSeries, serviceRanking, shiftMonth, topDay, variationPct,
 } from '../../services/financeCalculations.js';
 import type { Order } from '../../types';
 import { FinanceStatementTab } from './adminPages/FinanceStatementTab';
@@ -62,11 +62,12 @@ export const AdminFinancePage: React.FC = () => {
     const fixedTotal = expensesForMonth(data.expenses, monthKey).total;
     const editing = editingCostForMonth(entries, monthKey);
     const eventCost = eventCostForMonth(costs, monthKey);
-    const expenseTotal = fixedTotal + editing.total + eventCost.total;
+    const collab = collabCostForMonth(entries, monthKey);
+    const expenseTotal = fixedTotal + editing.total + collab.total + eventCost.total;
     const days = dailyRevenue(entries, monthKey);
     const monthEntries = entries.filter((e) => e.monthKey === monthKey);
     return {
-      current, previous, fixedTotal, editing, eventCost, expenseTotal, days, monthEntries, top: topDay(days), variation: variationPct(current.total, previous.total),
+      current, previous, fixedTotal, editing, collab, eventCost, expenseTotal, days, monthEntries, top: topDay(days), variation: variationPct(current.total, previous.total),
       series: revenueSeries(entries, monthKey, 12), patrimony: patrimonySummary(data.assets),
     };
   }, [data, orders, entries, costs, monthKey]);

@@ -21,7 +21,7 @@ function statementTitle({ r, client, child }: StatementItem): string {
 }
 
 function statementSubtitle({ r, service }: StatementItem): string {
-  return r.source === 'expense' ? `Despesa · ${r.expense.category}` : r.source === 'editing' ? 'Custo de edição — Vídeo personalizado' : r.source === 'eventCost' ? LEDGER_LABELS[(r.entry?.order.ledgerKind ?? 'cost') as LedgerKind] : `${service?.title || 'Serviço não encontrado'}${r.entry?.order.ledgerKind ? ` · ${LEDGER_LABELS[r.entry.order.ledgerKind as LedgerKind]}` : ''}`;
+  return r.source === 'expense' ? `Despesa · ${r.expense.category}` : r.source === 'editing' ? 'Custo de edição — Vídeo personalizado' : r.source === 'collab' ? `Comissão Mamães em Collab · cupom ${r.entry.order.collab?.code ?? ''}` : r.source === 'eventCost' ? LEDGER_LABELS[(r.entry?.order.ledgerKind ?? 'cost') as LedgerKind] : `${service?.title || 'Serviço não encontrado'}${r.entry?.order.ledgerKind ? ` · ${LEDGER_LABELS[r.entry.order.ledgerKind as LedgerKind]}` : ''}`;
 }
 
 const StatementRowItem: React.FC<{ item: StatementItem; onOpenOrders: () => void }> = ({ item, onOpenOrders }) => {

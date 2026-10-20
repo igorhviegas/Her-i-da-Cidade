@@ -1,3 +1,5 @@
+import type { OrderCollab } from './services/collab.js';
+
 
 /** Dúvida pública de um serviço (categoria + resposta), exibida em /duvidas/{slug}. */
 export interface ServiceFaqItem {
@@ -109,6 +111,10 @@ export interface Order {
   editingCost?: number;
   /** Campos da arte do Vídeo Convite aprovados pelo administrador (ausente = ainda na leitura automática do texto). */
   inviteArt?: { name: string; age: string; date: string; time: string; place: string };
+  /** Cupom das Mamães em Collab usado no pagamento (gravado pelo webhook do ManyChat; ver services/collab.js). */
+  collab?: OrderCollab;
+  /** Benefício concedido a uma parceira das Mamães em Collab (id em collabPartners); pedido sem valor. */
+  collabGrant?: string;
 }
 
 export interface EventForm {

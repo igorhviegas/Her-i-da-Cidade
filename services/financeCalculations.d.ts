@@ -25,6 +25,8 @@ export function variationPct(current: number, previous: number): number | null;
 export const EDITING_COST: number;
 export const CUSTOM_VIDEO_SERVICE_ID: string;
 export function editingCostFields(serviceId: string | undefined, existingOrder?: { editingCost?: number } | null, charge?: boolean): { editingCost?: number };
+export function collabCommission(order: { collab?: { partnerId?: string | null; commission?: number } } | null | undefined): number;
+export function collabCostForMonth(entries: RevenueEntry[], monthKey: string): { items: RevenueEntry[]; total: number };
 export function editingCostForMonth(entries: RevenueEntry[], monthKey: string): { items: RevenueEntry[]; total: number };
 export function isExpenseInMonth(expense: Partial<FixedExpense>, monthKey: string): boolean;
 export function expenseAmountForMonth(expense: Partial<FixedExpense>, monthKey: string): number;
@@ -36,7 +38,7 @@ export function financeMetrics(entries: RevenueEntry[], expenses: FixedExpense[]
   recordMonth: { monthKey: string; total: number } | null; cumulative: number; evolutionPct: number | null;
   goalStreak: number; operatingMarginPct: number | null; servicesCount: number;
 };
-export interface StatementRow { id: string; kind: 'in' | 'out'; source: 'order' | 'editing' | 'eventCost' | 'expense'; date: Date; amount: number; entry?: RevenueEntry; expense?: FixedExpense }
+export interface StatementRow { id: string; kind: 'in' | 'out'; source: 'order' | 'editing' | 'collab' | 'eventCost' | 'expense'; date: Date; amount: number; entry?: RevenueEntry; expense?: FixedExpense }
 export function buildStatement(entries: RevenueEntry[], expenses: FixedExpense[], monthKey: string, costs?: RevenueEntry[]): { rows: StatementRow[]; totalIn: number; totalOut: number; balance: number };
 export type RankingPeriod = 'all' | '30d' | '7d' | 'month';
 export interface ServiceRankingRow { serviceId: string; count: number; revenue: number }

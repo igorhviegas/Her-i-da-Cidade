@@ -1,7 +1,7 @@
 // Relatórios do Financeiro (puros, sem React/Firebase). Parte dos mesmos itens do módulo Financeiro (buildRevenueEntries):
 // `entries` = faturamento, `costs` = despesas de evento do livro. Datas no fuso do navegador, como o resto do Financeiro.
 // Missões e XP ficam de fora de propósito.
-import { monthKeyOf, shiftMonth, toDate } from './financeCalculations.js';
+import { collabCommission, monthKeyOf, shiftMonth, toDate } from './financeCalculations.js';
 
 const DAY_MS = 86_400_000;
 const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -43,15 +43,16 @@ export function shiftPeriod(granularity, anchor, delta) {
 
 const inRange = (entry, range) => entry.revenueDate >= range.start && entry.revenueDate < range.end;
 
-/** Totais do período: faturamento, serviços, ticket e custos variáveis (edição + despesa de evento). Fixas ficam com quem chama (mensais). */
+/** Totais do período: faturamento, serviços, ticket e custos variáveis (edição + comissão de parceira + despesa de evento). Fixas ficam com quem chama (mensais). */
 export function periodTotals(entries, costs, range) {
   const rows = entries.filter((e) => inRange(e, range));
   const revenue = sum(rows, (e) => e.value);
   const count = new Set(rows.filter(isRealOrder).map(realOrderId)).size;
   const editingCost = sum(rows.filter((e) => typeof e.order.editingCost === 'number'), (e) => e.order.editingCost);
+  const collabCost = sum(rows, (e) => collabCommission(e.order));
   const eventCost = sum(costs.filter((c) => inRange(c, range)), (c) => c.value);
-  const variableCost = editingCost + eventCost;
-  return { revenue, count, ticket: count ? revenue / count : null, editingCost, eventCost, variableCost, result: revenue - variableCost };
+  const variableCost = editingCost + collabCost + eventCost;
+  return { revenue, count, ticket: count ? revenue / count : null, editingCost, collabCost, eventCost, variableCost, result: revenue - variableCost };
 }
 
 /** Um item por dia do período: faturamento e nº de serviços. */
@@ -213,6 +214,7 @@ export function serviceProfitability(entries, costs, range) {
     g.revenue += e.value;
     if (isRealOrder(e)) g.orders.add(realOrderId(e));
     if (typeof e.order.editingCost === 'number') g.cost += e.order.editingCost;
+    g.cost += collabCommission(e.order);
   }
   for (const c of costs.filter((item) => inRange(item, range))) group(c.order.serviceId || 'sem-servico').cost += c.value;
   return [...groups.values()]

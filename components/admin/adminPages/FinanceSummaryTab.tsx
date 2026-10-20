@@ -14,6 +14,7 @@ export interface FinanceView {
   previous: { total: number; count: number };
   fixedTotal: number;
   editing: { total: number };
+  collab: { total: number };
   eventCost: { total: number };
   expenseTotal: number;
   days: DayRevenue[];
@@ -35,7 +36,7 @@ const SummaryKpis: React.FC<{ view: FinanceView; monthKey: string }> = ({ view, 
     <Kpi label="Mês anterior" value={formatMoney(view.previous.total)} hint={monthLabel(shiftMonth(monthKey, -1))} />
     <VariationKpi variation={view.variation} />
     <Kpi label="Despesas do mês" value={formatMoney(view.expenseTotal)} tone="text-red-300"
-      hint={`Fixas ${formatMoney(view.fixedTotal)} · Edição de vídeos ${formatMoney(view.editing.total)} · Eventos ${formatMoney(view.eventCost.total)}`} />
+      hint={`Fixas ${formatMoney(view.fixedTotal)} · Edição de vídeos ${formatMoney(view.editing.total)}${view.collab.total ? ` · Comissões Collab ${formatMoney(view.collab.total)}` : ''} · Eventos ${formatMoney(view.eventCost.total)}`} />
     <Kpi label="Resultado operacional estimado" value={formatMoney(view.current.total - view.expenseTotal)} tone={view.current.total - view.expenseTotal >= 0 ? 'text-white' : 'text-red-300'} hint="Faturamento − despesas" />
     <Kpi label="Patrimônio ativo" value={formatMoney(view.patrimony.currentTotal)} hint={`${view.patrimony.activeCount} iten${view.patrimony.activeCount === 1 ? '' : 's'}`} />
   </div>

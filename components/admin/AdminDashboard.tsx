@@ -35,7 +35,8 @@ import {
   ClipboardCheck,
   Dumbbell,
   Flag,
-  QrCode
+  QrCode,
+  HeartHandshake
 } from 'lucide-react';
 
 // Módulos reorganizáveis (ordem padrão). "Principal" é fixo no topo e fica fora desta lista.
@@ -47,6 +48,7 @@ const NAV_ITEMS: NavItem<AdminTab>[] = [
   { id: CREATIVE_HOME.id, label: 'Visão geral', icon: CREATIVE_HOME.icon },
   ...CREATIVE_TOOLS.map(({ id, label, icon }) => ({ id, label, icon })),
   { id: 'clients', label: 'Clientes', icon: UserCheck },
+  { id: 'collab', label: 'Mamães em Collab', icon: HeartHandshake },
   { id: 'videos', label: 'Vídeos', icon: Video },
   { id: 'categories', label: 'Categorias', icon: Layers },
   { id: 'clientarea', label: 'Página dos clientes', icon: QrCode },
@@ -61,7 +63,7 @@ const NAV_ITEMS: NavItem<AdminTab>[] = [
   { id: 'kart', label: 'Kart', icon: Flag },
 ];
 const NAV_GROUPS: NavGroup<AdminTab>[] = [
-  { key: 'crm', label: 'CRM', icon: Briefcase, ids: ['orders', 'missions', 'finance', 'instagram', 'clients'] },
+  { key: 'crm', label: 'CRM', icon: Briefcase, ids: ['orders', 'missions', 'finance', 'instagram', 'clients', 'collab'] },
   // Espaço Criativo: ferramentas vêm de creative/creativeTools.ts (nova ferramenta não precisa mexer aqui).
   { key: 'criativo', label: CREATIVE_HOME.label, icon: CREATIVE_HOME.icon, ids: [CREATIVE_HOME.id, ...CREATIVE_TOOLS.map((tool) => tool.id)] },
   { key: 'streaming', label: 'Streaming', icon: Tv, ids: ['videos', 'categories', 'clientarea'] },
@@ -86,6 +88,8 @@ const tabFromPath = (path: string): AdminTab =>
       ? 'orders'
       : path === '/admin/clientes'
       ? 'clients'
+      : path === '/admin/collab'
+      ? 'collab'
       : path === '/admin/missoes'
       ? 'missions'
       : path === '/admin/instagram'
@@ -135,6 +139,8 @@ const syncTabFromPath = (path: string, setCurrentTab: (tab: AdminTab) => void) =
       setCurrentTab('orders');
     } else if (path === '/admin/clientes') {
       setCurrentTab('clients');
+    } else if (path === '/admin/collab') {
+      setCurrentTab('collab');
     } else if (path === '/admin/missoes') {
       setCurrentTab('missions');
     } else if (path === '/admin/instagram') {
@@ -186,6 +192,8 @@ const navigateToTab = (tabId: AdminTab, navigate: (to: string) => void) => {
       navigate('/admin/pedidos');
     } else if (tabId === 'clients') {
       navigate('/admin/clientes');
+    } else if (tabId === 'collab') {
+      navigate('/admin/collab');
     } else if (tabId === 'missions') {
       navigate('/admin/missoes');
     } else if (tabId === 'instagram') {

@@ -134,6 +134,7 @@ export const MonthlyDocument: React.FC<{ data: MonthlyData }> = ({ data }) => {
         <dl className="mt-3 max-w-md">
           <Row label="Faturamento" value={formatMoney(totals.revenue)} />
           <Row label="Custo de edição" value={formatMoney(0 - totals.editingCost)} tone="text-red-600" />
+          {totals.collabCost > 0 && <Row label="Comissões Mamães em Collab" value={formatMoney(0 - totals.collabCost)} tone="text-red-600" />}
           <Row label="Despesas de eventos" value={formatMoney(0 - totals.eventCost)} tone="text-red-600" />
           <Row label="Despesas fixas" value={formatMoney(0 - fixed)} tone="text-red-600" />
           <Row label="Resultado do mês" value={formatMoney(result)} strong tone={tone(result)} />
