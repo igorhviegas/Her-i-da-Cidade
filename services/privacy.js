@@ -22,3 +22,6 @@ export const BOOKING_DETAILS_HINT = 'Se contar algo sobre a saúde ou as necessi
 
 /** Aviso do formulário do evento presencial (/formulario-evento). O CPF identifica quem contrata (é um contrato). */
 export const EVENT_FORM_PRIVACY_NOTE = 'Usamos estes dados só para o contrato do evento: reserva, contato pelo WhatsApp, pagamento e o termo em PDF. O CPF identifica quem contrata.';
+
+/** Aviso do cadastro das Mamães em Collab (/mamaes-em-collab). Dos filhos, só primeiro nome e idade. */
+export const COLLAB_FORM_PRIVACY_NOTE = 'Usamos estes dados só para a seleção, o contato pelo WhatsApp e a parceria. Dos seus filhos, pedimos apenas o primeiro nome e a idade.';

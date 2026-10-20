@@ -3,6 +3,8 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { ACTIVITY_LOG_COLLECTION, GAMIFICATION_CONFIG_PATH, activityLogId, prepareActivityLog } from './activity-log.js';
 import { MISSION_EVENT, createMissionFromManyChat, validateMissionPayload } from './missions-manychat.js';
 import { recordRun } from './system-status.js';
+import { dateKey } from './missions-core.js';
+import { PARTNERS, couponAttribution, discountedPrice, normalizeCouponCode } from '../services/collab.js';
 
 const CLIENTS = 'clients';
 const ORDERS = 'orders';
@@ -49,11 +51,28 @@ function parseCatalogPrice(value) {
  */
 export const bookingKey = (normalizedWhatsApp) => (/^55\d{10,11}$/.test(normalizedWhatsApp) ? `${normalizedWhatsApp.slice(0, 4)}${normalizedWhatsApp.slice(-8)}` : normalizedWhatsApp);
 
+// Cupom das Mamães em Collab (campo CUPOM do contato no ManyChat): opcional em todos os serviços; vazio = sem cupom.
+// Código desconhecido não recusa o pagamento (fica como aviso no painel Collabs); só um tipo errado é recusado.
+const COUPON_ERROR = 'coupon deve ser texto de até 40 caracteres (ou vazio).';
+const validCoupon = (value) => value === undefined || value === null || ((typeof value === 'string' || typeof value === 'number') && String(value).length <= 40);
+
+/** Parceira dona do código (só uma; duas com o mesmo código = desconhecido). Falha de leitura não impede gravar o pagamento. */
+async function findCouponPartner(database, code, logger) {
+  try {
+    const result = await database.collection(PARTNERS).where('couponCode', '==', code).limit(2).get();
+    return result.docs.length === 1 ? { id: result.docs[0].id, ...result.docs[0].data() } : null;
+  } catch (error) {
+    logger.error('Cupom não conferido; o pedido segue com aviso.', { error: error instanceof Error ? error.message : String(error) });
+    return null;
+  }
+}
+
 export function validateManyChatOrderInput(body) {
   const errors = [];
   if (!body || typeof body !== 'object' || Array.isArray(body)) return ['O corpo deve ser um objeto JSON.'];
-  const acceptedKeys = new Set(['eventType', 'customer', 'childName']);
+  const acceptedKeys = new Set(['eventType', 'customer', 'childName', 'coupon']);
   const unexpectedKeys = Object.keys(body).filter((key) => !acceptedKeys.has(key));
+  if (!validCoupon(body.coupon)) errors.push(COUPON_ERROR);
   if (unexpectedKeys.length) errors.push(`Campos não aceitos nesta integração: ${unexpectedKeys.join(', ')}.`);
   if (body.eventType !== 'payment.paid') errors.push('eventType deve ser exatamente payment.paid.');
   if (!body.customer || typeof body.customer !== 'object' || Array.isArray(body.customer)) {
@@ -129,8 +148,9 @@ export function validateManyChatPayload(body) {
   if (!profile) return { errors: [`service deve ser um destes valores: ${Object.keys(SERVICE_PROFILES).join(', ')}.`], profile: null };
 
   const errors = [];
-  const accepted = new Set(['eventType', 'service', 'customer', ...Object.keys(profile.fields), ...(profile.tiers ? ['modality'] : [])]);
+  const accepted = new Set(['eventType', 'service', 'customer', 'coupon', ...Object.keys(profile.fields), ...(profile.tiers ? ['modality'] : [])]);
   const unexpected = Object.keys(body).filter((key) => !accepted.has(key));
+  if (!validCoupon(body.coupon)) errors.push(COUPON_ERROR);
   if (unexpected.length) errors.push(`Campos não aceitos para ${body.service}: ${unexpected.join(', ')}.`);
   if (body.eventType !== 'payment.paid') errors.push('eventType deve ser exatamente payment.paid.');
   if (!body.customer || typeof body.customer !== 'object' || Array.isArray(body.customer)) {
@@ -274,6 +294,13 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
       if (actualClients.length === 1) legacyClientRef = actualClients[0].ref;
     }
 
+    // Cupom: o desconto sai do valor pago (a equipe já cobrou com desconto) e a comissão fica no pedido (custo na conclusão).
+    const couponCode = normalizeCouponCode(input.coupon);
+    const collab = couponCode
+      ? couponAttribution(couponCode, await findCouponPartner(database, couponCode, customLogger || console), dateKey(paidAt.toDate()), profile.pricing)
+      : null;
+    const paid = (price) => (collab ? discountedPrice(price, collab.discount) : price);
+
     const transactionResult = await database.runTransaction(async (transaction) => {
       const [serviceSnapshot, indexSnapshot] = await Promise.all([
         transaction.get(serviceRef),
@@ -295,7 +322,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
         // mesmo: a entrada é lançada no Financeiro e o rascunho fecha (como "Já recebi o sinal" no Editar pedido). Sem valor ainda,
         // continua rascunho e a entrada é lançada quando o dono salvar os valores.
         if (profile.pricing === 'pending' && bookedSnapshot?.exists && bookedSnapshot.get('paymentPending') === true) {
-          const confirmation = { paymentPending: FieldValue.delete(), depositPaidAt: paidAt, updatedAt: FieldValue.serverTimestamp() };
+          const confirmation = { paymentPending: FieldValue.delete(), depositPaidAt: paidAt, updatedAt: FieldValue.serverTimestamp(), ...(collab ? { collab } : {}) };
           const event = bookedSnapshot.get('eventForm');
           if (bookedSnapshot.get('eventDraft') === true && event?.totalValue > 0 && Number.isFinite(event.entryValue) && event.entryValue >= 0) {
             // Mesmo registro de services/eventFinance.js#planEntry (ID determinístico: nunca lança duas vezes).
@@ -316,7 +343,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
           // O valor cobrado é o que estava configurado quando a reserva foi feita (gravado no pedido).
           const bookedPrice = bookedSnapshot.get('servicePrice');
           const price = typeof bookedPrice === 'number' && bookedPrice >= 0 ? bookedPrice : evaluation.price;
-          const confirmation = { paymentPending: FieldValue.delete(), paidAt, servicePrice: price, totalPaid: price, updatedAt: FieldValue.serverTimestamp() };
+          const confirmation = { paymentPending: FieldValue.delete(), paidAt, servicePrice: price, totalPaid: paid(price), updatedAt: FieldValue.serverTimestamp(), ...(collab ? { collab } : {}) };
           if (evaluation.deliveryDays !== undefined) {
             const deadlines = calculateDeadlines(paidAt.toDate(), evaluation.deliveryDays);
             confirmation.deliveryDays = evaluation.deliveryDays;
@@ -377,14 +404,15 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
         serviceId: profile.serviceId,
         status: evaluation.status,
         ...(profile.pricing === 'pending' ? { eventDraft: true } : { paidAt }),
-        content: buildOrderContent(input),
+        content: [buildOrderContent(input), ...(collab ? [`Cupom: ${collab.code}`] : [])].join('\n'),
         servicePrice: evaluation.price,
         rushFee: 0,
-        totalPaid: evaluation.price,
+        totalPaid: paid(evaluation.price),
         productionType: evaluation.productionType,
         source: 'manychat',
         technicalPurchaseId: orderRef.id,
         createdAt: FieldValue.serverTimestamp(),
+        ...(collab ? { collab } : {}),
       };
       if (input.eventDate) orderData.eventDate = Timestamp.fromDate(parseEventDate(input.eventDate));
       if (evaluation.deliveryDays !== undefined) {
@@ -399,7 +427,7 @@ export async function handleManyChatOrderRequest(req, res, { database, secret, l
         orderData.completedAt = paidAt;
         // Pedido que já nasce concluído: registro permanente na mesma transação, com a dificuldade vigente.
         activity = await prepareActivityLog(transaction, { logRef, configRef: database.collection(GAMIFICATION_CONFIG_PATH[0]).doc(GAMIFICATION_CONFIG_PATH[1]) }, {
-          type: 'order_completed', refId: orderRef.id, occurredAt: paidAt.toDate(), difficultyKey: `service_${profile.serviceId}`, meta: { serviceId: profile.serviceId, value: evaluation.price, revenue: evaluation.price, cost: 0 },
+          type: 'order_completed', refId: orderRef.id, occurredAt: paidAt.toDate(), difficultyKey: `service_${profile.serviceId}`, meta: { serviceId: profile.serviceId, value: orderData.totalPaid, revenue: orderData.totalPaid, cost: collab?.commission ?? 0 },
         });
       }
 

@@ -22,6 +22,7 @@ Use apenas uma das duas URLs (a que estiver publicada). O limite do corpo é 256
 | `service` | string | sim* | Identificador do serviço (tabela abaixo). *Se omitido, vale o contrato antigo do Vídeo Especial de Aniversário. |
 | `customer.name` | string | sim | Nome do contato (até 120 caracteres). |
 | `customer.whatsapp` | string | sim | Telefone brasileiro com DDD (`+55 31 99999-0000`, `31999990000`…) ou internacional com `+` e o código do país (`+351 912 345 678`). Sem `+`, só número brasileiro é aceito. |
+| `coupon` | string | não | Cupom das Mamães em Collab (campo CUPOM do contato), em qualquer serviço. Vazio = sem cupom. Ver [Cupom](#cupom-mamães-em-collab). |
 
 Qualquer campo fora da lista do serviço é rejeitado com `400`.
 
@@ -134,6 +135,18 @@ No ManyChat, o corpo do External Request é montado com campos personalizados (*
 5. Remova do corpo `amountPaid` e, na Chamada ao Vivo, `eventDate`.
 6. Envolva todos os valores em aspas: o CRM só aceita texto.
 7. Header `Authorization: Bearer <segredo>` e `Content-Type: application/json`.
+8. `coupon`: `"coupon": "{{CUPOM}}"` em todos os External Requests de pagamento. Limpe o campo CUPOM depois do pagamento, para o próximo pedido do mesmo contato não herdar o cupom.
+
+### Cupom (Mamães em Collab)
+
+Quando o cliente diz que tem cupom, a equipe confere e grava o código da criadora no campo CUPOM do contato; o Pix já é cobrado com o desconto. Com `coupon` preenchido, o CRM:
+
+- grava `totalPaid` = preço − R$ 5 (o `servicePrice` continua o preço cheio) e `Cupom: CÓDIGO` no conteúdo do pedido;
+- grava `collab` no pedido: código, parceira (achada pelo código cadastrado na ficha), desconto e comissão (R$ 3). A comissão vira custo no Financeiro na conclusão do pedido;
+- **nunca recusa o pagamento por causa do cupom**: código não cadastrado, vencido (mais de 30 dias depois do Reel), usado antes do Reel ou de parceira cancelada entra com aviso em Admin → Mamães em Collab, onde a equipe vincula ou tira a comissão;
+- evento presencial: só registra o cupom (sem valor no pagamento); o desconto é abatido no valor do evento.
+
+Só um tipo inválido (objeto, ou texto acima de 40 caracteres) é recusado com `400`. Detalhes em [`docs/mamaes-em-collab.md`](mamaes-em-collab.md).
 
 ## Evento presencial (pedido incompleto)
 

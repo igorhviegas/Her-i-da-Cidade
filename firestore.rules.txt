@@ -327,6 +327,22 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Mamães em Collab (services/collab.js): fichas das criadoras. O formulário público grava pelo servidor (Admin SDK), nunca pelo cliente.
+    match /collabPartners/{partnerId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Comissões pagas: um documento por parceira e semana (id = parceira_segunda-feira). Histórico: nunca é apagado nem troca de dona/semana.
+    match /collabPayouts/{payoutId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && payoutId == request.resource.data.partnerId + '_' + request.resource.data.weekKey
+        && request.resource.data.weekKey is string && request.resource.data.weekKey.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && request.resource.data.orderIds is list
+        && request.resource.data.amount is number && request.resource.data.amount >= 0;
+      allow delete: if false;
+    }
+
     match /orders/{orderId} {
       allow read: if isAdmin();
       // Local transition: old clients may still create numbered orders paired

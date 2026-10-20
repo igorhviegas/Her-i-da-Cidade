@@ -19,6 +19,7 @@ import { AdminFitPage } from '../AdminFitPage';
 import { AdminFitCheckinsPage } from '../AdminFitCheckinsPage';
 import { AdminFitWorkoutsPage } from '../AdminFitWorkoutsPage';
 import { AdminCreativePage } from '../creative/AdminCreativePage';
+import { AdminCollabPage } from '../collab/AdminCollabPage';
 import { CREATIVE_HOME, CREATIVE_TOOLS } from '../creative/creativeTools';
 import type { AdminTab } from './dashboardTypes';
 
@@ -55,6 +56,7 @@ export const AdminTabContentSecondary: React.FC<AdminTabContentProps> = ({ curre
   <>
     {currentTab === 'orders' && <AdminOrdersPage />}
     {currentTab === 'clients' && <AdminClientsPage />}
+    {currentTab === 'collab' && <AdminCollabPage />}
     {currentTab === CREATIVE_HOME.id && <AdminCreativePage />}
     {CREATIVE_TOOLS.map(({ id, Page }) => currentTab === id && <Page key={id} />)}
     {currentTab === 'missions' && <AdminMissionsPage />}

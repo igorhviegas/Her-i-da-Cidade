@@ -6,7 +6,7 @@ export interface PeriodRange { start: Date; end: Date }
 export function periodRange(granularity: Granularity, anchor: Date): PeriodRange;
 export function shiftPeriod(granularity: Granularity, anchor: Date, delta: number): Date;
 
-export interface PeriodTotals { revenue: number; count: number; ticket: number | null; editingCost: number; eventCost: number; variableCost: number; result: number }
+export interface PeriodTotals { revenue: number; count: number; ticket: number | null; editingCost: number; collabCost: number; eventCost: number; variableCost: number; result: number }
 export function periodTotals(entries: RevenueEntry[], costs: RevenueEntry[], range: PeriodRange): PeriodTotals;
 export function dailyBreakdown(entries: RevenueEntry[], range: PeriodRange): { date: Date; revenue: number; count: number }[];
 export interface ServiceBreakdownRow { serviceId: string; count: number; revenue: number; share: number }

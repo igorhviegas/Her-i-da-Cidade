@@ -119,6 +119,17 @@ export function editingCostForMonth(entries, monthKey) {
   return { items, total: items.reduce((sum, e) => sum + e.order.editingCost, 0) };
 }
 
+// ---- Comissão das Mamães em Collab ----
+// Gravada no pedido pelo webhook do ManyChat (collab.commission, ver services/collab.js) e contada como custo na data de conclusão,
+// como o custo de edição: reabrir tira do mês, concluir de novo devolve, nunca em dobro.
+export const collabCommission = (order) => (order?.collab?.partnerId && order.collab.commission > 0 ? order.collab.commission : 0);
+
+/** Comissão de parceiras do mês: pedidos concluídos com cupom de uma parceira. */
+export function collabCostForMonth(entries, monthKey) {
+  const items = entries.filter((e) => e.monthKey === monthKey && collabCommission(e.order) > 0);
+  return { items, total: items.reduce((sum, e) => sum + collabCommission(e.order), 0) };
+}
+
 /** "Despesa evento" do mês: despesas do livro de lançamentos (data = conclusão do pedido), vindas de buildRevenueEntries().costs. */
 export function eventCostForMonth(costs, monthKey) {
   const items = (costs ?? []).filter((e) => e.monthKey === monthKey);
@@ -196,7 +207,7 @@ export function financeMetrics(entries, expenses, monthKey, monthlyGoal = null) 
 }
 
 // ---- Extrato do mês ----
-// Entradas: pedidos concluídos (data de conclusão). Saídas: custo de edição de cada vídeo (data de conclusão) e despesas do mês
+// Entradas: pedidos concluídos (data de conclusão). Saídas: custo de edição e comissão de parceira de cada pedido (data de conclusão) e despesas do mês
 // (data = dia 1 do mês, para entrar no balanço do mês). `amount` já vem com sinal: saídas são negativas.
 export function buildStatement(entries, expenses, monthKey, costs = []) {
   const [y, m] = monthKey.split('-').map(Number);
@@ -206,6 +217,8 @@ export function buildStatement(entries, expenses, monthKey, costs = []) {
       .map((e) => ({ id: `in-${e.orderId}`, kind: e.value < 0 ? 'out' : 'in', source: 'order', date: e.revenueDate, amount: e.value, entry: e })), // ajuste negativo vira saída
     ...editingCostForMonth(entries, monthKey).items
       .map((e) => ({ id: `edit-${e.orderId}`, kind: 'out', source: 'editing', date: e.revenueDate, amount: -e.order.editingCost, entry: e })),
+    ...collabCostForMonth(entries, monthKey).items
+      .map((e) => ({ id: `collab-${e.orderId}`, kind: 'out', source: 'collab', date: e.revenueDate, amount: -collabCommission(e.order), entry: e })),
     ...eventCostForMonth(costs, monthKey).items
       .map((e) => ({ id: e.orderId, kind: e.value < 0 ? 'in' : 'out', source: 'eventCost', date: e.revenueDate, amount: -e.value, entry: e })), // ajuste que reduz o custo vira entrada
     ...expensesForMonth(expenses, monthKey).items

@@ -91,7 +91,7 @@ export const ReportsPeriod: React.FC<Props> = ({ entries, costs, expenses, clien
         <div className={cardClass}>
           <h3 className="mb-3 text-sm font-bold text-white">Resultado do mês</h3>
           <dl className="space-y-1.5 text-sm">
-            {([['Faturamento', totals.revenue, 'text-white'], ['Custo de edição (Vídeo Personalizado)', 0 - totals.editingCost, 'text-red-300'], ['Despesas de eventos', 0 - totals.eventCost, 'text-red-300'], ['Despesas fixas', 0 - fixed, 'text-red-300']] as const).map(([label, value, tone]) => (
+            {([['Faturamento', totals.revenue, 'text-white'], ['Custo de edição (Vídeo Personalizado)', 0 - totals.editingCost, 'text-red-300'], ['Comissões Mamães em Collab', 0 - totals.collabCost, 'text-red-300'], ['Despesas de eventos', 0 - totals.eventCost, 'text-red-300'], ['Despesas fixas', 0 - fixed, 'text-red-300']] as const).map(([label, value, tone]) => (
               <div key={label} className="flex justify-between gap-3"><dt className="text-white/65">{label}</dt><dd className={`tabular-nums ${tone}`}>{formatMoney(value)}</dd></div>
             ))}
             <div className="flex justify-between gap-3 border-t border-white/10 pt-2 font-bold"><dt className="text-white">Resultado</dt><dd className={`tabular-nums ${result >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{formatMoney(result)}</dd></div>

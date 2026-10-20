@@ -26,9 +26,9 @@ test('periodTotals: faturamento, serviços, ticket e custos variáveis só do pe
     { id: 'evt-x-cost', orderId: 'x', ledger: true, ledgerKind: 'cost', status: 'completed', clientId: 'c2', serviceId: 's2', eventCost: 30, completedAt: at('2026-10-06') },
   ]);
   const week = periodTotals(entries, costs, periodRange('week', at('2026-10-08')));
-  assert.deepEqual(week, { revenue: 200, count: 2, ticket: 100, editingCost: 25, eventCost: 30, variableCost: 55, result: 145 });
+  assert.deepEqual(week, { revenue: 200, count: 2, ticket: 100, editingCost: 25, collabCost: 0, eventCost: 30, variableCost: 55, result: 145 });
   assert.equal(periodTotals(entries, costs, periodRange('day', at('2026-10-07'))).revenue, 140);
-  assert.deepEqual(periodTotals(entries, costs, periodRange('day', at('2026-10-20'))), { revenue: 0, count: 0, ticket: null, editingCost: 0, eventCost: 0, variableCost: 0, result: 0 });
+  assert.deepEqual(periodTotals(entries, costs, periodRange('day', at('2026-10-20'))), { revenue: 0, count: 0, ticket: null, editingCost: 0, collabCost: 0, eventCost: 0, variableCost: 0, result: 0 });
 });
 
 test('livro de evento: entrada e parcela final contam como um serviço; ajuste de receita muda o valor, não a contagem', () => {

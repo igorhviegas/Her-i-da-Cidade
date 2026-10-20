@@ -41,6 +41,15 @@
       ]
     },
     {
+      "source": "/mamaes-em-collab",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
       "source": "/formulario-evento",
       "headers": [
         {

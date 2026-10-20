@@ -6,6 +6,7 @@ import { clientIp, verifyTurnstile } from '../functions/turnstile.js';
 import { TravelRouteError } from '../functions/travel-route.js';
 import { EventFormError, calculateQuote, getQuotePrefill, loadFormConfig, saveQuote, submitEventForm } from '../functions/event-form.js';
 import { publicFormConfig } from '../services/eventFormConfig.js';
+import { CollabFormError, submitCollabForm } from '../functions/collab.js';
 
 const STATUS_BY_CODE: Record<string, number> = {
   validation_error: 400, already_pending: 409, terms_changed: 409, service_unavailable: 503,
@@ -19,6 +20,7 @@ type Auth = 'unauthenticated' | 'forbidden' | 'authorized';
  * Público:
  *   GET  [?orcamento=ID]               -> { config, prefill }: textos/preços/termos atuais do CRM e o orçamento enviado (ou null)
  *   POST { action: 'submit', ... }     -> grava o formulário (captcha Turnstile quando ligado) e devolve número + link do WhatsApp
+ *   POST { action: 'collab', ... }     -> cadastro das Mamães em Collab (/mamaes-em-collab), mesmo captcha (functions/collab.js)
  * Administrador (ID token do Firebase):
  *   POST { action: 'quote', address, date, packageId, companyBase? } -> cálculo com a rota casa → evento
  *   POST { action: 'save-quote', packageId, date, location, total, km, city } -> { id } para o link
@@ -26,7 +28,7 @@ type Auth = 'unauthenticated' | 'forbidden' | 'authorized';
 export async function handleEventForm(
   req: Request | any,
   res: Response | any,
-  deps: { database?: unknown; authorize?: (req: Request) => Promise<Auth>; captcha?: typeof verifyTurnstile; submit?: typeof submitEventForm; quote?: typeof calculateQuote } = {},
+  deps: { database?: unknown; authorize?: (req: Request) => Promise<Auth>; captcha?: typeof verifyTurnstile; submit?: typeof submitEventForm; quote?: typeof calculateQuote; collab?: typeof submitCollabForm } = {},
 ) {
   const send = (status: number, body: unknown) => {
     res.setHeader?.('Cache-Control', 'no-store');
@@ -43,11 +45,12 @@ export async function handleEventForm(
     }
 
     const body = req.body ?? {};
-    if (body.action === 'submit') {
+    if (body.action === 'submit' || body.action === 'collab') {
       const captcha = await (deps.captcha ?? verifyTurnstile)({ token: body.turnstileToken, secret: process.env.TURNSTILE_SECRET_KEY, ip: clientIp(req.headers) });
       if (captcha.ok && captcha.unavailable) logger.warn('[EventForm] Turnstile indisponível: envio liberado sem verificação.');
       if (!captcha.ok) return fail(403, 'captcha_failed', 'Não foi possível confirmar a verificação de segurança. Atualize a página e tente de novo.');
       const { turnstileToken: _token, action: _action, ...input } = body;
+      if (body.action === 'collab') return send(200, { ok: true, result: await (deps.collab ?? submitCollabForm)({ database, input }) });
       return send(200, { ok: true, result: await (deps.submit ?? submitEventForm)({ database, input }) });
     }
 
@@ -59,7 +62,7 @@ export async function handleEventForm(
     if (body.action === 'quote') return send(200, { ok: true, ...(await (deps.quote ?? calculateQuote)({ database, input: body })) });
     return send(200, { ok: true, ...(await saveQuote({ database, input: body })) });
   } catch (error) {
-    if (error instanceof EventFormError || error instanceof TravelRouteError) {
+    if (error instanceof EventFormError || error instanceof TravelRouteError || error instanceof CollabFormError) {
       if (error instanceof TravelRouteError) logger.error('[EventForm] Google Maps:', error.code, (error as any).detail ?? '');
       return fail(STATUS_BY_CODE[error.code] ?? 400, error.code, error.message);
     }
