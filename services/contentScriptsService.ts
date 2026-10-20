@@ -23,6 +23,8 @@ export type ContentScriptInput = {
   plannedPublishAt?: Date | null;
   notes: string;
   parentScriptId?: string | null;
+  /** undefined = não mexe no projeto (atualizações de outras telas); null = tira o projeto. */
+  projectId?: string | null;
 };
 
 function mapScript(id: string, data: Record<string, any>): ContentScript {
@@ -42,6 +44,7 @@ function mapScript(id: string, data: Record<string, any>): ContentScript {
     ...(typeof data.sourceScriptId === 'string' ? { sourceScriptId: data.sourceScriptId } : {}),
     ...(typeof data.parentScriptId === 'string' ? { parentScriptId: data.parentScriptId } : {}),
     ...(typeof data.sortOrder === 'number' ? { sortOrder: data.sortOrder } : {}),
+    ...(typeof data.projectId === 'string' && data.projectId ? { projectId: data.projectId } : {}),
   };
 }
 
@@ -142,9 +145,10 @@ export async function createContentScript(input: ContentScriptInput): Promise<Co
   const clean = validate(input);
   await validateParent(undefined, clean.parentScriptId);
   const reference = doc(collection(db, CONTENT_SCRIPTS_COLLECTION));
-  const { publishedAt, plannedPublishAt, parentScriptId, ...fields } = clean;
+  const { publishedAt, plannedPublishAt, parentScriptId, projectId, ...fields } = clean;
   const payload = {
     ...fields,
+    ...(projectId ? { projectId } : {}),
     ...(publishedAt ? { publishedAt } : {}),
     ...(plannedPublishAt ? { plannedPublishAt } : {}),
     ...(parentScriptId ? { parentScriptId } : {}),
@@ -166,7 +170,7 @@ export async function createContentScript(input: ContentScriptInput): Promise<Co
   } else {
     await setDoc(reference, payload);
   }
-  return { ...clean, ...(parentScriptId ? { parentScriptId } : {}), id: reference.id };
+  return { ...fields, publishedAt, plannedPublishAt, ...(parentScriptId ? { parentScriptId } : {}), ...(projectId ? { projectId } : {}), id: reference.id };
 }
 
 export async function updateContentScript(id: string, input: ContentScriptInput): Promise<void> {
@@ -174,7 +178,7 @@ export async function updateContentScript(id: string, input: ContentScriptInput)
   if (!id) throw new Error('ID do roteiro é obrigatório.');
   const clean = validate(input);
   await validateParent(id, clean.parentScriptId);
-  const { publishedAt, plannedPublishAt, parentScriptId, ...fields } = clean;
+  const { publishedAt, plannedPublishAt, parentScriptId, projectId, ...fields } = clean;
   const firestore = db;
   const scriptRef = doc(firestore, CONTENT_SCRIPTS_COLLECTION, id);
   await runTransaction(firestore, async (transaction) => {
@@ -195,6 +199,7 @@ export async function updateContentScript(id: string, input: ContentScriptInput)
       publishedAt: publishedAt || deleteField(),
       plannedPublishAt: plannedPublishAt || deleteField(),
       parentScriptId: parentScriptId || deleteField(),
+      ...(projectId !== undefined ? { projectId: projectId || deleteField() } : {}),
       ...(becomesReady ? { readyAt: serverTimestamp() } : {}),
       updatedAt: serverTimestamp(),
     });

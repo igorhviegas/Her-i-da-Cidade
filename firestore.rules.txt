@@ -131,7 +131,7 @@ service cloud.firestore {
         && d.text is string && d.text.size() > 0 && d.text.size() <= 500
         && d.category is string && d.category.size() <= 60
         && d.notes is string && d.notes.size() <= 2000
-        && d.status in ['draft', 'ready', 'answered', 'scripted']
+        && d.status in ['draft', 'scripted', 'answered']
         && (d.answeredAt == null || d.answeredAt is timestamp)
         && (d.scriptId == null || (d.scriptId is string && d.scriptId.size() > 0 && d.scriptId.size() <= 128))
         && d.updatedAt == request.time;
@@ -139,8 +139,9 @@ service cloud.firestore {
 
     // Vínculo só com roteiro que existe (contentScripts); um vínculo já gravado não precisa existir de novo
     // (o roteiro pode ter sido excluído depois e a pergunta continua editável).
+    // existsAfter: o envio para Roteiros cria o roteiro e vincula a pergunta no mesmo lote.
     function scriptExists(scriptId) {
-      return exists(/databases/$(database)/documents/contentScripts/$(scriptId));
+      return existsAfter(/databases/$(database)/documents/contentScripts/$(scriptId));
     }
 
     // Resumo de pedalada do Fit (services/fitRide.js): só estes campos, com tipos e limites plausíveis.
@@ -320,6 +321,21 @@ service cloud.firestore {
         && request.resource.data.createdAt == resource.data.createdAt
         && (request.resource.data.scriptId == null || request.resource.data.scriptId == resource.data.scriptId
           || scriptExists(request.resource.data.scriptId));
+    }
+
+    // Projetos de roteiro (tipos de conteúdo). Roteiros guardam só o id; o da Caixinha não pode ser excluído.
+    function validScriptProject(d) {
+      return d.keys().hasOnly(['name', 'icon', 'createdAt', 'updatedAt'])
+        && d.keys().hasAll(['name', 'icon', 'createdAt', 'updatedAt'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 60
+        && d.icon is string && d.icon.matches('^[A-Za-z0-9]{1,40}$')
+        && d.updatedAt == request.time;
+    }
+    match /scriptProjects/{projectId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && validScriptProject(request.resource.data) && request.resource.data.createdAt == request.time;
+      allow update: if isAdmin() && validScriptProject(request.resource.data) && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAdmin() && projectId != 'caixinha';
     }
 
     // Dados internos do CRM: acesso restrito aos administradores autenticados.

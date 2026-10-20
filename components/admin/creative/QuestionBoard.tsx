@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { DndContext, MouseSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowUpRight, Link2, Trash2 } from 'lucide-react';
+import { ArrowUpRight, Loader2, Send, Trash2 } from 'lucide-react';
 import { QUESTION_STATUSES } from '../../../services/creativeQuestions.js';
 import type { CreativeQuestion, QuestionStatus } from '../../../services/creativeQuestions.js';
 import type { ContentScript } from '../../../types';
@@ -9,9 +9,8 @@ import { formatDate } from '../ordersFlow/scriptsHelpers';
 
 export const statusStyles: Record<QuestionStatus, string> = {
   draft: 'border-slate-400/20 bg-slate-400/10 text-slate-200',
-  ready: 'border-blue-400/20 bg-blue-400/10 text-blue-200',
-  answered: 'border-amber-400/20 bg-amber-400/10 text-amber-200',
-  scripted: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200',
+  scripted: 'border-fuchsia-400/20 bg-fuchsia-400/10 text-fuchsia-200',
+  answered: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-200',
 };
 const PAGE = 40;
 
@@ -23,16 +22,22 @@ interface CardActions {
   onMove: (question: CreativeQuestion, status: QuestionStatus) => void;
   onDelete: (question: CreativeQuestion) => void;
   onOpenScript: (scriptId: string) => void;
+  /** Cria o roteiro (projeto da Caixinha) na biblioteca de Roteiros e vincula a pergunta. */
+  onSend: (question: CreativeQuestion) => void;
 }
 
-const ScriptLink: React.FC<{ question: CreativeQuestion } & CardActions> = ({ question, scriptsById, scriptsLoaded, onOpen, onOpenScript }) => {
+const ScriptLink: React.FC<{ question: CreativeQuestion } & CardActions> = ({ question, scriptsById, scriptsLoaded, busyId, onOpenScript, onSend }) => {
   if (question.scriptId) {
     const script = scriptsById.get(question.scriptId);
     if (script) return <button type="button" onClick={() => onOpenScript(script.id)} className="flex min-h-9 w-full min-w-0 items-center gap-1.5 rounded-lg bg-emerald-500/10 px-2 text-left text-[11px] font-semibold text-emerald-200 hover:bg-emerald-500/20"><ArrowUpRight className="h-3.5 w-3.5 shrink-0" /><span className="truncate">Roteiro: {script.title}</span></button>;
     return scriptsLoaded ? <p className="text-[11px] text-rose-200/80">Roteiro vinculado não encontrado.</p> : null;
   }
-  if (question.status !== 'scripted') return null;
-  return <button type="button" onClick={() => onOpen(question)} className="flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-[11px] font-semibold text-blue-200 hover:bg-blue-500/10"><Link2 className="h-3.5 w-3.5" />Vincular roteiro</button>;
+  return (
+    <button type="button" onClick={() => onSend(question)} disabled={busyId !== null}
+      className="flex min-h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-fuchsia-400/25 bg-fuchsia-500/10 px-2 text-xs font-bold text-fuchsia-100 hover:bg-fuchsia-500/20 disabled:opacity-50">
+      {busyId === question.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}Enviar para Roteiros
+    </button>
+  );
 };
 
 const QuestionCard: React.FC<{ question: CreativeQuestion } & CardActions> = (props) => {
@@ -95,17 +100,17 @@ export const QuestionBoard: React.FC<{ questions: CreativeQuestion[]; statuses: 
   return (
     <DndContext sensors={sensors} onDragEnd={handleEnd}>
       {columns.length > 1 && (
-        <div role="tablist" aria-label="Colunas" className="mb-3 grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-[#0D1527] p-1 sm:grid-cols-4 xl:hidden">
+        <div role="tablist" aria-label="Colunas" className="mb-3 grid grid-cols-3 gap-1 rounded-xl border border-white/10 bg-[#0D1527] p-1 xl:hidden">
           {columns.map(([status, label]) => (
             <button key={status} type="button" role="tab" aria-selected={active === status} onClick={() => setMobileStatus(status)}
-              className={`flex min-h-11 items-center justify-between gap-1 rounded-lg px-2.5 text-left text-xs font-semibold transition-colors ${active === status ? 'bg-blue-600 text-white' : 'text-white/60 hover:bg-white/5'}`}>
-              <span className="min-w-0 leading-tight">{label}</span>
+              className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg px-1.5 text-center text-xs font-semibold transition-colors ${active === status ? 'bg-blue-600 text-white' : 'text-white/60 hover:bg-white/5'}`}>
+              <span className="leading-tight">{label}</span>
               <span className="shrink-0 rounded-full bg-white/10 px-1.5 text-[11px] tabular-nums">{questions.filter((question) => question.status === status).length}</span>
             </button>
           ))}
         </div>
       )}
-      <div className={`grid grid-cols-1 gap-3 ${columns.length > 1 ? 'xl:grid-cols-4' : ''}`}>
+      <div className={`grid grid-cols-1 gap-3 ${columns.length > 1 ? 'xl:grid-cols-3' : ''}`}>
         {columns.map(([status, label]) => <Column key={status} status={status} label={label} items={questions.filter((question) => question.status === status)} hiddenOnMobile={status !== active} {...actions} />)}
       </div>
     </DndContext>

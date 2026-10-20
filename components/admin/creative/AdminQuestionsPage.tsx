@@ -3,11 +3,10 @@ import { AlertCircle, CheckCircle2, Loader2, MessageCircleQuestionMark, Plus, Se
 import { useRouter } from '../../../lib/router';
 import { filterQuestions, QUESTION_LIMITS, QUESTION_STATUSES } from '../../../services/creativeQuestions.js';
 import type { CreativeQuestion, QuestionInput, QuestionStatus } from '../../../services/creativeQuestions.js';
-import { createQuestion, deleteQuestion, listQuestions, updateQuestion } from '../../../services/creativeQuestionsService';
-import { sendScriptToRecording } from '../../../services/scriptProductionService';
-import type { ContentScript } from '../../../types';
-import { ScriptEditorModal } from '../ScriptEditorModal';
+import { createQuestion, deleteQuestion, listQuestions, sendQuestionToScripts, updateQuestion } from '../../../services/creativeQuestionsService';
+import { CAIXINHA_PROJECT_ID } from '../../../services/scriptProjects.js';
 import { useScriptsData } from '../ordersFlow/useScriptLibrary';
+import { useScriptProjects } from '../scriptProjects/useScriptProjects';
 import { QuestionBoard } from './QuestionBoard';
 import { QuestionModal } from './QuestionModal';
 
@@ -41,7 +40,8 @@ function useQuestions() {
 export const AdminQuestionsPage: React.FC = () => {
   const { navigate } = useRouter();
   const { questions, setQuestions, replace, loading, loadError, load, flash, setFlash } = useQuestions();
-  const { scripts, setScripts, categories: scriptCategories, loading: scriptsLoading } = useScriptsData();
+  const { scripts, setScripts, loading: scriptsLoading } = useScriptsData();
+  const { projectsById } = useScriptProjects(); // também cria o projeto da Caixinha na primeira vez
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<QuestionStatus | ''>('');
@@ -49,8 +49,6 @@ export const AdminQuestionsPage: React.FC = () => {
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<CreativeQuestion | 'new' | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [scriptFor, setScriptFor] = useState<CreativeQuestion | null>(null);
-  const linkedScript = useRef<string | null>(null);
 
   const scriptsById = useMemo(() => new Map(scripts.map((script) => [script.id, script])), [scripts]);
   const categories = useMemo(() => Array.from(new Set<string>(questions.map((item) => item.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })), [questions]);
@@ -111,24 +109,24 @@ export const AdminQuestionsPage: React.FC = () => {
     }
   };
 
-  // Roteiro criado a partir da pergunta: o editor cria o documento uma vez (salvar de novo atualiza o mesmo);
-  // a pergunta é vinculada a esse id na primeira gravação.
-  const startScript = (question: CreativeQuestion) => { linkedScript.current = null; setEditing(null); setScriptFor(question); };
-  const handleScriptSaved = async (saved: ContentScript, closeEditor = true) => {
-    setScripts((current) => [saved, ...current.filter((item) => item.id !== saved.id)]);
-    if (closeEditor) setScriptFor(null);
-    const question = scriptFor;
-    if (!question || linkedScript.current === saved.id) return;
-    linkedScript.current = saved.id;
+  // Roteiro e vínculo são gravados juntos no serviço; o botão some quando a pergunta já tem roteiro.
+  const send = async (question: CreativeQuestion) => {
+    if (busyId || question.scriptId) return;
+    setEditing(null);
+    setBusyId(question.id);
     try {
-      replace(await updateQuestion(question, { ...inputOf(question), status: 'scripted', scriptId: saved.id }));
-      setFlash({ kind: 'ok', text: 'Roteiro criado e vinculado à pergunta.' });
+      const result = await sendQuestionToScripts(question);
+      replace(result.question);
+      setScripts((current) => [result.script, ...current]);
+      setFlash({ kind: 'ok', text: `Enviada para Roteiros como rascunho do projeto “${projectsById.get(CAIXINHA_PROJECT_ID)?.name ?? 'Aranha Responde'}”.` });
     } catch (error) {
-      setFlash({ kind: 'error', text: `Roteiro “${saved.title}” criado, mas o vínculo com a pergunta falhou (${errorText(error, 'erro desconhecido')}). Abra a pergunta e escolha esse roteiro em “Roteiro relacionado”.` });
+      setFlash({ kind: 'error', text: errorText(error, 'Não foi possível enviar para Roteiros.') });
+    } finally {
+      setBusyId(null);
     }
   };
 
-  const actions = { scriptsById, scriptsLoaded: !scriptsLoading, busyId, onOpen: setEditing, onMove: (question: CreativeQuestion, status: QuestionStatus) => void move(question, status), onDelete: (question: CreativeQuestion) => void remove(question), onOpenScript: openScript };
+  const actions = { scriptsById, scriptsLoaded: !scriptsLoading, busyId, onOpen: setEditing, onMove: (question: CreativeQuestion, status: QuestionStatus) => void move(question, status), onDelete: (question: CreativeQuestion) => void remove(question), onOpenScript: openScript, onSend: (question: CreativeQuestion) => void send(question) };
   const filterClass = 'rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-base text-white outline-none focus:border-blue-500/60 sm:text-sm';
 
   return (
@@ -168,14 +166,7 @@ export const AdminQuestionsPage: React.FC = () => {
             : visible.length === 0 ? <p className="rounded-xl border border-white/10 bg-[#0D1527] p-5 text-center text-sm text-white/55">Nenhuma pergunta corresponde à busca ou aos filtros.</p>
               : <QuestionBoard questions={visible} statuses={statuses} {...actions} />}
 
-      {editing && <QuestionModal question={editing === 'new' ? null : editing} scripts={scripts} categories={categories} onClose={() => setEditing(null)} onSave={save} onDelete={(question) => void remove(question)} onOpenScript={openScript} onCreateScript={startScript} />}
-      {scriptFor && (
-        <ScriptEditorModal script={null} scripts={scripts} categories={scriptCategories}
-          initialDraft={{ title: scriptFor.text.slice(0, 180), category: scriptFor.category, content: `Pergunta da caixinha: ${scriptFor.text}\n\n`, notes: scriptFor.notes }}
-          onClose={() => setScriptFor(null)} onSaved={(saved, close) => void handleScriptSaved(saved, close)}
-          onSendToRecording={async (script) => { const order = await sendScriptToRecording(script.id); return { ...script, productionStatus: 'in_production', orderId: order.id }; }}
-          onOpenOrder={(orderId) => navigate(`/admin/pedidos?orderId=${encodeURIComponent(orderId)}`)} />
-      )}
+      {editing && <QuestionModal question={editing === 'new' ? null : editing} scripts={scripts} categories={categories} onClose={() => setEditing(null)} onSave={save} onDelete={(question) => void remove(question)} onOpenScript={openScript} onSend={(question) => void send(question)} />}
     </section>
   );
 };

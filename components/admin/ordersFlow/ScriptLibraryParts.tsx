@@ -2,6 +2,8 @@ import React from 'react';
 import { AlertTriangle, ArrowUpRight, Copy, GripVertical, Loader2, Plus, Search, Trash2 } from 'lucide-react';
 import { scriptPublishTime } from '../../../services/scriptSchedule.js';
 import type { ContentScript, ScriptProductionStatus, ScriptPublicationStatus } from '../../../types';
+import type { ScriptProject } from '../../../services/scriptProjects.js';
+import { ProjectBadge, ProjectIcon } from '../scriptProjects/projectIcons';
 import { productionOptions } from './scriptEditorHelpers';
 import { SortableArea, SortableGroup, SortableItem } from './ScriptSortable';
 import { formatDate, productionLabels, productionStyles, publicationLabels, publishedStyle } from './scriptsHelpers';
@@ -9,23 +11,23 @@ import { formatDate, productionLabels, productionStyles, publicationLabels, publ
 interface ScriptFiltersBarProps {
   search: string;
   setSearch: (value: string) => void;
-  categoryFilter: string;
-  setCategoryFilter: (value: string) => void;
+  projectFilter: string;
+  setProjectFilter: (value: string) => void;
   productionFilter: ScriptProductionStatus | '';
   setProductionFilter: (value: ScriptProductionStatus | '') => void;
   publicationFilter: ScriptPublicationStatus | '';
   setPublicationFilter: (value: ScriptPublicationStatus | '') => void;
-  categoriesInLibrary: string[];
+  projects: ScriptProject[];
 }
 
-export const ScriptFiltersBar: React.FC<ScriptFiltersBarProps> = ({ search, setSearch, categoryFilter, setCategoryFilter, productionFilter, setProductionFilter, publicationFilter, setPublicationFilter, categoriesInLibrary }) => (
+export const ScriptFiltersBar: React.FC<ScriptFiltersBarProps> = ({ search, setSearch, projectFilter, setProjectFilter, productionFilter, setProductionFilter, publicationFilter, setPublicationFilter, projects }) => (
   <div className="grid grid-cols-1 gap-2 rounded-2xl border border-white/10 bg-[#0D1527] p-3 sm:grid-cols-2 xl:grid-cols-4">
     <label className="relative block sm:col-span-2 xl:col-span-1">
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
       <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar título ou conteúdo" aria-label="Buscar roteiros por título ou conteúdo" className="w-full rounded-xl border border-white/10 bg-[#070B14] py-2.5 pl-9 pr-3 text-sm text-white outline-none placeholder:text-white/35 focus:border-blue-500/60" />
     </label>
-    <select aria-label="Filtrar por categoria" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} className="rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/60">
-      <option value="">Todas as categorias</option>{categoriesInLibrary.map((item) => <option key={item} value={item}>{item}</option>)}
+    <select aria-label="Filtrar por projeto" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)} className="rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/60">
+      <option value="">Todos os projetos</option>{projects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}<option value="none">Sem projeto</option>
     </select>
     <select aria-label="Filtrar por status de produção" value={productionFilter} onChange={(event) => setProductionFilter(event.target.value as ScriptProductionStatus | '')} className="rounded-xl border border-white/10 bg-[#070B14] px-3 py-2.5 text-sm text-white outline-none focus:border-blue-500/60">
       <option value="">Todos os status de produção</option>{Object.entries(productionLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -38,6 +40,7 @@ export const ScriptFiltersBar: React.FC<ScriptFiltersBarProps> = ({ search, setS
 
 interface ScriptRowProps {
   script: ContentScript;
+  project: ScriptProject | undefined;
   scriptActionId: string | null;
   sendingScriptId: string | null;
   openEdit: (script: ContentScript) => void;
@@ -50,14 +53,14 @@ interface ScriptRowProps {
   draggable?: boolean;
 }
 
-export const ScriptRow: React.FC<ScriptRowProps> = ({ script, scriptActionId, sendingScriptId, openEdit, openNewChild, onDuplicate, onDelete, onSendToRecording, onOpenOrder, draggable }) => (
+export const ScriptRow: React.FC<ScriptRowProps> = ({ script, project, scriptActionId, sendingScriptId, openEdit, openNewChild, onDuplicate, onDelete, onSendToRecording, onOpenOrder, draggable }) => (
   <article>
     <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[#0D1527] px-3 py-2.5 transition-colors hover:border-blue-400/35 sm:flex-row sm:items-center sm:justify-between">
       {draggable && <GripVertical aria-hidden className="hidden h-4 w-4 shrink-0 cursor-grab text-white/30 sm:block" />}
       <button type="button" onClick={() => openEdit(script)} className="min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
         <span className="block truncate text-sm font-bold text-white">{script.title}</span>
         <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
-          {script.category ? <span className="max-w-44 truncate rounded-full border border-blue-400/15 bg-blue-400/5 px-2 py-0.5 font-semibold text-blue-200/80">{script.category}</span> : <span className="text-white/35">Sem categoria</span>}
+          <ProjectBadge project={project} className="max-w-44" />
           <span className={`rounded-full border px-2 py-0.5 font-bold ${productionStyles[script.productionStatus]}`}>{productionLabels[script.productionStatus]}</span>
           <span className={`rounded-full border px-2 py-0.5 font-semibold ${script.publicationStatus === 'published' ? publishedStyle : 'border-white/10 bg-white/5 text-white/55'}`}>{publicationLabels[script.publicationStatus]}</span>
           <PublishDateBadge script={script} />
@@ -83,21 +86,24 @@ const PublishDateBadge: React.FC<{ script: ContentScript }> = ({ script }) => {
   return <span className="font-semibold text-white/70">{script.publicationStatus === 'published' && script.publishedAt ? 'Publicado em' : 'Previsto para'} {formatDate(new Date(time))}</span>;
 };
 
-/** Card do Kanban; o card fica verde quando o roteiro já foi publicado. */
-export const ScriptKanbanCard: React.FC<{ script: ContentScript; openEdit: (script: ContentScript) => void }> = ({ script, openEdit }) => (
+/** Card do Kanban; o card fica verde quando o roteiro já foi publicado. O ícone do projeto fica no canto. */
+export const ScriptKanbanCard: React.FC<{ script: ContentScript; project: ScriptProject | undefined; openEdit: (script: ContentScript) => void }> = ({ script, project, openEdit }) => (
   <button type="button" onClick={() => openEdit(script)} className={`block w-full rounded-xl border p-3 text-left transition hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${script.publicationStatus === 'published' ? publishedStyle : productionStyles[script.productionStatus]}`}>
-    <span className="block text-sm font-bold text-white">{script.title}</span>
+    <span className="flex items-start justify-between gap-2">
+      <span className="min-w-0 text-sm font-bold text-white [overflow-wrap:anywhere]">{script.title}</span>
+      {project && <span title={`Projeto: ${project.name}`} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-fuchsia-500/15 text-fuchsia-100"><ProjectIcon icon={project.icon} className="h-4 w-4" /></span>}
+    </span>
     <span className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
       {script.publicationStatus === 'published' && <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 font-bold">Publicado</span>}
-      {script.category && <span className="max-w-40 truncate text-white/55">{script.category}</span>}
+      {project && <span className="max-w-40 truncate font-semibold text-fuchsia-100/80">{project.name}</span>}
       <PublishDateBadge script={script} />
     </span>
   </button>
 );
 
 /** Kanban por status de produção, com arrastar para reordenar dentro da coluna e "+" para novo rascunho. */
-export const ScriptKanban: React.FC<{ scripts: ContentScript[]; openEdit: (script: ContentScript) => void; onNew: () => void; onMove: (draggedId: string, targetId: string) => void }> = ({ scripts, openEdit, onNew, onMove }) => (
-  <SortableArea onMove={onMove} renderOverlay={(id) => { const script = scripts.find((item) => item.id === id); return script ? <ScriptKanbanCard script={script} openEdit={openEdit} /> : null; }}>
+export const ScriptKanban: React.FC<{ scripts: ContentScript[]; projectsById: Map<string, ScriptProject>; openEdit: (script: ContentScript) => void; onNew: () => void; onMove: (draggedId: string, targetId: string) => void }> = ({ scripts, projectsById, openEdit, onNew, onMove }) => (
+  <SortableArea onMove={onMove} renderOverlay={(id) => { const script = scripts.find((item) => item.id === id); return script ? <ScriptKanbanCard script={script} project={script.projectId ? projectsById.get(script.projectId) : undefined} openEdit={openEdit} /> : null; }}>
     <div className="-mx-4 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0">
       <div className="grid min-w-max grid-cols-4 gap-3 lg:min-w-0">
         {productionOptions.map(([status, label]) => {
@@ -113,7 +119,7 @@ export const ScriptKanban: React.FC<{ scripts: ContentScript[]; openEdit: (scrip
               </header>
               <SortableGroup id={status} ids={items.map((script) => script.id)}>
                 <div className="space-y-2.5">
-                  {items.map((script) => <SortableItem key={script.id} id={script.id}><ScriptKanbanCard script={script} openEdit={openEdit} /></SortableItem>)}
+                  {items.map((script) => <SortableItem key={script.id} id={script.id}><ScriptKanbanCard script={script} project={script.projectId ? projectsById.get(script.projectId) : undefined} openEdit={openEdit} /></SortableItem>)}
                   {items.length === 0 && <p className="rounded-xl border border-dashed border-white/10 px-3 py-5 text-center text-xs text-white/30">Nenhum roteiro neste status</p>}
                 </div>
               </SortableGroup>

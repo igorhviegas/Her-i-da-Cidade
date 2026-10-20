@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { answeredAtFor, cleanQuestion, filterQuestions, QUESTION_LIMITS } from './creativeQuestions.js';
+import { answeredAtFor, cleanQuestion, filterQuestions, normalizeStatus, QUESTION_LIMITS } from './creativeQuestions.js';
 
 test('cleanQuestion: apara textos, exige pergunta, respeita limites e valida status/roteiro', () => {
   assert.deepEqual(cleanQuestion({ text: '  Qual o carro dos sonhos? ', category: ' Carros ', notes: '', status: 'draft' }),
@@ -12,18 +12,25 @@ test('cleanQuestion: apara textos, exige pergunta, respeita limites e valida sta
   assert.throws(() => cleanQuestion({ text: 'x', category: '', notes: '', status: 'draft', scriptId: 'a/b' }), /Roteiro/);
 });
 
-test('answeredAtFor: preenche ao responder, mantém a data existente e limpa ao voltar', () => {
+test('answeredAtFor: só em Respondidos; preenche ao responder, mantém a data existente e limpa ao voltar', () => {
   const now = new Date('2026-10-19T12:00:00Z');
   const before = new Date('2026-10-01T12:00:00Z');
   assert.equal(answeredAtFor('answered', null, now), now);
-  assert.equal(answeredAtFor('scripted', before, now), before);
-  assert.equal(answeredAtFor('ready', before, now), null);
+  assert.equal(answeredAtFor('answered', before, now), before);
+  assert.equal(answeredAtFor('scripted', before, now), null);
   assert.equal(answeredAtFor('draft', null, now), null);
+});
+
+test('normalizeStatus: status antigo ou desconhecido vira Rascunhos', () => {
+  assert.equal(normalizeStatus('ready'), 'draft');
+  assert.equal(normalizeStatus('x'), 'draft');
+  assert.equal(normalizeStatus('scripted'), 'scripted');
+  assert.equal(normalizeStatus('answered'), 'answered');
 });
 
 test('filterQuestions: busca sem acento em pergunta/categoria/observações e filtra categoria e status', () => {
   const list = [
-    { text: 'Você já atendeu um famoso?', category: 'Bastidores', notes: '', status: 'ready' },
+    { text: 'Você já atendeu um famoso?', category: 'Bastidores', notes: '', status: 'scripted' },
     { text: 'Qual o pedido mais difícil?', category: 'Pedidos', notes: 'falar da chupeta', status: 'draft' },
   ];
   assert.equal(filterQuestions(list, { search: 'voce FAMOSO' }).length, 1);

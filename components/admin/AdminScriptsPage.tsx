@@ -10,13 +10,17 @@ import { ScriptFiltersBar, ScriptKanban, ScriptRow } from './ordersFlow/ScriptLi
 import { SortableArea, SortableGroup, SortableItem } from './ordersFlow/ScriptSortable';
 import { logScriptOperationError, toDate } from './ordersFlow/scriptsHelpers';
 import { useScriptEditorState, useScriptFilters, useScriptLink, useScriptsData } from './ordersFlow/useScriptLibrary';
+import { ProjectsPanel } from './scriptProjects/ProjectsPanel';
+import { useScriptProjects } from './scriptProjects/useScriptProjects';
 
 export const AdminScriptsPage: React.FC = () => {
   const { navigate } = useRouter();
-  const { scripts, setScripts, categories, setCategories, loading, error, categoryLoadError } = useScriptsData();
+  const { scripts, setScripts, loading, error } = useScriptsData();
+  const { projects, setProjects, projectsById, error: projectsError } = useScriptProjects();
+  const projectIds = useMemo(() => new Set(projectsById.keys()), [projectsById]);
   const [success, setSuccess] = useState('');
-  const { search, setSearch, categoryFilter, setCategoryFilter, productionFilter, setProductionFilter, publicationFilter, setPublicationFilter, categoriesInLibrary, filtered } = useScriptFilters(scripts);
-  const [view, setView] = useState<'kanban' | 'list'>('kanban');
+  const { search, setSearch, projectFilter, setProjectFilter, productionFilter, setProductionFilter, publicationFilter, setPublicationFilter, filtered } = useScriptFilters(scripts, projectIds);
+  const [view, setView] = useState<'kanban' | 'list' | 'projects'>('kanban');
   const [listOrder, setListOrder] = useState<'date' | 'manual'>('date');
   // Uma só base para exibir e para gravar: roteiros ainda sem posição seguem a data de postagem.
   const manualBase = useMemo(() => sortByManualOrder(sortByPublishDate<ContentScript>(scripts)), [scripts]);
@@ -37,7 +41,7 @@ export const AdminScriptsPage: React.FC = () => {
     }
   };
   const renderRow = (script: ContentScript, draggable: boolean) => (
-    <ScriptRow script={script} draggable={draggable} scriptActionId={scriptActionId} sendingScriptId={sendingScriptId} openEdit={openEdit} openNewChild={openNewChild} onDuplicate={(item) => void handleDuplicateScript(item)} onDelete={(item) => void handleDeleteScript(item)} onSendToRecording={(item) => void handleSendToRecording(item)} onOpenOrder={(orderId) => navigate(`/admin/pedidos?orderId=${encodeURIComponent(orderId)}`)} />
+    <ScriptRow script={script} project={script.projectId ? projectsById.get(script.projectId) : undefined} draggable={draggable} scriptActionId={scriptActionId} sendingScriptId={sendingScriptId} openEdit={openEdit} openNewChild={openNewChild} onDuplicate={(item) => void handleDuplicateScript(item)} onDelete={(item) => void handleDeleteScript(item)} onSendToRecording={(item) => void handleSendToRecording(item)} onOpenOrder={(orderId) => navigate(`/admin/pedidos?orderId=${encodeURIComponent(orderId)}`)} />
   );
   const { editorOpen, setEditorOpen, editingScript, setEditingScript, initialParentScriptId, openNew, openNewChild, openEdit } = useScriptEditorState();
   const [sendingScriptId, setSendingScriptId] = useState<string | null>(null);
@@ -71,7 +75,6 @@ export const AdminScriptsPage: React.FC = () => {
     setScripts((current) => [complete, ...current.filter((item) => item.id !== complete.id)]
       .sort((a, b) => (toDate(b.updatedAt)?.getTime() || 0) - (toDate(a.updatedAt)?.getTime() || 0)));
     setEditingScript((current) => current?.id === complete.id ? complete : current);
-    if (complete.category && !categories.includes(complete.category)) setCategories((current) => [...current, complete.category].sort((a, b) => a.localeCompare(b, 'pt-BR')));
     if (closeEditor) {
       setEditorOpen(false);
       setSuccess(saved.createdAt ? 'Roteiro atualizado.' : 'Roteiro criado.');
@@ -88,6 +91,7 @@ export const AdminScriptsPage: React.FC = () => {
         title: `${script.title} (cópia)`.slice(0, 180),
         content: script.content,
         category: script.category,
+        projectId: script.projectId || null,
         notes: script.notes,
         productionStatus: 'draft',
         publicationStatus: 'unpublished',
@@ -127,9 +131,9 @@ export const AdminScriptsPage: React.FC = () => {
           <h2 className="mt-1 text-2xl font-extrabold tracking-tight text-white">Biblioteca de Roteiros</h2>
           <p className="mt-1 max-w-2xl text-sm text-white/50">Materiais permanentes para produzir vídeos, consultar referências e desenvolver novas ideias.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <div role="group" aria-label="Visualização" className="flex gap-1 rounded-xl border border-white/10 bg-[#0D1527] p-1">
-            {([['kanban', 'Kanban'], ['list', 'Lista']] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setView(id)} aria-pressed={view === id} className={`rounded-lg px-3 py-2 text-xs font-semibold sm:py-1.5 transition-colors ${view === id ? 'bg-blue-600 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}>{label}</button>)}
+            {([['kanban', 'Kanban'], ['list', 'Lista'], ['projects', 'Projetos']] as const).map(([id, label]) => <button key={id} type="button" onClick={() => setView(id)} aria-pressed={view === id} className={`rounded-lg px-3 py-2 text-xs font-semibold sm:py-1.5 transition-colors ${view === id ? 'bg-blue-600 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}>{label}</button>)}
           </div>
           <button type="button" onClick={openNew} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/15 transition-colors hover:bg-blue-500"><Plus className="h-4 w-4" /> Novo roteiro</button>
         </div>
@@ -137,15 +141,16 @@ export const AdminScriptsPage: React.FC = () => {
 
       {success && <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-200"><CheckCircle2 className="h-4 w-4" />{success}</div>}
       {error && <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200"><AlertCircle className="h-4 w-4 shrink-0" />Não foi possível carregar a biblioteca. {error}</div>}
-      {categoryLoadError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-200"><AlertCircle className="h-4 w-4 shrink-0" />Falha ao carregar categorias; a biblioteca segue usando as categorias dos roteiros. {categoryLoadError}</div>}
+      {projectsError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-200"><AlertCircle className="h-4 w-4 shrink-0" />Falha ao carregar os projetos. {projectsError}</div>}
       {actionError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-sm text-red-200"><AlertCircle className="h-4 w-4 shrink-0" />{actionError}</div>}
 
-      <ScriptFiltersBar search={search} setSearch={setSearch} categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter} productionFilter={productionFilter} setProductionFilter={setProductionFilter} publicationFilter={publicationFilter} setPublicationFilter={setPublicationFilter} categoriesInLibrary={categoriesInLibrary} />
+      {view === 'projects' ? <ProjectsPanel projects={projects} setProjects={setProjects} scripts={scripts} onShowScripts={(projectId) => { setProjectFilter(projectId); setView('kanban'); }} onUnlinked={(projectId) => setScripts((current) => current.map((item) => (item.projectId === projectId ? { ...item, projectId: undefined } : item)))} />
+        : <ScriptFiltersBar search={search} setSearch={setSearch} projectFilter={projectFilter} setProjectFilter={setProjectFilter} productionFilter={productionFilter} setProductionFilter={setProductionFilter} publicationFilter={publicationFilter} setPublicationFilter={setPublicationFilter} projects={projects} />}
 
-      {loading ? <div className="flex min-h-52 items-center justify-center gap-3 text-sm text-white/55"><Loader2 className="h-5 w-5 animate-spin text-blue-400" />Carregando roteiros…</div>
+      {view === 'projects' ? null : loading ? <div className="flex min-h-52 items-center justify-center gap-3 text-sm text-white/55"><Loader2 className="h-5 w-5 animate-spin text-blue-400" />Carregando roteiros…</div>
         : !error && scripts.length === 0 ? <div className="rounded-2xl border border-dashed border-white/15 bg-[#0D1527]/60 px-5 py-14 text-center"><BookOpen className="mx-auto h-8 w-8 text-white/30" /><p className="mt-3 text-base font-semibold text-white">Sua biblioteca começa aqui.</p><p className="mt-1 text-sm text-white/45">Crie roteiros que continuarão disponíveis mesmo depois de produzidos ou publicados.</p></div>
           : !error && filtered.length === 0 ? <p className="rounded-xl border border-white/10 bg-[#0D1527] p-5 text-center text-sm text-white/55">Nenhum roteiro corresponde aos filtros escolhidos.</p>
-            : !error && (view === 'kanban' ? <ScriptKanban scripts={manualOrdered} openEdit={openEdit} onNew={openNew} onMove={(draggedId, targetId) => void handleMove(draggedId, targetId)} />
+            : !error && (view === 'kanban' ? <ScriptKanban scripts={manualOrdered} projectsById={projectsById} openEdit={openEdit} onNew={openNew} onMove={(draggedId, targetId) => void handleMove(draggedId, targetId)} />
               : <div className="space-y-3">
               <div role="group" aria-label="Ordenar lista" className="flex w-fit items-center gap-1 rounded-xl border border-white/10 bg-[#0D1527] p-1 text-xs">
                 <span className="px-2 text-white/45">Ordenar:</span>
@@ -161,7 +166,7 @@ export const AdminScriptsPage: React.FC = () => {
                 : filtered.map((script) => <React.Fragment key={script.id}>{renderRow(script, false)}</React.Fragment>)}
             </div>)}
 
-      {editorOpen && <ScriptEditorModal script={editingScript} initialParentScriptId={initialParentScriptId} scripts={scripts} categories={categories} onClose={() => setEditorOpen(false)} onSaved={handleSaved} onSendToRecording={(script) => handleSendToRecording(script, false)} onOpenOrder={(orderId) => { setEditorOpen(false); navigate(`/admin/pedidos?orderId=${encodeURIComponent(orderId)}`); }} />}
+      {editorOpen && <ScriptEditorModal script={editingScript} initialParentScriptId={initialParentScriptId} scripts={scripts} projects={projects} onClose={() => setEditorOpen(false)} onSaved={handleSaved} onSendToRecording={(script) => handleSendToRecording(script, false)} onOpenOrder={(orderId) => { setEditorOpen(false); navigate(`/admin/pedidos?orderId=${encodeURIComponent(orderId)}`); }} />}
     </section>
   );
 };

@@ -1,7 +1,10 @@
 import { logger } from '../lib/logger.js';
-import { collection, deleteDoc, doc, getDocs, serverTimestamp, setDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, serverTimestamp, setDoc, Timestamp, updateDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { answeredAtFor, cleanQuestion } from './creativeQuestions.js';
+import { answeredAtFor, cleanQuestion, normalizeStatus } from './creativeQuestions.js';
+import { CONTENT_SCRIPTS_COLLECTION } from './contentScriptsService';
+import { CAIXINHA_PROJECT_ID } from './scriptProjects.js';
+import type { ContentScript } from '../types';
 import type { CreativeQuestion, QuestionInput } from './creativeQuestions.js';
 
 /** Caixinha de Perguntas do Espaço Criativo (regras em firestore.rules › creativeQuestions). */
@@ -25,7 +28,7 @@ function mapQuestion(id: string, data: Record<string, unknown>): CreativeQuestio
     text: typeof data.text === 'string' ? data.text : '',
     category: typeof data.category === 'string' ? data.category : '',
     notes: typeof data.notes === 'string' ? data.notes : '',
-    status: (['draft', 'ready', 'answered', 'scripted'].includes(data.status as string) ? data.status : 'draft') as CreativeQuestion['status'],
+    status: normalizeStatus(data.status),
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
     answeredAt: toDate(data.answeredAt),
@@ -83,4 +86,40 @@ export async function deleteQuestion(id: string): Promise<void> {
   } catch (error) {
     fail(`excluir pergunta ${id}`, error);
   }
+}
+
+/**
+ * Envia a pergunta para a biblioteca de Roteiros: cria o roteiro (Rascunho, projeto da Caixinha) e vincula a pergunta
+ * no mesmo lote, então ou acontecem os dois ou nenhum (nunca roteiro duplicado nem pergunta sem vínculo).
+ */
+export async function sendQuestionToScripts(question: CreativeQuestion): Promise<{ question: CreativeQuestion; script: ContentScript }> {
+  if (!question.id || question.id.includes('/')) throw new Error('Pergunta inválida.');
+  if (question.scriptId) throw new Error('Esta pergunta já tem um roteiro.');
+  const store = firestore();
+  const scriptRef = doc(collection(store, CONTENT_SCRIPTS_COLLECTION));
+  const now = new Date();
+  const script = {
+    title: question.text.slice(0, 180),
+    content: `Pergunta da caixinha: ${question.text}`,
+    category: '',
+    notes: question.notes,
+    productionStatus: 'draft' as const,
+    publicationStatus: 'unpublished' as const,
+    projectId: CAIXINHA_PROJECT_ID,
+  };
+  // Já respondida continua em Respondidos; senão vai para Roteiro pronto.
+  const status = question.status === 'answered' ? 'answered' : 'scripted';
+  const answeredAt = answeredAtFor(status, question.answeredAt, now);
+  const batch = writeBatch(store);
+  batch.set(scriptRef, { ...script, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  batch.update(doc(store, CREATIVE_QUESTIONS_COLLECTION, question.id), { status, scriptId: scriptRef.id, answeredAt, updatedAt: serverTimestamp() });
+  try {
+    await batch.commit();
+  } catch (error) {
+    return fail(`enviar pergunta ${question.id} para Roteiros`, error);
+  }
+  return {
+    question: { ...question, status, scriptId: scriptRef.id, answeredAt, updatedAt: now },
+    script: { ...script, id: scriptRef.id, createdAt: now, updatedAt: now },
+  };
 }
