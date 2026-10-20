@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// Firebase Storage: só as fotos do Clarim Semanal (podem mostrar crianças). Privado: leitura e escrita só de
+// administradores (mesmo documento admins/{uid} das regras do Firestore); nada é público e não há link permanente.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAdmin() {
+      return request.auth != null
+        && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data.get('active', true) != false;
+    }
+
+    match /clarim/{editionId}/{pageId}/{fileName} {
+      allow read, delete: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.size < 15 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+  }
+}

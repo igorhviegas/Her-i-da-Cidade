@@ -137,6 +137,39 @@ service cloud.firestore {
         && d.updatedAt == request.time;
     }
 
+    // Clarim Semanal (services/clarim.js): edição semanal e suas páginas.
+    function validClarimEdition(d) {
+      return d.keys().hasOnly(['number', 'periodStart', 'periodEnd', 'status', 'publishedAt', 'createdAt', 'updatedAt'])
+        && d.keys().hasAll(['number', 'periodStart', 'periodEnd', 'status', 'publishedAt', 'createdAt', 'updatedAt'])
+        && d.number is int && d.number >= 1
+        && d.periodStart is string && d.periodStart.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.periodEnd is string && d.periodEnd.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.periodStart <= d.periodEnd
+        && d.status in ['draft', 'published']
+        && (d.publishedAt == null || d.publishedAt is timestamp)
+        && d.updatedAt == request.time;
+    }
+
+    function validClarimPage(d) {
+      return d.keys().hasOnly(['template', 'order', 'fields', 'photos', 'ads', 'sources', 'services', 'approval', 'createdAt', 'updatedAt'])
+        && d.keys().hasAll(['template', 'order', 'fields', 'photos', 'ads', 'sources', 'services', 'approval', 'createdAt', 'updatedAt'])
+        && d.template in ['cover', 'events', 'performance', 'news', 'classifieds']
+        && d.order is int && d.order >= 0
+        && d.fields is map && d.photos is map && d.ads is map
+        && d.sources is list && d.sources.size() <= 3
+        && d.services is list && d.services.size() <= 6
+        && d.updatedAt == request.time;
+    }
+
+    // Aprovação: sempre em nome de quem está logado e com a hora do servidor; regravar a mesma aprovação (salvar sem
+    // aprovar de novo) ou limpá-la também vale.
+    function validClarimApproval(next, prev) {
+      return next == null || next == prev
+        || (next is map && next.keys().hasOnly(['by', 'at', 'hash']) && next.keys().hasAll(['by', 'at', 'hash'])
+          && next.by == request.auth.uid && next.at == request.time
+          && next.hash is string && next.hash.size() > 0 && next.hash.size() <= 16);
+    }
+
     // Vínculo só com roteiro que existe (contentScripts); um vínculo já gravado não precisa existir de novo
     // (o roteiro pode ter sido excluído depois e a pergunta continua editável).
     function scriptExists(scriptId) {
@@ -308,6 +341,28 @@ service cloud.firestore {
     // Biblioteca interna de roteiros, acessível somente a administradores.
     match /contentScripts/{scriptId} {
       allow read, write: if isAdmin();
+    }
+
+    // Clarim Semanal (Espaço Criativo): só admin; data de criação e número da edição fixos; aprovação da página assinada
+    // pelo próprio usuário. As fotos ficam no Firebase Storage privado (storage.rules), nunca em URL pública.
+    match /clarimEditions/{editionId} {
+      allow read, delete: if isAdmin();
+      allow create: if isAdmin() && validClarimEdition(request.resource.data)
+        && request.resource.data.createdAt == request.time;
+      allow update: if isAdmin() && validClarimEdition(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.number == resource.data.number;
+
+      match /pages/{pageId} {
+        allow read, delete: if isAdmin();
+        allow create: if isAdmin() && validClarimPage(request.resource.data)
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.approval == null;
+        allow update: if isAdmin() && validClarimPage(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.template == resource.data.template
+          && validClarimApproval(request.resource.data.approval, resource.data.approval);
+      }
     }
 
     // Pergunta da Caixinha (Espaço Criativo): só admin; data de criação fixa; roteiro relacionado por id, sem cópia do conteúdo.

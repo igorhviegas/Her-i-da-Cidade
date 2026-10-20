@@ -1,6 +1,7 @@
 import type React from 'react';
-import { BookOpen, Lightbulb, MessageCircleQuestionMark, type LucideIcon } from 'lucide-react';
+import { BookOpen, Lightbulb, MessageCircleQuestionMark, Newspaper, type LucideIcon } from 'lucide-react';
 import { AdminScriptsPage } from '../AdminScriptsPage';
+import { AdminClarimPage } from '../clarim/AdminClarimPage';
 import { AdminQuestionsPage } from './AdminQuestionsPage';
 import type { AdminTab } from '../videoAdmin/dashboardTypes';
 
@@ -38,6 +39,14 @@ export const CREATIVE_TOOLS: CreativeTool[] = [
     description: 'Banco de perguntas para a caixinha dos Stories, do rascunho ao roteiro de resposta.',
     icon: MessageCircleQuestionMark,
     Page: AdminQuestionsPage,
+  },
+  {
+    id: 'clarim',
+    path: '/admin/espaco-criativo/clarim-semanal',
+    label: 'Clarim Semanal',
+    description: 'O jornal da semana nos Stories: páginas a partir de templates, aprovadas e baixadas uma a uma.',
+    icon: Newspaper,
+    Page: AdminClarimPage,
   },
 ];
 
