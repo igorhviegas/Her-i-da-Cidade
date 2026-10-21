@@ -189,7 +189,7 @@ export async function updateContentScript(id: string, input: ContentScriptInput)
     const becomesReady = fields.productionStatus === 'ready' && !current.data().readyAt;
     const refs = becomesReady ? activityRefs(firestore, 'script_ready', id) : null;
     const record = refs ? await prepareActivityLog(transaction, refs, { type: 'script_ready', refId: id, occurredAt: new Date(), difficultyKey: 'script_created' }) : null;
-    // Conteúdo publicado: evento permanente (2.000 XP) na 1ª vez que o roteiro vira Publicado (ID por roteiro, então republicar não paga de novo).
+    // Conteúdo publicado: evento permanente (20.000 XP) na 1ª vez que o roteiro vira Publicado (ID por roteiro, então republicar não paga de novo).
     // Roteiros já publicados na criação do baseline ficam em xpBaseline.counted.scripts e não pagam de novo (ver functions/xp.js).
     const becomesPublished = fields.publicationStatus === 'published' && current.data().publicationStatus !== 'published';
     const publishRefs = becomesPublished ? activityRefs(firestore, 'content_published', id) : null;

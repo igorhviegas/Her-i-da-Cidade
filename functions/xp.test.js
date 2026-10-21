@@ -24,9 +24,9 @@ test('levelInfo: nível 1 sem XP; fronteiras exatas; sem limite máximo', () => 
   assert.ok(Math.abs(info.left - (info.nextAt - info.xp)) < 1e-6);
 });
 
-test('XP por evento: pedido = valor × 10, missão/tarefa/roteiro pela dificuldade, meta pelo período, conteúdo 2.000', () => {
-  assert.equal(orderXp(75), 750);
-  assert.equal(xpOfEvent({ type: 'order_completed', meta: { value: 75 } }), 750);
+test('XP por evento: pedido = valor × 100, missão/tarefa/roteiro pela dificuldade, meta pelo período, conteúdo 20.000', () => {
+  assert.equal(orderXp(75), 7500);
+  assert.equal(xpOfEvent({ type: 'order_completed', meta: { value: 75 } }), 7500);
   assert.equal(xpOfEvent({ type: 'order_completed' }), 0);
   assert.equal(xpOfEvent({ type: 'mission', difficulty: 5 }), 1000);
   assert.equal(xpOfEvent({ type: 'task_occurrence', difficulty: 1 }), 100);
@@ -35,7 +35,7 @@ test('XP por evento: pedido = valor × 10, missão/tarefa/roteiro pela dificulda
   assert.equal(xpOfEvent({ type: 'goal_completed', meta: { period: 'weekly' } }), 1000);
   assert.equal(xpOfEvent({ type: 'goal_completed', meta: { period: 'daily' } }), 100);
   assert.equal(xpOfEvent({ type: 'goal_completed' }), 0);
-  assert.equal(xpOfEvent({ type: 'content_published' }), 2000);
+  assert.equal(xpOfEvent({ type: 'content_published' }), 20000);
   assert.equal(xpOfEvent({ type: 'instagram', xp: 42 }), 42);
 });
 
@@ -47,8 +47,8 @@ test('baseline: soma as categorias reais; pedidos internos e não concluídos fi
     missions: [{ difficulty: 3 }], occurrences: [{ difficulty: 1 }],
     goalCycles: [{ reached: true, period: 'weekly' }, { reached: false, period: 'monthly' }], goals: [{ completedAt: 1, period: 'daily' }], scriptDifficulty: 2,
   });
-  assert.deepEqual(baseline.categories.orders, { count: 2, xp: 750 + 700 });
-  assert.equal(baseline.categories.content.xp, 2000);
+  assert.deepEqual(baseline.categories.orders, { count: 2, xp: 7500 + 7000 });
+  assert.equal(baseline.categories.content.xp, 20000);
   assert.deepEqual(baseline.categories.views, { count: 100, xp: 100 });
   assert.deepEqual(baseline.categories.likes, { count: 15, xp: 30 });
   assert.deepEqual(baseline.categories.comments, { count: 2, xp: 6 });
@@ -69,11 +69,11 @@ test('total: sem baseline = null; eventos anteriores ao baseline e já contados 
     { type: 'mission', difficulty: 3, occurredAt: new Date('2026-10-09T00:00:00Z'), refId: 'm0' }, // antes: já no baseline
     { type: 'mission', difficulty: 3, occurredAt: new Date('2026-10-11T00:00:00Z'), refId: 'm1' }, // +500
     { type: 'order_completed', meta: { value: 50 }, occurredAt: new Date('2026-10-11T00:00:00Z'), refId: 'old' }, // pedido antigo reaberto: não paga de novo
-    { type: 'order_completed', meta: { value: 50 }, occurredAt: new Date('2026-10-11T00:00:00Z'), refId: 'new' }, // +500
+    { type: 'order_completed', meta: { value: 50 }, occurredAt: new Date('2026-10-11T00:00:00Z'), refId: 'new' }, // +5000
     { type: 'content_published', occurredAt: new Date('2026-10-11T00:00:00Z'), refId: 's1' }, // já no baseline
-    { type: 'content_published', occurredAt: { toDate: () => new Date('2026-10-12T00:00:00Z') }, refId: 's2' }, // +2000 (Timestamp)
+    { type: 'content_published', occurredAt: { toDate: () => new Date('2026-10-12T00:00:00Z') }, refId: 's2' }, // +20000 (Timestamp)
   ];
-  assert.deepEqual(totalXp(baseline, events), { baseline: 1000, events: 3000, total: 4000 });
+  assert.deepEqual(totalXp(baseline, events), { baseline: 1000, events: 25500, total: 26500 });
 });
 
 test('Instagram: só o que subiu conta; sincronizar de novo sem mudança não gera XP; 678.710 → 678.900 = +190 seguidores', () => {
@@ -96,9 +96,9 @@ test('Instagram: queda não tira XP, seguidor que cai e volta não paga duas vez
 test('aviso de ganho: XP e valores reais do Financeiro; Instagram, eventos antigos e já contados não avisam', () => {
   const baseline = { at: new Date('2026-10-10T12:00:00Z'), total: 0, counted: { orders: ['old'] } };
   const after = new Date('2026-10-11T00:00:00Z');
-  assert.deepEqual(eventReward(baseline, { type: 'order_completed', refId: 'a', occurredAt: after, meta: { value: 60, revenue: 60, cost: 25 } }), { xp: 600, revenue: 60, cost: 25 });
+  assert.deepEqual(eventReward(baseline, { type: 'order_completed', refId: 'a', occurredAt: after, meta: { value: 60, revenue: 60, cost: 25 } }), { xp: 6000, revenue: 60, cost: 25 });
   assert.deepEqual(eventReward(baseline, { type: 'mission', refId: 'm', occurredAt: after, difficulty: 2 }), { xp: 250, revenue: 0, cost: 0 }); // missão não mexe no Financeiro
-  assert.deepEqual(eventReward(baseline, { type: 'order_completed', refId: 'b', occurredAt: after, meta: { value: 300, revenue: 150, cost: 40 } }), { xp: 3000, revenue: 150, cost: 40 }); // evento: só a 2ª parcela e a despesa
+  assert.deepEqual(eventReward(baseline, { type: 'order_completed', refId: 'b', occurredAt: after, meta: { value: 300, revenue: 150, cost: 40 } }), { xp: 30000, revenue: 150, cost: 40 }); // evento: só a 2ª parcela e a despesa
   assert.equal(eventReward(baseline, { type: 'instagram', refId: 'd', occurredAt: after, xp: 999 }), null);
   assert.equal(eventReward(baseline, { type: 'order_completed', refId: 'old', occurredAt: after, meta: { value: 60 } }), null);
   assert.equal(eventReward(baseline, { type: 'mission', refId: 'm0', occurredAt: new Date('2026-10-09T00:00:00Z'), difficulty: 2 }), null);
