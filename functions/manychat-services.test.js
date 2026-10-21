@@ -155,7 +155,7 @@ test('recusa do webhook fica registrada em systemStatus/manychat (só o fim do W
   assert.equal(writes.length, 1);
   assert.equal(writes[0].id, 'manychat');
   assert.equal(writes[0].value.ok, false);
-  assert.match(writes[0].value.detail, /^validation_error \(custom-video, WhatsApp final 0000\): .*amountPaid/);
+  assert.match(writes[0].value.detail, /^validation_error \(custom-video, WhatsApp "\+•• •• •••••-0000"\):.*amountPaid/);
   assert.ok(!writes[0].value.detail.includes('99999'), 'número completo não é guardado');
   await post(base('custom-video', { modality: '7_days' }), database);
   assert.equal(writes.length, 2);
