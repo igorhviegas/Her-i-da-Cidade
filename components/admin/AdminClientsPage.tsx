@@ -3,6 +3,7 @@ import { AlertCircle, ArrowLeft, CalendarDays, Search, Users } from 'lucide-reac
 import { listClients } from '../../services/clientsService';
 import { listOrders } from '../../services/ordersService';
 import { formatOrderReference } from '../../services/orderReference.js';
+import { orderPaidAmount } from '../../services/eventFinance.js';
 import { getServiceById } from '../../services/servicesService';
 import type { Client, Order, OrderStatus } from '../../types';
 import { useRouter } from '../../lib/router';
@@ -24,9 +25,6 @@ function money(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
-function validPaidAmount(order: Order): number | null {
-  return asDate(order.paidAt) && Number.isFinite(order.totalPaid) && order.totalPaid >= 0 ? order.totalPaid : null;
-}
 
 function compareClientNames(a: Client, b: Client): number {
   return a.name.localeCompare(b.name, 'pt-BR') || a.id.localeCompare(b.id);
@@ -78,7 +76,7 @@ export const AdminClientsPage: React.FC = () => {
     const ordered = [...clientOrders].sort((a, b) => (asDate(b.createdAt)?.getTime() ?? 0) - (asDate(a.createdAt)?.getTime() ?? 0) || a.id.localeCompare(b.id));
     const paidAmounts = clientOrders.map((order) => {
       const status = String(order.status).toLowerCase();
-      return ['cancelled', 'canceled', 'cancelado', 'cancelada'].includes(status) ? null : validPaidAmount(order);
+      return ['cancelled', 'canceled', 'cancelado', 'cancelada'].includes(status) ? null : orderPaidAmount(order);
     });
     const spent = paidAmounts.reduce<number>((sum, amount) => sum + (amount ?? 0), 0);
     return { client, orders: ordered, spent, lastOrder: asDate(ordered[0]?.createdAt) };
@@ -120,7 +118,7 @@ export const AdminClientsPage: React.FC = () => {
               <div className="divide-y divide-white/5">
                 {selected.orders.map((order) => <button key={order.id} type="button" onClick={() => navigate(`/admin/pedidos?orderId=${encodeURIComponent(order.id)}`)} className="grid grid-cols-1 w-full gap-2 px-5 py-4 text-left transition-colors hover:bg-white/[0.03] sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <span className="min-w-0"><span className="block truncate text-sm font-semibold text-white"><span className="mr-2 text-white/40">{formatOrderReference(order, orders)}</span>{serviceNames.get(order.serviceId) || `Serviço indisponível (${order.serviceId})`}</span><span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/45"><span>Pedido: {formatDate(order.createdAt)}</span>{order.paidAt && <span>Pago: {formatDate(order.paidAt)}</span>}{order.customerDueDate && <span>Prazo: {formatDate(order.customerDueDate)}</span>}</span></span>
-                  <span className="flex items-center justify-between gap-4 sm:justify-end"><span className="text-sm font-bold text-emerald-300">{validPaidAmount(order) !== null ? money(validPaidAmount(order)) : 'Pago não registrado'}</span><span className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-white/65">{statusNames[order.status] || order.status}</span></span>
+                  <span className="flex items-center justify-between gap-4 sm:justify-end"><span className="text-sm font-bold text-emerald-300">{orderPaidAmount(order) !== null ? money(orderPaidAmount(order)) : 'Pago não registrado'}</span><span className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-white/65">{statusNames[order.status] || order.status}</span></span>
                 </button>)}
               </div>
             )}

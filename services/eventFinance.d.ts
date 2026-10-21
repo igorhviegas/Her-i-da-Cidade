@@ -15,3 +15,4 @@ export function planEntry(orderId: string, order: unknown, date: unknown): Ledge
 export function planCompletion(orderId: string, order: unknown, booked: { bookedRevenue?: number; final?: boolean; cost?: boolean }, date: unknown): LedgerRecord[];
 export function planAdjustments(orderId: string, order: unknown, form: { totalValue?: number; entryValue?: number; cost?: number | null }, date: unknown): { records: LedgerRecord[]; next: EventLedger | undefined };
 export function ledgerToOrders(docs: Array<LedgerRecord & { id: string }>): any[];
+export function orderPaidAmount(order: { eventLedger?: EventLedger; eventForm?: unknown; paidAt?: unknown; status?: string; totalPaid?: number } | null | undefined): number | null;
