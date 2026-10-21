@@ -446,7 +446,7 @@ export async function updateOrder(id: string, updates: UpdateOrderInput): Promis
       })
       : null;
 
-    // Roteiro que passa a Publicado com a conclusão do pedido: evento permanente (2.000 XP), uma vez por roteiro.
+    // Roteiro que passa a Publicado com a conclusão do pedido: evento permanente (20.000 XP), uma vez por roteiro.
     const publishRefs = linkedScriptRef && linkedScript && linkedScript.publicationStatus !== 'published' ? activityRefs(firestore, 'content_published', linkedScriptRef.id) : null;
     const publishRecord = publishRefs && linkedScriptRef
       ? await prepareActivityLog(transaction, publishRefs, { type: 'content_published', refId: linkedScriptRef.id, occurredAt: updates.completedAt instanceof Date ? updates.completedAt : new Date(), meta: { orderId: id } })

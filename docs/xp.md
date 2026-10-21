@@ -5,8 +5,8 @@ O avatar do topo abre `/admin/perfil` ("Ficha do Herói"): nome de exibição (F
 ## Regras (`functions/xp.js`)
 | Origem | XP |
 |---|---|
-| Pedido concluído | valor do pedido (`totalPaid`) × 10; pedido interno de roteiro vale 0 |
-| Conteúdo publicado (`contentScripts.publicationStatus = published`) | 2.000 |
+| Pedido concluído | valor do pedido (`totalPaid`) × 100; pedido interno de roteiro vale 0 |
+| Conteúdo publicado (`contentScripts.publicationStatus = published`) | 20.000 |
 | Instagram | visualização 1, curtida 2, comentário 3, seguidor 10 |
 | Missão, tarefa e roteiro pronto | pela dificuldade: 1=100, 2=250, 3=500, 4=750, 5=1.000 |
 | Meta atingida | mensal 5.000, semanal 1.000, diária 100 |

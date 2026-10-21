@@ -6,14 +6,14 @@
 
 export const BASELINE_PATH = ['xpBaseline', 'main'];
 
-export const ORDER_XP_PER_REAL = 10;
-export const CONTENT_PUBLISHED_XP = 2000;
+export const ORDER_XP_PER_REAL = 100;
+export const CONTENT_PUBLISHED_XP = 20000;
 export const DIFFICULTY_XP = { 1: 100, 2: 250, 3: 500, 4: 750, 5: 1000 };
 export const GOAL_XP = { monthly: 5000, weekly: 1000, daily: 100 };
 export const INSTAGRAM_XP = { views: 1, likes: 2, comments: 3, followers: 10 };
 
 // ---- Fit (docs/fit.md): o XP é calculado UMA vez, na hora de coletar, e gravado no evento (campo `xp`); mudar um peso depois não reescreve o histórico ----
-// Calibrado com as missões (100–1.000 XP) e os pedidos (R$ × 10): 8.000 passos = 800 XP, 20 km de bike = 1.000 XP, um treino = uma missão média.
+// Calibrado com as missões (100–1.000 XP) e os pedidos (antes R$ × 10, hoje × 100): 8.000 passos = 800 XP, 20 km de bike = 1.000 XP, um treino = uma missão média.
 export const FIT_XP = { stepsPerXp: 10, stepsDailyCap: 20000, kmCycled: 50, checkin: 500 };
 export const FIT_EVENT_TYPES = ['fit_ride', 'fit_steps', 'fit_checkin'];
 
@@ -45,7 +45,7 @@ export const rideXp = (distanceKm) => Math.floor(finiteOr0(distanceKm) * FIT_XP.
 /** Check-in de academia ou funcional (um por tipo e dia). */
 export const checkinXp = () => FIT_XP.checkin;
 
-/** Pedido: valor do pedido (totalPaid, o mesmo do Financeiro) × 10. Pedido interno de roteiro vale 0. */
+/** Pedido: valor do pedido (totalPaid, o mesmo do Financeiro) × 100. Pedido interno de roteiro vale 0. */
 export const orderXp = (value) => Math.round(finiteOr0(value) * ORDER_XP_PER_REAL);
 
 export function xpOfEvent(event) {
