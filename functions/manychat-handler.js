@@ -238,8 +238,9 @@ function buildOrderContent(input) {
  * um pagamento recusado só seria notado quando o cliente reclamasse). Melhor esforço; guarda só o fim do WhatsApp.
  */
 async function recordWebhook(database, input, rejection) {
-  const tail = String(input?.customer?.whatsapp ?? '').replace(/\D/g, '').slice(-4);
-  const detail = rejection ? `${rejection.code} (${input?.service ?? 'birthday-video'}, WhatsApp final ${tail || '?'}): ${rejection.message}`.slice(0, 400) : null;
+  // Formato como chegou, com os dígitos escondidos menos os 4 últimos: mostra "+", DDD/zero extra e quantidade de dígitos sem expor o número.
+  const masked = String(input?.customer?.whatsapp ?? '').trim().slice(0, 30).replace(/\d(?=(?:\D*\d){4})/g, '•');
+  const detail = rejection ? `${rejection.code} (${input?.service ?? 'birthday-video'}, WhatsApp "${masked || '?'}"): ${rejection.message}`.slice(0, 400) : null;
   await recordRun(database, 'manychat', { ok: !rejection, detail });
 }
 
