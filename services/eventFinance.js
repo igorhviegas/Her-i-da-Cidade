@@ -103,3 +103,16 @@ export function ledgerToOrders(docs) {
       ...(d.type === 'expense' ? { eventCost: d.amount } : { totalPaid: d.amount }),
     }));
 }
+
+/**
+ * Valor já recebido de um pedido (CRM de clientes) ou null se nada foi registrado.
+ * Evento com livro: entrada + 2ª parcela + ajustes (o mesmo que o Financeiro soma). Evento antigo sem livro e concluído: totalPaid.
+ * Demais pedidos: totalPaid quando há data de pagamento (paidAt).
+ */
+export function orderPaidAmount(order) {
+  const ledger = order?.eventLedger;
+  if (ledger && Number.isFinite(ledger.entry)) return roundMoney(ledger.entry + (ledger.final ?? 0) + (ledger.adj ?? 0));
+  const paid = Number.isFinite(order?.totalPaid) && order.totalPaid >= 0 ? order.totalPaid : null;
+  if (order?.eventForm && !order.paidAt) return order.status === 'completed' ? paid : null;
+  return order?.paidAt ? paid : null;
+}

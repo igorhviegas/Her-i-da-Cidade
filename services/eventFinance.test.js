@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { EventFinanceError, ledgerId, ledgerToOrders, planCompletion, planEntry } from './eventFinance.js';
+import { EventFinanceError, ledgerId, ledgerToOrders, orderPaidAmount, planCompletion, planEntry } from './eventFinance.js';
 import { buildRevenueEntries, buildStatement, eventCostForMonth, monthTotals } from './financeCalculations.js';
 
 const order = (over = {}) => ({
@@ -151,4 +151,13 @@ test('ledgerIdsFor lista entrada, 2ª parcela, custo e todos os ajustes do pedid
   assert.deepEqual(ledgerIdsFor('o1', { entry: 1 }), ['evt-o1-entry', 'evt-o1-final', 'evt-o1-cost']);
   assert.deepEqual(ledgerIdsFor('o1', { entry: 1, seq: 2 }), ['evt-o1-entry', 'evt-o1-final', 'evt-o1-cost', 'evt-o1-adjrev-1', 'evt-o1-adjcost-1', 'evt-o1-adjrev-2', 'evt-o1-adjcost-2']);
   assert.equal(ledgerId('o1', 'adjrev', 3), 'evt-o1-adjrev-3');
+});
+
+test('orderPaidAmount: evento soma o livro; sem livro só conta concluído; comum exige paidAt', () => {
+  assert.equal(orderPaidAmount({ eventForm: {}, eventLedger: { entry: 500 }, totalPaid: 1000 }), 500);
+  assert.equal(orderPaidAmount({ eventForm: {}, eventLedger: { entry: 500, final: 500, adj: -50 }, totalPaid: 950 }), 950);
+  assert.equal(orderPaidAmount({ eventForm: {}, status: 'completed', totalPaid: 800 }), 800);
+  assert.equal(orderPaidAmount({ eventForm: {}, status: 'scheduled', totalPaid: 800 }), null);
+  assert.equal(orderPaidAmount({ paidAt: day('2026-10-01'), totalPaid: 120 }), 120);
+  assert.equal(orderPaidAmount({ status: 'completed', totalPaid: 120 }), null);
 });
