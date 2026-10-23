@@ -10,6 +10,7 @@ import {
   serverTimestamp
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import { normalizeMessages, type AgentMessages } from "./eventSchedule.js";
 import { PublicSiteConfig } from "../types";
 import { isValidWhatsAppUrl } from "./serviceWhatsApp.js";
 import { VIDEO_CALL_CONFIG_PATH, normalizeVideoCallConfig, type VideoCallConfig } from "../functions/video-call-config.js";
@@ -306,4 +307,15 @@ export async function getEventFormNextNumber(): Promise<number | null> {
 export async function saveEventFormNextNumber(next: number): Promise<void> {
   if (!db) throw new Error("Firebase Firestore não inicializado.");
   await setDoc(doc(db, SITE_CONFIG_COLLECTION, "eventFormCounter"), { next, updatedAt: serverTimestamp() });
+}
+
+/** Mensagens "chegamos" para as esposas (Admin → Agente → Mensagens). O servidor lê o mesmo documento para a área do agente. */
+export async function getAgentMessages(): Promise<AgentMessages> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  return normalizeMessages((await getDoc(doc(db, SITE_CONFIG_COLLECTION, "agentMessages"))).data());
+}
+
+export async function saveAgentMessages(messages: AgentMessages): Promise<void> {
+  if (!db) throw new Error("Firebase Firestore não inicializado.");
+  await setDoc(doc(db, SITE_CONFIG_COLLECTION, "agentMessages"), { ...normalizeMessages(messages), updatedAt: serverTimestamp() });
 }

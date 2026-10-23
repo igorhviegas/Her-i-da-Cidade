@@ -36,13 +36,23 @@ export function planDay(stops, legs, buffers = DEFAULT_BUFFERS) {
   return { rows, homeAt, vitorAt, feasible: rows.every((r) => r.ok) };
 }
 
-/** Mensagem para a esposa: chegamos ao evento e a previsão de chegada em casa depois de todos. `arrivalAt` = minutos de chegada em casa. */
-export function arrivalMessage({ venueLabel, arrivalAt, now }) {
-  return [
-    `Oi, amor! Já chegamos${venueLabel ? ` no evento (${venueLabel})` : ' no evento'}${now !== undefined ? ` às ${formatTime(now)}` : ''}. 🕷️`,
-    `Previsão de chegada em casa depois de todos os eventos: ~${formatTime(arrivalAt)}.`,
-    'Se mudar alguma coisa eu te aviso!',
-  ].join('\n');
+/** Mensagens "chegamos" (editáveis em Admin → Agente → Mensagens): `self` = do dono, `vitor` = do Vitor. Variáveis: {evento} {hora} {previsao}. */
+export const DEFAULT_MESSAGES = {
+  self: 'Oi, amor! Já chegamos no evento ({evento}), às {hora}. 🕷️\nPrevisão de chegada em casa depois de todos os eventos: ~{previsao}.\nSe mudar alguma coisa eu te aviso!',
+  vitor: 'Oi, amor! Já chegamos no evento ({evento}), às {hora}. 🕷️\nPrevisão de chegada em casa depois de todos os eventos: ~{previsao}.\nSe mudar alguma coisa eu te aviso!',
+};
+export const MESSAGE_VARIABLES = ['{evento}', '{hora}', '{previsao}'];
+export const MAX_MESSAGE_LENGTH = 1000;
+
+/** Documento salvo -> { self, vitor } (texto vazio ou inválido volta ao padrão). */
+export function normalizeMessages(data) {
+  const pick = (value, fallback) => (typeof value === 'string' && value.trim() ? value.slice(0, MAX_MESSAGE_LENGTH) : fallback);
+  return { self: pick(data?.self, DEFAULT_MESSAGES.self), vitor: pick(data?.vitor, DEFAULT_MESSAGES.vitor) };
+}
+
+/** Troca as variáveis do modelo pelos valores (variável desconhecida fica como foi escrita). */
+export function renderMessage(template, values) {
+  return String(template).replace(/{(evento|hora|previsao)}/g, (_, key) => values[key] ?? '');
 }
 
 /** Duração padrão (min) do evento por pacote na conta de horários; o dono pode trocar na tela. */

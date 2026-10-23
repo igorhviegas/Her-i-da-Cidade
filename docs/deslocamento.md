@@ -165,3 +165,8 @@ $env:GOOGLE_MAPS_API_KEY = "..."; $env:TRAVEL_ACCESS_CODE = "..."; $env:TRAVEL_S
 ## Trocar o código ou os endereços depois
 
 Altere a variável na Vercel e faça um **Redeploy**. Se trocar o código, o aparelho do agente receberá "Código de acesso inválido" e pedirá o novo.
+
+## Mensagens para as esposas (editáveis)
+
+Admin → **Agente** → aba **Mensagens**: dois modelos (o seu e o do Vitor) com as variáveis `{evento}`, `{hora}` e `{previsao}` e prévia. Ficam em `siteConfig/agentMessages` (já coberto pelas regras de administrador);
+o servidor lê o documento no `home-eta` e entrega o texto à tela Chegada em casa. Sem documento ou campo vazio, vale o texto padrão (`DEFAULT_MESSAGES` em `services/eventSchedule.js`).
