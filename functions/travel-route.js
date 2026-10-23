@@ -104,12 +104,12 @@ export async function geocodeAddress(address, { apiKey, fetchImpl = fetch, label
   return { formatted: result.formatted_address ?? '', lat: location.lat, lng: location.lng, placeId: result.place_id ?? '', precise, city };
 }
 
-/** Distância (metros) de cada trecho de uma rota por `points` ({lat,lng}), em uma única chamada. Mantém a ordem recebida. */
-export async function computeLegsMeters(points, { apiKey, fetchImpl = fetch }) {
+/** Distância (metros) e duração (segundos) de cada trecho de uma rota por `points` ({lat,lng}), em uma única chamada. Mantém a ordem recebida. */
+export async function computeLegs(points, { apiKey, fetchImpl = fetch }) {
   const waypoint = (p) => ({ location: { latLng: { latitude: p.lat, longitude: p.lng } } });
   const { response, body } = await request(fetchImpl, ROUTES_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey, 'X-Goog-FieldMask': 'routes.legs.distanceMeters' },
+    headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey, 'X-Goog-FieldMask': 'routes.legs.distanceMeters,routes.legs.duration' },
     body: JSON.stringify({
       origin: waypoint(points[0]),
       destination: waypoint(points[points.length - 1]),
@@ -123,7 +123,43 @@ export async function computeLegsMeters(points, { apiKey, fetchImpl = fetch }) {
   const legs = body?.routes?.[0]?.legs;
   if (!Array.isArray(legs) || legs.length === 0) throw new TravelRouteError('no_route');
   if (legs.length !== points.length - 1) throw new TravelRouteError('api_error', { detail: 'legs' });
-  return legs.map((leg) => Number(leg.distanceMeters ?? 0)); // campo ausente = 0 m (trecho entre pontos muito próximos)
+  // Campo ausente = 0 (trecho entre pontos muito próximos); a duração vem como "1234s".
+  return legs.map((leg) => ({ meters: Number(leg.distanceMeters ?? 0), seconds: parseInt(String(leg.duration ?? '0'), 10) || 0 }));
+}
+
+export async function computeLegsMeters(points, opts) {
+  return (await computeLegs(points, opts)).map((leg) => leg.meters);
+}
+
+/**
+ * Minutos e km de cada trecho de `casa → paradas… → casa [→ casa do Vitor]` (uma rota, sem trânsito em tempo real).
+ * `stops` = [{label, address}] na ordem; `vitor` = endereço da casa do Vitor ou ''. `legs` tem um trecho por seta
+ * (paradas + 1 até voltar para casa, mais um se houver Vitor); `resolved` é o endereço que o Google entendeu em cada parada.
+ */
+export async function routeTimes({ home, vitor = '', stops, apiKey, fetchImpl = fetch }) {
+  const creds = { apiKey, fetchImpl };
+  const withVitor = !!vitor && vitor !== home;
+  const sequence = [{ label: 'sua casa', address: home }, ...stops, { label: 'sua casa', address: home }];
+  if (withVitor) sequence.push({ label: 'casa do Vitor', address: vitor });
+  const firstUse = new Map();
+  sequence.forEach((p) => { if (!firstUse.has(p.address)) firstUse.set(p.address, p.label); });
+  const places = new Map();
+  await Promise.all([...firstUse].map(async ([address, label]) => { places.set(address, await geocodeAddress(address, { ...creds, label })); }));
+  // Pontos consecutivos no mesmo lugar não vão para a rota: o trecho vale 0.
+  const route = [places.get(sequence[0].address)];
+  const routeLegOf = [];
+  for (let i = 1; i < sequence.length; i += 1) {
+    const previous = route[route.length - 1];
+    const current = places.get(sequence[i].address);
+    if (previous.lat !== current.lat || previous.lng !== current.lng) { route.push(current); routeLegOf[i - 1] = route.length - 2; }
+  }
+  const measured = route.length > 1 ? await computeLegs(route, creds) : [];
+  const legs = sequence.slice(1).map((_, i) => {
+    const leg = routeLegOf[i] === undefined ? null : measured[routeLegOf[i]];
+    return { minutes: Math.ceil((leg?.seconds ?? 0) / 60), km: metersToKm(leg?.meters ?? 0) };
+  });
+  const resolved = stops.map((stop) => { const place = places.get(stop.address); return { label: stop.label, address: place.formatted, precise: place.precise }; });
+  return { legs, resolved, withVitor };
 }
 
 /**
@@ -194,4 +230,21 @@ export async function listDayEvents({ date, listOrdersBetween }) {
     .filter((order) => orderEventSlot(order)?.key === date && String(order.eventForm.location ?? '').trim())
     .map((order) => ({ time: order.eventForm.eventTime, location: String(order.eventForm.location).trim().replace(/\s+/g, ' '), formType: String(order.eventForm.formType ?? '').trim() }))
     .sort((a, b) => a.time.localeCompare(b.time) || a.location.localeCompare(b.location));
+}
+
+/**
+ * Horários do dia para a previsão de chegada em casa (área do agente): eventos do dia + minutos de cada trecho
+ * casa → eventos → casa → casa do Vitor. A "casa" é a parada padrão (TRAVEL_STOP_ADDRESS) e a do Vitor, a partida padrão.
+ * Devolve só horário, rótulo e minutos; nenhum endereço.
+ */
+export async function dayEta({ date, config, listOrdersBetween, fetchImpl = fetch }) {
+  const events = await listDayEvents({ date, listOrdersBetween });
+  if (events.length === 0) return { events: [], legs: [], withVitor: false };
+  const home = (config.defaults.stop ?? config.defaults.start).address;
+  const vitor = config.defaults.stop ? config.defaults.start.address : '';
+  const { legs, withVitor } = await routeTimes({
+    home, vitor, apiKey: config.apiKey, fetchImpl,
+    stops: events.slice(0, 8).map((e, i) => ({ label: `Evento ${i + 1}`, address: e.location })),
+  });
+  return { events: events.slice(0, 8).map((e) => ({ time: e.time, formType: e.formType })), legs, withVitor };
 }

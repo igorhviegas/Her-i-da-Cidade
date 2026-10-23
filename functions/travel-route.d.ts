@@ -10,6 +10,9 @@ export interface TravelConfig {
 export function readTravelConfig(env?: Record<string, string | undefined>): TravelConfig | null;
 export function codeMatches(provided: unknown, expected: string): boolean;
 export function geocodeAddress(address: string, opts: { apiKey: string; fetchImpl?: typeof fetch; label?: string }): Promise<{ formatted: string; lat: number; lng: number; placeId: string; precise: boolean }>;
+export function computeLegs(points: { lat: number; lng: number }[], opts: { apiKey: string; fetchImpl?: typeof fetch }): Promise<{ meters: number; seconds: number }[]>;
+export interface RouteTimes { legs: { minutes: number; km: number }[]; resolved: { label: string; address: string; precise: boolean }[]; withVitor: boolean }
+export function routeTimes(opts: { home: string; vitor?: string; stops: { label: string; address: string }[]; apiKey: string; fetchImpl?: typeof fetch }): Promise<RouteTimes>;
 export function computeLegsMeters(points: { lat: number; lng: number }[], opts: { apiKey: string; fetchImpl?: typeof fetch }): Promise<number[]>;
 export interface TravelDayResult extends TravelDayKm {
   /** Endereço entendido pelo Google para cada ponto digitado pelo agente neste dia. */
@@ -28,3 +31,6 @@ export function calculateTravel(opts: { input: TravelInput; config: TravelConfig
 
 export interface TravelDayEvent { time: string; location: string; formType: string }
 export function listDayEvents(opts: { date: string; listOrdersBetween: (start: Date, end: Date) => Promise<unknown[]> }): Promise<TravelDayEvent[]>;
+
+export interface DayEta { events: { time: string; formType: string }[]; legs: { minutes: number; km: number }[]; withVitor: boolean }
+export function dayEta(opts: { date: string; config: TravelConfig; listOrdersBetween: (start: Date, end: Date) => Promise<unknown[]>; fetchImpl?: typeof fetch }): Promise<DayEta>;

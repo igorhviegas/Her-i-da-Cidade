@@ -15,7 +15,7 @@ import { randomBytes } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { calendarEventId, deleteCalendarEvent, eventDateKey, syncOrderToCalendar } from './google-calendar.js';
 import { SERVICE_PROFILES, bookingKey, evaluateService } from './manychat-handler.js';
-import { TravelRouteError, computeLegsMeters, geocodeAddress } from './travel-route.js';
+import { TravelRouteError, computeLegsMeters, geocodeAddress, routeTimes } from './travel-route.js';
 import { bookingWhatsAppUrl, normalizePhone } from './video-call.js';
 import { zonedInstant } from './video-call-time.js';
 import { computeQuote, normalizeQuoteConfig, packageById } from '../services/eventQuote.js';
@@ -270,6 +270,20 @@ export async function calculateQuote({ database, input, env = process.env, fetch
   const quote = computeQuote({ packageId: input.packageId, km: meters / 1000, date: input.date, city: place.city, companyBase: input.companyBase }, config);
   if (quote.error) throw new EventFormError('validation_error', quote.error);
   return { quote, address: { formatted: place.formatted, precise: place.precise, city: place.city } };
+}
+
+/**
+ * Viabilidade do dia: minutos de cada trecho casa → eventos (na ordem recebida) → casa → casa do Vitor (TRAVEL_START_ADDRESS).
+ * `input.stops` = [{label, address}] (até 8). Os endereços das casas nunca saem do servidor.
+ */
+export async function calculateSchedule({ input, env = process.env, fetchImpl = fetch }) {
+  const apiKey = String(env.GOOGLE_MAPS_API_KEY ?? '').trim();
+  const home = quoteOrigin(env);
+  if (!apiKey || !home) throw new TravelRouteError('not_configured');
+  const stops = (Array.isArray(input?.stops) ? input.stops : []).slice(0, 8)
+    .map((s) => ({ label: String(s?.label ?? 'evento').slice(0, 80), address: typeof s?.address === 'string' ? s.address.trim().slice(0, 300) : '' }));
+  if (stops.length === 0 || stops.some((s) => s.address.length < 5)) throw new EventFormError('validation_error', 'Todos os eventos precisam de endereço.');
+  return routeTimes({ home, vitor: String(env.TRAVEL_START_ADDRESS ?? '').trim(), stops, apiKey, fetchImpl });
 }
 
 /** Guarda o orçamento enviado e devolve o ID do link (?orcamento=ID). O valor pode ter sido ajustado à mão pelo dono. */

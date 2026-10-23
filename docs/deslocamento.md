@@ -34,6 +34,20 @@ deles para um dia específico sem alterar o padrão.
 - Nada é gravado no Firestore. O rascunho (código, dias, eventos, valores) fica no `localStorage` do aparelho (`hdc.agente.deslocamento.v1`); "Novo cálculo" limpa os dias e eventos.
 - O Google pode sugerir um trajeto diferente do aplicativo do agente; a tela avisa e mostra todos os trechos usados.
 
+## Viabilidade de horários e chegada em casa
+
+Usa os mesmos endereços: **sua casa** = `QUOTE_ORIGIN_ADDRESS` (ou `TRAVEL_STOP_ADDRESS`) e **casa do Vitor** = `TRAVEL_START_ADDRESS`. Tempos do Google sem trânsito em tempo real.
+Regra (editável na tela): 1º evento = sair de casa `trajeto + 35 min` antes; evento seguinte = fim do anterior `+ 10 min` (organizar o carro) `+ trajeto + 30 min` ≤ início;
+chegada em casa = fim do último `+ 10 min + trajeto`; Vitor = isso `+` trajeto da sua casa até a dele.
+
+- **Calendário → Orçamentos** (admin): ao escolher a data e digitar o endereço, o bloco "Dá para encaixar neste dia?" lista os compromissos da agenda **com endereço e horário**
+  (desmarque os que não são eventos), recebe início/fim do novo evento e mostra, por evento, a hora de sair, a folga ou o que falta, e a previsão de chegada em casa (sua e do Vitor).
+  Endpoint: `POST /api/event-form` `{ action: 'schedule', stops }` (administrador).
+- **Área do agente → Chegada em casa:** calcula com os eventos de **hoje** cadastrados no CRM (cada um conta 1 hora, como na Agenda), escolhe em qual evento chegamos e abre o WhatsApp com a mensagem
+  "já chegamos + previsão de chegada em casa": um botão para a esposa do Vitor (horário do Vitor) e outro para a sua (sem número: você escolhe o contato).
+  Endpoint: `POST /api/travel-route` `{ action: 'home-eta', date }` (código de acesso); devolve só horários e minutos, nunca endereços.
+- Regras puras e teste: `services/eventSchedule.js`, `services/eventSchedule.test.js`.
+
 ## Segurança
 
 - `POST /api/travel-route` é público, mas exige o **código de acesso** no header `x-travel-code` (comparação em tempo constante).

@@ -25,6 +25,11 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
 export const calculateEventQuote = (input: { address: string; date: string; packageId: string; companyBase?: string }) =>
   call<QuoteCalculation>({ action: 'quote', ...input });
 
+export interface ScheduleLegs { legs: { minutes: number; km: number }[]; resolved: { label: string; address: string; precise: boolean }[]; withVitor: boolean }
+
+/** Minutos de cada trecho casa → eventos (na ordem) → casa → casa do Vitor, para a viabilidade do dia. */
+export const calculateSchedule = (stops: { label: string; address: string }[]) => call<ScheduleLegs>({ action: 'schedule', stops });
+
 /** Guarda o orçamento e devolve o ID usado no link do formulário (?orcamento=ID). */
 export const saveEventQuote = async (input: { packageId: string; date: string; location: string; total: number; km: number; city: string }) =>
   (await call<{ id: string }>({ action: 'save-quote', ...input })).id;

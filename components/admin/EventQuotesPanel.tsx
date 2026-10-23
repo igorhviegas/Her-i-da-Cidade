@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Calculator, ChevronLeft, ChevronRight, Copy, Loader2, MessageCircle, Save, Settings2 } from 'lucide-react';
 import { dateKey } from '../../functions/missions-core.js';
 import { daysBetween, eventsOnDay, shiftDate, visibleRange } from '../../services/calendarEvents.js';
-import { useCalendarEvents } from '../../services/calendarService';
+import { useCalendarEvents, type CalendarEvent } from '../../services/calendarService';
+import { EventScheduleCheck } from './EventScheduleCheck';
 import { DEFAULT_QUOTE_CONFIG, PACKAGES, formatBrl, quoteMessage, type QuoteConfig } from '../../services/eventQuote.js';
 import { FORM_PATH } from '../../services/eventSiteForm.js';
 import { calculateEventQuote, saveEventQuote, type QuoteCalculation } from '../../services/eventQuoteService';
@@ -76,12 +77,13 @@ export const EventQuotesPanel: React.FC = () => {
       </div>
       {state.status === 'error' && <p className="text-xs text-amber-200">Agenda indisponível agora ({state.message}); o orçamento funciona mesmo assim.</p>}
 
-      {config && <DayQuote key={selected} date={selected} config={config} packages={packages} onSaveConfig={persist} busy={eventsOnDay(events, selected).map((e) => `${e.startTime ?? 'dia todo'} · ${e.title}`)} />}
+      {config && <DayQuote key={selected} date={selected} config={config} packages={packages} onSaveConfig={persist} dayEvents={eventsOnDay(events, selected)} />}
     </div>
   );
 };
 
-const DayQuote: React.FC<{ date: string; config: QuoteConfig; packages: EventPackage[]; busy: string[]; onSaveConfig: (next: QuoteConfig) => Promise<void> }> = ({ date, config, packages, busy, onSaveConfig }) => {
+const DayQuote: React.FC<{ date: string; config: QuoteConfig; packages: EventPackage[]; dayEvents: CalendarEvent[]; onSaveConfig: (next: QuoteConfig) => Promise<void> }> = ({ date, config, packages, dayEvents, onSaveConfig }) => {
+  const busy = dayEvents.map((e) => `${e.startTime ?? 'dia todo'} · ${e.title}`);
   const [extra, setExtra] = useState(config.dateExtras[date] ? String(config.dateExtras[date]) : '');
   const [packageId, setPackageId] = useState('aniversario');
   const [address, setAddress] = useState('');
@@ -162,6 +164,7 @@ const DayQuote: React.FC<{ date: string; config: QuoteConfig; packages: EventPac
           <input value={address} onChange={(e) => { setAddress(e.target.value); reset(); }} className={inputClass} placeholder="Rua, número, bairro, cidade" />
         </label>
       </div>
+      <EventScheduleCheck dayEvents={dayEvents} address={address} />
       <button type="button" onClick={calculate} disabled={busyAction !== '' || address.trim().length < 5} className={primaryButton}>
         {busyAction === 'calc' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}Calcular
       </button>
