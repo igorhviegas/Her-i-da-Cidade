@@ -41,9 +41,9 @@ Regra (editável na tela): 1º evento = sair de casa `trajeto + 35 min` antes; e
 chegada em casa = fim do último `+ 10 min + trajeto`; Vitor = isso `+` trajeto da sua casa até a dele.
 
 - **Calendário → Orçamentos** (admin): ao escolher a data e digitar o endereço, o bloco "Dá para encaixar neste dia?" lista os compromissos da agenda **com endereço e horário**
-  (desmarque os que não são eventos), recebe início/fim do novo evento e mostra, por evento, a hora de sair, a folga ou o que falta, e a previsão de chegada em casa (sua e do Vitor).
+  (desmarque os que não são eventos), recebe o início do novo evento (duração padrão pelo pacote: 1 h aniversário, 30 min visita, 1h30 VIP; editável) e mostra, por evento, a hora de sair, a folga ou o que falta, e a previsão de chegada em casa (sua e do Vitor).
   Endpoint: `POST /api/event-form` `{ action: 'schedule', stops }` (administrador).
-- **Área do agente → Chegada em casa:** calcula com os eventos de **hoje** cadastrados no CRM (cada um conta 1 hora, como na Agenda), escolhe em qual evento chegamos e abre o WhatsApp com a mensagem
+- **Área do agente → Chegada em casa:** calcula com os eventos de **hoje ou de outra data escolhida** (mostra também o período fora de casa) cadastrados no CRM (cada um conta 1 hora, como na Agenda), escolhe em qual evento chegamos e abre o WhatsApp com a mensagem
   "já chegamos + previsão de chegada em casa": um botão para a esposa do Vitor (horário do Vitor) e outro para a sua (sem número: você escolhe o contato).
   Endpoint: `POST /api/travel-route` `{ action: 'home-eta', date }` (código de acesso); devolve só horários e minutos, nunca endereços.
 - Regras puras e teste: `services/eventSchedule.js`, `services/eventSchedule.test.js`.

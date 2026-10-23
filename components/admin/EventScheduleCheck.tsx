@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, Route, XCircle } from 'lucide-react';
 import type { CalendarEvent } from '../../services/calendarService';
 import { calculateSchedule, type ScheduleLegs } from '../../services/eventQuoteService';
-import { DEFAULT_BUFFERS, formatTime, parseTime, planDay, type ScheduleStop } from '../../services/eventSchedule.js';
+import { DEFAULT_BUFFERS, PACKAGE_MINUTES, formatTime, parseTime, planDay, type ScheduleStop } from '../../services/eventSchedule.js';
 import { ErrorNote, inputClass, labelClass, primaryButton } from './missionsUi';
 
 interface Stop extends ScheduleStop { address: string; precise?: boolean }
@@ -14,11 +14,12 @@ const num = (text: string, fallback: number) => { const n = Number(text); return
  * Viabilidade de encaixar um evento no dia: casa → eventos da agenda (com endereço) + o novo → casa → casa do Vitor.
  * Cada evento seguinte precisa de: fim do anterior + organização + trajeto + chegada antecipada ≤ início (docs/deslocamento.md).
  */
-export const EventScheduleCheck: React.FC<{ dayEvents: CalendarEvent[]; address: string }> = ({ dayEvents, address }) => {
+export const EventScheduleCheck: React.FC<{ dayEvents: CalendarEvent[]; address: string; packageId: string }> = ({ dayEvents, address, packageId }) => {
   const candidates = useMemo(() => dayEvents.filter((e) => e.startTime && e.endTime && e.startKey === e.endKey && !e.transparent), [dayEvents]);
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [start, setStart] = useState('');
-  const [end, setEnd] = useState('');
+  const [duration, setDuration] = useState(String(PACKAGE_MINUTES[packageId] ?? 60));
+  useEffect(() => { setDuration(String(PACKAGE_MINUTES[packageId] ?? 60)); setCalc(null); }, [packageId]);
   const [buffers, setBuffers] = useState({ first: String(DEFAULT_BUFFERS.first), next: String(DEFAULT_BUFFERS.next), after: String(DEFAULT_BUFFERS.after) });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -26,8 +27,9 @@ export const EventScheduleCheck: React.FC<{ dayEvents: CalendarEvent[]; address:
 
   const reset = () => setCalc(null);
   const startMin = parseTime(start);
-  const endMin = parseTime(end);
-  const newReady = startMin !== null && endMin !== null && endMin > startMin && address.trim().length >= 5;
+  const minutes = Number(duration);
+  const endMin = startMin !== null && minutes > 0 ? startMin + minutes : null;
+  const newReady = startMin !== null && endMin !== null && endMin !== null && address.trim().length >= 5;
 
   const run = async () => {
     if (startMin === null || endMin === null) return;
@@ -70,8 +72,8 @@ export const EventScheduleCheck: React.FC<{ dayEvents: CalendarEvent[]; address:
       )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <label className={labelClass}>Início do novo<input type="time" value={start} onChange={(e) => { setStart(e.target.value); const typed = parseTime(e.target.value); if (!end && typed !== null) setEnd(formatTime(typed + 60)); reset(); }} className={inputClass} /></label>
-        <label className={labelClass}>Fim do novo<input type="time" value={end} onChange={(e) => { setEnd(e.target.value); reset(); }} className={inputClass} /></label>
+        <label className={labelClass}>Início do novo<input type="time" value={start} onChange={(e) => { setStart(e.target.value); reset(); }} className={inputClass} /></label>
+        <label className={labelClass}>Duração (min)<input inputMode="numeric" value={duration} onChange={(e) => { setDuration(e.target.value); reset(); }} className={inputClass} /></label>
         {buffer('first', 'Chegar antes (1º)')}
         {buffer('next', 'Chegar antes (demais)')}
         {buffer('after', 'Organizar após')}

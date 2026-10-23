@@ -15,6 +15,7 @@ const nowMinutes = () => { const d = new Date(); return d.getHours() * 60 + d.ge
  */
 export const HomeEta: React.FC = () => {
   const [code] = useState(() => load().code);
+  const [date, setDate] = useState(todayKey);
   const [eta, setEta] = useState<DayEta | null>(null);
   const [current, setCurrent] = useState(0);
   const [at, setAt] = useState(0);
@@ -30,7 +31,7 @@ export const HomeEta: React.FC = () => {
   const run = async () => {
     setBusy(true); setError(''); setEta(null);
     try {
-      const result = await fetchDayEta(code, todayKey());
+      const result = await fetchDayEta(code, date);
       const now = nowMinutes();
       const upcoming = result.events.findIndex((e) => (parseTime(e.time) ?? 0) + EVENT_MINUTES > now);
       setCurrent(upcoming === -1 ? Math.max(result.events.length - 1, 0) : upcoming);
@@ -47,11 +48,15 @@ export const HomeEta: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      <label className={card}>
+        <span className={heading}>Data dos eventos</span>
+        <input type="date" value={date} onChange={(e) => { if (e.target.value) { setDate(e.target.value); setEta(null); setError(''); } }} className={field} />
+      </label>
       <button disabled={busy} onClick={run} className={`${btn} flex h-16 w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 text-lg font-black uppercase tracking-wide shadow-lg shadow-blue-600/30 disabled:opacity-40`}>
-        {busy ? <><Loader2 className="h-5 w-5 animate-spin" />Calculando...</> : 'Calcular previsão de hoje'}
+        {busy ? <><Loader2 className="h-5 w-5 animate-spin" />Calculando...</> : date === todayKey() ? 'Calcular previsão de hoje' : 'Calcular previsão do dia'}
       </button>
       {error && <div role="alert" className="flex items-start gap-3 rounded-2xl border border-red-400/50 bg-red-600/20 px-4 py-3 text-[15px] font-semibold text-red-100"><TriangleAlert className="mt-0.5 h-5 w-5 shrink-0" />{error}</div>}
-      {eta && !plan && <div className={card}><p className="text-sm text-white/70">Nenhum evento cadastrado para hoje.</p></div>}
+      {eta && !plan && <div className={card}><p className="text-sm text-white/70">Nenhum evento cadastrado para este dia.</p></div>}
 
       {eta && plan && (
         <>
@@ -59,7 +64,8 @@ export const HomeEta: React.FC = () => {
             {plan.rows.map((row, i) => (
               <p key={i}><b className="text-white">{formatTime(row.start)} · {row.label}</b> — {i === 0 ? 'sair de casa' : 'sair do evento anterior'} às <b>{formatTime(row.leaveAt)}</b> ({row.travel} min){row.slack !== null && (row.ok ? `, sobra ${row.slack} min` : `, faltam ${-row.slack} min`)}</p>
             ))}
-            <p className="border-t border-white/10 pt-2">Chegada em casa: <b className="text-white">{formatTime(plan.homeAt)}</b></p>
+            <p className="border-t border-white/10 pt-2">Fora de casa: <b className="text-white">{formatTime(plan.rows[0].leaveAt)} às {formatTime(plan.homeAt)}</b> ({Math.round((plan.homeAt - plan.rows[0].leaveAt) / 6) / 10} h)</p>
+            <p>Chegada em casa: <b className="text-white">{formatTime(plan.homeAt)}</b></p>
             {plan.vitorAt !== null && <p>Chegada do Vitor: <b className="text-white">{formatTime(plan.vitorAt)}</b></p>}
             <p className="text-xs text-white/40">Sem trânsito em tempo real; cada evento conta 1 hora.</p>
           </div>

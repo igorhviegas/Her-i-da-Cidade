@@ -44,3 +44,6 @@ export function arrivalMessage({ venueLabel, arrivalAt, now }) {
     'Se mudar alguma coisa eu te aviso!',
   ].join('\n');
 }
+
+/** Duração padrão (min) do evento por pacote na conta de horários; o dono pode trocar na tela. */
+export const PACKAGE_MINUTES = { aniversario: 60, visita: 30, vip: 90 };
