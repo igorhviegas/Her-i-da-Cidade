@@ -48,9 +48,9 @@ export const HomeEta: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <label className={card}>
+      <label className={`${card} block`}>
         <span className={heading}>Data dos eventos</span>
-        <input type="date" value={date} onChange={(e) => { if (e.target.value) { setDate(e.target.value); setEta(null); setError(''); } }} className={field} />
+        <input type="date" value={date} onChange={(e) => { if (e.target.value) { setDate(e.target.value); setEta(null); setError(''); } }} className={`${field} min-w-0 appearance-none`} />
       </label>
       <button disabled={busy} onClick={run} className={`${btn} flex h-16 w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 text-lg font-black uppercase tracking-wide shadow-lg shadow-blue-600/30 disabled:opacity-40`}>
         {busy ? <><Loader2 className="h-5 w-5 animate-spin" />Calculando...</> : date === todayKey() ? 'Calcular previsão de hoje' : 'Calcular previsão do dia'}
@@ -70,7 +70,7 @@ export const HomeEta: React.FC = () => {
             <p className="text-xs text-white/40">Sem trânsito em tempo real; cada evento conta 1 hora.</p>
           </div>
 
-          <label className={card}>
+          <label className={`${card} block`}>
             <span className={heading}>Em qual evento chegamos?</span>
             <select value={current} onChange={(e) => setCurrent(Number(e.target.value))} className={field}>
               {eta.events.map((e, i) => <option key={i} value={i}>Evento {i + 1} · {e.time}{e.formType ? ` · ${e.formType}` : ''}</option>)}
@@ -78,12 +78,12 @@ export const HomeEta: React.FC = () => {
           </label>
 
           {plan.vitorAt !== null && (
-            <a href={send('vitor', plan.vitorAt)} target="_blank" rel="noopener noreferrer" className={`${btn} flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 text-base font-black text-[#04210F]`}>
-              <MessageCircle className="h-5 w-5" />Mensagem para a esposa do Vitor
+            <a href={send('vitor', plan.vitorAt)} target="_blank" rel="noopener noreferrer" className={`${btn} flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-center text-base font-black leading-tight text-[#04210F]`}>
+              <MessageCircle className="h-5 w-5 shrink-0" />Mensagem para a esposa do Vitor
             </a>
           )}
-          <a href={send('self', plan.homeAt)} target="_blank" rel="noopener noreferrer" className={`${btn} flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 text-base font-black text-[#04210F]`}>
-            <MessageCircle className="h-5 w-5" />Mensagem para minha esposa
+          <a href={send('self', plan.homeAt)} target="_blank" rel="noopener noreferrer" className={`${btn} flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-center text-base font-black leading-tight text-[#04210F]`}>
+            <MessageCircle className="h-5 w-5 shrink-0" />Mensagem para minha esposa
           </a>
         </>
       )}
