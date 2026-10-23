@@ -164,7 +164,6 @@ const DayQuote: React.FC<{ date: string; config: QuoteConfig; packages: EventPac
           <input value={address} onChange={(e) => { setAddress(e.target.value); reset(); }} className={inputClass} placeholder="Rua, número, bairro, cidade" />
         </label>
       </div>
-      <EventScheduleCheck dayEvents={dayEvents} address={address} />
       <button type="button" onClick={calculate} disabled={busyAction !== '' || address.trim().length < 5} className={primaryButton}>
         {busyAction === 'calc' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />}Calcular
       </button>
@@ -207,6 +206,8 @@ const DayQuote: React.FC<{ date: string; config: QuoteConfig; packages: EventPac
           )}
         </div>
       )}
+
+      <EventScheduleCheck dayEvents={dayEvents} address={address} packageId={packageId} />
     </section>
   );
 };

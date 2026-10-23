@@ -7,3 +7,4 @@ export function parseTime(text: string): number | null;
 export function formatTime(minutes: number): string;
 export function planDay(stops: ScheduleStop[], legs: { minutes: number }[], buffers?: ScheduleBuffers): DayPlan;
 export function arrivalMessage(opts: { venueLabel?: string; arrivalAt: number; now?: number }): string;
+export const PACKAGE_MINUTES: Record<string, number>;
