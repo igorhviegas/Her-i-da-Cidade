@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Loader2, MessageCircle, TriangleAlert } from 'lucide-react';
 import { fetchDayEta, type DayEta } from '../../services/travelService';
-import { arrivalMessage, formatTime, parseTime, planDay } from '../../services/eventSchedule.js';
+import { formatTime, renderMessage, parseTime, planDay } from '../../services/eventSchedule.js';
 import { btn, card, field, heading, load, todayKey } from '../publicSite/agente/travelShared';
 
 const EVENT_MINUTES = 60; // mesma duração do evento na Agenda (functions/google-calendar.js)
@@ -44,7 +44,7 @@ export const HomeEta: React.FC = () => {
   if (!code) return <div className={card}><p className="text-sm text-white/70">Salve o código de acesso em <b>Deslocamento</b> primeiro. Ele também vale aqui.</p></div>;
 
   const venueLabel = eta?.events[current] ? `${eta.events[current].formType ? `${eta.events[current].formType}, ` : ''}${eta.events[current].time}` : '';
-  const send = (arrivalAt: number) => whatsApp(arrivalMessage({ venueLabel, arrivalAt, now: at }));
+  const send = (who: 'self' | 'vitor', arrivalAt: number) => whatsApp(renderMessage(eta?.messages[who] ?? '', { evento: venueLabel, hora: formatTime(at), previsao: formatTime(arrivalAt) }));
 
   return (
     <div className="space-y-4">
@@ -78,11 +78,11 @@ export const HomeEta: React.FC = () => {
           </label>
 
           {plan.vitorAt !== null && (
-            <a href={send(plan.vitorAt)} target="_blank" rel="noopener noreferrer" className={`${btn} flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-center text-base font-black leading-tight text-[#04210F]`}>
+            <a href={send('vitor', plan.vitorAt)} target="_blank" rel="noopener noreferrer" className={`${btn} flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-center text-base font-black leading-tight text-[#04210F]`}>
               <MessageCircle className="h-5 w-5 shrink-0" />Mensagem para a esposa do Vitor
             </a>
           )}
-          <a href={send(plan.homeAt)} target="_blank" rel="noopener noreferrer" className={`${btn} flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-center text-base font-black leading-tight text-[#04210F]`}>
+          <a href={send('self', plan.homeAt)} target="_blank" rel="noopener noreferrer" className={`${btn} flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-4 py-3 text-center text-base font-black leading-tight text-[#04210F]`}>
             <MessageCircle className="h-5 w-5 shrink-0" />Mensagem para minha esposa
           </a>
         </>

@@ -9,11 +9,12 @@ import {
 import { DEFAULT_AGENT_STEPS, moveItem, newId } from '../../services/agentContent.js';
 import { card, iconBtn, input, Loading, type Run } from './adminPages/agentShared';
 import { FaqTab } from './adminPages/AgentFaqTab';
+import { MessagesTab } from './adminPages/AgentMessagesTab';
 
 type Feedback = { type: 'success' | 'error'; message: string } | null;
 
 export const AdminAgentPage: React.FC = () => {
-  const [tab, setTab] = useState<'steps' | 'tracks' | 'faq'>('steps');
+  const [tab, setTab] = useState<'steps' | 'tracks' | 'faq' | 'messages'>('steps');
   const [feedback, setFeedback] = useState<Feedback>(null);
 
   /** Executa uma gravação e mostra o resultado; devolve se deu certo. */
@@ -32,7 +33,7 @@ export const AdminAgentPage: React.FC = () => {
       </div>
 
       <div className="flex gap-2">
-        {([['steps', 'Instruções'], ['tracks', 'Músicas'], ['faq', 'Suporte (FAQ)']] as const).map(([id, label]) => (
+        {([['steps', 'Instruções'], ['tracks', 'Músicas'], ['faq', 'Suporte (FAQ)'], ['messages', 'Mensagens']] as const).map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} className={`rounded-xl px-4 py-2 text-sm font-semibold ${tab === id ? 'bg-blue-600 text-white' : 'bg-white/5 text-white/60 hover:text-white'}`}>{label}</button>
         ))}
       </div>
@@ -41,7 +42,7 @@ export const AdminAgentPage: React.FC = () => {
         <div className={`rounded-xl border p-3 text-sm font-medium ${feedback.type === 'success' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-red-500/30 bg-red-500/10 text-red-300'}`}>{feedback.message}</div>
       )}
 
-      {tab === 'steps' ? <StepsTab run={run} /> : tab === 'tracks' ? <TracksTab run={run} /> : <FaqTab run={run} />}
+      {tab === 'steps' ? <StepsTab run={run} /> : tab === 'tracks' ? <TracksTab run={run} /> : tab === 'messages' ? <MessagesTab run={run} /> : <FaqTab run={run} />}
     </div>
   );
 };

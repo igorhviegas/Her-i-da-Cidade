@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { arrivalMessage, formatTime, parseTime, planDay } from './eventSchedule.js';
+import { DEFAULT_MESSAGES, formatTime, normalizeMessages, renderMessage, parseTime, planDay } from './eventSchedule.js';
 
 const t = parseTime;
 const legs = (...m) => m.map((minutes) => ({ minutes }));
@@ -31,6 +31,9 @@ test('2º evento: fim + 10 + trajeto + 30 precisa caber no início', () => {
   assert.equal(no.vitorAt, null);
 });
 
-test('mensagem inclui a previsão', () => {
-  assert.match(arrivalMessage({ arrivalAt: t('17:40'), now: t('14:10') }), /às 14:10[\s\S]*~17:40/);
+test('mensagens: variáveis trocadas, vazio volta ao padrão', () => {
+  const text = renderMessage('{evento} às {hora}, casa ~{previsao} {x}', { evento: 'Evento 1', hora: '14:10', previsao: '17:40' });
+  assert.equal(text, 'Evento 1 às 14:10, casa ~17:40 {x}');
+  assert.deepEqual(normalizeMessages({ self: '  ', vitor: 'Oi' }), { self: DEFAULT_MESSAGES.self, vitor: 'Oi' });
+  assert.deepEqual(normalizeMessages(null), DEFAULT_MESSAGES);
 });

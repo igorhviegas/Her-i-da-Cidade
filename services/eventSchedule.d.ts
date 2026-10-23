@@ -6,5 +6,10 @@ export interface DayPlan { rows: ScheduleRow[]; homeAt: number; vitorAt: number 
 export function parseTime(text: string): number | null;
 export function formatTime(minutes: number): string;
 export function planDay(stops: ScheduleStop[], legs: { minutes: number }[], buffers?: ScheduleBuffers): DayPlan;
-export function arrivalMessage(opts: { venueLabel?: string; arrivalAt: number; now?: number }): string;
+export interface AgentMessages { self: string; vitor: string }
+export const DEFAULT_MESSAGES: AgentMessages;
+export const MESSAGE_VARIABLES: string[];
+export const MAX_MESSAGE_LENGTH: number;
+export function normalizeMessages(data: unknown): AgentMessages;
+export function renderMessage(template: string, values: { evento: string; hora: string; previsao: string }): string;
 export const PACKAGE_MINUTES: Record<string, number>;

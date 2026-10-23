@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminFirestore } from '../functions/firebase-admin.js';
 import { TravelRouteError, calculateTravel, codeMatches, dayEta, listDayEvents, readTravelConfig } from '../functions/travel-route.js';
+import { normalizeMessages } from '../services/eventSchedule.js';
 import { validateTravelInput } from '../services/travelCost.js';
 
 const STATUS_BY_CODE: Record<string, number> = {
@@ -52,7 +53,8 @@ export async function handleTravelRoute(
         logger.error('[Travel] previsão de chegada falhou:', error instanceof Error ? error.name : 'erro');
         throw new TravelRouteError('events_unavailable');
       });
-      return send(200, { ok: true, date, ...eta });
+      const saved = await getAdminFirestore().collection('siteConfig').doc('agentMessages').get().then((snap: any) => snap.data(), () => null);
+      return send(200, { ok: true, date, ...eta, messages: normalizeMessages(saved) });
     }
 
     if (action === 'events') {
