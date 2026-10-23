@@ -30,7 +30,7 @@ export function stepProgress(steps: AgentStep[], checks: Record<string, boolean>
 }
 
 function viewTitle(view: string, faqCategory: AgentFaqCategory | undefined, activeStep: AgentStep | undefined): string {
-  return view === 'home' ? 'Agente HDC' : view === 'steps' ? 'Passo a passo' : view === 'music' ? 'Músicas' : view === 'travel' ? 'Deslocamento' : view === 'support' ? 'Suporte' : view === 'support:info' ? 'Informações importantes' : faqCategory?.title ?? activeStep?.kicker ?? 'Etapa';
+  return view === 'home' ? 'Agente HDC' : view === 'steps' ? 'Passo a passo' : view === 'music' ? 'Músicas' : view === 'travel' ? 'Deslocamento' : view === 'eta' ? 'Chegada em casa' : view === 'support' ? 'Suporte' : view === 'support:info' ? 'Informações importantes' : faqCategory?.title ?? activeStep?.kicker ?? 'Etapa';
 }
 
 export interface ViewInfo {

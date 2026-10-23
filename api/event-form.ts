@@ -4,7 +4,7 @@ import { getAdminFirestore } from '../functions/firebase-admin.js';
 import { authorizeAdminRequest } from '../functions/admin-auth.js';
 import { clientIp, verifyTurnstile } from '../functions/turnstile.js';
 import { TravelRouteError } from '../functions/travel-route.js';
-import { EventFormError, calculateQuote, getQuotePrefill, loadFormConfig, saveQuote, submitEventForm } from '../functions/event-form.js';
+import { EventFormError, calculateQuote, calculateSchedule, getQuotePrefill, loadFormConfig, saveQuote, submitEventForm } from '../functions/event-form.js';
 import { publicFormConfig } from '../services/eventFormConfig.js';
 import { CollabFormError, submitCollabForm } from '../functions/collab.js';
 
@@ -23,6 +23,7 @@ type Auth = 'unauthenticated' | 'forbidden' | 'authorized';
  *   POST { action: 'collab', ... }     -> cadastro das Mamães em Collab (/mamaes-em-collab), mesmo captcha (functions/collab.js)
  * Administrador (ID token do Firebase):
  *   POST { action: 'quote', address, date, packageId, companyBase? } -> cálculo com a rota casa → evento
+ *   POST { action: 'schedule', stops: [{label, address}] } -> { legs: [{minutes, km}], resolved, withVitor } (viabilidade de horários)
  *   POST { action: 'save-quote', packageId, date, location, total, km, city } -> { id } para o link
  */
 export async function handleEventForm(
@@ -54,11 +55,12 @@ export async function handleEventForm(
       return send(200, { ok: true, result: await (deps.submit ?? submitEventForm)({ database, input }) });
     }
 
-    if (body.action !== 'quote' && body.action !== 'save-quote') return fail(400, 'invalid_action', 'Ação inválida.');
+    if (body.action !== 'quote' && body.action !== 'save-quote' && body.action !== 'schedule') return fail(400, 'invalid_action', 'Ação inválida.');
     let auth: Auth;
     try { auth = await (deps.authorize ?? authorizeAdminRequest)(req); } catch { return fail(503, 'auth_unavailable', 'Não foi possível validar o acesso agora.'); }
     if (auth === 'unauthenticated') return fail(401, 'unauthorized', 'Faça login novamente.');
     if (auth === 'forbidden') return fail(403, 'forbidden', 'Acesso restrito a administradores.');
+    if (body.action === 'schedule') return send(200, { ok: true, ...(await calculateSchedule({ input: body })) });
     if (body.action === 'quote') return send(200, { ok: true, ...(await (deps.quote ?? calculateQuote)({ database, input: body })) });
     return send(200, { ok: true, ...(await saveQuote({ database, input: body })) });
   } catch (error) {

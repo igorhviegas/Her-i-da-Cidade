@@ -1,8 +1,9 @@
 import React from 'react';
-import { ChevronRight, CircleHelp, ClipboardList, Info, MessageCircle, Music, Route, Timer, TriangleAlert, ChevronLeft } from 'lucide-react';
+import { ChevronRight, CircleHelp, ClipboardList, Home, Info, MessageCircle, Music, Route, Timer, TriangleAlert, ChevronLeft } from 'lucide-react';
 import type { AgentFaqCategory, AgentStep, AgentTrack } from '../../../services/agentService';
 import { SUPPORT_WHATSAPP_URL, searchFaq } from '../../../services/agentContent.js';
 import { TravelCalculator } from '../../agente/TravelCalculator';
+import { HomeEta } from '../../agente/HomeEta';
 import { FaqResults, FaqView, InfoCard, PlayerButtons, SearchBox } from './AgentBits';
 import { MusicView } from './MusicView';
 import { StepView } from './StepView';
@@ -47,6 +48,11 @@ const HomeView: React.FC<HomeViewProps> = ({ saved, update, progress, player, tr
         <button onClick={() => setView('travel')} className={bigBtn}>
           <Route className="h-7 w-7 shrink-0 text-emerald-300" />
           <span className="min-w-0 flex-1"><span className="block text-lg font-bold">Deslocamento</span><span className="block text-sm text-white/50">Km da rota, cachês e texto do WhatsApp</span></span>
+          <ChevronRight className="h-5 w-5 text-white/40" />
+        </button>
+        <button onClick={() => setView('eta')} className={bigBtn}>
+          <Home className="h-7 w-7 shrink-0 text-sky-300" />
+          <span className="min-w-0 flex-1"><span className="block text-lg font-bold">Chegada em casa</span><span className="block text-sm text-white/50">Previsão do dia e mensagem para as esposas</span></span>
           <ChevronRight className="h-5 w-5 text-white/40" />
         </button>
         <button onClick={() => setView('support')} className={bigBtn}>
@@ -155,6 +161,8 @@ export const AgentScreens: React.FC<AgentScreensProps> = ({ view, info, steps, t
       )}
 
       {view === 'travel' && <TravelCalculator />}
+
+      {view === 'eta' && <HomeEta />}
 
       {view === 'music' && <MusicView player={player} tracks={tracks} loading={tracksLoading} query={query} onQuery={onQuery} />}
 

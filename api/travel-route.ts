@@ -2,7 +2,7 @@ import { logger } from '../lib/logger.js';
 import type { Request, Response } from 'express';
 import { Timestamp } from 'firebase-admin/firestore';
 import { getAdminFirestore } from '../functions/firebase-admin.js';
-import { TravelRouteError, calculateTravel, codeMatches, listDayEvents, readTravelConfig } from '../functions/travel-route.js';
+import { TravelRouteError, calculateTravel, codeMatches, dayEta, listDayEvents, readTravelConfig } from '../functions/travel-route.js';
 import { validateTravelInput } from '../services/travelCost.js';
 
 const STATUS_BY_CODE: Record<string, number> = {
@@ -21,6 +21,7 @@ const ordersBetween = async (start: Date, end: Date) => {
  * - Cálculo (padrão): { events: string[], start?, stop?, end?, kmRate, eventFee } (ver validateTravelInput).
  *   Resposta { ok: true, ...resultado }: trechos em km, valores, endereços entendidos, avisos e a base do link do WhatsApp.
  * - { action: 'events', date: 'YYYY-MM-DD' }: eventos cadastrados no dia (só horário, local e tipo) para importar os endereços.
+ * - { action: 'home-eta', date }: eventos do dia + minutos de cada trecho (casa → eventos → casa → casa do Vitor), sem endereços.
  * Os endereços padrão e o número do WhatsApp ficam só no servidor; o número só sai depois de o código ser validado.
  */
 export async function handleTravelRoute(
@@ -41,9 +42,19 @@ export async function handleTravelRoute(
   if (!codeMatches(Array.isArray(header) ? header[0] : header, config.accessCode)) return fail(401, 'unauthorized', 'Código de acesso inválido.');
 
   const action = req.body?.action;
-  if (action !== undefined && action !== 'events') return fail(400, 'invalid_request', 'Ação inválida.');
+  if (action !== undefined && action !== 'events' && action !== 'home-eta') return fail(400, 'invalid_request', 'Ação inválida.');
 
   try {
+    if (action === 'home-eta') {
+      const date = req.body?.date;
+      const eta = await dayEta({ date: typeof date === 'string' ? date : '', config, listOrdersBetween: deps.listOrdersBetween ?? ordersBetween, fetchImpl: deps.fetchImpl }).catch((error) => {
+        if (error instanceof TravelRouteError) throw error;
+        logger.error('[Travel] previsão de chegada falhou:', error instanceof Error ? error.name : 'erro');
+        throw new TravelRouteError('events_unavailable');
+      });
+      return send(200, { ok: true, date, ...eta });
+    }
+
     if (action === 'events') {
       const date = req.body?.date;
       const events = await listDayEvents({ date: typeof date === 'string' ? date : '', listOrdersBetween: deps.listOrdersBetween ?? ordersBetween }).catch((error) => {

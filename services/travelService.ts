@@ -36,6 +36,11 @@ async function call<T>(code: string, payload: unknown, failure: string): Promise
 
 export const calculateTravelRoute = (code: string, payload: TravelRequest) => call<TravelResult>(code, payload, 'Não foi possível calcular agora.');
 
+export type { DayEta } from '../functions/travel-route.js';
+
+/** Eventos do dia ('YYYY-MM-DD') com os minutos de cada trecho casa → eventos → casa → casa do Vitor (previsão de chegada). */
+export const fetchDayEta = (code: string, date: string) => call<import('../functions/travel-route.js').DayEta>(code, { action: 'home-eta', date }, 'Não foi possível calcular a previsão agora.');
+
 /** Eventos cadastrados no dia ('YYYY-MM-DD'), em ordem de horário: só horário, local e tipo. */
 export async function fetchDayEvents(code: string, date: string): Promise<TravelDayEvent[]> {
   const { events } = await call<{ events: TravelDayEvent[] }>(code, { action: 'events', date }, 'Não foi possível consultar os eventos agora.');

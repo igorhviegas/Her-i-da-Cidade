@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TravelRouteError, calculateTravel, codeMatches, computeLegsMeters, geocodeAddress, listDayEvents, readTravelConfig } from './travel-route.js';
+import { TravelRouteError, calculateTravel, codeMatches, computeLegsMeters, routeTimes, geocodeAddress, listDayEvents, readTravelConfig } from './travel-route.js';
 import { validateTravelInput } from '../services/travelCost.js';
 
 const ENV = {
@@ -68,7 +68,7 @@ test('rota: uma chamada com ordem preservada, faixa Essentials e só o campo de 
   const meters = await computeLegsMeters([{ lat: 1, lng: 1 }, { lat: 2, lng: 2 }, { lat: 3, lng: 3 }], { apiKey: 'k', fetchImpl });
   assert.deepEqual(meters, [1000, 2000]);
   const [{ headers, body }] = calls.routes;
-  assert.equal(headers['X-Goog-FieldMask'], 'routes.legs.distanceMeters');
+  assert.equal(headers['X-Goog-FieldMask'], 'routes.legs.distanceMeters,routes.legs.duration');
   assert.equal(body.routingPreference, 'TRAFFIC_UNAWARE');
   assert.equal(body.travelMode, 'DRIVE');
   assert.equal(body.optimizeWaypointOrder, undefined);
@@ -189,4 +189,19 @@ test('eventos do dia: data inválida é recusada antes de consultar; sem eventos
   const never = async () => { throw new Error('não deveria consultar'); };
   for (const date of ['', '2026-02-31', '10/10/2026', undefined]) await assert.rejects(() => listDayEvents({ date, listOrdersBetween: never }), { code: 'invalid_date' });
   assert.deepEqual(await listDayEvents({ date: '2026-10-10', listOrdersBetween: async () => [] }), []);
+});
+
+test('tempos da rota: casa → evento → casa → casa do Vitor, minutos arredondados para cima', async () => {
+  const spots = { casa: [1, 1], vitor: [2, 2], evento: [3, 3] };
+  const fetchImpl = async (url, init) => {
+    if (String(url).includes('geocode')) {
+      const [lat, lng] = spots[new URL(url).searchParams.get('address')];
+      return { ok: true, status: 200, json: async () => ({ status: 'OK', results: [{ formatted_address: 'x', geometry: { location: { lat, lng }, location_type: 'ROOFTOP' } }] }) };
+    }
+    const count = (JSON.parse(init.body).intermediates?.length ?? 0) + 1;
+    return { ok: true, status: 200, json: async () => ({ routes: [{ legs: Array.from({ length: count }, (_, i) => ({ distanceMeters: 5000, duration: `${(i + 1) * 601}s` })) }] }) };
+  };
+  const { legs, withVitor } = await routeTimes({ home: 'casa', vitor: 'vitor', stops: [{ label: 'E', address: 'evento' }], apiKey: 'k', fetchImpl });
+  assert.deepEqual(legs.map((l) => l.minutes), [11, 21, 31]);
+  assert.ok(withVitor);
 });
