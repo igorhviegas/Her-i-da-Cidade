@@ -39,8 +39,12 @@ test('cron: falha da rotina devolve 500 genérico, sem vazar a mensagem do erro'
 test('vercel.json agenda /api/instagram-sync?job=missions uma vez por dia às 03:00 UTC (00:00 de Brasília) e mantém o rewrite do SPA', async () => {
   const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
   assert.ok(config.crons.some((c) => c.path === '/api/instagram-sync?job=missions' && c.schedule === '0 3 * * *'));
-  assert.ok(config.rewrites.some((r) => r.destination === '/index.html'));
-  assert.match(config.rewrites[0].source, /\(\?!api\/\.\*\)/); // /api/* não cai no SPA
+  const spa = config.rewrites.find((r) => r.destination === '/index.html');
+  assert.ok(spa);
+  assert.match(spa.source, /\(\?!api\/\.\*\)/); // /api/* não cai no SPA
+  // /academy/* vai para o projeto do jogo e precisa vir ANTES da regra do SPA, senão o index.html do site o engole.
+  const academy = config.rewrites.findIndex((r) => r.source === '/academy/:path*' && r.destination.startsWith('https://hdc-academy.vercel.app/academy/'));
+  assert.ok(academy >= 0 && academy < config.rewrites.indexOf(spa));
 });
 
 test('nenhum arquivo de api/ importa outro arquivo de api/ (na Vercel a função falha ao carregar: FUNCTION_INVOCATION_FAILED)', async () => {
