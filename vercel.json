@@ -22,6 +22,10 @@
   },
   "rewrites": [
     {
+      "source": "/academy/:path*",
+      "destination": "https://hdc-academy.vercel.app/academy/:path*"
+    },
+    {
       "source": "/((?!api/.*).*)",
       "destination": "/index.html"
     },
