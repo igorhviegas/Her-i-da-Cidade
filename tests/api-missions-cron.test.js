@@ -45,6 +45,11 @@ test('vercel.json agenda /api/instagram-sync?job=missions uma vez por dia às 03
   // /academy/* vai para o projeto do jogo e precisa vir ANTES da regra do SPA, senão o index.html do site o engole.
   const academy = config.rewrites.findIndex((r) => r.source === '/academy/:path*' && r.destination.startsWith('https://hdc-academy.vercel.app/academy/'));
   assert.ok(academy >= 0 && academy < config.rewrites.indexOf(spa));
+  // A raiz (/academy e /academy/) tem regra própria: "/academy/:path*" não casa com a barra final e o SPA do site servia a home no lugar do jogo.
+  for (const raiz of ['/academy', '/academy/']) {
+    const i = config.rewrites.findIndex((r) => r.source === raiz && r.destination === 'https://hdc-academy.vercel.app/academy/');
+    assert.ok(i >= 0 && i < config.rewrites.indexOf(spa), `falta o rewrite de ${raiz} antes do SPA`);
+  }
 });
 
 test('nenhum arquivo de api/ importa outro arquivo de api/ (na Vercel a função falha ao carregar: FUNCTION_INVOCATION_FAILED)', async () => {

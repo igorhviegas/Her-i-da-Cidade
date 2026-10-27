@@ -22,6 +22,14 @@
   },
   "rewrites": [
     {
+      "source": "/academy",
+      "destination": "https://hdc-academy.vercel.app/academy/"
+    },
+    {
+      "source": "/academy/",
+      "destination": "https://hdc-academy.vercel.app/academy/"
+    },
+    {
       "source": "/academy/:path*",
       "destination": "https://hdc-academy.vercel.app/academy/:path*"
     },
