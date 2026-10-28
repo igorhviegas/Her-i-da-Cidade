@@ -24,7 +24,10 @@ export interface MonthlyData {
   fit: Loadable<FitMonth>;
   /** Extrato real do Inter importado (bankTransactions). */
   bank: Loadable<BankTotals>;
+  /** Último dia importado do mês (null = nada) e se está em dia; 'loading'/'error' quando ainda não dá para saber. */
+  imports: { inter: ImportState; whatsapp: ImportState };
 }
+export type ImportState = { status: 'loading' | 'error' } | { status: 'ready'; lastDay: string | null; upToDate: boolean; expected: string };
 
 const pct = (value: number | null) => (value === null ? '—' : `${Math.round(value * 100)}%`);
 const num = (value: number | null, digits = 0) => (value === null ? '—' : value.toLocaleString('pt-BR', { maximumFractionDigits: digits }));
@@ -48,6 +51,13 @@ const Row: React.FC<{ label: string; value: string; strong?: boolean; tone?: str
   <div className={`flex justify-between gap-3 py-1 text-sm ${strong ? 'border-t border-slate-300 pt-2 font-bold' : ''}`}><dt className="text-slate-600">{label}</dt><dd className={`tabular-nums ${tone}`}>{value}</dd></div>
 );
 const Pending: React.FC<{ state: Loadable<unknown>; what: string }> = ({ state, what }) => <p className="text-sm text-slate-500">{state.status === 'loading' ? `Carregando ${what}…` : `${what} indisponível no momento.`}</p>;
+
+const dmy = (iso: string) => iso.split('-').reverse().join('/');
+const ImportRow: React.FC<{ label: string; state: ImportState }> = ({ label, state }) => {
+  if (state.status !== 'ready') return <Row label={label} value={state.status === 'loading' ? 'Verificando…' : 'Indisponível'} />;
+  if (state.upToDate) return <Row label={label} value={`Em dia (até ${dmy(state.lastDay ?? state.expected)})`} tone="text-emerald-700" />;
+  return <Row label={label} value={state.lastDay ? `Atrasado: último dado em ${dmy(state.lastDay)}, faltam até ${dmy(state.expected)}` : `Atrasado: nada importado neste mês (esperado até ${dmy(state.expected)})`} tone="text-amber-700" />;
+};
 
 const Bank: React.FC<{ state: Loadable<BankTotals>; revenue: number }> = ({ state, revenue }) => {
   if (state.status !== 'ready') return <Pending state={state} what="Extrato do Inter" />;
@@ -122,6 +132,10 @@ export const MonthlyDocument: React.FC<{ data: MonthlyData }> = ({ data }) => {
         <h1 className="text-2xl font-extrabold">Relatório de {monthLabel(data.monthKey)}</h1>
         {data.partial && <p className="mt-1 text-xs font-semibold text-amber-700">Mês em andamento: os números são parciais.</p>}
       </header>
+
+      <Section title="Importações em dia?">
+        <dl><ImportRow label="Extrato do Banco Inter" state={data.imports.inter} /><ImportRow label="CSV do WhatsApp (ManyChat)" state={data.imports.whatsapp} /></dl>
+      </Section>
 
       <Section title="Resumo financeiro">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">

@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Papa from 'papaparse';
 import { AlertCircle, Loader2, Upload } from 'lucide-react';
 import { listClients } from '../../services/clientsService';
 import { importWalletOps, listWalletYear } from '../../services/manychatWalletService';
-import { linkSpend, parseWalletRows, spendByDay, spendByMonth, spendByWeek, type WalletOp } from '../../services/manychatWallet.js';
+import { changePct, linkSpend, parseWalletRows, phoneKey, snapshotSpend, spendByDay, spendByMonth, spendByWeek, type SpendSnapshot, type WalletOp } from '../../services/manychatWallet.js';
 import type { RevenueEntry } from '../../services/financeCalculations.js';
 import type { Client } from '../../types';
 import { cardClass, formatMoney, inputClass, labelClass, monthLabel, primaryBtn, shortMonthLabel } from './financeFormat';
@@ -12,10 +12,22 @@ const RATE_KEY = 'manychatUsdBrl';
 const readRate = () => { try { return localStorage.getItem(RATE_KEY) || '5,50'; } catch { return '5,50'; } };
 const pad = (n: number) => String(n).padStart(2, '0');
 
-const Kpi: React.FC<{ label: string; value: string; hint?: string; tone?: string }> = ({ label, value, hint, tone = 'text-white' }) => (
+const BASE_KEY = 'manychatBaseline:';
+const readBase = (monthKey: string): (SpendSnapshot & { at: string }) | null => { try { return JSON.parse(localStorage.getItem(BASE_KEY + monthKey) || 'null'); } catch { return null; } };
+
+/** (+x%) em relação à importação anterior; gasto que sobe fica vermelho, que cai, verde. Nada aparece se não mudou ou sem base. */
+const Delta: React.FC<{ prev?: number | null; cur: number; goodWhenUp?: boolean }> = ({ prev, cur, goodWhenUp = false }) => {
+  const pct = changePct(prev, cur);
+  if (pct === null || Math.abs(pct) < 0.05) return null;
+  const up = pct > 0;
+  const tone = up === goodWhenUp ? 'text-emerald-300' : 'text-red-300';
+  return <span className={`ml-1 whitespace-nowrap text-[11px] font-semibold ${tone}`}>({pct === Infinity ? 'novo' : `${up ? '+' : '−'}${Math.abs(pct).toFixed(1).replace('.', ',')}%`})</span>;
+};
+
+const Kpi: React.FC<{ label: string; value: string; hint?: string; tone?: string; delta?: React.ReactNode }> = ({ label, value, hint, tone = 'text-white', delta }) => (
   <div className={cardClass}>
     <p className="text-[11px] font-semibold uppercase tracking-wider text-white/50">{label}</p>
-    <p className={`mt-1 text-xl font-extrabold tabular-nums sm:text-2xl ${tone}`}>{value}</p>
+    <p className={`mt-1 text-xl font-extrabold tabular-nums sm:text-2xl ${tone}`}>{value}{delta}</p>
     {hint && <p className="mt-1 text-xs text-white/50">{hint}</p>}
   </div>
 );
@@ -56,6 +68,9 @@ export const FinanceManychat: React.FC<{ entries: RevenueEntry[]; monthKey: stri
   const [rate, setRate] = useState(readRate);
   const [filter, setFilter] = useState<ClientFilter>('all');
   const [showAll, setShowAll] = useState(false);
+  const [base, setBase] = useState(() => readBase(monthKey));
+  const pre = useRef<SpendSnapshot | null>(null);
+  useEffect(() => { setBase(readBase(monthKey)); }, [monthKey]);
 
   const usdBrl = Number(rate.replace(',', '.')) || 0;
   const brl = useCallback((usd: number) => formatMoney(usd * usdBrl), [usdBrl]);
@@ -71,6 +86,7 @@ export const FinanceManychat: React.FC<{ entries: RevenueEntry[]; monthKey: stri
   const importCsv = (file: File | undefined) => {
     if (!file) return;
     setBusy(true); setError(null); setNotice(null);
+    pre.current = view && ops ? snapshotSpend({ ops, monthKey, link: view.link }) : null;
     Papa.parse<Record<string, string>>(file, {
       header: true, skipEmptyLines: true, transformHeader: (h) => h.replace(/^\uFEFF/, '').trim(),
       complete: async (result) => {
@@ -95,6 +111,16 @@ export const FinanceManychat: React.FC<{ entries: RevenueEntry[]; monthKey: stri
     const top = days.reduce((best, d) => (d.total > best.total ? d : best), days[0]);
     return { days, weeks: spendByWeek(ops, monthKey), months: spendByMonth(ops, year), total, count: month.length, top, link: linkSpend({ ops, monthKey, entries, clients }) };
   }, [ops, monthKey, year, entries, clients]);
+
+  // Após importar: se o mês mudou, o retrato de antes vira a base das variações (reimportar o mesmo arquivo preserva a base anterior).
+  useEffect(() => {
+    if (!pre.current || !ops || !view || busy) return;
+    const before = pre.current; pre.current = null;
+    if (JSON.stringify(before) === JSON.stringify(snapshotSpend({ ops, monthKey, link: view.link }))) return;
+    const saved = { ...before, at: new Date().toISOString() };
+    try { localStorage.setItem(BASE_KEY + monthKey, JSON.stringify(saved)); } catch { /* sem armazenamento: vale só nesta sessão */ }
+    setBase(saved);
+  }, [ops, view, busy, monthKey]);
 
   const rows = useMemo(() => (view?.link.rows ?? []).filter((r) => filter === 'all' || (filter === 'sold') === (r.orders.length > 0)), [view, filter]);
   const shownRows = showAll ? rows : rows.slice(0, 30);
@@ -121,11 +147,12 @@ export const FinanceManychat: React.FC<{ entries: RevenueEntry[]; monthKey: stri
 
       {view && (
         <>
+          {base && <p className="text-xs text-white/50">Variações (±%) em relação ao que havia antes da última importação que trouxe mudanças ({new Date(base.at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}).</p>}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Kpi label={`Gasto · ${monthLabel(monthKey).split(' ')[0]}`} value={brl(view.total)} hint={`US$ ${view.total.toFixed(2)}`} tone="text-red-300" />
-            <Kpi label="Mensagens cobradas" value={String(view.count)} hint={view.count ? `${brl(view.total / view.count)} por mensagem` : undefined} />
+            <Kpi label={`Gasto · ${monthLabel(monthKey).split(' ')[0]}`} value={brl(view.total)} hint={`US$ ${view.total.toFixed(2)}`} tone="text-red-300" delta={<Delta prev={base?.total} cur={view.total} />} />
+            <Kpi label="Mensagens cobradas" value={String(view.count)} delta={<Delta prev={base?.count} cur={view.count} />} hint={view.count ? `${brl(view.total / view.count)} por mensagem` : undefined} />
             <Kpi label="Maior dia" value={view.top.total > 0 ? brl(view.top.total) : '—'} hint={view.top.total > 0 ? `dia ${view.top.day} · ${view.top.count} mensagens` : undefined} tone="text-amber-300" />
-            <Kpi label="Em quem fechou / sem venda" value={`${brl(view.link.spendSold)} / ${brl(view.link.spendNoSale)}`} hint="cliente cadastrado com pedido no mês × demais contatos" />
+            <Kpi label="Em quem fechou / sem venda" value={`${brl(view.link.spendSold)} / ${brl(view.link.spendNoSale)}`} delta={<><Delta prev={base?.spendSold} cur={view.link.spendSold} /><Delta prev={base?.spendNoSale} cur={view.link.spendNoSale} /></>} hint="cliente cadastrado com pedido no mês × demais contatos" />
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -159,16 +186,19 @@ export const FinanceManychat: React.FC<{ entries: RevenueEntry[]; monthKey: stri
               <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm">
                 <thead className="text-[11px] uppercase tracking-wider text-white/45"><tr><th className="py-2">Serviço</th><th className="text-right">Vendas</th><th className="text-right">Faturamento</th><th className="text-right">Gasto no chat</th><th className="text-right">Por venda</th><th className="text-right">% do fat.</th></tr></thead>
                 <tbody className="divide-y divide-white/5 text-white/80">
-                  {view.link.services.map((s) => (
-                    <tr key={s.serviceId}>
-                      <td className="py-2 font-semibold text-white">{serviceName(s.serviceId)}</td>
-                      <td className="text-right tabular-nums">{s.orders}</td>
-                      <td className="text-right tabular-nums">{formatMoney(s.revenue)}</td>
-                      <td className="text-right tabular-nums text-red-300">{brl(s.spend)}</td>
-                      <td className="text-right tabular-nums">{brl(s.spend / s.orders)}</td>
-                      <td className="text-right tabular-nums">{s.revenue > 0 ? `${((s.spend * usdBrl / s.revenue) * 100).toFixed(1).replace('.', ',')}%` : '—'}</td>
-                    </tr>
-                  ))}
+                  {view.link.services.map((s) => {
+                    const b = base?.services[s.serviceId];
+                    return (
+                      <tr key={s.serviceId}>
+                        <td className="py-2 font-semibold text-white">{serviceName(s.serviceId)}</td>
+                        <td className="text-right tabular-nums">{s.orders}<Delta prev={b?.orders} cur={s.orders} goodWhenUp /></td>
+                        <td className="text-right tabular-nums">{formatMoney(s.revenue)}<Delta prev={b?.revenue} cur={s.revenue} goodWhenUp /></td>
+                        <td className="text-right tabular-nums text-red-300">{brl(s.spend)}<Delta prev={base ? b?.spend ?? 0 : null} cur={s.spend} /></td>
+                        <td className="text-right tabular-nums">{brl(s.spend / s.orders)}<Delta prev={b && (b.orders ? b.spend / b.orders : 0)} cur={s.spend / s.orders} /></td>
+                        <td className="text-right tabular-nums">{s.revenue > 0 ? `${((s.spend * usdBrl / s.revenue) * 100).toFixed(1).replace('.', ',')}%` : '—'}{s.revenue > 0 && <Delta prev={b && (b.revenue > 0 ? b.spend / b.revenue : 0)} cur={s.spend / s.revenue} />}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table></div>
             )}
@@ -186,7 +216,9 @@ export const FinanceManychat: React.FC<{ entries: RevenueEntry[]; monthKey: stri
             </div>
             {rows.length === 0 ? <p className="py-6 text-center text-sm text-white/45">Nenhum consumo neste filtro.</p> : (
               <div className="divide-y divide-white/5">
-                {shownRows.map((r) => (
+                {shownRows.map((r) => {
+                  const b = base?.clients[phoneKey(r.phone)];
+                  return (
                   <div key={r.phone} className="flex items-start justify-between gap-3 py-2.5">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold text-white">{r.client?.name || <span className="text-white/55">Sem cadastro · {r.phone || 'sem número'}</span>}</p>
@@ -195,11 +227,12 @@ export const FinanceManychat: React.FC<{ entries: RevenueEntry[]; monthKey: stri
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-sm font-extrabold tabular-nums text-red-300">− {brl(r.total)}</p>
-                      <p className="text-[11px] text-white/45">{r.count} msg</p>
+                      <p className="text-sm font-extrabold tabular-nums text-red-300">− {brl(r.total)}<Delta prev={base ? b?.total ?? 0 : null} cur={r.total} /></p>
+                      <p className="text-[11px] text-white/45">{r.count} msg{b && r.count !== b.count && <span className="ml-1">({r.count > b.count ? '+' : '−'}{Math.abs(r.count - b.count)})</span>}</p>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             {rows.length > 30 && <button type="button" className="mt-3 text-xs font-semibold text-blue-400 hover:text-blue-300" onClick={() => setShowAll((v) => !v)}>{showAll ? 'Mostrar menos' : `Mostrar todos (${rows.length})`}</button>}

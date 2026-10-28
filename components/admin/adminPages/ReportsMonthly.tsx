@@ -16,6 +16,8 @@ import { cardClass, ghostBtn, monthLabel, primaryBtn } from '../financeFormat';
 import type { Lookup } from './financePageHooks';
 import { MonthlyDocument, type Loadable, type MonthlyData } from './MonthlyDocument';
 import { useBankMonth } from '../../../services/bankService';
+import { listWalletYear } from '../../../services/manychatWalletService';
+import { importFreshness } from '../../../services/manychatWallet.js';
 
 type FitSources = Parameters<typeof fitMonth>[0];
 
@@ -61,6 +63,20 @@ function useFitSources() {
   return state;
 }
 
+/** Último dia com cobrança do WhatsApp importada no mês (leitura do ano do mês escolhido). */
+function useWalletLastDay(monthKey: string) {
+  const [state, setState] = useState<{ key: string; lastDay: string | null } | 'error' | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setState(null);
+    listWalletYear(monthKey.slice(0, 4))
+      .then((ops) => { if (alive) setState({ key: monthKey, lastDay: ops.map((o) => o.day).filter((d) => d.startsWith(monthKey)).sort().pop() ?? null }); })
+      .catch(() => { if (alive) setState('error'); });
+    return () => { alive = false; };
+  }, [monthKey]);
+  return state;
+}
+
 interface Props {
   entries: RevenueEntry[]; costs: RevenueEntry[]; orders: Order[]; expenses: FixedExpense[];
   clients: Lookup<Client>; services: Lookup<Service>;
@@ -74,6 +90,7 @@ export const ReportsMonthly: React.FC<Props> = ({ entries, costs, orders, expens
   const instagram = useInstagramSources();
   const fit = useFitSources();
   const bank = useBankMonth(monthKey);
+  const wallet = useWalletLastDay(monthKey);
 
   const data = useMemo<MonthlyData>(() => {
     const range = monthRange(monthKey);
@@ -93,8 +110,12 @@ export const ReportsMonthly: React.FC<Props> = ({ entries, costs, orders, expens
       clients: clientsInMonth(entries, range),
       delivery: { delivered: delivery.delivered, onTimeRate: delivery.onTimeRate, avgLateDays: delivery.avgLateDays, avgLeadDays: delivery.avgLeadDays },
       instagram: igMonth, fit: fitState, bank: bank.status === 'ready' ? { status: 'ready', data: bank.data.totals } : bank,
+      imports: {
+        inter: bank.status === 'ready' ? { status: 'ready', ...importFreshness(bank.data.items.map((t) => t.date).sort().pop() ?? null, monthKey) } : { status: bank.status },
+        whatsapp: wallet === null ? { status: 'loading' } : wallet === 'error' ? { status: 'error' } : { status: 'ready', ...importFreshness(wallet.lastDay, monthKey) },
+      },
     };
-  }, [monthKey, entries, costs, orders, expenses, services, instagram, fit, bank]);
+  }, [monthKey, entries, costs, orders, expenses, services, instagram, fit, bank, wallet]);
 
   const atCurrent = monthKey >= monthKeyOf(new Date());
   const go = (delta: number) => setMonthKey(monthKeyOf(shiftPeriod('month', new Date(Number(monthKey.slice(0, 4)), Number(monthKey.slice(5, 7)) - 1, 1), delta)));
