@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseWalletRows, phoneKey, groupByDayPhone, expandDocs, spendByDay, spendByWeek, spendByMonth, linkSpend } from './manychatWallet.js';
+import { parseWalletRows, phoneKey, groupByDayPhone, expandDocs, spendByDay, spendByWeek, spendByMonth, linkSpend, changePct, importFreshness } from './manychatWallet.js';
 
 const row = (Id, Amount, Subscriber, iso, extra = {}) => ({ Id, Amount, Tax: '0', Type: 'WhatsApp service message', Source: 'Flow "Aniversário"', Subscriber, 'Created at (ISO 8601)': iso, ...extra });
 const rows = [
@@ -54,4 +54,22 @@ test('cruza consumo com vendas: gasto do cliente dividido entre os pedidos; sem 
   const live = r.services.find((s) => s.serviceId === 'live');
   assert.deepEqual([live.orders, live.revenue, +live.spend.toFixed(4)], [2, 150, 0.0068]);
   assert.equal(r.services.find((s) => s.serviceId === 'tema').spend.toFixed(4), '0.0068');
+});
+
+test('changePct: base ausente, zero e variação', () => {
+  assert.equal(changePct(undefined, 5), null);
+  assert.equal(changePct(0, 0), 0);
+  assert.equal(changePct(0, 3), Infinity);
+  assert.equal(changePct(100, 112), 12);
+  assert.equal(changePct(100, 80), -20);
+});
+
+test('importFreshness: em dia até ontem; mês fechado exige o último dia', () => {
+  const now = new Date(2026, 9, 28); // 28/out
+  assert.equal(importFreshness('2026-10-27', '2026-10', now).upToDate, true);
+  assert.equal(importFreshness('2026-10-20', '2026-10', now).upToDate, false);
+  assert.equal(importFreshness(null, '2026-10', now).upToDate, false);
+  assert.equal(importFreshness('2026-09-29', '2026-09', now).upToDate, false);
+  assert.equal(importFreshness('2026-09-30', '2026-09', now).upToDate, true);
+  assert.equal(importFreshness(null, '2026-10', new Date(2026, 9, 1)).upToDate, true); // dia 1: ainda não há dia fechado
 });

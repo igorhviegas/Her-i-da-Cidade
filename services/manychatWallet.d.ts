@@ -15,3 +15,12 @@ export function spendByWeek(ops: WalletOp[], monthKey: string): { from: number; 
 export function linkSpend(input: { ops: WalletOp[]; monthKey: string; entries: RevenueEntry[]; clients: { id: string; name: string; whatsappNormalized?: string }[] }): {
   rows: SpendRow[]; services: ServiceSpend[]; spendSold: number; spendNoSale: number;
 };
+
+export interface SpendSnapshot {
+  total: number; count: number; spendSold: number; spendNoSale: number;
+  services: Record<string, { spend: number; revenue: number; orders: number }>;
+  clients: Record<string, { total: number; count: number }>;
+}
+export function changePct(prev: number | null | undefined, cur: number): number | null;
+export function snapshotSpend(input: { ops: WalletOp[]; monthKey: string; link: ReturnType<typeof linkSpend> }): SpendSnapshot;
+export function importFreshness(lastDay: string | null, monthKey: string, now?: Date): { upToDate: boolean; lastDay: string | null; expected: string };

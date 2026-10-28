@@ -123,3 +123,34 @@ export function linkSpend({ ops, monthKey, entries, clients }) {
     spendNoSale: total(rows.filter((r) => !r.orders.length).map((r) => ({ cost: r.total }))),
   };
 }
+
+/** Variação relativa em %: null sem base para comparar; "novo" (Infinity) quando antes era zero e agora não. */
+export function changePct(prev, cur) {
+  if (prev === undefined || prev === null) return null;
+  if (prev === 0) return cur === 0 ? 0 : Infinity;
+  return ((cur - prev) / Math.abs(prev)) * 100;
+}
+
+/** Retrato do mês (totais, por serviço, por cliente) para comparar com a importação seguinte. */
+export function snapshotSpend({ ops, monthKey, link }) {
+  const month = ops.filter((o) => o.day.startsWith(monthKey));
+  const spend = total(month);
+  return {
+    total: spend, count: month.length, spendSold: link.spendSold, spendNoSale: link.spendNoSale,
+    services: Object.fromEntries(link.services.map((s) => [s.serviceId, { spend: s.spend, revenue: s.revenue, orders: s.orders }])),
+    clients: Object.fromEntries(link.rows.map((r) => [phoneKey(r.phone), { total: r.total, count: r.count }])),
+  };
+}
+
+/**
+ * Importação em dia? Esperado: o extrato/CSV chega até ontem (ou ao último dia do mês, se o mês já fechou).
+ * `lastDay` = AAAA-MM-DD do último dado importado do mês (null = nada importado). `now` injetável para teste.
+ */
+export function importFreshness(lastDay, monthKey, now = new Date()) {
+  const [y, m] = monthKey.split('-').map(Number);
+  const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  const expected = [fmt(new Date(y, m, 0)), fmt(yesterday)].sort()[0];
+  if (expected < `${monthKey}-01`) return { upToDate: true, lastDay, expected }; // mês ainda não começou a fechar dia nenhum
+  return { upToDate: !!lastDay && lastDay >= expected, lastDay, expected };
+}
