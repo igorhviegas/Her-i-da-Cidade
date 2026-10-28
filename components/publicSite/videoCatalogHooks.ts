@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Video } from '../../types';
-import { getVideos, subscribeToVideos } from '../../services/videosService';
+import { subscribeToVideos } from '../../services/videosService';
 
 /** Carrega vídeos e assina atualizações do Firestore. */
 export function useCatalogVideos() {
   const [videos, setVideos] = useState<Video[]>([]);
   useEffect(() => {
-    getVideos().then(setVideos).catch(() => setVideos([]));
     return subscribeToVideos(setVideos);
   }, []);
   return videos;

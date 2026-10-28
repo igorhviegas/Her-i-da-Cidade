@@ -50,9 +50,12 @@ export const XpProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     }, (error) => { logger.error('[XpContext] linha de base indisponível', error); setBaselineReady(true); });
   }, []);
 
+  // Só eventos posteriores à linha de base valem XP (countsAfterBaseline); sem baseline não há o que escutar.
+  const baselineAt = baseline?.at ? new Date((baseline.at as { toDate?: () => Date }).toDate?.() ?? (baseline.at as string)).getTime() : NaN;
   useEffect(() => {
+    if (!Number.isFinite(baselineAt)) { setEvents([]); return; }
     let first = true;
-    return subscribeToActivityLog((snapshot) => {
+    return subscribeToActivityLog(new Date(baselineAt), (snapshot) => {
       setEvents(snapshot.docs.map((item) => ({ ...item.data(), id: item.id })));
       if (first) { first = false; return; }
       for (const change of snapshot.docChanges()) {
@@ -65,7 +68,7 @@ export const XpProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         window.setTimeout(() => dismiss(id), TOAST_MS);
       }
     }, (error) => logger.error('[XpContext] histórico de atividades indisponível', error));
-  }, [dismiss]);
+  }, [dismiss, baselineAt]);
 
   const value = useMemo<XpContextType>(() => {
     const result = totalXp(baseline, events);
