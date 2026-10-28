@@ -20,10 +20,10 @@ export function subscribeToXpBaseline(next: (snapshot: DocumentSnapshot) => void
   return onSnapshot(doc(db, ...BASELINE_PATH), next, onError);
 }
 
-/** Escuta o histórico de atividades (base do XP e das janelinhas de ganho). */
-export function subscribeToActivityLog(next: (snapshot: QuerySnapshot) => void, onError: (error: Error) => void): Unsubscribe | undefined {
+/** Escuta o histórico de atividades a partir de `since` (a linha de base já contém o que veio antes; não relê o passado). */
+export function subscribeToActivityLog(since: Date, next: (snapshot: QuerySnapshot) => void, onError: (error: Error) => void): Unsubscribe | undefined {
   if (!db) return;
-  return onSnapshot(collection(db, ACTIVITY_LOG_COLLECTION), next, onError);
+  return onSnapshot(query(collection(db, ACTIVITY_LOG_COLLECTION), where('occurredAt', '>=', since)), next, onError);
 }
 
 /** XP retroativo calculado com os dados que existem agora (somente leitura; não grava nada). */

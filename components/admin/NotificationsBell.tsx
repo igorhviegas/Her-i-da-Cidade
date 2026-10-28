@@ -4,7 +4,7 @@ import { Bell, Camera, CircleX, Clock, FileText, ListChecks, Target, Trophy, Tri
 import { useRouter } from '../../lib/router';
 import { dismissAllNotifications, dismissNotification, previousDaysNotifications, runClientSync, subscribeNotifications, type AppNotification } from '../../services/missionsService';
 
-const SYNC_INTERVAL_MS = 10 * 60 * 1000;
+const SYNC_INTERVAL_MS = 30 * 60 * 1000;
 
 type Look = { icon: LucideIcon; badge: string; card: string };
 // Classes literais (o Tailwind só gera o que aparece escrito). Vermelho + alerta é reservado ao que é mais relevante.
@@ -31,14 +31,14 @@ const LOOKS: Record<string, Look> = {
 };
 const DEFAULT_LOOK: Look = { icon: Bell, badge: 'bg-white/10 text-white/60', card: 'border-transparent bg-white/5' };
 
-/** Avisos internos do CRM. Também dispara a sincronização de tarefas/avisos ao abrir o painel e a cada 10 min. */
+/** Avisos internos do CRM. Também dispara a sincronização de tarefas/avisos ao abrir o painel e a cada 30 min (pula com a aba oculta). */
 export const NotificationsBell: React.FC<{ onOpenMissions: () => void }> = ({ onOpenMissions }) => {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
   const { navigate } = useRouter();
 
   useEffect(() => {
-    const sync = () => runClientSync().catch((error) => logger.error('[NotificationsBell] sincronização falhou', error));
+    const sync = () => (document.visibilityState === 'hidden' ? Promise.resolve() : runClientSync()).catch((error) => logger.error('[NotificationsBell] sincronização falhou', error));
     void sync();
     const timer = window.setInterval(sync, SYNC_INTERVAL_MS);
     const unsubscribe = subscribeNotifications(setItems);
