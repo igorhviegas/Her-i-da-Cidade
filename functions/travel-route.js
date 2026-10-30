@@ -104,12 +104,28 @@ export async function geocodeAddress(address, { apiKey, fetchImpl = fetch, label
   return { formatted: result.formatted_address ?? '', lat: location.lat, lng: location.lng, placeId: result.place_id ?? '', precise, city };
 }
 
-/** Distância (metros) e duração (segundos) de cada trecho de uma rota por `points` ({lat,lng}), em uma única chamada. Mantém a ordem recebida. */
-export async function computeLegs(points, { apiKey, fetchImpl = fetch }) {
+const MAX_PATH_POINTS = 120; // por trecho: basta para a linha seguir as ruas no mapa sem pesar a resposta
+const r5 = (n) => Math.round(n * 1e5) / 1e5;
+
+/** Linha GeoJSON do Google ([lng, lat]) -> até MAX_PATH_POINTS pontos [lat, lng], sempre com o primeiro e o último. */
+export function simplifyPath(coordinates) {
+  if (!Array.isArray(coordinates) || coordinates.length < 2) return [];
+  const step = Math.max(1, Math.ceil((coordinates.length - 1) / (MAX_PATH_POINTS - 1)));
+  const picked = coordinates.filter((_, i) => i % step === 0);
+  if (picked[picked.length - 1] !== coordinates[coordinates.length - 1]) picked.push(coordinates[coordinates.length - 1]);
+  return picked.map(([lng, lat]) => [r5(lat), r5(lng)]);
+}
+
+/**
+ * Distância (metros) e duração (segundos) de cada trecho de uma rota por `points` ({lat,lng}), em uma única chamada. Mantém a ordem recebida.
+ * `withPath` = também o traçado de cada trecho (`path`, [lat, lng][]) para desenhar no mapa. Só o admin pede: a área do agente não recebe.
+ */
+export async function computeLegs(points, { apiKey, fetchImpl = fetch, withPath = false }) {
   const waypoint = (p) => ({ location: { latLng: { latitude: p.lat, longitude: p.lng } } });
+  const fields = `routes.legs.distanceMeters,routes.legs.duration${withPath ? ',routes.legs.polyline.geoJsonLinestring' : ''}`;
   const { response, body } = await request(fetchImpl, ROUTES_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey, 'X-Goog-FieldMask': 'routes.legs.distanceMeters,routes.legs.duration' },
+    headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': apiKey, 'X-Goog-FieldMask': fields },
     body: JSON.stringify({
       origin: waypoint(points[0]),
       destination: waypoint(points[points.length - 1]),
@@ -117,6 +133,7 @@ export async function computeLegs(points, { apiKey, fetchImpl = fetch }) {
       travelMode: 'DRIVE',
       routingPreference: 'TRAFFIC_UNAWARE', // sem trânsito em tempo real: resultado estável e faixa Essentials (mais barata)
       units: 'METRIC',
+      ...(withPath ? { polylineEncoding: 'GEO_JSON_LINESTRING' } : {}),
     }),
   });
   if (!response.ok) throw httpError(response, body);
@@ -124,7 +141,10 @@ export async function computeLegs(points, { apiKey, fetchImpl = fetch }) {
   if (!Array.isArray(legs) || legs.length === 0) throw new TravelRouteError('no_route');
   if (legs.length !== points.length - 1) throw new TravelRouteError('api_error', { detail: 'legs' });
   // Campo ausente = 0 (trecho entre pontos muito próximos); a duração vem como "1234s".
-  return legs.map((leg) => ({ meters: Number(leg.distanceMeters ?? 0), seconds: parseInt(String(leg.duration ?? '0'), 10) || 0 }));
+  return legs.map((leg) => ({
+    meters: Number(leg.distanceMeters ?? 0), seconds: parseInt(String(leg.duration ?? '0'), 10) || 0,
+    ...(withPath ? { path: simplifyPath(leg.polyline?.geoJsonLinestring?.coordinates) } : {}),
+  }));
 }
 
 export async function computeLegsMeters(points, opts) {
@@ -136,7 +156,7 @@ export async function computeLegsMeters(points, opts) {
  * `stops` = [{label, address}] na ordem; `vitor` = endereço da casa do Vitor ou ''. `legs` tem um trecho por seta
  * (paradas + 1 até voltar para casa, mais um se houver Vitor); `resolved` é o endereço que o Google entendeu em cada parada.
  */
-export async function routeTimes({ home, vitor = '', stops, apiKey, fetchImpl = fetch }) {
+export async function routeTimes({ home, vitor = '', stops, apiKey, fetchImpl = fetch, withPath = false }) {
   const creds = { apiKey, fetchImpl };
   const withVitor = !!vitor && vitor !== home;
   const sequence = [{ label: 'sua casa', address: home }, ...stops, { label: 'sua casa', address: home }];
@@ -153,13 +173,26 @@ export async function routeTimes({ home, vitor = '', stops, apiKey, fetchImpl = 
     const current = places.get(sequence[i].address);
     if (previous.lat !== current.lat || previous.lng !== current.lng) { route.push(current); routeLegOf[i - 1] = route.length - 2; }
   }
-  const measured = route.length > 1 ? await computeLegs(route, creds) : [];
+  const measured = route.length > 1 ? await computeLegs(route, { ...creds, withPath }) : [];
   const legs = sequence.slice(1).map((_, i) => {
     const leg = routeLegOf[i] === undefined ? null : measured[routeLegOf[i]];
     return { minutes: Math.ceil((leg?.seconds ?? 0) / 60), km: metersToKm(leg?.meters ?? 0) };
   });
   const resolved = stops.map((stop) => { const place = places.get(stop.address); return { label: stop.label, address: place.formatted, precise: place.precise }; });
-  return { legs, resolved, withVitor };
+  return { legs, resolved, withVitor, ...(withPath ? { map: dayMap({ places, home, vitor: withVitor ? vitor : '', stops, measured }) } : {}) };
+}
+
+/** Mapa do dia (só admin): as casas e as paradas na ordem, mais o traçado de cada trecho. */
+function dayMap({ places, home, vitor, stops, measured }) {
+  const at = (address) => { const p = places.get(address); return { lat: p.lat, lng: p.lng }; };
+  return {
+    places: [
+      { kind: 'home', label: 'Sua casa', ...at(home) },
+      ...stops.map((stop, i) => ({ kind: 'stop', label: stop.label, order: i + 1, ...at(stop.address) })),
+      ...(vitor ? [{ kind: 'vitor', label: 'Casa do Vitor', ...at(vitor) }] : []),
+    ],
+    paths: measured.map((leg) => leg.path).filter((p) => p.length > 1),
+  };
 }
 
 /**
