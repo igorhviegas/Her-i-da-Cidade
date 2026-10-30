@@ -205,3 +205,34 @@ test('tempos da rota: casa → evento → casa → casa do Vitor, minutos arredo
   assert.deepEqual(legs.map((l) => l.minutes), [11, 21, 31]);
   assert.ok(withVitor);
 });
+
+test('mapa (só admin): sem withPath nada muda; com withPath vêm os pontos e o traçado simplificado', async () => {
+  const spots = { casa: [1, 1], vitor: [2, 2], evento: [3, 3] };
+  const sent = [];
+  const line = Array.from({ length: 500 }, (_, i) => [-44 + i / 1000, -19.9 - i / 1000]); // [lng, lat], como o Google
+  const fetchImpl = async (url, init) => {
+    if (String(url).includes('geocode')) {
+      const [lat, lng] = spots[new URL(url).searchParams.get('address')];
+      return { ok: true, status: 200, json: async () => ({ status: 'OK', results: [{ formatted_address: 'x', geometry: { location: { lat, lng }, location_type: 'ROOFTOP' } }] }) };
+    }
+    sent.push({ mask: init.headers['X-Goog-FieldMask'], body: JSON.parse(init.body) });
+    const count = (JSON.parse(init.body).intermediates?.length ?? 0) + 1;
+    return { ok: true, status: 200, json: async () => ({ routes: [{ legs: Array.from({ length: count }, () => ({ distanceMeters: 5000, duration: '600s', polyline: { geoJsonLinestring: { coordinates: line } } })) }] }) };
+  };
+  const opts = { home: 'casa', vitor: 'vitor', stops: [{ label: 'E', address: 'evento' }], apiKey: 'k', fetchImpl };
+
+  const plain = await routeTimes(opts);
+  assert.equal(plain.map, undefined); // a área do agente (sem login) continua sem coordenadas
+  assert.ok(!sent[0].mask.includes('polyline'));
+  assert.equal(sent[0].body.polylineEncoding, undefined);
+
+  const withMap = await routeTimes({ ...opts, withPath: true });
+  assert.ok(sent[1].mask.includes('routes.legs.polyline.geoJsonLinestring'));
+  assert.equal(sent[1].body.polylineEncoding, 'GEO_JSON_LINESTRING');
+  assert.deepEqual(withMap.map.places.map((p) => [p.kind, p.order ?? null, p.lat]), [['home', null, 1], ['stop', 1, 3], ['vitor', null, 2]]);
+  assert.equal(withMap.map.paths.length, 3);
+  const path = withMap.map.paths[0];
+  assert.ok(path.length <= 120);
+  assert.deepEqual(path[0], [-19.9, -44]); // virou [lat, lng]
+  assert.deepEqual(path[path.length - 1], [-20.399, -43.501]); // o último ponto nunca se perde
+});

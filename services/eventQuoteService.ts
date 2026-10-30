@@ -1,7 +1,13 @@
 import { auth } from '../lib/firebaseAuth';
 import type { QuoteResult } from './eventQuote.js';
+import type { RoutePath, RoutePlace } from '../functions/travel-route.js';
 
-export interface QuoteCalculation { quote: QuoteResult; address: { formatted: string; precise: boolean; city: string } }
+export interface QuoteCalculation {
+  quote: QuoteResult;
+  address: { formatted: string; precise: boolean; city: string; lat: number; lng: number };
+  /** Casa e traçado da ida (casa → evento) para o mapa. */
+  map: { home: { lat: number; lng: number }; path?: RoutePath };
+}
 
 async function call<T>(body: Record<string, unknown>): Promise<T> {
   const user = auth?.currentUser;
@@ -25,7 +31,10 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
 export const calculateEventQuote = (input: { address: string; date: string; packageId: string; companyBase?: string }) =>
   call<QuoteCalculation>({ action: 'quote', ...input });
 
-export interface ScheduleLegs { legs: { minutes: number; km: number }[]; resolved: { label: string; address: string; precise: boolean }[]; withVitor: boolean }
+export interface ScheduleLegs {
+  legs: { minutes: number; km: number }[]; resolved: { label: string; address: string; precise: boolean }[]; withVitor: boolean;
+  map?: { places: RoutePlace[]; paths: RoutePath[] };
+}
 
 /** Minutos de cada trecho casa → eventos (na ordem) → casa → casa do Vitor, para a viabilidade do dia. */
 export const calculateSchedule = (stops: { label: string; address: string }[]) => call<ScheduleLegs>({ action: 'schedule', stops });

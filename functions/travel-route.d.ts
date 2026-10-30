@@ -10,9 +10,18 @@ export interface TravelConfig {
 export function readTravelConfig(env?: Record<string, string | undefined>): TravelConfig | null;
 export function codeMatches(provided: unknown, expected: string): boolean;
 export function geocodeAddress(address: string, opts: { apiKey: string; fetchImpl?: typeof fetch; label?: string }): Promise<{ formatted: string; lat: number; lng: number; placeId: string; precise: boolean }>;
-export function computeLegs(points: { lat: number; lng: number }[], opts: { apiKey: string; fetchImpl?: typeof fetch }): Promise<{ meters: number; seconds: number }[]>;
-export interface RouteTimes { legs: { minutes: number; km: number }[]; resolved: { label: string; address: string; precise: boolean }[]; withVitor: boolean }
-export function routeTimes(opts: { home: string; vitor?: string; stops: { label: string; address: string }[]; apiKey: string; fetchImpl?: typeof fetch }): Promise<RouteTimes>;
+/** Traçado de um trecho: pontos [lat, lng]. */
+export type RoutePath = [number, number][];
+export function simplifyPath(coordinates: unknown): RoutePath;
+export function computeLegs(points: { lat: number; lng: number }[], opts: { apiKey: string; fetchImpl?: typeof fetch; withPath?: boolean }): Promise<{ meters: number; seconds: number; path?: RoutePath }[]>;
+/** Ponto do mapa do dia: casa, parada (com a ordem) ou casa do Vitor. */
+export interface RoutePlace { kind: 'home' | 'stop' | 'vitor'; label: string; lat: number; lng: number; order?: number }
+export interface RouteTimes {
+  legs: { minutes: number; km: number }[]; resolved: { label: string; address: string; precise: boolean }[]; withVitor: boolean;
+  /** Só com `withPath` (admin). */
+  map?: { places: RoutePlace[]; paths: RoutePath[] };
+}
+export function routeTimes(opts: { home: string; vitor?: string; stops: { label: string; address: string }[]; apiKey: string; fetchImpl?: typeof fetch; withPath?: boolean }): Promise<RouteTimes>;
 export function computeLegsMeters(points: { lat: number; lng: number }[], opts: { apiKey: string; fetchImpl?: typeof fetch }): Promise<number[]>;
 export interface TravelDayResult extends TravelDayKm {
   /** Endereço entendido pelo Google para cada ponto digitado pelo agente neste dia. */

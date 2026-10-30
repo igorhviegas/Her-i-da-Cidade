@@ -15,7 +15,7 @@ import { randomBytes } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { calendarEventId, deleteCalendarEvent, eventDateKey, syncOrderToCalendar } from './google-calendar.js';
 import { SERVICE_PROFILES, bookingKey, evaluateService } from './manychat-handler.js';
-import { TravelRouteError, computeLegsMeters, geocodeAddress, routeTimes } from './travel-route.js';
+import { TravelRouteError, computeLegs, geocodeAddress, routeTimes } from './travel-route.js';
 import { bookingWhatsAppUrl, normalizePhone } from './video-call.js';
 import { zonedInstant } from './video-call-time.js';
 import { computeQuote, normalizeQuoteConfig, packageById } from '../services/eventQuote.js';
@@ -265,11 +265,16 @@ export async function calculateQuote({ database, input, env = process.env, fetch
     geocodeAddress(origin, { apiKey, fetchImpl, label: 'partida' }),
     geocodeAddress(address, { apiKey, fetchImpl, label: 'evento' }),
   ]);
-  const [meters] = await computeLegsMeters([home, place], { apiKey, fetchImpl });
+  const [leg] = await computeLegs([home, place], { apiKey, fetchImpl, withPath: true });
   const config = await loadQuoteConfig(database);
-  const quote = computeQuote({ packageId: input.packageId, km: meters / 1000, date: input.date, city: place.city, companyBase: input.companyBase }, config);
+  const quote = computeQuote({ packageId: input.packageId, km: leg.meters / 1000, date: input.date, city: place.city, companyBase: input.companyBase }, config);
   if (quote.error) throw new EventFormError('validation_error', quote.error);
-  return { quote, address: { formatted: place.formatted, precise: place.precise, city: place.city } };
+  // `map` = casa e traçado da ida para o mapa do admin (esta ação exige login de administrador).
+  return {
+    quote,
+    address: { formatted: place.formatted, precise: place.precise, city: place.city, lat: place.lat, lng: place.lng },
+    map: { home: { lat: home.lat, lng: home.lng }, path: leg.path },
+  };
 }
 
 /**
@@ -283,7 +288,7 @@ export async function calculateSchedule({ input, env = process.env, fetchImpl = 
   const stops = (Array.isArray(input?.stops) ? input.stops : []).slice(0, 8)
     .map((s) => ({ label: String(s?.label ?? 'evento').slice(0, 80), address: typeof s?.address === 'string' ? s.address.trim().slice(0, 300) : '' }));
   if (stops.length === 0 || stops.some((s) => s.address.length < 5)) throw new EventFormError('validation_error', 'Todos os eventos precisam de endereço.');
-  return routeTimes({ home, vitor: String(env.TRAVEL_START_ADDRESS ?? '').trim(), stops, apiKey, fetchImpl });
+  return routeTimes({ home, vitor: String(env.TRAVEL_START_ADDRESS ?? '').trim(), stops, apiKey, fetchImpl, withPath: true });
 }
 
 /** Guarda o orçamento enviado e devolve o ID do link (?orcamento=ID). O valor pode ter sido ajustado à mão pelo dono. */

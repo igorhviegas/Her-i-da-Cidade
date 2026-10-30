@@ -4,6 +4,8 @@ import type { CalendarEvent } from '../../services/calendarService';
 import { calculateSchedule, type ScheduleLegs } from '../../services/eventQuoteService';
 import { DEFAULT_BUFFERS, PACKAGE_MINUTES, formatTime, parseTime, planDay, type ScheduleStop } from '../../services/eventSchedule.js';
 import { ErrorNote, inputClass, labelClass, primaryButton } from './missionsUi';
+import type { RoutePath } from '../../functions/travel-route.js';
+import type { MapPoint } from './QuoteMap';
 
 interface Stop extends ScheduleStop { address: string; precise?: boolean }
 
@@ -14,7 +16,7 @@ const num = (text: string, fallback: number) => { const n = Number(text); return
  * Viabilidade de encaixar um evento no dia: casa → eventos da agenda (com endereço) + o novo → casa → casa do Vitor.
  * Cada evento seguinte precisa de: fim do anterior + organização + trajeto + chegada antecipada ≤ início (docs/deslocamento.md).
  */
-export const EventScheduleCheck: React.FC<{ dayEvents: CalendarEvent[]; address: string; packageId: string }> = ({ dayEvents, address, packageId }) => {
+export const EventScheduleCheck: React.FC<{ dayEvents: CalendarEvent[]; address: string; packageId: string; onMap?: (map: { points: MapPoint[]; paths: RoutePath[] } | null) => void }> = ({ dayEvents, address, packageId, onMap }) => {
   const candidates = useMemo(() => dayEvents.filter((e) => e.startTime && e.endTime && e.startKey === e.endKey && !e.transparent), [dayEvents]);
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [start, setStart] = useState('');
@@ -26,6 +28,11 @@ export const EventScheduleCheck: React.FC<{ dayEvents: CalendarEvent[]; address:
   const [calc, setCalc] = useState<{ stops: Stop[]; legs: ScheduleLegs } | null>(null);
 
   const reset = () => setCalc(null);
+  // Trajeto do dia no mapa do orçamento (o evento novo fica destacado); some quando o cálculo é refeito.
+  useEffect(() => {
+    const map = calc?.legs.map;
+    onMap?.(map ? { paths: map.paths, points: map.places.map((p) => ({ ...p, kind: p.kind === 'stop' && p.label === NEW_LABEL ? 'new' : p.kind })) } : null);
+  }, [calc, onMap]);
   const startMin = parseTime(start);
   const minutes = Number(duration);
   const endMin = startMin !== null && minutes > 0 ? startMin + minutes : null;

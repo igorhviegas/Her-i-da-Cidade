@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Calculator, ChevronLeft, ChevronRight, Copy, Loader2, MessageCircle, Save, Settings2 } from 'lucide-react';
 import { dateKey } from '../../functions/missions-core.js';
 import { daysBetween, eventsOnDay, shiftDate, visibleRange } from '../../services/calendarEvents.js';
@@ -11,6 +11,11 @@ import { getEventFormConfig, getEventQuoteConfig, saveEventQuoteConfig } from '.
 import type { EventPackage } from '../../services/eventQuote.js';
 import { ErrorNote, cardClass, ghostButton, inputClass, labelClass, primaryButton } from './missionsUi';
 import { fmt } from './ordersFlow/CalendarViews';
+import type { MapPoint } from './QuoteMap';
+import type { RoutePath } from '../../functions/travel-route.js';
+
+// O mapa (Leaflet + MapLibre, ~250 KB) só baixa quando há um orçamento calculado.
+const QuoteMap = lazy(() => import('./QuoteMap'));
 
 const WEEKDAY_SHORT = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 
@@ -94,6 +99,15 @@ const DayQuote: React.FC<{ date: string; config: QuoteConfig; packages: EventPac
   const [busyAction, setBusyAction] = useState<'' | 'extra' | 'calc' | 'save'>('');
   const [error, setError] = useState('');
   const [copied, setCopied] = useState('');
+  const [dayMap, setDayMap] = useState<{ points: MapPoint[]; paths: RoutePath[] } | null>(null);
+  // Mapa: o trajeto do dia (depois de "Verificar horários") ou, antes disso, só a ida casa → evento do orçamento.
+  const mapData = useMemo(() => dayMap ?? (result ? {
+    points: [
+      { kind: 'home' as const, label: 'Sua casa', ...result.map.home },
+      { kind: 'new' as const, label: result.address.formatted || 'Evento', lat: result.address.lat, lng: result.address.lng },
+    ],
+    paths: result.map.path ? [result.map.path] : [],
+  } : null), [dayMap, result]);
 
   const reset = () => { setResult(null); setCopied(''); setChecked(false); };
 
@@ -207,7 +221,13 @@ const DayQuote: React.FC<{ date: string; config: QuoteConfig; packages: EventPac
         </div>
       )}
 
-      <EventScheduleCheck dayEvents={dayEvents} address={address} packageId={packageId} />
+      {mapData && (
+        <Suspense fallback={<div style={{ height: 340 }} className="w-full animate-pulse rounded-xl border border-white/10 bg-white/5" />}>
+          <QuoteMap points={mapData.points} paths={mapData.paths} />
+        </Suspense>
+      )}
+
+      <EventScheduleCheck dayEvents={dayEvents} address={address} packageId={packageId} onMap={setDayMap} />
     </section>
   );
 };
