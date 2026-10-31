@@ -6,8 +6,11 @@ import '@maplibre/maplibre-gl-leaflet';
 import type { RoutePath } from '../../functions/travel-route.js';
 import { mapStyle } from './mapStyle';
 
-/** Ponto do mapa: casa, casa do Vitor, evento da agenda (com a ordem do dia) ou o evento do orçamento. */
-export interface MapPoint { kind: 'home' | 'vitor' | 'stop' | 'new'; label: string; lat: number; lng: number; order?: number }
+/**
+ * Ponto do mapa: casa, casa do Vitor, evento da agenda (com a ordem do dia), o evento do orçamento ou, na aba Mapa,
+ * um local já visitado (apagado) / com evento marcado. `count` = quantos eventos no mesmo local (número no ícone).
+ */
+export interface MapPoint { kind: 'home' | 'vitor' | 'stop' | 'new' | 'visited' | 'upcoming'; label: string; lat: number; lng: number; order?: number; count?: number }
 
 // Área de atendimento: retângulo em volta da Região Metropolitana de BH (Betim/Florestal a oeste, Jaboticatubas ao norte,
 // Nova União a leste, Rio Manso/Brumadinho ao sul), com folga. O mapa não sai dela.
@@ -18,20 +21,26 @@ const STYLE: Record<MapPoint['kind'], { bg: string; border: string; text: (p: Ma
   vitor: { bg: '#0d9488', border: '#fff', text: () => 'V' },
   stop: { bg: '#ea580c', border: '#fff', text: (p) => String(p.order ?? '') },
   new: { bg: '#0D1527', border: '#facc15', text: (p) => (p.order ? String(p.order) : '★') },
+  visited: { bg: 'rgba(148,163,184,.45)', border: 'rgba(255,255,255,.5)', text: (p) => (p.count && p.count > 1 ? String(p.count) : '') },
+  upcoming: { bg: '#ea580c', border: '#fff', text: (p) => (p.count && p.count > 1 ? String(p.count) : '') },
 };
 
 const icon = (p: MapPoint) => {
   const s = STYLE[p.kind];
   const dashed = p.kind === 'new' ? 'border-style:dashed;' : '';
+  const size = p.kind === 'visited' || p.kind === 'upcoming' ? 22 : 28;
   return L.divIcon({
     className: '',
-    html: `<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:9999px;background:${s.bg};border:2px solid ${s.border};${dashed}color:#fff;font:800 12px/1 sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.5)">${s.text(p)}</div>`,
-    iconSize: [28, 28], iconAnchor: [14, 14],
+    html: `<div style="width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;border-radius:9999px;background:${s.bg};border:2px solid ${s.border};${dashed}color:#fff;font:800 11px/1 sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.5)">${s.text(p)}</div>`,
+    iconSize: [size, size], iconAnchor: [size / 2, size / 2],
   });
 };
 
-/** Mapa dos orçamentos (Leaflet + MapLibre, como no HDC Academy). Carregado sob demanda: só baixa quando aparece na tela. */
-export default function QuoteMap({ points, paths }: { points: MapPoint[]; paths: RoutePath[] }) {
+/**
+ * Mapa dos orçamentos e da aba Mapa (Leaflet + MapLibre, como no HDC Academy). Carregado sob demanda: só baixa quando aparece na tela.
+ * `focus` = centraliza nesse ponto (clique na lista da aba Mapa).
+ */
+export default function QuoteMap({ points, paths, height = 340, focus }: { points: MapPoint[]; paths: RoutePath[]; height?: number; focus?: { lat: number; lng: number } | null }) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
@@ -67,6 +76,8 @@ export default function QuoteMap({ points, paths }: { points: MapPoint[]; paths:
     if (all.length > 0) m.fitBounds(L.latLngBounds(all), { padding: [30, 30], maxZoom: 14 });
   }, [points, paths]);
 
+  useEffect(() => { if (focus) map.current?.setView([focus.lat, focus.lng], 15); }, [focus]);
+
   // Altura fixa no próprio elemento: o Leaflet mede o espaço ao nascer e precisa dela já aplicada.
-  return <div ref={el} style={{ height: 340 }} className="w-full overflow-hidden rounded-xl border border-white/10" role="region" aria-label="Mapa do trajeto" />;
+  return <div ref={el} style={{ height }} className="w-full overflow-hidden rounded-xl border border-white/10" role="region" aria-label="Mapa" />;
 }

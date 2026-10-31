@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
-import { EventFormError, depositMissionId, submitEventForm, syncEventFormHolds } from './event-form.js';
+import { EventFormError, depositMissionId, geocodeEvents, submitEventForm, syncEventFormHolds } from './event-form.js';
 import { bookingKey, handleManyChatOrderRequest } from './manychat-handler.js';
 
 // Firestore em memória, só com o que o formulário usa (transações serializadas).
@@ -174,4 +174,22 @@ test('valor definido no CRM antes do pagamento: o ManyChat confirma o mesmo pedi
   assert.equal(entry.amount, 423.5);
   assert.equal(entry.kind, 'entry');
   assert.equal(entry.type, 'revenue');
+});
+
+test('geocodeEvents grava eventGeo no pedido e marca endereço não encontrado sem parar o lote', async () => {
+  const database = fakeDatabase({
+    'orders/a': { eventForm: { location: 'Rua A, 10, Belo Horizonte' } },
+    'orders/b': { eventForm: { location: 'Lugar que não existe' } },
+    'orders/c': { content: 'sem evento' },
+  });
+  const fetchImpl = async (url) => {
+    const ok = String(url).includes('Rua+A');
+    const body = ok ? { status: 'OK', results: [{ formatted_address: 'Rua A', geometry: { location: { lat: -19.9, lng: -43.9 }, location_type: 'ROOFTOP' } }] } : { status: 'ZERO_RESULTS' };
+    return { ok: true, status: 200, json: async () => body, text: async () => JSON.stringify(body) };
+  };
+  const { results } = await geocodeEvents({ database, input: { orderIds: ['a', 'b', 'c', '../x'] }, env: { GOOGLE_MAPS_API_KEY: 'k' }, fetchImpl });
+  assert.deepEqual(results.map((r) => r.id), ['a', 'b']);
+  assert.deepEqual(database.docs.get('orders/a').eventGeo, { address: 'Rua A, 10, Belo Horizonte', lat: -19.9, lng: -43.9 });
+  assert.deepEqual(database.docs.get('orders/b').eventGeo, { address: 'Lugar que não existe', failed: true });
+  assert.equal(database.docs.get('orders/c').eventGeo, undefined);
 });

@@ -113,6 +113,8 @@ export interface Order {
   inviteArt?: { name: string; age: string; date: string; time: string; place: string };
   /** Cupom das Mamães em Collab usado no pagamento (gravado pelo webhook do ManyChat; ver services/collab.js). */
   collab?: OrderCollab;
+  /** Coordenadas do local do evento (aba Mapa), gravadas pelo servidor. `address` = texto geocodificado; `failed` = endereço não encontrado. */
+  eventGeo?: { address: string; lat?: number; lng?: number; failed?: boolean };
   /** Benefício concedido a uma parceira das Mamães em Collab (id em collabPartners); pedido sem valor. */
   collabGrant?: string;
 }
