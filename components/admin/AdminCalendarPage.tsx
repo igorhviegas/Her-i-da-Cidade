@@ -10,22 +10,24 @@ import { DayList, MonthGrid, WeekList, fmt } from './ordersFlow/CalendarViews';
 import { EventDialog } from './ordersFlow/CalendarEventDialog';
 import { EventQuotesPanel } from './EventQuotesPanel';
 import { EventFormSettings } from './EventFormSettings';
+import { EventMapPanel } from './EventMapPanel';
 
 const VIEWS: { id: CalendarView; label: string }[] = [{ id: 'month', label: 'Mês' }, { id: 'week', label: 'Semana' }, { id: 'day', label: 'Dia' }];
 
-/** Calendário com três abas: a agenda (Google), os orçamentos de eventos (?aba=orcamentos) e o formulário do site (?aba=formulario). */
+/** Calendário com quatro abas: a agenda (Google), os orçamentos de eventos (?aba=orcamentos), o mapa dos eventos (?aba=mapa) e o formulário do site (?aba=formulario). */
 export const AdminCalendarPage: React.FC = () => {
   const { search } = useRouter();
-  const [tab, setTab] = useState<'agenda' | 'quotes' | 'form'>(() => ({ orcamentos: 'quotes', formulario: 'form' } as const)[new URLSearchParams(search).get('aba') as 'orcamentos'] ?? 'agenda');
+  const [tab, setTab] = useState<'agenda' | 'quotes' | 'map' | 'form'>(() => ({ orcamentos: 'quotes', mapa: 'map', formulario: 'form' } as const)[new URLSearchParams(search).get('aba') as 'orcamentos'] ?? 'agenda');
   const tabClass = (active: boolean) => `rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${active ? 'bg-blue-600 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'}`;
   return (
     <div className="space-y-4">
       <div className="flex w-fit gap-1 rounded-xl bg-white/5 p-1" role="tablist" aria-label="Calendário">
         <button type="button" role="tab" aria-selected={tab === 'agenda'} onClick={() => setTab('agenda')} className={tabClass(tab === 'agenda')}>Agenda</button>
         <button type="button" role="tab" aria-selected={tab === 'quotes'} onClick={() => setTab('quotes')} className={tabClass(tab === 'quotes')}>Orçamentos</button>
+        <button type="button" role="tab" aria-selected={tab === 'map'} onClick={() => setTab('map')} className={tabClass(tab === 'map')}>Mapa</button>
         <button type="button" role="tab" aria-selected={tab === 'form'} onClick={() => setTab('form')} className={tabClass(tab === 'form')}>Formulário</button>
       </div>
-      {tab === 'agenda' ? <AgendaView /> : tab === 'quotes' ? <EventQuotesPanel /> : <EventFormSettings />}
+      {tab === 'agenda' ? <AgendaView /> : tab === 'quotes' ? <EventQuotesPanel /> : tab === 'map' ? <EventMapPanel /> : <EventFormSettings />}
     </div>
   );
 };

@@ -291,6 +291,38 @@ export async function calculateSchedule({ input, env = process.env, fetchImpl = 
   return routeTimes({ home, vitor: String(env.TRAVEL_START_ADDRESS ?? '').trim(), stops, apiKey, fetchImpl, withPath: true });
 }
 
+export const GEOCODE_BATCH = 25;
+
+// Onde está o local de cada origem: pedidos (formulário do evento) ou eventos antigos importados dos PDFs do Google (eventHistory).
+const GEO_SOURCES = {
+  orders: ['orders', (snap) => snap.get('eventForm')?.location],
+  history: ['eventHistory', (snap) => snap.get('location')],
+};
+
+/**
+ * Aba Mapa: geocodifica o local dos documentos indicados (`input.source`: 'orders' padrão ou 'history') e grava `eventGeo` = {address, lat, lng}.
+ * `address` guarda o texto usado; se o local mudar, o admin pede de novo. Endereço não encontrado grava `failed` para não repetir.
+ */
+export async function geocodeEvents({ database, input, env = process.env, fetchImpl = fetch }) {
+  const apiKey = String(env.GOOGLE_MAPS_API_KEY ?? '').trim();
+  if (!apiKey) throw new TravelRouteError('not_configured');
+  const ids = [...new Set((Array.isArray(input?.orderIds) ? input.orderIds : []).filter((id) => typeof id === 'string' && /^[\w-]{1,64}$/.test(id)))].slice(0, GEOCODE_BATCH);
+  const [collection, locationOf] = GEO_SOURCES[input?.source] ?? GEO_SOURCES.orders;
+  const results = [];
+  for (const id of ids) {
+    const ref = database.collection(collection).doc(id);
+    const address = String(locationOf(await ref.get()) ?? '').trim().slice(0, 300);
+    if (address.length < 5) continue;
+    const eventGeo = await geocodeAddress(address, { apiKey, fetchImpl, label: 'evento' }).then(
+      (place) => ({ address, lat: place.lat, lng: place.lng }),
+      (error) => { if (error?.code === 'address_not_found') return { address, failed: true }; throw error; },
+    );
+    await ref.update({ eventGeo });
+    results.push({ id, eventGeo });
+  }
+  return { results };
+}
+
 /** Guarda o orçamento enviado e devolve o ID do link (?orcamento=ID). O valor pode ter sido ajustado à mão pelo dono. */
 export async function saveQuote({ database, input, nowMs = Date.now() }) {
   const pack = packageById(input?.packageId);

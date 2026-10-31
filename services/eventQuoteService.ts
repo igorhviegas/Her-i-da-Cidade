@@ -42,3 +42,7 @@ export const calculateSchedule = (stops: { label: string; address: string }[]) =
 /** Guarda o orçamento e devolve o ID usado no link do formulário (?orcamento=ID). */
 export const saveEventQuote = async (input: { packageId: string; date: string; location: string; total: number; km: number; city: string }) =>
   (await call<{ id: string }>({ action: 'save-quote', ...input })).id;
+
+/** Aba Mapa: geocodifica e grava `eventGeo` nos pedidos ou eventos antigos (eventHistory) indicados (até 25 por chamada). */
+export const geocodeEvents = async (orderIds: string[], source: 'orders' | 'history' = 'orders') =>
+  (await call<{ results: { id: string; eventGeo: NonNullable<import('../types').Order['eventGeo']> }[] }>({ action: 'geocode-events', orderIds, source })).results;
