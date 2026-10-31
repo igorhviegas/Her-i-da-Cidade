@@ -21,3 +21,8 @@ export function groupPlaces(events) {
     label: g.labels.slice(0, 4).join(' · ') + (g.labels.length > 4 ? ` +${g.labels.length - 4}` : ''),
   }));
 }
+
+const slug = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+/** Chave de um evento: data + nome da criança. É o ID no eventHistory (reimportar o mesmo PDF sobrescreve) e evita duplicar um pedido. */
+export const eventKey = (eventDate, childName) => `${eventDate}-${slug(childName)}`.slice(0, 64);

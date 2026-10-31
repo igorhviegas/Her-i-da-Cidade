@@ -24,7 +24,7 @@ type Auth = 'unauthenticated' | 'forbidden' | 'authorized';
  * Administrador (ID token do Firebase):
  *   POST { action: 'quote', address, date, packageId, companyBase? } -> cálculo com a rota casa → evento
  *   POST { action: 'schedule', stops: [{label, address}] } -> { legs: [{minutes, km}], resolved, withVitor } (viabilidade de horários)
- *   POST { action: 'geocode-events', orderIds } -> { results: [{id, eventGeo}] } (aba Mapa; até 25 por chamada)
+ *   POST { action: 'geocode-events', orderIds, source? } -> { results: [{id, eventGeo}] } (aba Mapa; até 25 por chamada)
  *   POST { action: 'save-quote', packageId, date, location, total, km, city } -> { id } para o link
  */
 export async function handleEventForm(

@@ -343,6 +343,11 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // Eventos antigos importados dos PDFs do Google Forms (aba Mapa): só histórico, não são pedidos. eventGeo é gravado pelo servidor.
+    match /eventHistory/{eventId} {
+      allow read, write: if isAdmin();
+    }
+
     // Mamães em Collab (services/collab.js): fichas das criadoras. O formulário público grava pelo servidor (Admin SDK), nunca pelo cliente.
     match /collabPartners/{partnerId} {
       allow read, write: if isAdmin();

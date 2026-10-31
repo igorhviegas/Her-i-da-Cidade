@@ -192,4 +192,8 @@ test('geocodeEvents grava eventGeo no pedido e marca endereço não encontrado s
   assert.deepEqual(database.docs.get('orders/a').eventGeo, { address: 'Rua A, 10, Belo Horizonte', lat: -19.9, lng: -43.9 });
   assert.deepEqual(database.docs.get('orders/b').eventGeo, { address: 'Lugar que não existe', failed: true });
   assert.equal(database.docs.get('orders/c').eventGeo, undefined);
+
+  database.docs.set('eventHistory/h1', { location: 'Rua A, 10, Belo Horizonte' });
+  await geocodeEvents({ database, input: { orderIds: ['h1'], source: 'history' }, env: { GOOGLE_MAPS_API_KEY: 'k' }, fetchImpl });
+  assert.equal(database.docs.get('eventHistory/h1').eventGeo.lat, -19.9);
 });
