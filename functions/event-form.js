@@ -300,7 +300,7 @@ const GEO_SOURCES = {
 };
 
 /**
- * Aba Mapa: geocodifica o local dos documentos indicados (`input.source`: 'orders' padrão ou 'history') e grava `eventGeo` = {address, lat, lng}.
+ * Aba Mapa: geocodifica o local dos documentos indicados (`input.source`: 'orders' padrão ou 'history') e grava `eventGeo` = {address, lat, lng, city}.
  * `address` guarda o texto usado; se o local mudar, o admin pede de novo. Endereço não encontrado grava `failed` para não repetir.
  */
 export async function geocodeEvents({ database, input, env = process.env, fetchImpl = fetch }) {
@@ -314,7 +314,7 @@ export async function geocodeEvents({ database, input, env = process.env, fetchI
     const address = String(locationOf(await ref.get()) ?? '').trim().slice(0, 300);
     if (address.length < 5) continue;
     const eventGeo = await geocodeAddress(address, { apiKey, fetchImpl, label: 'evento' }).then(
-      (place) => ({ address, lat: place.lat, lng: place.lng }),
+      (place) => ({ address, lat: place.lat, lng: place.lng, city: place.city }),
       (error) => { if (error?.code === 'address_not_found') return { address, failed: true }; throw error; },
     );
     await ref.update({ eventGeo });

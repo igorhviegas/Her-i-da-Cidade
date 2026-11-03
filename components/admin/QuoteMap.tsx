@@ -13,9 +13,9 @@ setWorkerUrl(maplibreWorkerUrl);
 
 /**
  * Ponto do mapa: casa, casa do Vitor, evento da agenda (com a ordem do dia), o evento do orçamento ou, na aba Mapa,
- * um local já visitado (apagado) / com evento marcado. `count` = quantos eventos no mesmo local (número no ícone).
+ * um local já visitado (apagado) / com evento marcado. `count` = quantos eventos no mesmo local (número no ícone); `ids` = quais (clique).
  */
-export interface MapPoint { kind: 'home' | 'vitor' | 'stop' | 'new' | 'visited' | 'upcoming'; label: string; lat: number; lng: number; order?: number; count?: number }
+export interface MapPoint { kind: 'home' | 'vitor' | 'stop' | 'new' | 'visited' | 'upcoming'; label: string; lat: number; lng: number; order?: number; count?: number; ids?: string[] }
 
 // Área de atendimento: retângulo em volta da Região Metropolitana de BH (Betim/Florestal a oeste, Jaboticatubas ao norte,
 // Nova União a leste, Rio Manso/Brumadinho ao sul), com folga. O mapa não sai dela.
@@ -43,10 +43,14 @@ const icon = (p: MapPoint) => {
 
 /**
  * Mapa dos orçamentos e da aba Mapa (Leaflet + MapLibre, como no HDC Academy). Carregado sob demanda: só baixa quando aparece na tela.
- * `focus` = centraliza nesse ponto (clique na lista da aba Mapa).
+ * `focus` = centraliza nesse ponto (clique na lista da aba Mapa). `onPick` = clique num ponto. `overlay` = fica acima dos botões de zoom (filtro).
  */
-export default function QuoteMap({ points, paths, height = 340, focus }: { points: MapPoint[]; paths: RoutePath[]; height?: number; focus?: { lat: number; lng: number } | null }) {
+export default function QuoteMap({ points, paths, height = 340, focus, onPick, overlay }: {
+  points: MapPoint[]; paths: RoutePath[]; height?: number; focus?: { lat: number; lng: number } | null; onPick?: (p: MapPoint) => void; overlay?: React.ReactNode;
+}) {
   const el = useRef<HTMLDivElement>(null);
+  const pick = useRef(onPick);
+  pick.current = onPick;
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
 
@@ -75,7 +79,7 @@ export default function QuoteMap({ points, paths, height = 340, focus }: { point
       const key = `${p.kind}:${p.lat},${p.lng}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      L.marker([p.lat, p.lng], { icon: icon(p), title: p.label, zIndexOffset: p.kind === 'new' ? 1000 : 0 }).bindTooltip(p.label).addTo(g);
+      L.marker([p.lat, p.lng], { icon: icon(p), title: p.label, zIndexOffset: p.kind === 'new' ? 1000 : 0 }).bindTooltip(p.label).on('click', () => pick.current?.(p)).addTo(g);
     }
     const all = [...points.map((p) => [p.lat, p.lng] as [number, number]), ...paths.flat()];
     if (all.length > 0) m.fitBounds(L.latLngBounds(all), { padding: [30, 30], maxZoom: 14 });
@@ -84,5 +88,10 @@ export default function QuoteMap({ points, paths, height = 340, focus }: { point
   useEffect(() => { if (focus) map.current?.setView([focus.lat, focus.lng], 15); }, [focus]);
 
   // Altura fixa no próprio elemento: o Leaflet mede o espaço ao nascer e precisa dela já aplicada.
-  return <div ref={el} style={{ height }} className="w-full overflow-hidden rounded-xl border border-white/10" role="region" aria-label="Mapa" />;
+  return (
+    <div className="relative">
+      <div ref={el} style={{ height }} className="w-full overflow-hidden rounded-xl border border-white/10" role="region" aria-label="Mapa" />
+      {overlay && <div className="absolute bottom-[86px] right-[10px] z-[1000]">{overlay}</div>}
+    </div>
+  );
 }

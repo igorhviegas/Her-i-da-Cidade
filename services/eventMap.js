@@ -3,21 +3,22 @@
 const CELL = 2000; // 1/2000 de grau ≈ 55 m em BH
 
 /**
- * `events` = [{ lat, lng, label, upcoming }]. Devolve um ponto por local: `upcoming` se houver evento marcado ali,
- * senão `visited` (apagado); `count` = nº de eventos; `label` = nomes (até 4) para a dica do ícone.
+ * `events` = [{ id, lat, lng, label, upcoming }]. Devolve um ponto por local: `upcoming` se houver evento marcado ali,
+ * senão `visited` (apagado); `count` = nº de eventos; `ids` = os eventos do local (clique abre); `label` = nomes (até 4) para a dica do ícone.
  */
 export function groupPlaces(events) {
   const groups = new Map();
   for (const e of events) {
     if (!Number.isFinite(e.lat) || !Number.isFinite(e.lng)) continue;
     const key = `${Math.round(e.lat * CELL)},${Math.round(e.lng * CELL)}`;
-    const g = groups.get(key) ?? { lat: e.lat, lng: e.lng, labels: [], upcoming: false };
+    const g = groups.get(key) ?? { lat: e.lat, lng: e.lng, labels: [], ids: [], upcoming: false };
     g.labels.push(e.label);
+    g.ids.push(e.id);
     g.upcoming ||= Boolean(e.upcoming);
     groups.set(key, g);
   }
   return [...groups.values()].map((g) => ({
-    kind: g.upcoming ? 'upcoming' : 'visited', lat: g.lat, lng: g.lng, count: g.labels.length,
+    kind: g.upcoming ? 'upcoming' : 'visited', lat: g.lat, lng: g.lng, count: g.labels.length, ids: g.ids,
     label: g.labels.slice(0, 4).join(' · ') + (g.labels.length > 4 ? ` +${g.labels.length - 4}` : ''),
   }));
 }
