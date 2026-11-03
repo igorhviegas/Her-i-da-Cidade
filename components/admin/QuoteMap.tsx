@@ -2,9 +2,14 @@ import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { setWorkerUrl } from 'maplibre-gl';
+import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import '@maplibre/maplibre-gl-leaflet';
 import type { RoutePath } from '../../functions/travel-route.js';
 import { mapStyle } from './mapStyle';
+
+// A MapLibre 6 procura o worker ao lado do próprio arquivo; depois do build do Vite ele não está lá e as ruas não desenham.
+setWorkerUrl(maplibreWorkerUrl);
 
 /**
  * Ponto do mapa: casa, casa do Vitor, evento da agenda (com a ordem do dia), o evento do orçamento ou, na aba Mapa,
