@@ -10,16 +10,22 @@ import { eventKey, groupPlaces } from '../../services/eventMap.js';
 import { dateKey } from '../../functions/missions-core.js';
 import { toDate } from './orders/orderView';
 import { ErrorNote, WarningNote, cardClass, ghostButton } from './missionsUi';
+import { EventPlaceDialog, type PlaceEvent } from './EventPlaceDialog';
+import type { MapPoint } from './QuoteMap';
 
 const QuoteMap = lazy(() => import('./QuoteMap'));
 
 type Source = 'orders' | 'history';
 /** Um evento na aba: pedido do CRM ou evento antigo importado do PDF do Google (eventHistory). */
-interface MapEvent { source: Source; id: string; date: Date | null; time: string; name: string; location: string; geo?: Order['eventGeo']; completed: boolean }
+interface MapEvent { source: Source; id: string; date: Date | null; time: string; name: string; location: string; geo?: Order['eventGeo']; completed: boolean; order?: Order }
+
+type Period = 'all' | 'upcoming' | 'past';
+const PERIODS: { id: Period; label: string }[] = [{ id: 'all', label: 'Todos' }, { id: 'upcoming', label: 'Próximos' }, { id: 'past', label: 'Realizados' }];
+const uid = (e: MapEvent) => `${e.source}:${e.id}`;
 
 const fromOrder = (o: Order): MapEvent => ({
   source: 'orders', id: o.id, date: toDate(o.eventDate), time: o.eventForm?.eventTime ?? '', name: o.childName || o.eventForm?.formType || o.content || 'Evento',
-  location: (o.eventForm?.location ?? '').trim().slice(0, 300), geo: o.eventGeo, completed: o.status === 'completed',
+  location: (o.eventForm?.location ?? '').trim().slice(0, 300), geo: o.eventGeo, completed: o.status === 'completed', order: o,
 });
 
 const fromHistory = (h: HistoryEvent): MapEvent => {
@@ -27,7 +33,8 @@ const fromHistory = (h: HistoryEvent): MapEvent => {
   return { source: 'history', id: h.id, date: y ? new Date(y, m - 1, d) : null, time: h.eventTime, name: h.childName || 'Evento', location: h.location.trim().slice(0, 300), geo: h.eventGeo, completed: true };
 };
 
-const needsGeo = (e: MapEvent) => e.location.length >= 5 && e.geo?.address !== e.location;
+// Também refaz os localizados antes da cidade ser gravada (uma vez só), para o filtro por cidade.
+const needsGeo = (e: MapEvent) => e.location.length >= 5 && (e.geo?.address !== e.location || (!e.geo.failed && e.geo.city === undefined));
 const keyOf = (e: MapEvent) => (e.date ? eventKey(dateKey(e.date), e.name) : '');
 
 /**
@@ -41,6 +48,9 @@ export const EventMapPanel: React.FC = () => {
   const [geoError, setGeoError] = useState<string | null>(null);
   const [locating, setLocating] = useState(0);
   const [focus, setFocus] = useState<{ lat: number; lng: number } | null>(null);
+  const [period, setPeriod] = useState<Period>('all');
+  const [city, setCity] = useState('');
+  const [open, setOpen] = useState<PlaceEvent[] | null>(null);
   const mapBox = useRef<HTMLDivElement>(null);
   const alive = useRef(true);
 
@@ -81,17 +91,27 @@ export const EventMapPanel: React.FC = () => {
     return () => { alive.current = false; };
   }, []);
 
-  const { upcoming, past, points } = useMemo(() => {
+  const cities = useMemo(() => [...new Set<string>((events ?? []).map((e) => e.geo?.city).filter((c): c is string => Boolean(c)))].sort((a, b) => a.localeCompare(b, 'pt-BR')), [events]);
+
+  // O filtro vale para o mapa e para as listas.
+  const { upcoming, past, points, byUid } = useMemo(() => {
     const todayStart = new Date().setHours(0, 0, 0, 0);
     const isUpcoming = (e: MapEvent) => (e.date ? e.date.getTime() >= todayStart : !e.completed);
-    const all = events ?? [];
+    const all = (events ?? []).filter((e) => !city || e.geo?.city === city);
     const time = (e: MapEvent) => e.date?.getTime() ?? 0;
+    const up = period === 'past' ? [] : all.filter(isUpcoming).sort((a, b) => time(a) - time(b));
+    const done = period === 'upcoming' ? [] : all.filter((e) => !isUpcoming(e)).sort((a, b) => time(b) - time(a));
+    const shown = [...up, ...done];
     return {
-      upcoming: all.filter(isUpcoming).sort((a, b) => time(a) - time(b)),
-      past: all.filter((e) => !isUpcoming(e)).sort((a, b) => time(b) - time(a)),
-      points: groupPlaces(all.map((e) => ({ lat: e.geo?.lat, lng: e.geo?.lng, label: e.name, upcoming: isUpcoming(e) }))),
+      upcoming: up, past: done, byUid: new Map(shown.map((e) => [uid(e), e])),
+      points: groupPlaces(shown.map((e) => ({ id: uid(e), lat: e.geo?.lat, lng: e.geo?.lng, label: e.name, upcoming: isUpcoming(e) }))),
     };
-  }, [events]);
+  }, [events, period, city]);
+
+  const pick = (p: MapPoint) => {
+    const list = (p.ids ?? []).map((id) => byUid.get(id)).filter((e): e is MapEvent => Boolean(e));
+    if (list.length) setOpen(list.map((e) => ({ key: uid(e), date: e.date, time: e.time, name: e.name, location: e.location, order: e.order })));
+  };
 
   const show = (e: MapEvent) => {
     if (e.geo?.lat === undefined || e.geo.lng === undefined) return;
@@ -123,14 +143,30 @@ export const EventMapPanel: React.FC = () => {
       <WarningNote message={geoError} />
       <div ref={mapBox}>
         <Suspense fallback={<div className="h-[520px] animate-pulse rounded-xl bg-white/5" />}>
-          <QuoteMap points={points} paths={[]} height={520} focus={focus} />
+          <QuoteMap points={points} paths={[]} height={520} focus={focus} onPick={pick} overlay={<MapFilter period={period} onPeriod={setPeriod} city={city} cities={cities} onCity={setCity} />} />
         </Suspense>
       </div>
       <EventList title={`Próximos (${upcoming.length})`} events={upcoming} onShow={show} />
       <EventList title={`Já realizados (${past.length})`} events={past} onShow={show} faded />
+      {open && <EventPlaceDialog events={open} onClose={() => setOpen(null)} />}
     </div>
   );
 };
+
+/** Filtro sobre o mapa (acima do zoom): período e cidade. */
+const MapFilter: React.FC<{ period: Period; onPeriod: (p: Period) => void; city: string; cities: string[]; onCity: (c: string) => void }> = ({ period, onPeriod, city, cities, onCity }) => (
+  <div className="flex flex-col items-end gap-1.5 rounded-xl border border-white/15 bg-[#0D1527]/95 p-1.5 shadow-lg backdrop-blur">
+    <div className="flex gap-0.5" role="group" aria-label="Período">
+      {PERIODS.map(({ id, label }) => (
+        <button key={id} type="button" onClick={() => onPeriod(id)} aria-pressed={period === id} className={`rounded-lg px-2 py-1 text-[11px] font-semibold transition-colors ${period === id ? 'bg-blue-600 text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'}`}>{label}</button>
+      ))}
+    </div>
+    <select value={city} onChange={(e) => onCity(e.target.value)} aria-label="Cidade" className="w-full rounded-lg border border-white/10 bg-[#070B14] px-2 py-1 text-[11px] text-white outline-none">
+      <option value="">Todas as cidades</option>
+      {cities.map((c) => <option key={c} value={c}>{c}</option>)}
+    </select>
+  </div>
+);
 
 /** Lê um PDF: evento novo (já gravado), já existente como pedido, ou não reconhecido. */
 async function importPdf(file: File, orderKeys: Set<string>): Promise<{ added: MapEvent } | { duplicated: string } | { failed: string }> {
