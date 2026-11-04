@@ -11,6 +11,7 @@ import { AdminFinancePage } from '../AdminFinancePage';
 import { AdminCalendarPage } from '../AdminCalendarPage';
 import { AdminVideoCallsPage } from '../AdminVideoCallsPage';
 import { AdminInstagramPage } from '../AdminInstagramPage';
+import { AdminGooglePage } from '../AdminGooglePage';
 import { AdminAgentPage } from '../AdminAgentPage';
 import { AdminProfilePage } from '../AdminProfilePage';
 import { AdminKartPage } from '../AdminKartPage';
@@ -62,6 +63,7 @@ export const AdminTabContentSecondary: React.FC<AdminTabContentProps> = ({ curre
     {currentTab === 'missions' && <AdminMissionsPage />}
     {currentTab === 'finance' && <AdminFinancePage />}
     {currentTab === 'instagram' && <AdminInstagramPage />}
+    {currentTab === 'google' && <AdminGooglePage />}
     {currentTab === 'agent' && <AdminAgentPage />}
     {currentTab === 'fit' && <AdminFitPage />}
     {currentTab === 'fitcheckins' && <AdminFitCheckinsPage />}
