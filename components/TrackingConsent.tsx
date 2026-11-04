@@ -23,7 +23,9 @@ const addScript = (src: string) => {
 function loadGoogle(w: TrackingWindow) {
   addScript(`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`);
   w.dataLayer = w.dataLayer || [];
-  w.gtag = function gtag(...args: unknown[]) { (w.dataLayer as unknown[]).push(args); };
+  // O gtag.js só entende o objeto `arguments` na dataLayer; um array comum é ignorado e nada é enviado.
+  // eslint-disable-next-line prefer-rest-params
+  w.gtag = function gtag() { (w.dataLayer as unknown[]).push(arguments); };
   w.gtag('js', new Date());
   w.gtag('config', GA_MEASUREMENT_ID, { send_page_view: false, anonymize_ip: true });
 }
