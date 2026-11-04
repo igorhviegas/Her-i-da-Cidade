@@ -674,6 +674,17 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Perfil da Empresa do Google: espelho de avaliações e desempenho, gravado só pelo servidor (Admin SDK); administradores apenas leem.
+    match /googleMeta/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /googleReviews/{reviewId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // =========================================================
     // SITE CONFIG (Configurações do Site)
     // =========================================================

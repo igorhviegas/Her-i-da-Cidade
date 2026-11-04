@@ -1,0 +1,40 @@
+import { logger } from '../lib/logger.js';
+import type { Request, Response } from 'express';
+import { getAdminFirestore } from '../functions/firebase-admin.js';
+import { authorizeAdminRequest } from '../functions/admin-auth.js';
+import { GoogleSyncError, runGoogleSync } from '../functions/google-business.js';
+
+type Auth = 'unauthenticated' | 'forbidden' | 'authorized';
+
+const STATUS_BY_CODE: Record<string, number> = { not_configured: 503, token_invalid: 502, permission: 502, rate_limited: 429, unavailable: 503, api_error: 502 };
+
+/** POST + ID token do Firebase de um administrador -> sincroniza avaliações e desempenho do Perfil da Empresa (intervalo mínimo de 60 s). */
+export async function handleGoogleBusiness(
+  req: Request | any,
+  res: Response | any,
+  deps: { authorize?: (req: Request) => Promise<Auth>; run?: () => Promise<unknown> } = {},
+) {
+  const send = (status: number, body: unknown) => {
+    res.setHeader?.('Cache-Control', 'no-store');
+    return res.status(status).json(body);
+  };
+  const fail = (status: number, code: string, message: string) => send(status, { ok: false, error: { code, message } });
+
+  if (req.method !== 'POST') return fail(405, 'method_not_allowed', 'Use POST.');
+
+  let auth: Auth;
+  try { auth = await (deps.authorize ?? authorizeAdminRequest)(req); } catch { return fail(503, 'auth_unavailable', 'Não foi possível validar o acesso agora.'); }
+  if (auth === 'unauthenticated') return fail(401, 'unauthorized', 'Faça login novamente.');
+  if (auth === 'forbidden') return fail(403, 'forbidden', 'Acesso restrito a administradores.');
+
+  try {
+    const result = await (deps.run ?? (() => runGoogleSync({ db: getAdminFirestore(), manual: true })))();
+    return send(200, { ok: true, ...(result as object) });
+  } catch (error) {
+    if (error instanceof GoogleSyncError) return fail(STATUS_BY_CODE[error.code] ?? 502, error.code, error.message);
+    logger.error('[Google Business] falha inesperada:', error instanceof Error ? error.name : 'erro');
+    return fail(500, 'internal_error', 'A sincronização falhou; consulte os logs.');
+  }
+}
+
+export default handleGoogleBusiness;

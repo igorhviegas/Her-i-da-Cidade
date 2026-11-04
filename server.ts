@@ -7,6 +7,7 @@ import { handleKartPdfUpload } from "./functions/kart-pdf-upload.js";
 import { handleManyChatWebhook } from "./api/manychat";
 import { handleAlexa } from "./api/alexa";
 import { handleInstagramSync } from "./api/instagram-sync";
+import { handleGoogleBusiness } from "./api/google-business";
 import { handleCalendarEvents } from "./api/calendar-events";
 import { handleVideoCall } from "./api/video-call";
 import { handleTravelRoute } from "./api/travel-route";
@@ -49,6 +50,11 @@ async function startServer() {
   // Instagram: sincronização (cron GET / admin POST); GET ?job=missions roda a rotina diária de missões
   app.all("/api/instagram-sync", (req, res) => {
     handleInstagramSync(req, res);
+  });
+
+  // Perfil da Empresa do Google: sincronização manual de avaliações e desempenho (administrador autenticado)
+  app.all("/api/google-business", (req, res) => {
+    handleGoogleBusiness(req, res);
   });
 
   // Calendário: listar/criar/editar/excluir eventos e enviar pedidos (action 'sync') à agenda (administrador autenticado)

@@ -23,6 +23,7 @@ import {
   Target,
   Wallet,
   Camera,
+  Star,
   House,
   CalendarDays,
   CalendarCheck,
@@ -45,6 +46,7 @@ const NAV_ITEMS: NavItem<AdminTab>[] = [
   { id: 'missions', label: 'Missões', icon: Target },
   { id: 'finance', label: 'Financeiro', icon: Wallet },
   { id: 'instagram', label: 'Instagram', icon: Camera },
+  { id: 'google', label: 'Google', icon: Star },
   { id: CREATIVE_HOME.id, label: 'Visão geral', icon: CREATIVE_HOME.icon },
   ...CREATIVE_TOOLS.map(({ id, label, icon }) => ({ id, label, icon })),
   { id: 'clients', label: 'Clientes', icon: UserCheck },
@@ -63,7 +65,7 @@ const NAV_ITEMS: NavItem<AdminTab>[] = [
   { id: 'kart', label: 'Kart', icon: Flag },
 ];
 const NAV_GROUPS: NavGroup<AdminTab>[] = [
-  { key: 'crm', label: 'CRM', icon: Briefcase, ids: ['orders', 'missions', 'finance', 'instagram', 'clients', 'collab'] },
+  { key: 'crm', label: 'CRM', icon: Briefcase, ids: ['orders', 'missions', 'finance', 'instagram', 'google', 'clients', 'collab'] },
   // Espaço Criativo: ferramentas vêm de creative/creativeTools.ts (nova ferramenta não precisa mexer aqui).
   { key: 'criativo', label: CREATIVE_HOME.label, icon: CREATIVE_HOME.icon, ids: [CREATIVE_HOME.id, ...CREATIVE_TOOLS.map((tool) => tool.id)] },
   { key: 'streaming', label: 'Streaming', icon: Tv, ids: ['videos', 'categories', 'clientarea'] },
@@ -94,6 +96,8 @@ const tabFromPath = (path: string): AdminTab =>
       ? 'missions'
       : path === '/admin/instagram'
       ? 'instagram'
+      : path === '/admin/google'
+      ? 'google'
       : path === '/admin/financeiro'
       ? 'finance'
       : path === '/admin/calendario'
@@ -145,6 +149,8 @@ const syncTabFromPath = (path: string, setCurrentTab: (tab: AdminTab) => void) =
       setCurrentTab('missions');
     } else if (path === '/admin/instagram') {
       setCurrentTab('instagram');
+    } else if (path === '/admin/google') {
+      setCurrentTab('google');
     } else if (path === '/admin/financeiro') {
       setCurrentTab('finance');
     } else if (path === '/admin/calendario') {
@@ -198,6 +204,8 @@ const navigateToTab = (tabId: AdminTab, navigate: (to: string) => void) => {
       navigate('/admin/missoes');
     } else if (tabId === 'instagram') {
       navigate('/admin/instagram');
+    } else if (tabId === 'google') {
+      navigate('/admin/google');
     } else if (tabId === 'finance') {
       navigate('/admin/financeiro');
     } else if (tabId === 'calendar') {
