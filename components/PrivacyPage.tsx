@@ -81,6 +81,14 @@ export const PrivacyPage: React.FC = () => {
           <p>Usamos esses dados para prestar o serviço que você pediu (execução do contrato) e para cumprir obrigações legais, como as fiscais. Não usamos para outras finalidades sem avisar você.</p>
         </Section>
 
+        <Section title="Cookies e anúncios">
+          <p>
+            Na página inicial, no catálogo de vídeos e nas dúvidas, e <strong className="text-white">só se você tocar em “Aceitar”</strong> no aviso, usamos o Google Analytics e o pixel do Meta (Instagram e Facebook).
+            Eles registram que você visitou a página e se tocou em um link de WhatsApp, para medirmos o que funciona e mostrarmos nossos anúncios a quem já nos conhece.
+          </p>
+          <p>Eles não rodam nos formulários, no agendamento nem na página dos clientes, e não recebem o que você digita. Se tocar em “Recusar”, nada é carregado. Para mudar de ideia, limpe os dados do site no navegador.</p>
+        </Section>
+
         <Section title="Crianças">
           <p>
             Os dados da criança são informados pelo pai, mãe ou responsável, e só para personalizar o serviço (chamada, vídeo, áudio) e organizar a festa.
