@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { RouterProvider, useRouter } from './lib/router';
 import { PublicSite } from './components/PublicSite';
+import { TrackingConsent } from './components/TrackingConsent';
 import { PRIVACY_PATH } from './services/privacy.js';
 import { FORM_PATH } from './services/eventSiteForm.js';
 import { FORM_PATH as COLLAB_PATH } from './services/collab.js';
@@ -222,6 +223,7 @@ export const App: React.FC = () => {
   return (
     <RouterProvider>
       <AppContent />
+      <TrackingConsent />
     </RouterProvider>
   );
 };

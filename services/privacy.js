@@ -2,7 +2,7 @@
 // A política completa fica em components/PrivacyPage.tsx; os formulários só trazem uma linha e o link para ela.
 
 export const PRIVACY_PATH = '/privacidade';
-export const PRIVACY_UPDATED = '16/10/2026';
+export const PRIVACY_UPDATED = '04/11/2026';
 
 /**
  * Identificação do responsável pelo tratamento. SÓ o que já é público e verificado vem preenchido.
