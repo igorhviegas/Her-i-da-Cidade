@@ -18,8 +18,13 @@ function jsonError(res, status, code, message, extra = {}) {
   return res.status(status).json({ ok: false, error: { code, message }, ...extra });
 }
 
+/** Tira espaços e caracteres invisíveis (ex.: espaço de largura zero antes do "+") e troca o "+" de largura total. */
+function cleanWhatsApp(value) {
+  return String(value ?? '').replace(/[\p{Cf}\s]/gu, '').replace(/[＋﹢]/g, '+');
+}
+
 function normalizeWhatsApp(value) {
-  const raw = String(value ?? '').trim();
+  const raw = cleanWhatsApp(value);
   const digits = raw.replace(/\D/g, '');
   if (!digits) return null;
   if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) return digits;
@@ -34,7 +39,7 @@ function isValidWhatsApp(value) {
   const normalized = normalizeWhatsApp(value);
   if (!normalized) return false;
   if (/^55\d{10,11}$/.test(normalized)) return true;
-  return String(value).trim().startsWith('+') && !normalized.startsWith('55') && /^[1-9]\d{7,14}$/.test(normalized);
+  return cleanWhatsApp(value).startsWith('+') && !normalized.startsWith('55') && /^[1-9]\d{7,14}$/.test(normalized);
 }
 
 function parseCatalogPrice(value) {

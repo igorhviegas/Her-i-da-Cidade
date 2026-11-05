@@ -1,4 +1,4 @@
-import { isValidWhatsApp, normalizeWhatsApp } from '../../../services/clientsService';
+import { isValidWhatsApp } from '../../../services/clientsService';
 import { createOrder } from '../../../services/ordersService';
 import { eventContentSummary, validateEventForm } from '../../../services/eventForm.js';
 import { buildVideoContents, findVideoService, VIDEO_KINDS } from '../../../services/eventVideos.js';

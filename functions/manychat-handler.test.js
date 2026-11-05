@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleManyChatOrderRequest } from './manychat-handler.js';
+import { handleManyChatOrderRequest, validateManyChatOrderInput } from './manychat-handler.js';
 
 const SECRET = 'unit-test-secret';
 const validBody = {
@@ -183,4 +183,12 @@ test('failed order write atomically discards client and index writes', async () 
   const next = await callHandler(makeRequest(), database);
   assert.equal(next.statusCode, 200);
   assert.equal(next.body.orderId, next.body.technicalPurchaseId);
+});
+
+test('WhatsApp internacional aceita "+" com caractere invisível ou de largura total colado antes', () => {
+  const withWhatsApp = (whatsapp) => ({ ...validBody, service: 'live-call', customer: { name: 'Ana', whatsapp } });
+  for (const whatsapp of ['+4917655781522', '​+4917655781522', '＋49 17655781522']) {
+    assert.equal(validateManyChatOrderInput(withWhatsApp(whatsapp)).filter((e) => /whatsapp/.test(e)).length, 0, whatsapp);
+  }
+  assert.equal(validateManyChatOrderInput(withWhatsApp('4917655781522')).filter((e) => /whatsapp/.test(e)).length, 1); // sem "+": não é brasileiro
 });
