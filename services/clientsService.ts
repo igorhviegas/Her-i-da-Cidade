@@ -19,6 +19,15 @@ export function normalizeWhatsApp(value: string): string {
   return digits;
 }
 
+/** Aceita WhatsApp brasileiro com DDD, ou internacional com "+" e o código do país (8 a 15 dígitos). Sem "+", só brasileiro. */
+export function isValidWhatsApp(value: string): boolean {
+  const raw = String(value ?? "").trim();
+  let normalized: string;
+  try { normalized = normalizeWhatsApp(raw); } catch { return false; }
+  if (raw.startsWith("+")) return /^\d{8,15}$/.test(normalized);
+  return /^55\d{10,11}$/.test(normalized);
+}
+
 function mapClient(id: string, data: Record<string, any>): Client {
   return {
     id, name: data.name || "", whatsapp: data.whatsapp || "",

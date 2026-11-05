@@ -1,4 +1,4 @@
-import { createClient, getClientByWhatsApp, normalizeWhatsApp, updateClient } from '../../../services/clientsService';
+import { createClient, getClientByWhatsApp, isValidWhatsApp, normalizeWhatsApp, updateClient } from '../../../services/clientsService';
 import type { updateOrder } from '../../../services/ordersService';
 import { eventContentSummary, validateEventForm } from '../../../services/eventForm.js';
 import type { planAdjustments } from '../../../services/eventFinance.js';
@@ -38,14 +38,8 @@ export function validateEditBasics({ name, isEventOrder, eventState, paidDate, s
 }
 
 export function validateEditWhatsApp(whatsapp: string, setError: SetError): { normalizedWhatsApp: string } | undefined {
-  let normalizedWhatsApp: string;
-  try {
-    normalizedWhatsApp = normalizeWhatsApp(whatsapp);
-    if (!/^55\d{10,11}$/.test(normalizedWhatsApp)) throw new Error();
-  } catch {
-    return fail(setError, 'Informe um WhatsApp válido com DDD.');
-  }
-  return { normalizedWhatsApp };
+  if (!isValidWhatsApp(whatsapp)) return fail(setError, 'Informe um WhatsApp válido com DDD.');
+  return { normalizedWhatsApp: normalizeWhatsApp(whatsapp) };
 }
 
 interface EditNumbersInput {

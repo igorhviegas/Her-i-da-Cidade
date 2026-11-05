@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getClientByWhatsApp, normalizeWhatsApp } from '../../../services/clientsService';
+import { getClientByWhatsApp, isValidWhatsApp, normalizeWhatsApp } from '../../../services/clientsService';
 import { getServices } from '../../../services/servicesService';
 import type { Service } from '../../../types';
 import { emptyEventForm, eventFormFromOrder } from '../EventOrderFields';
@@ -39,8 +39,8 @@ export const useClientFields = (initialValues: CreateOrderInitialValues | undefi
       return;
     }
     try {
+      if (!isValidWhatsApp(whatsapp)) throw new Error('Informe um WhatsApp válido com DDD.');
       const normalized = normalizeWhatsApp(whatsapp);
-      if (!/^55\d{10,11}$/.test(normalized)) throw new Error('Informe um WhatsApp válido com DDD.');
       setLookupState('checking');
       setLookupMessage('Verificando cliente…');
       const existing = await getClientByWhatsApp(whatsapp);
