@@ -1,4 +1,4 @@
-import { normalizeWhatsApp } from '../../../services/clientsService';
+import { isValidWhatsApp, normalizeWhatsApp } from '../../../services/clientsService';
 import { createOrder } from '../../../services/ordersService';
 import { eventContentSummary, validateEventForm } from '../../../services/eventForm.js';
 import { buildVideoContents, findVideoService, VIDEO_KINDS } from '../../../services/eventVideos.js';
@@ -24,13 +24,7 @@ interface ClientAndServiceInput {
 export function validateClientAndService({ name, whatsapp, selectedService, serviceConfigured, initialStatus, setFormError }: ClientAndServiceInput): { cleanName: string } | undefined {
   const cleanName = name.trim();
   if (!cleanName) return fail(setFormError, 'Informe o nome do cliente.');
-  let normalizedWhatsApp: string;
-  try {
-    normalizedWhatsApp = normalizeWhatsApp(whatsapp);
-    if (!/^55\d{10,11}$/.test(normalizedWhatsApp)) throw new Error();
-  } catch {
-    return fail(setFormError, 'Informe um WhatsApp válido com DDD.');
-  }
+  if (!isValidWhatsApp(whatsapp)) return fail(setFormError, 'Informe um WhatsApp válido com DDD.');
   if (!selectedService) return fail(setFormError, 'Selecione um serviço.');
   if (selectedService.generateOrder === false) return fail(setFormError, 'Este serviço está configurado para não gerar pedidos.');
   if (!serviceConfigured || !initialStatus || !selectedService.productionType) {
