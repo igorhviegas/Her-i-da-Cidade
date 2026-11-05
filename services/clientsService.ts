@@ -10,11 +10,13 @@ const whatsappIndexId = (normalized: string) => `whatsapp_${normalized}`;
 
 /** Remove símbolos e aplica o código do Brasil quando informado um número nacional. */
 export function normalizeWhatsApp(value: string): string {
-  const digits = String(value ?? "").replace(/\D/g, "");
+  // Tira espaços e caracteres invisíveis antes do "+" (ex.: espaço de largura zero colado por cópia).
+  const cleaned = String(value ?? "").replace(/[\p{Cf}\s]/gu, "").replace(/[＋﹢]/g, "+");
+  const digits = cleaned.replace(/\D/g, "");
   if (!digits) throw new Error("O WhatsApp é obrigatório.");
   if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) return digits;
   // Com "+" o número já traz o código do país (cliente internacional): não recebe o 55 do Brasil.
-  if (String(value ?? "").trim().startsWith("+")) return digits;
+  if (cleaned.startsWith("+")) return digits;
   if (digits.length === 10 || digits.length === 11) return `55${digits}`;
   return digits;
 }
