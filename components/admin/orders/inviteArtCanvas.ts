@@ -13,7 +13,7 @@ type Ctx = CanvasRenderingContext2D;
 
 const fontError = () => new Error('Não foi possível carregar as fontes da arte.');
 let fontsReady: Promise<void> | null = null;
-function loadFonts(): Promise<void> {
+export function loadFonts(): Promise<void> {
   if (fontsReady) return fontsReady;
   const italic = new FontFace('League Gothic Italic', `url(${ITALIC_URL})`).load().then((face) => { document.fonts.add(face); });
   const upright = new Promise<void>((resolve, reject) => {
