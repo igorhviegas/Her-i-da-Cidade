@@ -29,18 +29,15 @@ function normalizeDay(raw) {
   return text;
 }
 
-/**
- * Retorna { days: { 'AAAA-MM-DD': { steps, walkRunKm, ... } }, stats } ou null se o corpo não for um envio válido (sem `day`).
- * Aceita número ou texto numérico ("1,8" ou "1.8", como o Atalhos às vezes formata). Dia sem dado fica sem o campo (ausente é
- * diferente de zero). Campo desconhecido é descartado e contado (ignoredFields); valor fora do plausível também (invalid).
- */
-export function parseDailyPush(body) {
+const MAX_BATCH_DAYS = 31;
+
+/** Um dia do envio: { day, doc } (doc pode ser vazio) ou null se `day` for inválido. Soma em `stats`. */
+function parseDay(body, stats) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
   const day = typeof body.day === 'string' ? normalizeDay(body.day) : '';
   const parsed = new Date(`${day}T00:00:00Z`);
   const real = DAY_RE.test(day) && !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === day; // rejeita 2026-02-31 e 2026-13-01 (esta lança em toISOString)
   if (!real) return null;
-  const stats = { accepted: 0, ignoredFields: 0, invalid: 0 };
   const doc = {};
   for (const [field, raw] of Object.entries(body)) {
     if (field === 'day') continue;
@@ -51,7 +48,34 @@ export function parseDailyPush(body) {
     doc[field] = round(value, spec.decimals);
     stats.accepted += 1;
   }
-  return { days: Object.keys(doc).length ? { [day]: doc } : {}, stats };
+  return { day, doc };
+}
+
+/**
+ * Retorna { days: { 'AAAA-MM-DD': { steps, walkRunKm, ... } }, stats } ou null se o corpo não for um envio válido (sem `day`).
+ * Aceita um dia ({ day, steps... }) ou vários de uma vez ({ days: [{ day, ... }, ...] } ou a própria lista, até 31 dias; o resumo semanal
+ * do Atalho). Em lote, dia inválido é descartado e contado (invalidDays); se nenhum servir, null.
+ * Aceita número ou texto numérico ("1,8" ou "1.8", como o Atalhos às vezes formata). Dia sem dado fica sem o campo (ausente é
+ * diferente de zero). Campo desconhecido é descartado e contado (ignoredFields); valor fora do plausível também (invalid).
+ */
+export function parseDailyPush(body) {
+  const list = Array.isArray(body) ? body : Array.isArray(body?.days) ? body.days : null;
+  const stats = { accepted: 0, ignoredFields: 0, invalid: 0 };
+  const days = {};
+  if (!list) {
+    const one = parseDay(body, stats);
+    if (!one) return null;
+    if (Object.keys(one.doc).length) days[one.day] = one.doc;
+    return { days, stats };
+  }
+  let valid = 0;
+  for (const entry of list.slice(0, MAX_BATCH_DAYS)) {
+    const one = parseDay(entry, stats);
+    if (!one) { stats.invalidDays = (stats.invalidDays ?? 0) + 1; continue; }
+    valid += 1;
+    if (Object.keys(one.doc).length) days[one.day] = { ...days[one.day], ...one.doc };
+  }
+  return valid ? { days, stats } : null;
 }
 
 export const FIT_DAILY_SOURCE = 'atalho-ios';

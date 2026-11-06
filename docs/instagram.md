@@ -32,7 +32,7 @@ Limite: se o token nunca teve a expiração gravada (`tokenExpiresAt` vazio, por
 ## Balanço diário (seguidores, curtidas e visualizações)
 - Calculado no servidor, no mesmo batch da sincronização (falha não altera nada). Referências em `instagramPrivate/daily`; o saldo exibido em `instagramMeta/profile.daily` (painel e widget da Principal só leem).
 - O dia é o de Brasília (America/Sao_Paulo). A **primeira sincronização bem-sucedida de cada dia** vira a referência ("hoje" = desde ela; o painel mostra "desde HH:mm" se for depois das 02:00). Seguidores: atual − referência (líquido). Curtidas/visualizações: soma por publicação de (atual − referência), só onde as duas pontas existem; publicação nascida depois da referência entra com referência 0; publicação que sai do conjunto não gera saldo; visualizações desatualizadas ficam de fora ("parcial").
-- Cron: `0 3 * * *` (00:00–00:59 em Brasília no plano Hobby) cria a referência perto da meia-noite; `0 9 * * *` segue como atualização da manhã. Se o cron falhar, a 1ª sincronização do dia (manual ou da manhã) cria a referência; o cálculo não depende do cron.
+- Cron: `0 3 * * *` (00:00–00:59 em Brasília no plano Hobby) cria a referência perto da meia-noite; `0 9 * * *` (manhã), `0 15 * * *` (tarde), `0 21 * * *` (noite) e `0 2 * * *` (23h–23h59 em Brasília, fecha o dia) mantêm o balanço do dia (e o calendário) atualizado até o fim do dia; o saldo gravado no dia é o da última sincronização. Se o cron falhar, a 1ª sincronização do dia (manual ou da manhã) cria a referência; o cálculo não depende do cron.
 - Sem sincronização no dia, o painel mostra "Aguardando a 1ª sincronização de hoje" (nunca o saldo de ontem).
 
 ## Métricas e limitações

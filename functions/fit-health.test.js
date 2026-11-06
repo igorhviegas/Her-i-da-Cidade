@@ -65,3 +65,12 @@ test('describeInvalidPayload: dayShape mostra a forma do texto (e caracteres inv
   assert.equal('dayShape' in describeInvalidPayload({ day: 5 }), false); // só para texto
   assert.equal(describeInvalidPayload({ day: 'x'.repeat(100) }).dayShape.length, 40);
 });
+
+test('parseDailyPush aceita vários dias de uma vez (lista ou { days })', () => {
+  const week = [{ day: '2026-11-01', steps: 5000 }, { day: '2026-11-02', steps: '7000' }, { day: 'lixo', steps: 1 }];
+  const fromObject = parseDailyPush({ days: week });
+  assert.deepEqual(Object.keys(fromObject.days), ['2026-11-01', '2026-11-02']);
+  assert.equal(fromObject.stats.invalidDays, 1);
+  assert.deepEqual(parseDailyPush([{ day: '2026-11-03', steps: 10 }, { day: '2026-11-04', walkRunKm: '2,5' }]).days, { '2026-11-03': { steps: 10 }, '2026-11-04': { walkRunKm: 2.5 } });
+  assert.equal(parseDailyPush({ days: [{ day: 'x' }] }), null);
+});

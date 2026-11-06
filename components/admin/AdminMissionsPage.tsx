@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarCheck, CheckCircle2, ChevronDown, Flame, ListTodo, Loader2, Plus, RefreshCw, Repeat, Target } from 'lucide-react';
 import { addDays, dateKey, taskStreak } from '../../functions/missions-core.js';
 import {
-  getActivityDifficulties, listMissions, listOccurrencesSince, listTasks, loadGoals,
+  completeMission, completeOccurrence, getActivityDifficulties, listMissions, listOccurrencesSince, listTasks, loadGoals,
   runClientSync, setActivityDifficulty,
   type GoalView, type Mission, type RecurringTask, type TaskOccurrence,
 } from '../../services/missionsService';
@@ -105,6 +105,7 @@ export const AdminMissionsPage: React.FC = () => {
 
       <ErrorNote message={error} />
       <WarningNote message={warning} />
+      {!loading && <YesterdayPrompt data={data} reload={reload} />}
       <DaySummary data={data} />
 
       <div className="flex gap-1 rounded-xl border border-white/10 bg-[#0B1120] p-1">
@@ -125,6 +126,75 @@ export const AdminMissionsPage: React.FC = () => {
         </>
       )}
       <ActivityDifficulties />
+    </div>
+  );
+};
+
+// ------------------------------------------------------------------------ balanço de ontem
+
+const ASKED_KEY = 'hdc.missions.yesterdayAsked';
+const readAsked = () => { try { return localStorage.getItem(ASKED_KEY); } catch { return null; } };
+const writeAsked = (day: string) => { try { localStorage.setItem(ASKED_KEY, day); } catch { /* sem armazenamento: pergunta de novo na próxima abertura */ } };
+
+/** Na 1ª abertura do dia, pergunta o que de ontem (tarefa não marcada ou missão com prazo ontem) foi feito de fato. */
+const YesterdayPrompt: React.FC<{ data: MissionsData; reload: () => Promise<void> }> = ({ data, reload }) => {
+  const yesterday = addDays(data.today, -1);
+  const items = useMemo(() => [
+    ...data.occurrences.filter((o) => o.date === yesterday && (o.status === 'missed' || o.status === 'pending'))
+      .map((o) => ({ key: `o_${o.id}`, id: o.id, kind: 'task' as const, title: o.title })),
+    ...data.missions.pending.filter((m) => m.dueAt && dateKey(m.dueAt) === yesterday)
+      .map((m) => ({ key: `m_${m.id}`, id: m.id, kind: 'mission' as const, title: m.title })),
+  ], [data.occurrences, data.missions.pending, yesterday]);
+  const [open, setOpen] = useState(false);
+  const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (readAsked() === data.today) return;
+    writeAsked(data.today); // pergunta uma vez por dia, mesmo que feche sem responder
+    if (items.length) setOpen(true);
+  }, [data.today, items.length]);
+
+  if (!open) return null;
+  const toggle = (key: string) => setChecked((cur) => { const next = new Set(cur); if (!next.delete(key)) next.add(key); return next; });
+  const save = async () => {
+    setBusy(true); setError(null);
+    const failed = new Set<string>();
+    for (const item of items.filter((i) => checked.has(i.key))) {
+      try { await (item.kind === 'task' ? completeOccurrence(item.id) : completeMission(item.id)); } catch (err) { logger.error('[YesterdayPrompt] falha ao concluir', err); failed.add(item.key); }
+    }
+    await reload();
+    setBusy(false);
+    if (failed.size) { setChecked(failed); setError('Algumas não foram salvas. Tente de novo.'); } else setOpen(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 p-4 sm:items-center" role="dialog" aria-modal="true" aria-label="Balanço de ontem">
+      <div className="w-full max-w-md space-y-3 rounded-2xl border border-white/10 bg-[#0D1527] p-5 shadow-2xl">
+        <div>
+          <h3 className="text-lg font-extrabold text-white">Você fez isso ontem?</h3>
+          <p className="text-xs text-white/50">Marque o que foi feito e não deu tempo de registrar.</p>
+        </div>
+        <ul className="max-h-[50vh] space-y-1.5 overflow-y-auto">
+          {items.map((item) => (
+            <li key={item.key}>
+              <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-[#0B1120] px-3 py-2.5">
+                <input type="checkbox" checked={checked.has(item.key)} onChange={() => toggle(item.key)} className="h-4 w-4 accent-emerald-500" />
+                <span className="min-w-0 flex-1 text-sm text-white">{item.title}</span>
+                <span className="text-[10px] font-semibold uppercase text-white/40">{item.kind === 'task' ? 'Tarefa' : 'Missão'}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+        <ErrorNote message={error} />
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setOpen(false)} disabled={busy} className={`${ghostButton} flex-1 justify-center`}>Não fiz nenhuma</button>
+          <button type="button" onClick={() => void save()} disabled={busy || !checked.size} className={`${primaryButton} flex-1 justify-center`}>
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : `Marcar ${checked.size || ''} como feita${checked.size === 1 ? '' : 's'}`}
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

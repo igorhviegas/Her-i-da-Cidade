@@ -276,10 +276,10 @@ test('balanço diário: virada do dia em Brasília zera o saldo no 1º sync segu
   assert.deepEqual([db.store.get('instagramMeta/profile').daily.followers, db.store.get('instagramMeta/profile').daily.likes], [2, 1]);
 });
 
-test('vercel.json: sincronização à meia-noite de Brasília (03:00 UTC) além da das 09:00 UTC; missões intactas', async () => {
+test('vercel.json: sincronização à meia-noite (03:00 UTC), de manhã (09:00), tarde (15:00), noite (21:00) e fechamento do dia (02:00 UTC = 23h BRT); missões intactas', async () => {
   const config = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
   const schedules = config.crons.filter((c) => c.path === '/api/instagram-sync').map((c) => c.schedule).sort();
-  assert.deepEqual(schedules, ['0 3 * * *', '0 9 * * *']);
+  assert.deepEqual(schedules, ['0 15 * * *', '0 2 * * *', '0 21 * * *', '0 3 * * *', '0 9 * * *'].sort());
   assert.ok(config.crons.some((c) => c.path === '/api/instagram-sync?job=missions' && c.schedule === '0 3 * * *'));
 });
 
