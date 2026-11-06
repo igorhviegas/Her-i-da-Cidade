@@ -13,6 +13,18 @@
       "schedule": "0 9 * * *"
     },
     {
+      "path": "/api/instagram-sync",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/instagram-sync",
+      "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/instagram-sync",
+      "schedule": "0 2 * * *"
+    },
+    {
       "path": "/api/video-call",
       "schedule": "0 10 * * *"
     }
@@ -100,4 +112,4 @@
       ]
     }
   ]
-}
+}

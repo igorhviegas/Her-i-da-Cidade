@@ -213,7 +213,8 @@ export async function completeOccurrence(id: string): Promise<void> {
   await runTransaction(firestore(), async (transaction) => {
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists()) throw new Error('Ocorrência não encontrada.');
-    if (snapshot.data().status !== 'pending') throw new Error('Esta ocorrência não está mais pendente.');
+    // 'missed' também vale: o balanço de ontem permite marcar o que foi feito e não deu tempo de registrar.
+    if (!['pending', 'missed'].includes(snapshot.data().status)) throw new Error('Esta ocorrência não está mais pendente.');
     const refs = activityRefs(firestore(), 'task_occurrence', id);
     const record = await prepareActivityLog(transaction, refs, {
       type: 'task_occurrence', refId: id, occurredAt: completedAt, difficulty: snapshot.data().difficulty, meta: { taskId: snapshot.data().taskId },
