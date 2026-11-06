@@ -8,6 +8,7 @@ import { listClients } from '../../services/clientsService';
 import { subscribeVideoCallOrders } from '../../services/ordersService';
 import { getVideoCallConfig, saveVideoCallConfig } from '../../services/siteConfigService';
 import type { Client, Order } from '../../types';
+import { VideoCallSlotsArtPanel } from './VideoCallSlotsArtPanel';
 import { ErrorNote, cardClass, ghostButton, inputClass, labelClass, primaryButton } from './missionsUi';
 
 const PUBLIC_PATH = '/agendar-chamada';
@@ -63,6 +64,8 @@ const BookingsList: React.FC = () => {
         <button type="button" onClick={copy} className={ghostButton}><Copy className="h-3.5 w-3.5" />{copied ? 'Copiado!' : 'Copiar'}</button>
         <a href={PUBLIC_PATH} target="_blank" rel="noreferrer" className={ghostButton}><ExternalLink className="h-3.5 w-3.5" />Abrir</a>
       </div>
+
+      <VideoCallSlotsArtPanel />
 
       <ErrorNote message={error} />
       {!orders && !error && <p className="flex items-center gap-2 text-sm text-white/50"><Loader2 className="h-4 w-4 animate-spin" />Carregando...</p>}
